@@ -4,8 +4,8 @@ Materials app for a group of electrical-installation companies and their branche
 
 ## Source of truth
 
-- **Plan:** `.plans/todo/gmat-m8-master-plan.md`. It is local and git-ignored (missing in clones, CI and cloud sessions). If it is missing, stop and ask; never work from memory of it. Before a phase, read §0, the phase's step cards in §11 and the sections they list.
-- **Decisions:** plan §2 and §10 (H0.1 answers in §10.1). From M1.1 on they live in `docs/adr/`; an ADR wins over the plan. For a question still open, use its working assumption and say so in the PR. Do not invent business rules.
+- **Plans:** markdown files in `.plans/todo/`; there can be several. Work from the plan the maintainer names; "plan §n" in this file means a section of that plan. Plans are local and git-ignored (missing in clones, CI and cloud sessions). If the named plan is missing, or none is named and the choice is unclear, stop and ask; never work from memory of a plan. Before a phase, read the plan's working rules, the phase's step cards and the sections they list.
+- **Decisions:** the plan's decisions and answered questions; committed ones live in `docs/adr/` (from M1.1 on), and an ADR wins over any plan. For a question still open, use its working assumption and say so in the PR. Do not invent business rules.
 - Keep this file current when commands, layout or rules change.
 
 ## Git, PRs, releases
@@ -14,7 +14,7 @@ Materials app for a group of electrical-installation companies and their branche
 - Agents use the configured owner account (`gh`/git): commit, `git push -u origin <branch>`, open the PR with `gh pr create --repo mano8/gmat-m8 --head <branch> --draft`, answer reviews.
 - **Never:** merge or approve a PR; push to `main` or force-push; create tags or GitHub Releases (`v*` tags publish images); run `gh workflow run` or `docker-publish`; deploy or touch production data; change repo settings, rulesets, secrets or tokens. GitHub will not stop the owner account, so these rules and `.claude/settings.json` are the guard.
 - **No attribution:** no `Co-Authored-By` lines, no "Generated with" footers and no AI tool or model names in commits, PR titles, descriptions or comments.
-- Mark the PR ready only when CI is green and every step's review gate (R1/R2/R3, plan §0.3) has run and been addressed. Then append `· PR #n` to each of the phase's step lines in plan §1; never tick boxes (the human does after merging).
+- Mark the PR ready only when CI is green and every step's review gate (R1/R2/R3, see the plan's review legend) has run and been addressed. Then append `· PR #n` to each of the phase's step lines in the plan's TODO list; never tick boxes (the human does after merging).
 - Never stage `.plans/` or use `git add -f`. Never commit secrets or real env files (`.env`, `*.env`, backups, keys); only `*.example` templates.
 - Workflows: never `pull_request_target` or `workflow_run`, never a PR check that needs a secret, never `on.paths` on a required workflow (scope job + always-running gate job, plan §8.4). Flag any `.github/workflows/` change for explicit review.
 
