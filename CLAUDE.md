@@ -1,216 +1,105 @@
 # gmat-m8
 
-Web app for a group of electrical-installation companies and their branches. Technicians request materials for worksites; managers approve them; purchasing orders from suppliers; goods are received at a warehouse or directly on site and handed over to the worksite. Modular Django monolith (Django 6.1 + HTMX + PostgreSQL 18), deployed with Docker Compose on one VPS.
+Materials app for a group of electrical-installation companies and their branches: technicians request materials for worksites, managers approve, purchasing orders from suppliers, goods are received at a warehouse or on site and handed over. Modular Django monolith (Django 6.1 + HTMX + PostgreSQL 18), Docker Compose on one VPS.
 
 ## Source of truth
 
-- **Master plan:** `.plans/todo/gmat-m8-master-plan.md`. Before starting a step, read §0 (working rules), the step's card in §11, and the sections the card lists.
-  - The plan is **local and git-ignored**. It is shared from the maintainer's working copy into the agent workspace, and does not exist in fresh clones, CI or cloud sessions. If it is missing, stop and ask. Do not work from memory of it.
-  - Never stage anything under `.plans/`, and never use `git add -f`.
-- **Decisions:** plan §2, plus the answers to plan §10. M1.1 writes them as committed ADRs in `docs/adr/`. Once those exist, an ADR wins over the plan if the two disagree.
-- **Open questions:** plan §10. If a question is still open, use its working assumption and say so in the PR. Do not invent business rules.
-- The repository is pre-scaffold until M1.1 lands. Update this file whenever a step changes commands, layout or rules.
+- **Plan:** `.plans/todo/gmat-m8-master-plan.md`. It is local and git-ignored (missing in clones, CI and cloud sessions). If it is missing, stop and ask; never work from memory of it. Before a phase, read §0, the phase's step cards in §11 and the sections they list.
+- **Decisions:** plan §2 and §10 (H0.1 answers in §10.1). From M1.1 on they live in `docs/adr/`; an ADR wins over the plan. For a question still open, use its working assumption and say so in the PR. Do not invent business rules.
+- Keep this file current when commands, layout or rules change.
 
-## Hard rules: git, PRs, releases
+## Git, PRs, releases
 
-- One plan step = one branch = one PR. Branch from `origin/main` as `m<step>-<slug>` with `git switch --no-track -c m<step>-<slug> origin/main` (example: `m2.3-access-engine`), so a bare `git push` never targets `main`.
-- **Interim setup (plan Q20).** There is no agent account or fork yet. Use the `gh` and git credentials already configured in the workspace: push the feature branch with `git push -u origin <branch>`, then open the PR with `gh pr create --repo mano8/gmat-m8 --head <branch> --draft`. The target setup (plan H0.2) is a dedicated agent account working from its fork (`agent` remote, `origin` fetch-only) that never uses the maintainer's credentials.
-- Mark the PR ready only when CI is green and the step's review gate (R1/R2/R3, plan §0.3) has been run and addressed.
-- **Never:**
-  - merge or approve a PR;
-  - push to `main` or force-push a shared branch;
-  - create tags (`v*` tags publish images) or GitHub Releases;
-  - run `gh workflow run` or the `docker-publish` workflow;
-  - deploy, or touch production data;
-  - change repo settings, rulesets, secrets or tokens.
+- **One phase = one branch = one PR** (M1, M2, …). Branch: `git switch --no-track -c m<phase>-<slug> origin/main` (e.g. `m2-org-access`). Human steps (`H*`) are skipped. Commit per step with Conventional Commits + step id: `feat(access): resolve dependent branch scope [M2.3]`. Never `--no-verify`.
+- Agents use the configured owner account (`gh`/git): commit, `git push -u origin <branch>`, open the PR with `gh pr create --repo mano8/gmat-m8 --head <branch> --draft`, answer reviews.
+- **Never:** merge or approve a PR; push to `main` or force-push; create tags or GitHub Releases (`v*` tags publish images); run `gh workflow run` or `docker-publish`; deploy or touch production data; change repo settings, rulesets, secrets or tokens. GitHub will not stop the owner account, so these rules and `.claude/settings.json` are the guard.
+- **No attribution:** no `Co-Authored-By` lines, no "Generated with" footers and no AI tool or model names in commits, PR titles, descriptions or comments.
+- Mark the PR ready only when CI is green and every step's review gate (R1/R2/R3, plan §0.3) has run and been addressed. Then append `· PR #n` to each of the phase's step lines in plan §1; never tick boxes (the human does after merging).
+- Never stage `.plans/` or use `git add -f`. Never commit secrets or real env files (`.env`, `*.env`, backups, keys); only `*.example` templates.
+- Workflows: never `pull_request_target` or `workflow_run`, never a PR check that needs a secret, never `on.paths` on a required workflow (scope job + always-running gate job, plan §8.4). Flag any `.github/workflows/` change for explicit review.
 
-  These are human steps. The interim account is a repository admin, so GitHub does not stop you: these rules and the `.claude/settings.json` deny rules are the only guard. Server-side, the `main` ruleset refuses only direct pushes, force-pushes and deletion (plan §0.1).
-- Never add `pull_request_target` or `workflow_run` triggers, and never make a PR check depend on a secret. The repository is public, so fork PRs run with a read-only token and no secrets. Branches pushed to `origin` run their workflows with upstream's token: call out any change under `.github/workflows/` in the PR for the maintainer's explicit review.
-- Commits use Conventional Commits with the step id, for example `feat(access): resolve dependent branch scope [M2.3]`. Never use `--no-verify`.
-- When the PR is ready for review, append its link to the step's line in the local plan (§1), for example `· PR #12`. Do not tick the checkbox: the human ticks it after merging.
-- Never commit secrets or real env files (`.env`, `*.env`, backups, keys). Only `*.example` templates go in git.
+## Architecture invariants
 
-## Architecture invariants (do not break)
+**Layers.** Views read via `selectors.py` and write via `services.py`, never models directly. Services never import views, forms or the request; they take a **principal** (`SessionPrincipal`, `TokenPrincipal` one operation, `SystemPrincipal` worker without business capability, `OperatorPrincipal` for commands with `--operator <email>`) and check capabilities themselves. Only allowlisted modules construct non-session principals.
 
-### Layers
+**Access** (`apps/access`, plan §3):
 
-- Views read through `selectors.py` and write through `services.py`. A view never writes a model directly.
-- Services never import views, forms or the request object. They take a **principal** and check capabilities themselves, so any future interface stays safe.
-- There are four principal types (plan §3.6):
-  - `SessionPrincipal`: interactive users;
-  - `TokenPrincipal`: invitation acceptance, password reset, email confirmation; one operation only;
-  - `SystemPrincipal`: the worker; no business capability;
-  - `OperatorPrincipal`: management commands, which require `--operator <email>`.
+- Scoped models only via `visible_to(ctx, capability)` or selectors; no bare `Model.objects` in views, forms, template tags; form choice querysets come from selectors.
+- Capabilities from `ROLE_CAPABILITIES`, never mixed across memberships: `ctx.scope_for(capability)`.
+- Out of scope → **404**; in scope without capability → **403**; unsupported method → **405**.
+- Validity is half-open (`valid_from ≤ now < valid_until`, database clock); inactive companies/branches drop out of every scope.
+- Never authorize with `is_superuser` (platform operators only); group admins never modify staff/superusers.
+- Every URL **and method** gets rows in `tests/access/test_acceptance_matrix.py`, including redaction and revoked-access cases.
 
-  Only the allowlisted modules may construct the last three.
+**Quantities** (plan §4.5, I1–I12):
 
-### Access control
+- `Decimal(12,3)` quantities, `Decimal(14,4)` prices, never float. Received, pending, draft-reserved, delivered, committed, awaiting-handover, to-purchase and outstanding are **derived**, never stored.
+- Transition eligibility uses state-independent predicates only (plan §4.9).
+- Pending is a waterfall over open allocations in attribution order, capped by what the line can still receive; draft allocations reserve demand.
+- committed = max(D, R) + P + Q ≤ approved. Any change to an input (incl. priority/needed-by) reconciles the whole component: discover, lock L2–L5, verify, apply, fixpoint. Cuts target effective pending. Issuing a draft revalidates.
+- Worksite receipts attribute by allocation ceiling; every attribution is capped by A − R (and A − D on site); excess is surplus. R ≤ A and D ≤ A always.
+- `allocation.qty` grows only via authorized allocate/increase (rule C5), shrinks only via audited trims ≥ attributed. Receipts split into `ReceiptAttribution` rows.
+- Closures record `closed_short_source` (`LINE`/`REQUEST`); request reopen clears only `REQUEST`.
+- Composite FK `(material_id, unit_id) → Material(id, unit_id)`; never change a referenced material's unit.
 
-All access logic lives in `apps/access` (plan §3):
+**Writes** (plan §4.7–4.8). Each mutating service, in order: `transaction.atomic()` + `lock_timeout` → `authorize_in_txn(principal, …)` (full check every time, never skipped on unchanged generations) → `IdempotencyRecord` (signed key, 24 h, bound to actor + operation + payload hash; replay re-authorizes; same key + other payload → 409) → locks in canonical order (request headers → request lines → PO headers → their outbox rows → PO lines → receipts → handovers → `StorageQuota` → `DocumentSequence`; header before children; discover → lock → verify) → recompute aggregates → validate invariants and C1–C10 → write → reconcile → `audit.record` + `events.publish`. Retry deadlocks only through the shared wrapper.
 
-- Scoped models are queried only through `visible_to(ctx, capability)` or selectors. Never use a bare `Model.objects` in views, forms or template tags. Every form choice queryset comes from a selector.
-- Capabilities come from the `ROLE_CAPABILITIES` matrix and never mix across memberships. Use `ctx.scope_for(capability)`.
-- An object outside the user's scope returns **404**. An object in scope without the needed capability returns **403**. Unsupported methods return **405**.
-- Membership and assignment validity is half-open (`valid_from ≤ now < valid_until`, database clock). Inactive companies and branches drop out of every scope (plan S8–S9).
-- Never authorize with `is_superuser`; it is reserved for platform operators. Group admins can never modify staff or superuser accounts.
-- Every new URL **and HTTP method** gets rows in `tests/access/test_acceptance_matrix.py`, including the redaction and revoked-access cases (plan §8.2). CI fails otherwise.
+- Editing by state: plan §4.4. Material/unit/quantity change only in `DRAFT`; back to `DRAFT` clears decisions. Issued POs change only via audited amendments; snapshots never rewritten.
+- Posted receipts/handovers are immutable: void (with reason) and re-enter; a void can reopen documents. `DIRECT_RECEIPT` handovers are voided only through their receipt.
+- State changes only via services checked against `ALLOWED_TRANSITIONS`; no FSM library.
 
-### Quantities
+**Identifiers.** UUIDv7 primary keys; users see `DocumentSequence` numbers. Audit table is append-only (trigger). Apps are `material_requests` and `handovers`.
 
-- Quantities are `Decimal(12,3)` and prices `Decimal(14,4)`. Never use float.
-- Received, pending, draft-reserved, delivered, committed, awaiting-handover, to-purchase and outstanding quantities are **derived** from documents, never stored (plan §4.5, invariants I1–I12).
-- Keep **state-independent predicates** (line has capacity, request line is live) separate from **current-state predicates** (receivable, open). Transition eligibility uses only the first kind (plan §4.9).
-- **Pending** is a waterfall: a receivable line's remaining quantity is spread over the allocations of open request lines, in attribution order, so it never exceeds what the line can still receive. **Draft** allocations reserve demand. There is no stored "released" quantity.
-- **Commitments**: committed = max(D, R) + P + Q must stay ≤ approved.
-  - Pending depends on **other** requests through the waterfall, so reconciliation works on the whole **component** (request lines and order lines linked by allocations).
-  - Every operation that changes an input reconciles, including **priority or needed-by changes**.
-  - Discover the component, lock all of it at L2–L5, verify it, apply the operation, then run the fixpoint.
-  - Cuts target **effective pending** (`qty := attributed + (P − cut)`), never just the ceiling.
-  - Issuing a draft revalidates its lines.
-- Worksite receipts attribute by allocation **ceiling** for that project, not by waterfall position.
-- Every attribution is capped by the request line's **receipt capacity** A − R, counted across all orders (and by A − D at a worksite). The excess is surplus, manual splits obey the same caps, and posting a receipt reconciles. R ≤ A and D ≤ A always hold, whatever the line's state.
-- `allocation.qty` **increases** only through an explicit, authorized allocate / increase operation validated by rule C5 (demand and order-line capacity). It **decreases** only through audited **trims** that never go below the attributed quantity.
-- Receipts are split into `ReceiptAttribution` rows, never counted against every linked request.
-- Line closures record `closed_short_source` (`LINE` / `REQUEST`). A request reopen clears only `REQUEST` closures.
-- Units are bound by the composite FK `(material_id, unit_id) → Material(id, unit_id)`. Never change a referenced material's unit.
+## Security
 
-### Writes
-
-- Every mutating service follows this order (plan §4.7–4.8):
-  1. Run inside `transaction.atomic()` with a `lock_timeout`.
-  2. Call `authorize_in_txn(principal, …)`. It takes `FOR SHARE` on `AccessState` and the principal's user row, then **always** runs the full check for that principal type. For a session principal:
-     - the user is active and the session epoch is current;
-     - memberships are valid at the database clock;
-     - the capability and object scope hold for this operation;
-     - session MFA happened after `privilege_elevated_at`.
-
-     Never skip the check because generations are unchanged.
-  3. Insert the `IdempotencyRecord`. The key is signed, valid 24 h, and bound to actor + operation + payload hash.
-  4. Lock rows in the canonical order L2–L9:
-     - request headers → request lines → purchase-order headers → outbox rows of those orders (L4b) → purchase-order lines → receipt headers → handover headers → `StorageQuota` → `DocumentSequence`;
-     - outbox rows tied to an order are always locked **after** the order, by every path (claim, outcome, cancel, amend);
-     - a header always comes before its children;
-     - if the set to lock comes from a read, use discover → lock → verify.
-  5. Recompute the aggregates inside the lock.
-  6. Validate the invariants and the cross-document rules C1–C10 (plan §4.6), even when called without a form.
-  7. Write.
-  8. Run component reconciliation if the operation changes any input of it (plan §4.5).
-  9. Call `audit.record(...)` and `events.publish(...)`.
-- Retry deadlocks and lock timeouts through the shared wrapper only.
-- Idempotent replays re-authorize before returning the existing document. The same key with a different payload returns 409.
-- Editing rules by state are in plan §4.4. Material, unit and quantity change only in `DRAFT`; going back to `DRAFT` clears every decision. Approved quantities are reduced only on live lines, never below max(D, R) + P + Q. Issued purchase orders change only through audited amendments; their snapshots are never rewritten from master data.
-- Posted receipts and handovers are immutable. Correct them by voiding (with a reason) and entering them again. A void can reopen closed documents (plan §4.9).
-- `DIRECT_RECEIPT` handovers are never voided on their own, only through their receipt.
-- State changes go only through service functions checked against `ALLOWED_TRANSITIONS`. No FSM library.
-
-### Identifiers and naming
-
-- Primary keys are UUIDv7. Users see document numbers generated by `DocumentSequence`.
-- The audit table is append-only (DB trigger). Never update or delete audit rows.
-- App names are `material_requests` and `handovers`, not `requests` or `deliveries`.
-
-## Security rules
-
-- **CSP and browser**:
-  - strict CSP: no inline scripts, styles or event handlers;
-  - htmx is configured through `<meta name="htmx-config">` with `historyCacheSize: 0`, and the CSRF token goes in `hx-headers` on `<body>`;
-  - authenticated responses are `Cache-Control: no-store, private`;
-  - token-bearing and pre-authentication pages (login, reset, invitation, email confirmation, MFA) also send `Referrer-Policy: no-referrer` + `no-store`, anonymous responses included;
-  - token URLs redirect to a token-less URL after the first hit.
-- **Banned constructs**: no `|safe`, `mark_safe`, `csrf_exempt`, `.raw()` or `.extra()` outside the allowlist in `scripts/check_access_rules.py`. The only `csrf_exempt` allowed is the upload entry point. It admits the upload in a `ReservingUploadHandler` before the body is parsed, then calls an inner `csrf_protect` view (plan §5 Attachments).
-- **Mutating views are POST-only.** GET and HEAD never call a service.
-- **Django Admin**: build every `ModelAdmin` on the service-backed base class. Access and document models are read-only there, master-data saves go through services, and nothing can be deleted.
-- **Data exposure**: prices are rendered and exported only with the `price.view` capability. Partner users never see prices, suppliers or other users' requests. Site managers get only the expected-deliveries fields (plan §3.4).
-- **Authentication**:
-  - django-allauth **≥ 65.20.1** (floor checked in CI);
-  - the admin login goes through allauth;
-  - allauth's email-management and email-confirmation views are disabled. Email changes are administrator actions:
-    - confirmed by the new address;
-    - cancellable by the old address during a 24 h cooling-off;
-    - re-checked against the initiator's current authority at confirmation and at application;
-  - a password reset never logs the user in, and login-by-code is off;
-  - session and CSRF cookies use the `__Host-` prefix;
-  - password-reset tokens are stateless: re-validate them under the user-row lock before setting the password (one redemption only, 1 h lifetime);
-  - "MFA required" means the **current session** passed MFA;
-  - MFA secrets are encrypted with `MFA_ENCRYPTION_KEYS`;
-  - rate limits use `SecurityDatabaseCache`, which has atomic `add` / `incr`, never evicts live entries and answers 429 when full;
-  - the client IP comes from `ALLAUTH_TRUSTED_PROXY_COUNT=1`.
-- **Logging**: no secrets, tokens, passwords or unnecessary personal data in any log. Token-bearing URLs, query strings, `Referer` and `HX-Current-URL` are redacted at every layer (Caddy filter, Gunicorn access log off, Django filter, error tracking), and the sentinel test proves it.
-- **Email**: never send SMTP inside a request. Every email goes through the `EmailOutbox` and the `worker` (plan §5):
-  - notifications store recipient **user ids** and an eligibility rule, re-checked when the worker claims the message;
-  - a purchase-order cancel cancels its unsent dispatches in the same transaction. A cancellation notice (`PO_CANCELLATION`) has its own eligibility, and the obligation to send one survives an in-flight dispatch;
-  - every outcome update is conditional on the attempt id;
-  - the worker does nothing while `flags/worker.paused` exists or `OUTBOUND_EMAIL=off`;
-  - security emails are encrypted at rest and wiped after sending;
-  - an `AMBIGUOUS` supplier dispatch is never resent automatically.
-- **Accounts**:
-  - Offboarding revokes, in the same transaction, the user's pending invitations and email changes, and those **they initiated** for others.
-  - Token redemption locks the target and initiator `User` rows (in id order), then the token row. It re-checks the initiator's authority, and never changes the credentials of an active account.
-  - Tokens are 32 random bytes; only their hashes are stored, and they are compared in constant time.
-  - The first administrator comes only from `manage bootstrap_admin` (shell, one-time). `createsuperuser` is disabled.
-- **Outbound calls**: every other outbound call sets an explicit timeout.
-- **Fail closed**: production settings fail closed, and `manage.py check --deploy` must stay at zero warnings.
-- **Containers**: run as non-root uid 1000 with a read-only root filesystem. Only Caddy publishes ports. Only Caddy and `web` share the `edge` network. Each database client (`web`, `worker`, `backup`, `migrate`) has its own internal network to `db`, so no other container can reach `web`. The database is never published in production.
-- **Backups**:
-  - the VPS holds only append-only offsite credentials;
-  - pruning runs from the maintainer's machine with `--keep-within 90d`, and refuses to run on forged-looking snapshots;
-  - dumps exclude session and cache data;
-  - restore drills have no outbound connectivity.
-- **Dependencies**: new ones go through `pyproject.toml` + `uv.lock`. Docker base images and GitHub Actions are pinned by digest or SHA.
-- **Vulnerabilities**: Trivy runs without `--ignore-unfixed`. An exception goes in `.trivyignore.yaml` with a statement and an expiry of 90 days or less, and only through a PR the human approves.
+- **Browser:** strict CSP (no inline script/style/handlers); htmx via `<meta name="htmx-config">` with `historyCacheSize: 0`, CSRF in `hx-headers` on `<body>`; authenticated responses `Cache-Control: no-store, private`; token and pre-auth pages also `Referrer-Policy: no-referrer`; token URLs redirect to a token-less URL.
+- **Banned** outside the `scripts/check_access_rules.py` allowlist: `|safe`, `mark_safe`, `csrf_exempt` (only the upload entry point), `.raw()`, `.extra()`. Mutating views are POST-only; GET/HEAD never call a service.
+- **Admin:** every `ModelAdmin` on the service-backed base; access and document models read-only; no deletes.
+- **Exposure:** prices only with `price.view`; partners never see prices, suppliers or others' requests; site managers get only expected-deliveries fields (plan §3.4).
+- **Auth:** django-allauth ≥ 65.20.1 (CI floor), admin login through allauth; allauth email views off (admin-initiated email change: new address confirms, old can cancel within 24 h, authority re-checked); reset never logs in, no login-by-code; `__Host-` cookies; reset tokens re-validated under the user-row lock (single use, 1 h); "MFA required" = this session passed MFA; MFA secrets encrypted with `MFA_ENCRYPTION_KEYS`; rate limits on `SecurityDatabaseCache` (429 when full); `ALLAUTH_TRUSTED_PROXY_COUNT=1`.
+- **Accounts:** offboarding revokes the user's pending invitations and email changes and those they initiated; token redemption locks target and initiator users (id order) then the token, re-checks authority, never changes an active account's credentials; tokens 32 random bytes, hash stored, constant-time compare; first admin only via `manage bootstrap_admin`; `createsuperuser` disabled.
+- **Logging:** no secrets, tokens, passwords or needless personal data; token URLs, query strings, `Referer` and `HX-Current-URL` redacted at every layer (sentinel test).
+- **Email:** never SMTP in a request; all mail via `EmailOutbox` + `worker` (plan §5): recipients stored as user ids, eligibility re-checked at claim; PO cancel cancels unsent dispatches in the same transaction and keeps the `PO_CANCELLATION` obligation; outcome updates conditional on attempt id; worker idle while `flags/worker.paused` exists or `OUTBOUND_EMAIL=off`; security mail encrypted at rest, wiped after send; `AMBIGUOUS` dispatches never auto-resent.
+- **Other:** explicit timeout on every outbound call; production settings fail closed and `manage.py check --deploy` has zero warnings.
+- **Containers:** non-root uid 1000, read-only root fs; only Caddy publishes ports; only Caddy and `web` share `edge`; each DB client (`web`, `worker`, `backup`, `migrate`) has its own internal network; DB never published.
+- **Backups:** append-only offsite credentials on the VPS; pruning from the maintainer's machine (`--keep-within 90d`); dumps exclude sessions/cache; restore drills offline.
+- **Supply chain:** deps via `pyproject.toml` + `uv.lock`; images and Actions pinned by digest/SHA; Trivy without `--ignore-unfixed`; exceptions in `.trivyignore.yaml` with statement and ≤ 90-day expiry, human-approved.
 
 ## Stack
 
-- Python 3.14
-- Django 6.1 (upgrade to 6.2 LTS is backlog item B1)
-- PostgreSQL 18 with psycopg 3
-- htmx **2.x**, vendored (not 4.x), with django-htmx
-- Tailwind v4 standalone CLI (no Node)
-- django-allauth (account + mfa)
-- Gunicorn `gthread`, WhiteNoise, Caddy
-- Docker Compose, uv
-
-Do not add Redis, Celery, a JavaScript framework, Node tooling or an API layer unless the human approves a plan change.
+Python 3.14 · Django 6.1 (6.2 LTS = B1) · PostgreSQL 18 + psycopg 3 · htmx **2.x** vendored + django-htmx · Tailwind v4 standalone CLI · django-allauth (account + mfa) · Gunicorn `gthread`, WhiteNoise, Caddy · Docker Compose, uv. No Redis, Celery, JS framework, Node tooling or API layer without an approved plan change.
 
 ## Commands
 
-These are available from M1.1. Keep this section current.
+Available from M1.1; keep current.
 
 ```bash
-uv sync                                              # install, dev group included
+uv sync
 uv run ruff format . && uv run ruff check .
 uv run mypy .
 uv run djlint --check templates apps
 uv run python scripts/check_access_rules.py
 uv run python manage.py makemigrations --check --dry-run
-uv run pytest                                        # unit + integration, needs PostgreSQL 18
-uv run pytest -m e2e                                 # Playwright, against the compose stack
-```
+uv run pytest            # needs PostgreSQL 18
+uv run pytest -m e2e     # Playwright against the compose stack
 
-Run the full stack locally:
-
-```bash
-cd docker_compose/gmat_m8
-bash init.sh                                         # env files + generated secrets
+cd docker_compose/gmat_m8 && bash init.sh
 docker compose up -d --build --wait                  # https://localhost:8443
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo
 ```
 
-## Testing rules
+## Testing
 
-- Tests run on PostgreSQL only. Never use SQLite: the design depends on locks, CHECK constraints and triggers.
-- Markers: default (unit/service), `integration`, `live`, `e2e`. Run with `--strict-markers`.
-- Coverage: the whole project ≥ 90 %; `apps/access`, every `services.py` and every `selectors.py` = 100 %.
-- Every service needs tests for allowed roles, denied roles, revoked access, its invariants, its integrity rules and its state transitions. Concurrency-sensitive services also need a threaded test in `tests/integration/`.
-- Use the shared fixture (plan §8.1) instead of building ad-hoc organizations. It provides the A/B/C organization, mixed-membership and revoked users, and **sentinel values** for leak checks.
-- Leak assertions are **per projection**: each matrix row lists the sentinels it may show (for example, a site manager may see the supplier name), and every other sentinel must be absent (plan §8.2).
-- Never filter a required workflow with `on.paths`. Filter inside the workflow with a scope job and an always-running gate job (plan §8.4).
+- PostgreSQL only, never SQLite. Markers: default, `integration`, `live`, `e2e`; `--strict-markers`.
+- Coverage ≥ 90 % overall; 100 % for `apps/access`, every `services.py` and `selectors.py`.
+- Each service: allowed, denied and revoked roles, invariants, integrity rules, transitions; concurrency-sensitive ones add a threaded test in `tests/integration/`.
+- Use the shared A/B/C fixture (plan §8.1) with its sentinels; leak assertions are per projection (plan §8.2).
 
 ## Conventions
 
-- Code, identifiers, comments and commit messages are in English. UI strings are wrapped in gettext. The default language is Spanish (`es`), with `en` and `fr` also available.
-- Templates are mobile-first: check them at 360 px. Each view has a page template plus HTMX partials (`{% partialdef %}`).
-- Migrations follow expand/contract. Each one is reversible, or its PR and the release notes say it is not. CI checks reversibility.
-- The development machine runs Windows. Use LF line endings. Scripts in `docker/` and `docker_compose/` are bash and must run on Linux.
-- Reference for CI, compose and test patterns: `E:\Dev\fa-workspace\fa-auth-m8`. Read it, never modify it.
+- English code, comments and commits; UI strings via gettext; default language `es`, also `en`, `fr`.
+- Mobile-first templates (check at 360 px); page template + `{% partialdef %}` partials.
+- Migrations expand/contract and reversible (or flagged in PR and release notes); CI checks.
+- Windows dev machine, LF endings; `docker/` and `docker_compose/` scripts are bash for Linux.
+- Reference repo for CI/compose/tests: `E:\Dev\fa-workspace\fa-auth-m8` (read only).
