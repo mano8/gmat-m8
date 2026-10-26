@@ -71,7 +71,7 @@ Python 3.14 · Django 6.1 (6.2 LTS = B1) · PostgreSQL 18 + psycopg 3 · htmx **
 
 ## Commands
 
-Available from M1.1; keep current.
+Keep current. The Python commands exist since M1.1; the Docker and `e2e` ones arrive with M1.5 and M8.2.
 
 ```bash
 uv sync
@@ -80,14 +80,19 @@ uv run mypy .
 uv run djlint --check templates apps
 uv run python scripts/check_access_rules.py
 uv run python manage.py makemigrations --check --dry-run
-uv run pytest            # needs PostgreSQL 18
-uv run pytest -m e2e     # Playwright against the compose stack
+uv run pytest            # needs PostgreSQL 18; DB_* env, defaults in config/settings/test.py
+uv run pytest -m e2e     # M8.2: Playwright against the compose stack
 
+# M1.5 onwards
 cd docker_compose/gmat_m8 && bash init.sh
 docker compose up -d --build --wait                  # https://localhost:8443
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo
 ```
+
+## Layout
+
+`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, urls/wsgi/asgi) · `apps/<app>/` (`core`, `accounts` so far) · `templates/` · `scripts/` · `tests/{unit,access,integration,live,e2e}` · `docs/adr/` (decisions) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest).
 
 ## Testing
 
