@@ -4,6 +4,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from config.env import env_bool, env_int, env_list, env_str
 from config.settings.base import *  # noqa: F403
+from config.settings.base import database_from_env
 
 DEBUG = False
 if env_bool("DJANGO_DEBUG", False):
@@ -14,6 +15,7 @@ if SECRET_KEY.startswith(("dev-", "test-", "build-", "change", "insecure")):
     raise ImproperlyConfigured("DJANGO_SECRET_KEY is a placeholder")
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
+DATABASES = {"default": database_from_env()}
 if "*" in ALLOWED_HOSTS:
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must not contain a wildcard")
 

@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 CODE_DIRS = ("apps", "config", "templates")
 CODE_SUFFIXES = {".py", ".html", ".txt", ".xml"}
+YAML_SUFFIXES = {".yaml", ".yml"}
 SKIP_PARTS = {"migrations", "__pycache__"}
 
 # rule name -> pattern
@@ -27,10 +28,13 @@ CODE_RULES: dict[str, re.Pattern[str]] = {
     "extra-sql": re.compile(r"\.extra\s*\("),
 }
 
+# A trigger may appear as a key, in a list or in a flow mapping, so match the bare word on
+# any non-comment line.
 WORKFLOW_RULES: dict[str, re.Pattern[str]] = {
-    "pull_request_target": re.compile(r"^\s*-?\s*pull_request_target\s*:?", re.MULTILINE),
-    "workflow_run": re.compile(r"^\s*-?\s*workflow_run\s*:?", re.MULTILINE),
+    "pull_request_target": re.compile(r"(?<![\w-])pull_request_target(?![\w-])"),
+    "workflow_run": re.compile(r"(?<![\w-])workflow_run(?![\w-])"),
 }
+YAML_COMMENT = re.compile(r"#.*$", re.MULTILINE)
 
 # (posix path relative to the repository root, rule) pairs that are allowed.
 ALLOWLIST: frozenset[tuple[str, str]] = frozenset()
@@ -66,6 +70,9 @@ def _scan(
     for path in paths:
         rel = path.relative_to(root).as_posix()
         text = path.read_text(encoding="utf-8", errors="replace")
+        if path.suffix in YAML_SUFFIXES:
+            # Blank the comment but keep the line count so reported line numbers stay right.
+            text = YAML_COMMENT.sub("", text)
         for rule, pattern in rules.items():
             if (rel, rule) in allowlist:
                 continue

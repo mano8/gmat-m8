@@ -37,6 +37,10 @@ def test_repository_is_clean(script: ModuleType) -> None:
         ("templates/a.html", "{{ value | safe }}\n", "safe-filter"),
         (".github/workflows/ci.yaml", "on:\n  pull_request_target:\n", "pull_request_target"),
         (".github/workflows/ci.yml", "on:\n  workflow_run:\n    workflows: [x]\n", "workflow_run"),
+        (".github/workflows/ci.yml", "on: pull_request_target\n", "pull_request_target"),
+        (".github/workflows/ci.yml", "on: [push, pull_request_target]\n", "pull_request_target"),
+        (".github/workflows/ci.yml", "on: {workflow_run: {}}\n", "workflow_run"),
+        (".github/workflows/ci.yml", 'on:\n  "pull_request_target":\n', "pull_request_target"),
     ],
 )
 def test_banned_construct_is_reported(
@@ -64,6 +68,25 @@ def test_migrations_and_other_directories_are_not_scanned(
     _write(tmp_path, "tests/x.py", "mark_safe\n")
     _write(tmp_path, "docs/a.md", "|safe\n")
     assert script.check(tmp_path, frozenset()) == []
+
+
+def test_workflow_comments_and_similar_names_are_not_violations(
+    script: ModuleType, tmp_path: Path
+) -> None:
+    _write(
+        tmp_path,
+        ".github/workflows/ci.yaml",
+        "# never use pull_request_target here\non:\n  pull_request: {}\n"
+        "env:\n  NOTE: workflow_run_foo\n",
+    )
+    assert script.check(tmp_path, frozenset()) == []
+
+
+def test_workflow_violation_reports_the_right_line(script: ModuleType, tmp_path: Path) -> None:
+    _write(tmp_path, ".github/workflows/ci.yaml", "# c\non:\n  pull_request_target:\n")
+    assert script.check(tmp_path, frozenset()) == [
+        ".github/workflows/ci.yaml:3: banned construct 'pull_request_target'"
+    ]
 
 
 def test_missing_directories_are_fine(script: ModuleType, tmp_path: Path) -> None:

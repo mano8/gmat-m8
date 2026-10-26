@@ -84,9 +84,5 @@ def database_from_env() -> dict[str, object]:
         "HOST": env_str("DB_HOST"),
         "PORT": env_int("DB_PORT", 5432, minimum=1, maximum=65535),
         "CONN_MAX_AGE": 0,
-        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {"connect_timeout": 5},
     }
-
-
-DATABASES = {"default": database_from_env()}

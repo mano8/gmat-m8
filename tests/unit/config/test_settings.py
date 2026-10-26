@@ -95,9 +95,21 @@ def test_build_settings_need_no_database_or_secret() -> None:
     assert build.DEBUG is False
 
 
+def test_build_settings_load_without_any_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in [*GOOD_ENV, "DB_PORT"]:
+        monkeypatch.delenv(name, raising=False)
+    _forget()
+    sys.modules.pop("config.settings.build", None)
+    build = importlib.import_module("config.settings.build")
+    assert build.DATABASES == {}
+    _forget()
+    sys.modules.pop("config.settings.build", None)
+
+
 def test_dev_settings_default_to_local_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ("DJANGO_DEBUG", "DJANGO_SECRET_KEY", "DJANGO_ALLOWED_HOSTS"):
         monkeypatch.delenv(name, raising=False)
+    _forget()
     sys.modules.pop("config.settings.dev", None)
     dev = importlib.import_module("config.settings.dev")
     assert dev.DEBUG is True
