@@ -1,0 +1,94 @@
+"""Policy tests for ``.github/workflows`` (CLAUDE.md, Security; plan §8.4).
+
+These run on every PR, so a workflow that weakens a rule fails before the maintainer's
+review. The banned triggers themselves are checked by ``scripts/check_access_rules.py``.
+"""
+
+import re
+from pathlib import Path
+from typing import Any
+
+import pytest
+import yaml
+
+ROOT = Path(__file__).resolve().parents[3]
+WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.y*ml"))
+SHA_PIN = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
+REQUIRED_JOBS = {"lint", "typecheck", "security", "test", "trivy-image", "secret-scan"}
+
+
+def _load(path: Path) -> dict[Any, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    return data
+
+
+def _triggers(workflow: dict[Any, Any]) -> dict[str, Any]:
+    # YAML 1.1 reads the bare key `on` as the boolean True (hence the second lookup).
+    triggers = workflow.get("on") or workflow.get(True)
+    if isinstance(triggers, str):
+        return {triggers: None}
+    if isinstance(triggers, list):
+        return dict.fromkeys(triggers)
+    assert isinstance(triggers, dict)
+    return triggers
+
+
+def _steps(workflow: dict[Any, Any]) -> list[dict[str, Any]]:
+    return [step for job in workflow["jobs"].values() for step in job.get("steps", [])]
+
+
+def test_workflows_exist() -> None:
+    assert WORKFLOWS
+
+
+@pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
+def test_actions_are_pinned_by_sha(path: Path) -> None:
+    for step in _steps(_load(path)):
+        uses = step.get("uses")
+        if uses and not uses.startswith("./"):
+            assert SHA_PIN.match(uses), f"{path.name}: {uses} is not pinned by a full commit SHA"
+
+
+@pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
+def test_no_path_filter_on_triggers(path: Path) -> None:
+    for name, config in _triggers(_load(path)).items():
+        if isinstance(config, dict):
+            assert not {"paths", "paths-ignore"} & config.keys(), f"{path.name}: on.{name}"
+
+
+@pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
+def test_permissions_are_declared_and_read_only_by_default(path: Path) -> None:
+    workflow = _load(path)
+    assert workflow.get("permissions") == {"contents": "read"}
+
+
+@pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
+def test_only_the_run_token_is_used_as_a_secret(path: Path) -> None:
+    used = set(re.findall(r"secrets\.(\w+)", path.read_text(encoding="utf-8")))
+    assert used <= {"GITHUB_TOKEN"}, f"{path.name} reads {sorted(used - {'GITHUB_TOKEN'})}"
+
+
+def test_ci_defines_the_required_checks() -> None:
+    workflow = _load(ROOT / ".github" / "workflows" / "ci.yaml")
+    assert workflow["jobs"].keys() >= REQUIRED_JOBS
+    for job_id in REQUIRED_JOBS:
+        assert workflow["jobs"][job_id].get("name", job_id) == job_id
+
+
+def test_ci_runs_on_pull_requests_and_main() -> None:
+    triggers = _triggers(_load(ROOT / ".github" / "workflows" / "ci.yaml"))
+    assert triggers.keys() == {"push", "pull_request"}
+    assert triggers["push"]["branches"] == ["main"]
+
+
+def test_trivy_gate_does_not_ignore_unfixed() -> None:
+    text = (ROOT / ".github" / "workflows" / "ci.yaml").read_text(encoding="utf-8")
+    assert "ignore-unfixed: true" not in text
+
+
+def test_dependabot_covers_the_ecosystems_in_use() -> None:
+    config = _load(ROOT / ".github" / "dependabot.yml")
+    ecosystems = {update["package-ecosystem"] for update in config["updates"]}
+    assert {"github-actions", "uv"} <= ecosystems
+    assert all(update["schedule"]["interval"] == "monthly" for update in config["updates"])

@@ -1,0 +1,251 @@
+name: CI
+
+# Required checks (set by the maintainer in H1.8): lint, typecheck, security, test,
+# trivy-image, secret-scan (and compose-smoke-gate from compose-smoke.yaml).
+#
+# Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
+# `on.paths` filter (a skipped required workflow stays "Pending"), no job that needs a
+# secret on a PR, every action pinned by full commit SHA, least-privilege permissions.
+# A change under .github/workflows/ needs the maintainer's explicit review.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# Supersede older runs of the same PR; never cancel a run on main.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  UV_PYTHON_DOWNLOADS: never
+  UV_VERSION: "0.13.5"
+  # Pinned so the .trivyignore.yaml format is verified against a known release (plan §8.3).
+  TRIVY_VERSION: "v0.75.0"
+  TRIVY_IGNOREFILE: .trivyignore.yaml
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lock file is up to date
+        run: uv lock --check
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Lint templates
+        run: uv run djlint --check templates apps
+
+      - name: Banned constructs and workflow triggers
+        run: uv run python scripts/check_access_rules.py
+
+      - name: Security floors (uv.lock)
+        run: uv run python scripts/check_security_floors.py
+
+      - name: Trivy exceptions are valid and unexpired
+        run: uv run python scripts/check_trivyignore.py
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: mypy
+        run: uv run mypy .
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: bandit (no MEDIUM or HIGH findings)
+        run: uv run bandit -r apps config scripts --severity-level medium -f json -o bandit-report.json
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 90
+
+      - name: pip-audit (locked runtime and dev dependencies)
+        run: |
+          uv export --frozen --no-emit-project -o audit-requirements.txt
+          uv run pip-audit -r audit-requirements.txt --require-hashes --disable-pip --no-deps
+
+      # Full report first (every severity, never fails), then the gate. The gate has no
+      # --ignore-unfixed: every HIGH or CRITICAL finding is fixed or accepted in
+      # .trivyignore.yaml (plan §8.3).
+      - name: Trivy filesystem report (all severities)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_IGNOREFILE: ""
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: fs
+          scan-ref: .
+          format: json
+          output: trivy-fs-report.json
+          exit-code: "0"
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trivy-fs-report
+          path: trivy-fs-report.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Trivy filesystem gate (HIGH and CRITICAL, vulnerabilities and secrets)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+        env:
+          POSTGRES_DB: gmat
+          POSTGRES_USER: gmat
+          # Throwaway credential of a service container that lives for this job only.
+          POSTGRES_PASSWORD: gmat_test_pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gmat -d gmat"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DB_NAME: gmat
+      DB_USER: gmat
+      DB_PASSWORD: gmat_test_pw
+      DB_HOST: localhost
+      DB_PORT: "5432"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: No missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      # Layers A and B (plan §8.1). `live` and `e2e` run in their own workflows.
+      - name: Tests with coverage (project floor 90 %, branch coverage)
+        run: >-
+          uv run pytest -m "not live and not e2e"
+          --cov --cov-report=term-missing --cov-report=json:coverage.json
+
+      - name: Coverage gate (100 % for apps/access, services.py, selectors.py)
+        run: uv run python scripts/check_coverage_gates.py coverage.json
+
+      - name: Migrations apply, reverse to zero and apply again
+        run: uv run python scripts/check_migrations_reversible.py
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: coverage.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Placeholder until M1.4 adds the app and backup images. The job exists now so the
+  # required check name is stable; M1.4 replaces the body with build + Trivy gate
+  # (HIGH,CRITICAL, no --ignore-unfixed, .trivyignore.yaml) for both images.
+  trivy-image:
+    name: trivy-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: No images yet
+        run: echo "No images are built before M1.4; nothing to scan."
+
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # GITHUB_TOKEN is the per-run token, not a repository secret; it is read-only on
+      # fork PRs and the scan still runs. No GITLEAKS_LICENSE: not needed for a personal
+      # account's repository.
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
