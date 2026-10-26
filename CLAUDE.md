@@ -79,8 +79,12 @@ uv run ruff format . && uv run ruff check .
 uv run mypy .
 uv run djlint --check templates apps
 uv run python scripts/check_access_rules.py
+uv run python scripts/check_security_floors.py   # uv.lock vs. security floors
+uv run python scripts/check_trivyignore.py       # .trivyignore.yaml entries valid and unexpired
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest            # needs PostgreSQL 18; DB_* env, defaults in config/settings/test.py
+uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
+uv run python scripts/check_migrations_reversible.py   # scratch database only: migrates to zero and back
 uv run pytest -m e2e     # M8.2: Playwright against the compose stack
 
 # M1.5 onwards
@@ -92,7 +96,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web mana
 
 ## Layout
 
-`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, urls/wsgi/asgi) · `apps/<app>/` (`core`, `accounts` so far) · `templates/` · `scripts/` · `tests/{unit,access,integration,live,e2e}` · `docs/adr/` (decisions) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest).
+`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, urls/wsgi/asgi) · `apps/<app>/` (`core`, `accounts` so far) · `templates/` · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` · `docs/adr/` (decisions) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest).
 
 ## Testing
 
