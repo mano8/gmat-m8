@@ -13,8 +13,8 @@ Web app for a group of electrical-installation companies and their branches. Tec
 
 ## Hard rules: git, PRs, releases
 
-- One plan step = one branch = one PR. Branch from `origin/main` as `m<step>-<slug>` (example: `m2.3-access-engine`).
-- You work **from a fork**. `origin` is upstream (fetch only; you have the Read role); `agent` is your fork. Push only to `agent`, then open the PR upstream with `gh pr create --repo <owner>/gmat-m8 --head <agent-user>:<branch> --draft`.
+- One plan step = one branch = one PR. Branch from `origin/main` as `m<step>-<slug>` with `git switch --no-track -c m<step>-<slug> origin/main` (example: `m2.3-access-engine`), so a bare `git push` never targets `main`.
+- **Interim setup (plan Q20).** There is no agent account or fork yet. Use the `gh` and git credentials already configured in the workspace: push the feature branch with `git push -u origin <branch>`, then open the PR with `gh pr create --repo mano8/gmat-m8 --head <branch> --draft`. The target setup (plan H0.2) is a dedicated agent account working from its fork (`agent` remote, `origin` fetch-only) that never uses the maintainer's credentials.
 - Mark the PR ready only when CI is green and the step's review gate (R1/R2/R3, plan §0.3) has been run and addressed.
 - **Never:**
   - merge or approve a PR;
@@ -24,9 +24,8 @@ Web app for a group of electrical-installation companies and their branches. Tec
   - deploy, or touch production data;
   - change repo settings, rulesets, secrets or tokens.
 
-  These are human steps, enforced server-side by the Read role and rulesets (plan §0.1).
-- Work only with the dedicated agent account's credentials: its SSH key for git and its classic PAT for `gh` (plan H0.2). Never use the maintainer's credentials.
-- Never add `pull_request_target` or `workflow_run` triggers, and never make a PR check depend on a secret. Fork PRs run with a read-only token and no secrets.
+  These are human steps. The interim account is a repository admin, so GitHub does not stop you: these rules and the `.claude/settings.json` deny rules are the only guard. Server-side, the `main` ruleset refuses only direct pushes, force-pushes and deletion (plan §0.1).
+- Never add `pull_request_target` or `workflow_run` triggers, and never make a PR check depend on a secret. The repository is public, so fork PRs run with a read-only token and no secrets. Branches pushed to `origin` run their workflows with upstream's token: call out any change under `.github/workflows/` in the PR for the maintainer's explicit review.
 - Commits use Conventional Commits with the step id, for example `feat(access): resolve dependent branch scope [M2.3]`. Never use `--no-verify`.
 - When the PR is ready for review, append its link to the step's line in the local plan (§1), for example `· PR #12`. Do not tick the checkbox: the human ticks it after merging.
 - Never commit secrets or real env files (`.env`, `*.env`, backups, keys). Only `*.example` templates go in git.
