@@ -1,0 +1,16 @@
+# Trivy exceptions (plan §8.3). Empty on purpose: every HIGH/CRITICAL finding, fixable or
+# not, must be fixed, or accepted here in a PR the maintainer approves.
+#
+# Format (checked by scripts/check_trivyignore.py, enforced by Trivy via --ignorefile):
+#
+# vulnerabilities:
+#   - id: CVE-2026-00000
+#     paths:                      # optional: limit the exception to these files
+#       - "usr/local/lib/python3.14/site-packages/example-1.0.dist-info/METADATA"
+#     statement: >-               # why, which component, compensating control, owner
+#       Why the finding is accepted, the affected component, the control that
+#       limits the exposure, and who owns the follow-up (name).
+#     expired_at: 2026-12-31      # required; in the future and at most 90 days away
+#
+# Other sections: misconfigurations, secrets, licenses (same fields). An expired entry is
+# ignored by Trivy, so the finding returns and CI fails again.

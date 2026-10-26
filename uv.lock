@@ -630,7 +630,9 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-django" },
+    { name = "pyyaml" },
     { name = "ruff" },
+    { name = "types-pyyaml" },
 ]
 e2e = [
     { name = "pytest-playwright" },
@@ -659,7 +661,9 @@ dev = [
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "pytest-django", specifier = ">=4.9" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.14" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
 ]
 e2e = [{ name = "pytest-playwright", specifier = ">=0.7" }]
 
