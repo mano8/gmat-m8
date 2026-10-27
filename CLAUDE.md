@@ -96,7 +96,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web mana
 
 ## Layout
 
-`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, urls/wsgi/asgi) · `apps/<app>/` (`core`, `accounts` so far) · `templates/` · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` · `docs/adr/` (decisions) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest).
+`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, `logging.py` redaction, urls/wsgi/asgi) · `apps/<app>/` (`core`: security cache, checks, middleware, admin base classes; `accounts`: user, allauth/MFA adapters, sessions, admin site) · `templates/` · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` (shared helpers in `tests/support.py`) · `docs/adr/` (decisions) · `docs/security.md` (security baseline) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest). Mail is configured with Django 6.1's `MAILERS`, not `EMAIL_BACKEND`.
 
 ## Testing
 

@@ -6,7 +6,7 @@ It is a modular Django monolith: Django 6.1, HTMX 2.x and PostgreSQL 18, deploye
 
 ## Status
 
-Phase M1 (foundation) is in progress. The project scaffold, health endpoints and custom user exist; CI, the security baseline, images, the compose stack and the UI shell follow in the next steps.
+Phase M1 (foundation) is in progress. The project scaffold, health endpoints, custom user, CI pipeline and security baseline (authentication, MFA, admin, rate limits, headers, log redaction) exist; images, the compose stack and the UI shell follow in the next steps. The security baseline is described in [docs/security.md](docs/security.md).
 
 ## Requirements
 
@@ -22,9 +22,11 @@ uv sync
 # PostgreSQL connection (the tests default to gmat / gmat / localhost:5432)
 export DB_NAME=gmat DB_USER=gmat DB_PASSWORD=change-me DB_HOST=localhost DB_PORT=5432
 
-uv run python manage.py migrate
+uv run python manage.py migrate      # also creates the security cache table
 uv run python manage.py runserver
 ```
+
+`dev` settings use plain HTTP cookie names and derive a development-only MFA key, so no secret is needed locally. Accounts arrive through invitations (M2.6); until then, create a local test user from `manage.py shell`.
 
 Settings modules live in `config/settings/`: `dev` (default for `manage.py`), `test`, `prod` (default for WSGI/ASGI, fails closed when a required variable is missing or weak) and `build` (static files at image build time, no database).
 
@@ -35,6 +37,15 @@ Settings modules live in `config/settings/`: `dev` (default for `manage.py`), `t
 | `DJANGO_ALLOWED_HOSTS` | `prod` (required, no wildcard), `dev` (optional) | Comma-separated host names |
 | `DJANGO_DEBUG` | `dev` | Defaults to on in `dev`; refused in `prod` |
 | `DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_PRELOAD` | `prod` | HSTS lifetime (default one year) and preload flag (default on) |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | `prod` (required, `https://` only) | Comma-separated origins, e.g. `https://materials.example.org` |
+| `MFA_ENCRYPTION_KEYS` | `prod` (required) | Comma-separated Fernet keys, newest first, separate from the secret key; see [docs/security.md](docs/security.md#mfa) |
+| `DJANGO_SESSION_AGE_SECONDS` | all | Session lifetime for ordinary accounts (default 14 days) |
+| `DJANGO_PRIVILEGED_SESSION_AGE_SECONDS` | all | Session lifetime for privileged accounts (default 12 hours) |
+| `SECURITY_CACHE_MAX_ENTRIES` | all | Capacity of the rate-limit cache (default 50,000; at capacity new keys get 429) |
+| `DJANGO_LOG_LEVEL` | all | Root log level (default `INFO`); logs are JSON lines on stdout |
+| `DJANGO_DEFAULT_FROM_EMAIL` | all | Sender address of account emails |
+
+Generate an MFA key with `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
 
 ## Quality gates
 
