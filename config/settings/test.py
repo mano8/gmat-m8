@@ -18,6 +18,7 @@ _TEST_ENV = {
 for _key, _value in _TEST_ENV.items():
     os.environ.setdefault(_key, _value)
 
+from config.env import derived_fernet_key  # noqa: E402
 from config.settings.base import *  # noqa: E402, F403
 from config.settings.base import database_from_env  # noqa: E402
 
@@ -26,3 +27,5 @@ SECRET_KEY = "test-only-secret-key-not-for-any-deployment-1234567890abcdefghijkl
 ALLOWED_HOSTS = ["testserver", "localhost"]
 DATABASES = {"default": database_from_env()}
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+MFA_ENCRYPTION_KEYS = [derived_fernet_key("test")]
+MAILERS = {"default": {"BACKEND": "django.core.mail.backends.locmem.EmailBackend"}}

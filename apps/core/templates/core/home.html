@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+  {% translate "Home" %} · gmat-m8
+{% endblock title %}
+{% block content %}
+  <main>
+    <h1>gmat-m8</h1>
+    <p>{% blocktranslate with email=request.user.email %}Signed in as {{ email }}.{% endblocktranslate %}</p>
+    <form method="post" action="{% url 'account_logout' %}">
+      {% csrf_token %}
+      <button type="submit">{% translate "Sign out" %}</button>
+    </form>
+  </main>
+{% endblock content %}

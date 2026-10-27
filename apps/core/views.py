@@ -1,5 +1,7 @@
+from django.contrib.auth.decorators import login_required
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_safe
 
@@ -22,3 +24,10 @@ def readyz(request: HttpRequest) -> HttpResponse:
     except Exception:  # any failure means "not ready"; details stay out of the response
         return JsonResponse({"status": "unavailable"}, status=503)
     return JsonResponse({"status": "ok"})
+
+
+@require_safe
+@login_required
+def home(request: HttpRequest) -> HttpResponse:
+    """Landing page after login. The UI shell (M1.6) replaces its template."""
+    return render(request, "core/home.html")

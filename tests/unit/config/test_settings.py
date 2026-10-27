@@ -5,13 +5,21 @@ import sys
 from collections.abc import Iterator
 
 import pytest
+from cryptography.fernet import Fernet
 from django.core.checks import run_checks
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
+from config.env import derived_fernet_key
+
+MFA_KEY = Fernet.generate_key().decode()
+OLD_MFA_KEY = Fernet.generate_key().decode()
+
 GOOD_ENV = {
     "DJANGO_SECRET_KEY": "Zq8vN2xLp4Rt7WmB9cYd3GhJ6KsFa1UeVo5XnTi0PbQrCwEyAz",
     "DJANGO_ALLOWED_HOSTS": "app.example.org",
+    "DJANGO_CSRF_TRUSTED_ORIGINS": "https://app.example.org",
+    "MFA_ENCRYPTION_KEYS": f"{MFA_KEY},{OLD_MFA_KEY}",
     "DB_NAME": "gmat",
     "DB_USER": "gmat",
     "DB_PASSWORD": "pw",
@@ -47,9 +55,14 @@ def test_good_production_environment_loads(load_prod) -> None:  # type: ignore[n
     settings = load_prod()
     assert settings.DEBUG is False
     assert settings.ALLOWED_HOSTS == ["app.example.org"]
+    assert settings.CSRF_TRUSTED_ORIGINS == ["https://app.example.org"]
+    assert settings.MFA_ENCRYPTION_KEYS == [MFA_KEY, OLD_MFA_KEY]
     assert settings.SESSION_COOKIE_SECURE is True
     assert settings.CSRF_COOKIE_SECURE is True
+    assert settings.SESSION_COOKIE_NAME == "__Host-sessionid"
+    assert settings.CSRF_COOKIE_NAME == "__Host-csrftoken"
     assert settings.SECURE_HSTS_SECONDS == 31536000
+    assert settings.MAILERS["default"]["BACKEND"] == "apps.core.mail.DisabledEmailBackend"
 
 
 def test_good_production_environment_passes_deploy_checks(load_prod) -> None:  # type: ignore[no-untyped-def]
@@ -81,6 +94,15 @@ def test_health_endpoints_are_exempt_from_the_https_redirect(load_prod) -> None:
         {"DB_NAME": None},
         {"DB_USER": None},
         {"DJANGO_HSTS_SECONDS": "-1"},
+        {"DJANGO_CSRF_TRUSTED_ORIGINS": None},
+        {"DJANGO_CSRF_TRUSTED_ORIGINS": "http://app.example.org"},
+        {"DJANGO_CSRF_TRUSTED_ORIGINS": "https://app.example.org,http://other.example.org"},
+        {"MFA_ENCRYPTION_KEYS": None},
+        {"MFA_ENCRYPTION_KEYS": "not-a-fernet-key"},
+        {"MFA_ENCRYPTION_KEYS": f"{MFA_KEY},{MFA_KEY}"},
+        {"MFA_ENCRYPTION_KEYS": derived_fernet_key("development")},
+        {"MFA_ENCRYPTION_KEYS": derived_fernet_key("test")},
+        {"MFA_ENCRYPTION_KEYS": "change-me"},
     ],
 )
 def test_broken_production_environment_is_refused(load_prod, overrides) -> None:  # type: ignore[no-untyped-def]

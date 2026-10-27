@@ -4,13 +4,37 @@ A missing required value, an unparsable value or a too-short required string rai
 ``ImproperlyConfigured`` at import time, so a misconfigured deployment never starts.
 """
 
+import base64
+import hashlib
 import os
 from collections.abc import Mapping
 
+from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
 
 _TRUE = frozenset({"1", "true", "yes", "on"})
 _FALSE = frozenset({"0", "false", "no", "off"})
+
+# Values copied from templates or examples, never real secrets.
+_PLACEHOLDER_PREFIXES = ("dev-", "test-", "build-", "change", "insecure", "placeholder", "example")
+_PLACEHOLDER_MARKERS = ("change-me", "changeme", "replace-me", "your-", "xxxxxxxx")
+
+
+def is_placeholder(value: str) -> bool:
+    """True for template, example or development values that must never reach production."""
+    lowered = value.strip().lower()
+    return lowered.startswith(_PLACEHOLDER_PREFIXES) or any(
+        marker in lowered for marker in _PLACEHOLDER_MARKERS
+    )
+
+
+def derived_fernet_key(label: str) -> str:
+    """A deterministic Fernet key for development and tests only (never a production key).
+
+    Deriving it keeps key material out of the repository; production refuses these values.
+    """
+    digest = hashlib.sha256(f"gmat-m8 non-production key: {label}".encode()).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii")
 
 
 def _raw(name: str, environ: Mapping[str, str] | None) -> str | None:
@@ -95,3 +119,43 @@ def env_list(
     if not items:
         raise ImproperlyConfigured(f"Environment variable {name} must not be empty")
     return items
+
+
+def env_secret(name: str, *, min_length: int, environ: Mapping[str, str] | None = None) -> str:
+    """Return a required secret; a short or placeholder value is an error."""
+    value = env_str(name, min_length=min_length, environ=environ)
+    if is_placeholder(value):
+        raise ImproperlyConfigured(f"Environment variable {name} is a placeholder")
+    return value
+
+
+def fernet_key_problems(keys: list[str], *, refused: frozenset[str] = frozenset()) -> list[str]:
+    """Describe why a Fernet key list is unusable; an empty list means it is valid."""
+    if not keys:
+        return ["no key is configured"]
+    problems: list[str] = []
+    if len(set(keys)) != len(keys):
+        problems.append("a key is listed twice")
+    for position, key in enumerate(keys, start=1):
+        if key in refused or is_placeholder(key):
+            problems.append(f"key {position} is a development or placeholder key")
+            continue
+        try:
+            Fernet(key.encode("ascii"))
+        except ValueError, UnicodeEncodeError:
+            problems.append(f"key {position} is not a valid Fernet key")
+    return problems
+
+
+def env_fernet_keys(
+    name: str,
+    *,
+    refused: frozenset[str] = frozenset(),
+    environ: Mapping[str, str] | None = None,
+) -> list[str]:
+    """Return a required, comma-separated list of Fernet keys, newest first."""
+    keys = env_list(name, environ=environ)
+    problems = fernet_key_problems(keys, refused=refused)
+    if problems:
+        raise ImproperlyConfigured(f"Environment variable {name}: {'; '.join(problems)}")
+    return keys
