@@ -1,0 +1,8 @@
+{% comment %}Nothing to show yet. Parameters: title, text, and optionally href + label for the call to action.{% endcomment %}
+<div class="rounded-xl border border-dashed border-line bg-raised px-4 py-10 text-center">
+  <p class="text-lg font-semibold">{{ title }}</p>
+  {% if text %}<p class="mt-1 text-soft">{{ text }}</p>{% endif %}
+  {% if href %}
+    <div class="mt-4">{% include "components/button.html" with href=href label=label variant="primary" %}</div>
+  {% endif %}
+</div>

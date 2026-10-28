@@ -16,6 +16,12 @@ MFA_ENCRYPTION_KEYS = [derived_fernet_key("development")]
 # there. The compose stack (HTTPS through Caddy) uses the production values.
 SESSION_COOKIE_NAME = "sessionid"
 CSRF_COOKIE_NAME = "csrftoken"
+LANGUAGE_COOKIE_NAME = "django_language"
+LANGUAGE_COOKIE_SECURE = False
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http"

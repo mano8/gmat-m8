@@ -1,0 +1,19 @@
+{% load i18n %}
+{% comment %}Toast messages (django.contrib.messages). Success messages fade; others stay until dismissed.{% endcomment %}
+{% if messages %}
+  <div class="pointer-events-none fixed inset-x-0 bottom-20 z-40 mx-auto flex w-full max-w-md flex-col gap-2 px-4 md:bottom-6 md:right-6 md:left-auto md:mx-0"
+       role="region"
+       aria-label="{% translate 'Notifications' %}">
+    {% for message in messages %}
+      <div class="toast pointer-events-auto {% if message.level_tag == 'success' %}toast-success{% elif message.level_tag == 'error' %}toast-error{% elif message.level_tag == 'warning' %}toast-warning{% endif %}"
+           role="{% if message.level_tag == 'error' %}alert{% else %}status{% endif %}"
+           {% if message.level_tag == 'success' %}data-autohide="6000"{% endif %}>
+        <p class="flex-1">{{ message }}</p>
+        <button type="button"
+                class="btn-link -mr-1 min-h-11 min-w-11 cursor-pointer rounded px-2 text-lg leading-none"
+                data-dismiss=".toast"
+                aria-label="{% translate 'Dismiss' %}">×</button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

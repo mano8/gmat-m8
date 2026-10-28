@@ -1,0 +1,20 @@
+{% load ui_tags %}
+{% comment %}
+  A table that collapses to cards on phones. Parameters: columns (header labels) and rows (a
+  list of lists, one cell per column). Cells are escaped; for links or chips write the table
+  by hand with the `table-responsive` class and a `data-label` on each cell.
+{% endcomment %}
+<table class="table-responsive">
+  <thead>
+    <tr>
+      {% for column in columns %}<th scope="col">{{ column }}</th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+      <tr>
+        {% for cell in row %}<td data-label="{{ columns|at:forloop.counter0 }}">{{ cell }}</td>{% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>

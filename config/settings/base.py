@@ -16,7 +16,8 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.staticfiles",
+    "apps.core.apps.StaticFilesConfig",  # django.contrib.staticfiles, minus the Tailwind input
+    "django.forms",  # lets the project override the form templates (TemplatesSetting)
     "allauth",
     "allauth.account",
     "allauth.mfa",
@@ -32,8 +33,10 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.accounts.middleware.SessionGuardMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -42,6 +45,8 @@ MIDDLEWARE = [
     "apps.accounts.middleware.MFARequiredMiddleware",
     "apps.core.middleware.SecurityHeadersMiddleware",
     "apps.core.middleware.CacheUnavailableMiddleware",
+    # Innermost: gives a bare 405/409/429 answer a page (the security headers apply after).
+    "apps.core.middleware.ErrorPagesMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -64,12 +69,17 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "django.template.context_processors.i18n",
+                "apps.core.context_processors.ui",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
+
+# Forms render through the project's templates (templates/django/forms), styled by the UI shell.
+FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 AUTH_USER_MODEL = "accounts.User"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -181,12 +191,25 @@ DEFAULT_FROM_EMAIL = env_str("DJANGO_DEFAULT_FROM_EMAIL", "gmat-m8 <no-reply@loc
 LANGUAGE_CODE = "es"
 LANGUAGES = [("es", "Español"), ("en", "English"), ("fr", "Français")]
 LOCALE_PATHS = [BASE_DIR / "locale"]
+# The language choice is a cookie like the session: __Host- prefixed, Secure, not readable by
+# scripts (the switcher is a plain POST form).
+LANGUAGE_COOKIE_NAME = "__Host-language"
+LANGUAGE_COOKIE_SECURE = True
+LANGUAGE_COOKIE_HTTPONLY = True
+LANGUAGE_COOKIE_SAMESITE = "Lax"
+LANGUAGE_COOKIE_AGE = 365 * 24 * 3600
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Hashed file names and compressed copies, served by WhiteNoise with a far-future cache header.
+# `collectstatic` (image build) and production use this; dev and tests keep the plain storage.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").is_dir() else []
 
 # --- logging (plan §5, "Logging and secret redaction") --------------------------------

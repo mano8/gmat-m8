@@ -52,7 +52,7 @@ Materials app for a group of electrical-installation companies and their branche
 
 ## Security
 
-- **Browser:** strict CSP (no inline script/style/handlers); htmx via `<meta name="htmx-config">` with `historyCacheSize: 0`, CSRF in `hx-headers` on `<body>`; authenticated responses `Cache-Control: no-store, private`; token and pre-auth pages also `Referrer-Policy: no-referrer`; token URLs redirect to a token-less URL.
+- **Browser:** strict CSP (no inline script/style/handlers); htmx via `<meta name="htmx-config">` with `historyCacheSize: 0`, CSRF in `hx-headers` on `<body>`; authenticated responses `Cache-Control: no-store, private`; pre-auth pages also `no-store`; a URL that carries a token is `Referrer-Policy: no-referrer` and redirects to a token-less URL (pages with a form stay `same-origin`: `no-referrer` makes browsers send `Origin: null` on POST, which CSRF refuses).
 - **Banned** outside the `scripts/check_access_rules.py` allowlist: `|safe`, `mark_safe`, `csrf_exempt` (only the upload entry point), `.raw()`, `.extra()`. Mutating views are POST-only; GET/HEAD never call a service.
 - **Admin:** every `ModelAdmin` on the service-backed base; access and document models read-only; no deletes.
 - **Exposure:** prices only with `price.view`; partners never see prices, suppliers or others' requests; site managers get only expected-deliveries fields (plan §3.4).
@@ -98,7 +98,7 @@ docker build -f docker/app/Dockerfile --target runtime -t gmat-m8:local .   # im
 
 ## Layout
 
-`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, `logging.py` redaction, urls/wsgi/asgi) · `apps/<app>/` (`core`: security cache, checks, middleware, admin base classes; `accounts`: user, allauth/MFA adapters, sessions, admin site) · `templates/` · `static/` (`src/app.css` Tailwind entry, `js/`; built CSS in `dist/` is git-ignored) · `docker/{app,backup,postgres}` (image sources, entrypoint, backup scripts, DB role bootstrap) · `docker_compose/gmat_m8/` (the stack: compose files and overlays, Caddyfile, env templates, `init.sh`) · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` (`live` runs against a started stack) (shared helpers in `tests/support.py`) · `docs/adr/` (decisions) · `docs/security.md` (security baseline) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest). Mail is configured with Django 6.1's `MAILERS`, not `EMAIL_BACKEND`.
+`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, `logging.py` redaction, urls/wsgi/asgi) · `apps/<app>/` (`core`: security cache, checks, middleware, admin base classes; `accounts`: user, allauth/MFA adapters, sessions, admin site) · `templates/` (`layouts/`, `components/`, `partials/`, `allauth/` and `django/forms/` overrides, error pages) · `locale/` (es, en, fr; `.mo` compiled in the image build) · `static/` (`src/app.css` Tailwind entry, `js/`, `vendor/` htmx with its checksum record; built CSS in `dist/` is git-ignored) · `docker/{app,backup,postgres}` (image sources, entrypoint, backup scripts, DB role bootstrap) · `docker_compose/gmat_m8/` (the stack: compose files and overlays, Caddyfile, env templates, `init.sh`) · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` (`live` runs against a started stack) (shared helpers in `tests/support.py`) · `docs/adr/` (decisions) · `docs/security.md` (security baseline) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest). Mail is configured with Django 6.1's `MAILERS`, not `EMAIL_BACKEND`.
 
 ## Testing
 
@@ -110,7 +110,7 @@ docker build -f docker/app/Dockerfile --target runtime -t gmat-m8:local .   # im
 ## Conventions
 
 - English code, comments and commits; UI strings via gettext; default language `es`, also `en`, `fr`.
-- Mobile-first templates (check at 360 px); page template + `{% partialdef %}` partials.
+- Mobile-first templates (check at 360 px); page template + `{% partialdef %}` partials; shared pieces are includes under `templates/components/`. After editing templates rebuild the CSS (dev compose runs Tailwind in watch mode), and after adding strings run `makemessages -l es -l en -l fr` and `compilemessages`.
 - Migrations expand/contract and reversible (or flagged in PR and release notes); CI checks.
 - Windows dev machine, LF endings; `docker/` and `docker_compose/` scripts are bash for Linux.
 - Reference repo for CI/compose/tests: `E:\Dev\fa-workspace\fa-auth-m8` (read only).

@@ -1,0 +1,15 @@
+<div class="field{% if field.errors %} field-error{% endif %}">
+  {% if field.use_fieldset %}
+    <fieldset {% if field.aria_describedby %}aria-describedby="{{ field.aria_describedby }}"{% endif %}>
+      {% if field.label %}<legend class="mb-1 text-sm font-medium">{{ field.label }}</legend>{% endif %}
+  {% else %}
+    {% if field.label %}{{ field.label_tag }}{% endif %}
+  {% endif %}
+  {{ field.errors }}
+  {{ field }}
+  {% if field.help_text %}
+    <div class="helptext"
+         {% if field.auto_id %}id="{{ field.auto_id }}_helptext"{% endif %}>{{ field.help_text }}</div>
+  {% endif %}
+  {% if field.use_fieldset %}</fieldset>{% endif %}
+</div>

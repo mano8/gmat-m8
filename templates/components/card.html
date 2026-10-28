@@ -1,0 +1,5 @@
+{% comment %}A card with an optional title and a plain-text body. For richer content use the `card` class directly.{% endcomment %}
+<section class="card">
+  {% if title %}<h2 class="card-title">{{ title }}</h2>{% endif %}
+  {% if text %}<p class="text-soft">{{ text }}</p>{% endif %}
+</section>

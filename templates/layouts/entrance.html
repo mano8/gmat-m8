@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% comment %}
+  Pages before sign-in (login, password reset, MFA): one centred card, no navigation.
+{% endcomment %}
+{% block shell %}
+  <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-4 px-4 py-8">
+    <div class="flex items-center justify-between gap-3">
+      <a href="/"
+         class="inline-flex min-h-11 items-center text-xl font-bold text-ink no-underline hover:no-underline">gmat-m8</a>
+      {% include "partials/language_switcher.html" %}
+    </div>
+    <main id="main" class="card">
+      {% block content %}
+      {% endblock content %}
+    </main>
+  </div>
+{% endblock shell %}

@@ -35,8 +35,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - `init.sh` generating env files and secrets (`--ci`, `--reset-db`), `.env.example`, `app.env.example`, `app.env.production.example`;
   - `DJANGO_ADMIN_URL_PATH` to move the admin, shared with Caddy's `ADMIN_URL_PATH`;
   - `tests/live` (18 smoke tests: headers, `check --deploy`, rate limits across workers, forged `X-Forwarded-For`, log sentinel, maintenance gate, stalled upload, network isolation, role privileges, backup then `restore --verify`) and the `compose-smoke.yaml` workflow (`scope` → `smoke` → `compose-smoke-gate`).
+- UI shell (M1.6): mobile-first `base.html` with an app layout (top bar, sidebar from `md`, bottom navigation on phones) and an entrance layout; components (button, card, form field group, table that collapses to cards, pagination, empty state, toast messages, icons); Tailwind v4 theme tokens with dark mode; htmx 2.0.11 vendored with `historyCacheSize: 0`; restyled allauth pages and forms (the project's form templates); error pages 400/403/404/405/409/429/500; Spanish, English and French catalogs with a language switcher; hashed static files.
 
 ### Changed
 
+- Pre-authentication form pages keep `Referrer-Policy: same-origin`; only a URL that carries a token is `no-referrer` (browsers send `Origin: null` on a form POST under `no-referrer`, which CSRF refuses, so login failed in a real browser).
 - Production settings now also require `DJANGO_CSRF_TRUSTED_ORIGINS` (https only) and `MFA_ENCRYPTION_KEYS`.
 - Mail is configured through Django 6.1's `MAILERS`. Production uses a backend that sends nothing until the outbox arrives (M2.5).

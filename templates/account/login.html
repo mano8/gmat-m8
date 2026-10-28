@@ -1,0 +1,31 @@
+{% extends "account/base_entrance.html" %}
+{% load i18n allauth %}
+{% comment %}
+  allauth's login page without the "sign up first" sentence: sign-up is closed, accounts
+  arrive through invitations (M2.6). Passkey and login-by-code are off in this project.
+{% endcomment %}
+{% block head_title %}
+  {% translate "Sign In" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  {% element h1 %}
+  {% translate "Sign In" %}
+{% endelement %}
+{% url 'account_login' as login_url %}
+{% element form form=form method="post" action=login_url tags="entrance,login" %}
+{% slot body %}
+{% csrf_token %}
+{% element fields form=form unlabeled=True %}
+{% endelement %}
+{{ redirect_field }}
+{% endslot %}
+{% slot actions %}
+{% element button type="submit" tags="prominent,login" %}
+{% translate "Sign In" %}
+{% endelement %}
+{% endslot %}
+{% endelement %}
+{% element p %}
+{% translate "Accounts are created by invitation. Ask your administrator if you do not have one." %}
+{% endelement %}
+{% endblock content %}

@@ -11,7 +11,7 @@ from django.template import TemplateDoesNotExist
 from django.utils.cache import patch_cache_control, patch_vary_headers
 
 from apps.core.cache import CacheUnavailable
-from config.logging import request_id_var
+from config.logging import TOKEN_PATH_PREFIXES, request_id_var
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,24 @@ TOKEN_PAGE_URL_NAMES = frozenset(
         "mfa_reauthenticate_webauthn",
     }
 )
+
+# allauth's key-less steps of a password reset: the key already sits in the session.
+KEYLESS_SEGMENT_SUFFIX = "-set-password"
+KEYLESS_SEGMENTS = frozenset({"done"})
+
+
+def path_carries_secret(path: str) -> bool:
+    """True for a URL whose path holds a token (not for the key-less page that follows it)."""
+    for prefix in TOKEN_PATH_PREFIXES:
+        start = path.find(prefix)
+        if start == -1:
+            continue
+        segment = path[start + len(prefix) :].split("/", 1)[0]
+        keyless = segment in KEYLESS_SEGMENTS or segment.endswith(KEYLESS_SEGMENT_SUFFIX)
+        if segment and not keyless:
+            return True
+    return False
+
 
 PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=()"
 CLEAR_SITE_DATA = '"cache", "storage"'
@@ -70,8 +88,11 @@ class SecurityHeadersMiddleware:
 
     - every response to an authenticated user: ``Cache-Control: no-store, private`` and
       ``Vary: Cookie``;
-    - token and pre-authentication pages: ``Referrer-Policy: no-referrer`` and ``no-store``,
-      anonymous responses included;
+    - token and pre-authentication pages: ``no-store``, anonymous responses included;
+    - a URL that carries a token: ``Referrer-Policy: no-referrer``. Pages with a form keep
+      ``same-origin`` instead: under ``no-referrer`` browsers send ``Origin: null`` on a form
+      POST, which Django's CSRF check refuses, so a login or reset form would never work.
+      Such tokens are exchanged for a key-less URL before any form is shown;
     - logout: ``Clear-Site-Data``;
     - everywhere: ``Permissions-Policy``.
     """
@@ -89,7 +110,8 @@ class SecurityHeadersMiddleware:
             patch_vary_headers(response, ["Cookie"])
         if url_name in TOKEN_PAGE_URL_NAMES:
             patch_cache_control(response, no_store=True, private=True)
-            response["Referrer-Policy"] = "no-referrer"
+            if path_carries_secret(request.path):
+                response["Referrer-Policy"] = "no-referrer"
         if url_name == "account_logout" and request.method == "POST":
             response["Clear-Site-Data"] = CLEAR_SITE_DATA
         response.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
@@ -113,3 +135,30 @@ class CacheUnavailableMiddleware:
             return render(request, "429.html", status=429)
         except TemplateDoesNotExist:
             return HttpResponse("Too many requests.", status=429, content_type="text/plain")
+
+
+ERROR_PAGES = {405: "405.html", 409: "409.html", 429: "429.html"}
+
+
+class ErrorPagesMiddleware:
+    """Gives a bare 405, 409 or 429 answer a page that shows no internals.
+
+    Django's 400, 403, 404 and 500 pages come from ``handler*`` and the templates of the same
+    names; the other three statuses are returned by views and decorators as empty responses
+    (``require_POST``, an idempotency conflict, a rate limit). A response that already has a
+    body keeps it, and ``Allow`` and ``Retry-After`` are carried over.
+    """
+
+    def __init__(self, get_response: GetResponse) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        response = self.get_response(request)
+        template = ERROR_PAGES.get(response.status_code)
+        if template is None or response.streaming or getattr(response, "content", b"").strip():
+            return response
+        page = render(request, template, status=response.status_code)
+        for header in ("Allow", "Retry-After"):
+            if header in response:
+                page[header] = response[header]
+        return page

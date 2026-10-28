@@ -1,0 +1,12 @@
+{% extends "errors/base_error.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Not available" %} · gmat-m8
+{% endblock head_title %}
+{% block code %}405{% endblock code %}
+{% block heading %}
+  {% translate "That action is not available here" %}
+{% endblock heading %}
+{% block message %}
+  {% translate "Use the buttons and links of the page instead of typing the address." %}
+{% endblock message %}

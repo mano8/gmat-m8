@@ -56,7 +56,9 @@ class TestHeaders:
     def test_anonymous_pre_auth_pages_are_private(self, client: Client, name: str) -> None:
         response = client.get(reverse(name))
         assert response.status_code == 200
-        assert response["Referrer-Policy"] == "no-referrer"
+        # A form page keeps same-origin: no-referrer would make browsers send `Origin: null`
+        # on its POST, which CSRF refuses.
+        assert response["Referrer-Policy"] == "same-origin"
         assert "no-store" in response["Cache-Control"]
         assert "Content-Security-Policy" in response
 
@@ -70,7 +72,8 @@ class TestHeaders:
             assert "no-store" in response["Cache-Control"]
         keyless = client.get(reset_key_path(user))["Location"]
         response = client.get(keyless)
-        assert response["Referrer-Policy"] == "no-referrer"
+        # The key-less page shows the form; the secret is no longer in its address.
+        assert response["Referrer-Policy"] == "same-origin"
         assert "no-store" in response["Cache-Control"]
 
     def test_mfa_step_is_private(self, client: Client, make_user: Callable[..., User]) -> None:
@@ -79,8 +82,25 @@ class TestHeaders:
         password_login(client, user.email)
         response = client.get(reverse("mfa_authenticate"))
         assert response.status_code == 200
-        assert response["Referrer-Policy"] == "no-referrer"
+        assert response["Referrer-Policy"] == "same-origin"
         assert "no-store" in response["Cache-Control"]
+
+    @pytest.mark.parametrize(
+        ("path", "secret"),
+        [
+            ("/accounts/password/reset/key/MQ-abc123def456/", True),
+            ("/accounts/password/reset/key/MQ-set-password/", False),
+            ("/accounts/password/reset/key/done/", False),
+            ("/accounts/password/reset/key/", False),
+            ("/accounts/password/reset/", False),
+            ("/accounts/login/", False),
+            ("/", False),
+        ],
+    )
+    def test_only_a_url_with_a_token_is_no_referrer(self, path: str, secret: bool) -> None:
+        from apps.core.middleware import path_carries_secret
+
+        assert path_carries_secret(path) is secret
 
     def test_authenticated_pages_are_never_cached(
         self, client: Client, make_user: Callable[..., User]

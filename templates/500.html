@@ -1,0 +1,12 @@
+{% extends "errors/base_error.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Something went wrong" %} · gmat-m8
+{% endblock head_title %}
+{% block code %}500{% endblock code %}
+{% block heading %}
+  {% translate "Something went wrong on our side" %}
+{% endblock heading %}
+{% block message %}
+  {% translate "The problem has been recorded. Try again in a moment." %}
+{% endblock message %}

@@ -1,0 +1,139 @@
+# gmat-m8 English catalog.
+msgid ""
+msgstr ""
+"Project-Id-Version: gmat-m8\n"
+"Report-Msgid-Bugs-To: \n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Home"
+msgstr ""
+
+msgid "Signed in as %(email)s."
+msgstr ""
+
+msgid "Nothing here yet"
+msgstr ""
+
+msgid "Your requests and tasks will appear here once the first features are switched on."
+msgstr ""
+
+msgid "Bad request"
+msgstr ""
+
+msgid "We could not understand that request"
+msgstr ""
+
+msgid "Go back and try again. If it keeps happening, contact your administrator."
+msgstr ""
+
+msgid "Not allowed"
+msgstr ""
+
+msgid "You are not allowed to do that"
+msgstr ""
+
+msgid "Your account does not have access to this action. If you think it should, ask your administrator."
+msgstr ""
+
+msgid "Form expired"
+msgstr ""
+
+msgid "That form has expired"
+msgstr ""
+
+msgid "Reload the page and send it again."
+msgstr ""
+
+msgid "Page not found"
+msgstr ""
+
+msgid "We could not find that page"
+msgstr ""
+
+msgid "The address may be wrong, or the page may no longer exist."
+msgstr ""
+
+msgid "Not available"
+msgstr ""
+
+msgid "That action is not available here"
+msgstr ""
+
+msgid "Use the buttons and links of the page instead of typing the address."
+msgstr ""
+
+msgid "Conflict"
+msgstr ""
+
+msgid "That conflicts with a recent change"
+msgstr ""
+
+msgid "Reload the page to see the latest data, then try again."
+msgstr ""
+
+msgid "Too many requests"
+msgstr ""
+
+msgid "Too many attempts"
+msgstr ""
+
+msgid "Wait a few minutes and try again."
+msgstr ""
+
+msgid "Something went wrong"
+msgstr ""
+
+msgid "Something went wrong on our side"
+msgstr ""
+
+msgid "The problem has been recorded. Try again in a moment."
+msgstr ""
+
+msgid "Sign In"
+msgstr ""
+
+msgid "Accounts are created by invitation. Ask your administrator if you do not have one."
+msgstr ""
+
+msgid "Skip to content"
+msgstr ""
+
+msgid "Notifications"
+msgstr ""
+
+msgid "Dismiss"
+msgstr ""
+
+msgid "Pagination"
+msgstr ""
+
+msgid "Previous"
+msgstr ""
+
+msgid "Page %(number)s of %(total)s"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Back to the start"
+msgstr ""
+
+msgid "Main navigation"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Change"
+msgstr ""
+
+msgid "Security"
+msgstr ""
+
+msgid "Sign out"
+msgstr ""

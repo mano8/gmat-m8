@@ -39,6 +39,14 @@ COPY templates ./templates
 COPY apps ./apps
 RUN tailwindcss --input static/src/app.css --output static/dist/app.css --minify
 
+# ---------- locale: compiled message catalogs (the .mo files are not committed) ----------
+FROM --platform=$BUILDPLATFORM ${PYTHON_IMAGE} AS locale
+
+RUN apt-get update     && apt-get install -y --no-install-recommends gettext     && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY locale ./locale
+RUN find locale -name '*.po' -exec sh -c 'msgfmt --check-format -o "${1%.po}.mo" "$1"' _ {} \;
+
 # ---------- builder: locked, hash-verified Python dependencies ----------
 FROM ${PYTHON_IMAGE} AS builder
 
@@ -97,6 +105,7 @@ COPY config ./config
 COPY apps ./apps
 COPY templates ./templates
 COPY static ./static
+COPY --from=locale /app/locale ./locale
 COPY --from=assets /app/static/dist ./static/dist
 COPY --chmod=0755 docker/app/entrypoint.sh docker/app/gunicorn.conf.py ./docker/app/
 

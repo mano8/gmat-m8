@@ -1,0 +1,12 @@
+{% extends "errors/base_error.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Not allowed" %} · gmat-m8
+{% endblock head_title %}
+{% block code %}403{% endblock code %}
+{% block heading %}
+  {% translate "You are not allowed to do that" %}
+{% endblock heading %}
+{% block message %}
+  {% translate "Your account does not have access to this action. If you think it should, ask your administrator." %}
+{% endblock message %}

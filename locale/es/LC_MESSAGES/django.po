@@ -1,0 +1,139 @@
+# gmat-m8 Spanish catalog.
+msgid ""
+msgstr ""
+"Project-Id-Version: gmat-m8\n"
+"Report-Msgid-Bugs-To: \n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Home"
+msgstr "Inicio"
+
+msgid "Signed in as %(email)s."
+msgstr "Sesión iniciada como %(email)s."
+
+msgid "Nothing here yet"
+msgstr "Todavía no hay nada aquí"
+
+msgid "Your requests and tasks will appear here once the first features are switched on."
+msgstr "Tus solicitudes y tareas aparecerán aquí cuando se activen las primeras funciones."
+
+msgid "Bad request"
+msgstr "Solicitud incorrecta"
+
+msgid "We could not understand that request"
+msgstr "No hemos podido entender esa solicitud"
+
+msgid "Go back and try again. If it keeps happening, contact your administrator."
+msgstr "Vuelve atrás e inténtalo de nuevo. Si sigue ocurriendo, contacta con tu administrador."
+
+msgid "Not allowed"
+msgstr "No permitido"
+
+msgid "You are not allowed to do that"
+msgstr "No tienes permiso para hacer eso"
+
+msgid "Your account does not have access to this action. If you think it should, ask your administrator."
+msgstr "Tu cuenta no tiene acceso a esta acción. Si crees que debería tenerlo, pregunta a tu administrador."
+
+msgid "Form expired"
+msgstr "Formulario caducado"
+
+msgid "That form has expired"
+msgstr "Ese formulario ha caducado"
+
+msgid "Reload the page and send it again."
+msgstr "Recarga la página y envíalo de nuevo."
+
+msgid "Page not found"
+msgstr "Página no encontrada"
+
+msgid "We could not find that page"
+msgstr "No hemos encontrado esa página"
+
+msgid "The address may be wrong, or the page may no longer exist."
+msgstr "Puede que la dirección sea incorrecta o que la página ya no exista."
+
+msgid "Not available"
+msgstr "No disponible"
+
+msgid "That action is not available here"
+msgstr "Esa acción no está disponible aquí"
+
+msgid "Use the buttons and links of the page instead of typing the address."
+msgstr "Usa los botones y enlaces de la página en lugar de escribir la dirección."
+
+msgid "Conflict"
+msgstr "Conflicto"
+
+msgid "That conflicts with a recent change"
+msgstr "Eso entra en conflicto con un cambio reciente"
+
+msgid "Reload the page to see the latest data, then try again."
+msgstr "Recarga la página para ver los datos más recientes y vuelve a intentarlo."
+
+msgid "Too many requests"
+msgstr "Demasiadas solicitudes"
+
+msgid "Too many attempts"
+msgstr "Demasiados intentos"
+
+msgid "Wait a few minutes and try again."
+msgstr "Espera unos minutos e inténtalo de nuevo."
+
+msgid "Something went wrong"
+msgstr "Algo ha salido mal"
+
+msgid "Something went wrong on our side"
+msgstr "Algo ha salido mal por nuestra parte"
+
+msgid "The problem has been recorded. Try again in a moment."
+msgstr "El problema se ha registrado. Inténtalo de nuevo en un momento."
+
+msgid "Sign In"
+msgstr "Iniciar sesión"
+
+msgid "Accounts are created by invitation. Ask your administrator if you do not have one."
+msgstr "Las cuentas se crean por invitación. Pregunta a tu administrador si no tienes una."
+
+msgid "Skip to content"
+msgstr "Saltar al contenido"
+
+msgid "Notifications"
+msgstr "Notificaciones"
+
+msgid "Dismiss"
+msgstr "Cerrar"
+
+msgid "Pagination"
+msgstr "Paginación"
+
+msgid "Previous"
+msgstr "Anterior"
+
+msgid "Page %(number)s of %(total)s"
+msgstr "Página %(number)s de %(total)s"
+
+msgid "Next"
+msgstr "Siguiente"
+
+msgid "Back to the start"
+msgstr "Volver al inicio"
+
+msgid "Main navigation"
+msgstr "Navegación principal"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "Change"
+msgstr "Cambiar"
+
+msgid "Security"
+msgstr "Seguridad"
+
+msgid "Sign out"
+msgstr "Cerrar sesión"

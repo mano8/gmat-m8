@@ -1,0 +1,26 @@
+{% load i18n %}
+{% comment %}
+  The navigation entries, rendered twice by layouts/app.html (`variant` "side" and "bottom"
+  only changes the container). Later phases add their entries here, guarded by capability.
+{% endcomment %}
+<a href="{% url 'core:home' %}"
+   class="nav-link"
+   {% if request.resolver_match.view_name == 'core:home' %}aria-current="page"{% endif %}>
+  {% include "components/icon.html" with name="home" %}
+  <span>{% translate "Home" %}</span>
+</a>
+<a href="{% url 'mfa_index' %}"
+   class="nav-link"
+   {% if request.resolver_match.app_name == 'mfa' or request.resolver_match.url_name|slice:':4' == 'mfa_' %}aria-current="page"{% endif %}>
+  {% include "components/icon.html" with name="shield" %}
+  <span>{% translate "Security" %}</span>
+</a>
+<form method="post"
+      action="{% url 'account_logout' %}"
+      class="flex flex-1 md:flex-none">
+  {% csrf_token %}
+  <button type="submit" class="nav-link w-full cursor-pointer">
+    {% include "components/icon.html" with name="logout" %}
+    <span>{% translate "Sign out" %}</span>
+  </button>
+</form>

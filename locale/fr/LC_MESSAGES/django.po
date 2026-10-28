@@ -1,0 +1,139 @@
+# gmat-m8 French catalog.
+msgid ""
+msgstr ""
+"Project-Id-Version: gmat-m8\n"
+"Report-Msgid-Bugs-To: \n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "Home"
+msgstr "Accueil"
+
+msgid "Signed in as %(email)s."
+msgstr "Connecté en tant que %(email)s."
+
+msgid "Nothing here yet"
+msgstr "Rien ici pour le moment"
+
+msgid "Your requests and tasks will appear here once the first features are switched on."
+msgstr "Vos demandes et tâches apparaîtront ici dès que les premières fonctions seront activées."
+
+msgid "Bad request"
+msgstr "Requête incorrecte"
+
+msgid "We could not understand that request"
+msgstr "Nous n'avons pas pu comprendre cette requête"
+
+msgid "Go back and try again. If it keeps happening, contact your administrator."
+msgstr "Revenez en arrière et réessayez. Si le problème persiste, contactez votre administrateur."
+
+msgid "Not allowed"
+msgstr "Non autorisé"
+
+msgid "You are not allowed to do that"
+msgstr "Vous n'avez pas le droit de faire cela"
+
+msgid "Your account does not have access to this action. If you think it should, ask your administrator."
+msgstr "Votre compte n'a pas accès à cette action. Si vous pensez que ce devrait être le cas, demandez à votre administrateur."
+
+msgid "Form expired"
+msgstr "Formulaire expiré"
+
+msgid "That form has expired"
+msgstr "Ce formulaire a expiré"
+
+msgid "Reload the page and send it again."
+msgstr "Rechargez la page et envoyez-le à nouveau."
+
+msgid "Page not found"
+msgstr "Page introuvable"
+
+msgid "We could not find that page"
+msgstr "Nous n'avons pas trouvé cette page"
+
+msgid "The address may be wrong, or the page may no longer exist."
+msgstr "L'adresse est peut-être erronée, ou la page n'existe plus."
+
+msgid "Not available"
+msgstr "Indisponible"
+
+msgid "That action is not available here"
+msgstr "Cette action n'est pas disponible ici"
+
+msgid "Use the buttons and links of the page instead of typing the address."
+msgstr "Utilisez les boutons et les liens de la page plutôt que de saisir l'adresse."
+
+msgid "Conflict"
+msgstr "Conflit"
+
+msgid "That conflicts with a recent change"
+msgstr "Cela entre en conflit avec une modification récente"
+
+msgid "Reload the page to see the latest data, then try again."
+msgstr "Rechargez la page pour voir les données les plus récentes, puis réessayez."
+
+msgid "Too many requests"
+msgstr "Trop de requêtes"
+
+msgid "Too many attempts"
+msgstr "Trop de tentatives"
+
+msgid "Wait a few minutes and try again."
+msgstr "Attendez quelques minutes puis réessayez."
+
+msgid "Something went wrong"
+msgstr "Une erreur est survenue"
+
+msgid "Something went wrong on our side"
+msgstr "Une erreur est survenue de notre côté"
+
+msgid "The problem has been recorded. Try again in a moment."
+msgstr "Le problème a été enregistré. Réessayez dans un instant."
+
+msgid "Sign In"
+msgstr "Connexion"
+
+msgid "Accounts are created by invitation. Ask your administrator if you do not have one."
+msgstr "Les comptes sont créés sur invitation. Demandez à votre administrateur si vous n'en avez pas."
+
+msgid "Skip to content"
+msgstr "Aller au contenu"
+
+msgid "Notifications"
+msgstr "Notifications"
+
+msgid "Dismiss"
+msgstr "Fermer"
+
+msgid "Pagination"
+msgstr "Pagination"
+
+msgid "Previous"
+msgstr "Précédent"
+
+msgid "Page %(number)s of %(total)s"
+msgstr "Page %(number)s sur %(total)s"
+
+msgid "Next"
+msgstr "Suivant"
+
+msgid "Back to the start"
+msgstr "Retour à l'accueil"
+
+msgid "Main navigation"
+msgstr "Navigation principale"
+
+msgid "Language"
+msgstr "Langue"
+
+msgid "Change"
+msgstr "Changer"
+
+msgid "Security"
+msgstr "Sécurité"
+
+msgid "Sign out"
+msgstr "Se déconnecter"

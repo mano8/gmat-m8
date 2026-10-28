@@ -45,7 +45,8 @@ What the application enforces today (step M1.3), where it lives, and what later 
 | `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()` | every response |
 | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Cross-Origin-Opener-Policy: same-origin`, `Referrer-Policy: same-origin` | every response |
 | `Cache-Control: no-store, private` and `Vary: Cookie` | every response to an authenticated user |
-| `Referrer-Policy: no-referrer` and `no-store` | login, logout, reauthentication, all password-reset steps, MFA authenticate and reauthenticate, anonymous visitors included (invitation and email-change pages join in M2.6) |
+| `Cache-Control: no-store` | login, logout, reauthentication, all password-reset steps, MFA authenticate and reauthenticate, anonymous visitors included (invitation and email-change pages join in M2.6) |
+| `Referrer-Policy: no-referrer` | only a URL that carries a token (`/accounts/password/reset/key/<token>/`, which redirects to a key-less URL). Pages with a form keep `same-origin`: under `no-referrer` browsers send `Origin: null` on a form POST and Django's CSRF check refuses it (found in a real browser in M1.6) |
 | HSTS (one year), HTTPS redirect, `SECURE_PROXY_SSL_HEADER` | production settings |
 | `X-Request-ID` | every response; a well-formed id from the proxy is kept |
 
@@ -94,6 +95,17 @@ Files in `docker_compose/gmat_m8/` (see its README); `tests/live` proves the poi
 - **Log redaction.** Caddy's default and access logs replace the token paths (`/accounts/password/reset/key/…`, `/account/email-change/…`, `/invite/…`) and every query string with `REDACTED` and drop `Referer` and `HX-Current-URL`. Only paths under those prefixes are secrets to Caddy; Django's own filter also redacts any long random segment.
 - **Secrets.** `init.sh` generates every secret (mode 0600, never printed, redrawn if it resembles a placeholder). A secret is defined once in `.env` and reaches the services by interpolation; Django-only settings are in `app.env`. Only `*.example` templates are committed.
 - **Not yet.** The worker service and its heartbeat (M2.5), `deploy.sh` and `recover.sh` (M8.4), the signed image digests of the production overlay (M1.7).
+
+## The UI shell (step M1.6)
+
+Templates in `templates/`, styles in `static/src/app.css`, code in `static/js/app.js` and `static/vendor/`.
+
+- **No inline code.** Pages carry no inline script, style or event handler (`tests/unit/core/test_ui_shell.py` scans the rendered login, home and error pages; a real-browser run against the stack showed zero console and CSP errors). The only `<script>` blocks are allauth's `application/json` data blocks, which the CSP does not execute.
+- **htmx** 2.0.11 is vendored (`static/vendor/README.md` records its source and checksum; a test pins the sha256). It is configured by `<meta name="htmx-config">`: `historyCacheSize: 0`, `refreshOnHistoryMiss`, no eval, no script tags, no indicator styles, `selfRequestsOnly`. The CSRF token travels in `hx-headers` on `<body>`; the cookie is `HttpOnly`. Nothing is written to `localStorage` (checked in the browser).
+- **Static files** are hashed (`CompressedManifestStaticFilesStorage`) and served by WhiteNoise with a far-future cache header; the Tailwind input is not shipped.
+- **Language**: Spanish by default, English and French; the choice is a `__Host-language` cookie (`Secure`, `HttpOnly`, `SameSite=Lax`) set by a POST form. The form's `next` is the current path, except on a token URL, where it is `/` so a secret is never copied into another form. Catalogs are in `locale/`; the `.mo` files are compiled in the image build.
+- **Error pages** 400, 403 (including the CSRF failure), 404, 405, 409, 429 and 500 show a code and a generic sentence, never a path, a query, an exception or a user. 405, 409 and 429 are produced by `ErrorPagesMiddleware` for bare responses; 500 renders without a request.
+- **Referrer policy.** `no-referrer` only on a URL that carries a token. A form page keeps `same-origin`: under `no-referrer` browsers send `Origin: null` on its POST and Django's CSRF check refuses it, so login would fail. (Found by logging in with a real browser; the M1.3 tests asserted the header, not the login.)
 
 ## Still to come
 

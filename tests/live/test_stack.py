@@ -86,8 +86,9 @@ def test_security_headers_survive_the_proxy(stack: Stack) -> None:
     assert login.header("x-content-type-options") == "nosniff"
     assert login.header("cross-origin-opener-policy") == "same-origin"
     assert "camera=()" in (login.header("permissions-policy") or "")
-    # Pre-authentication pages: nothing leaves through Referer and nothing is cached.
-    assert login.header("referrer-policy") == "no-referrer"
+    # Pre-authentication pages are never cached; their form POSTs must carry a real Origin,
+    # so the policy stays same-origin (no-referrer is only for a URL that holds a token).
+    assert login.header("referrer-policy") == "same-origin"
     assert "no-store" in (login.header("cache-control") or "")
     assert login.header("x-request-id")
     # Neither Caddy nor Gunicorn announces itself.
@@ -112,6 +113,27 @@ def test_static_files_are_served(stack: Stack) -> None:
     assert css.status == 200
     assert "text/css" in (css.header("content-type") or "")
     assert "max-age=" in (css.header("cache-control") or "")
+
+
+def test_the_pages_load_their_hashed_assets_without_inline_code(stack: Stack) -> None:
+    html = stack.get("/accounts/login/").text
+    assert "<script>" not in html
+    assets = re.findall(r'(?:href|src)="(/static/[^"]+\.(?:css|js))"', html)
+    assert any("/static/dist/app." in asset for asset in assets), assets
+    assert any("/static/vendor/htmx.min." in asset for asset in assets), assets
+    for asset in assets:
+        response = stack.get(asset)
+        assert response.status == 200, asset
+        assert "immutable" in (response.header("cache-control") or ""), asset
+
+
+def test_error_pages_show_no_internals(stack: Stack) -> None:
+    missing = stack.get("/no-such-page/secret-value/?token=abc")
+    assert missing.status == 404
+    assert "secret-value" not in missing.text
+    assert "Traceback" not in missing.text
+    wrong_method = stack.request("OPTIONS", "/healthz/")
+    assert wrong_method.status == 405
 
 
 def test_check_deploy_passes_with_the_stack_configuration(stack: Stack) -> None:

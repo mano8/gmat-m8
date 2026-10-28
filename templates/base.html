@@ -1,12 +1,45 @@
-{% load i18n %}
+{% load i18n static %}
+{% get_current_language as LANGUAGE_CODE %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE|default:'es' }}">
+<html lang="{{ LANGUAGE_CODE }}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}gmat-m8{% endblock %}</title>
+    <meta name="color-scheme" content="light dark">
+    <meta name="robots" content="noindex, nofollow">
+    {# htmx is configured here, never inline: no page snapshot is stored (historyCacheSize 0), nothing is evaluated. #}
+    <meta name="htmx-config"
+          content='{"historyCacheSize": 0, "refreshOnHistoryMiss": true, "includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "selfRequestsOnly": true}'>
+    <title>
+      {% block title %}
+        {% block head_title %}gmat-m8{% endblock head_title %}
+      {% endblock title %}
+    </title>
+    <link rel="icon"
+          href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b5cad'/%3E%3Cpath d='M8 17l5 5 11-12' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="{% static 'dist/app.css' %}">
+    <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+    <script src="{% static 'js/app.js' %}" defer></script>
+    {% block extra_head %}
+    {% endblock extra_head %}
   </head>
-  <body>
-    {% block content %}{% endblock %}
+  {# The CSRF token travels in a header on every htmx request; the cookie is not readable by scripts. #}
+  <body class="min-h-dvh bg-surface text-ink"
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    {% block body %}
+      <a href="#main"
+         class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-raised focus:px-3 focus:py-2">
+        {% translate "Skip to content" %}
+      </a>
+      {% include "components/messages.html" %}
+      {% block shell %}
+        <main id="main">
+          {% block content %}
+          {% endblock content %}
+        </main>
+      {% endblock shell %}
+    {% endblock body %}
+    {% block extra_body %}
+    {% endblock extra_body %}
   </body>
 </html>
