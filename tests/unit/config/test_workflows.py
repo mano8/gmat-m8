@@ -90,7 +90,7 @@ def test_trivy_gate_does_not_ignore_unfixed() -> None:
 def test_dependabot_covers_the_ecosystems_in_use() -> None:
     config = _load(ROOT / ".github" / "dependabot.yml")
     ecosystems = {update["package-ecosystem"] for update in config["updates"]}
-    assert {"github-actions", "uv", "docker"} <= ecosystems
+    assert {"github-actions", "uv", "docker", "docker-compose"} <= ecosystems
     docker_dirs = {u["directory"] for u in config["updates"] if u["package-ecosystem"] == "docker"}
     assert docker_dirs == {"/docker/app", "/docker/backup"}
     assert all(update["schedule"]["interval"] == "monthly" for update in config["updates"])
@@ -129,3 +129,36 @@ def test_arm64_images_build_outside_the_required_checks() -> None:
     workflow = _load(ROOT / ".github" / "workflows" / "ci.yaml")
     assert "images-arm64" in workflow["jobs"]
     assert "images-arm64" not in REQUIRED_JOBS
+
+
+def test_compose_smoke_uses_the_scope_smoke_gate_structure() -> None:
+    workflow = _load(ROOT / ".github" / "workflows" / "compose-smoke.yaml")
+    jobs = workflow["jobs"]
+    assert jobs.keys() == {"scope", "smoke", "compose-smoke-gate"}
+    assert jobs["smoke"]["needs"] == "scope"
+    assert jobs["smoke"]["if"] == "needs.scope.outputs.run == 'true'"
+    gate = jobs["compose-smoke-gate"]
+    assert gate["name"] == "compose-smoke-gate"
+    assert gate["if"] == "always()"
+    assert set(gate["needs"]) == {"scope", "smoke"}
+    # The decision is taken inside the workflow: every trigger runs it, none filters paths.
+    triggers = _triggers(workflow)
+    assert {"push", "pull_request", "schedule", "workflow_dispatch"} <= triggers.keys()
+
+
+def test_compose_smoke_runs_the_live_tests_against_a_fresh_stack() -> None:
+    workflow = _load(ROOT / ".github" / "workflows" / "compose-smoke.yaml")
+    commands = "\n".join(step.get("run", "") for step in workflow["jobs"]["smoke"]["steps"])
+    assert "bash init.sh --ci" in commands
+    assert "docker compose up -d --build --wait" in commands
+    assert "pytest -m live" in commands
+    assert "docker compose down" in commands
+    teardown = [s for s in workflow["jobs"]["smoke"]["steps"] if s.get("name") == "Tear down"]
+    assert teardown
+    assert teardown[0]["if"] == "always()"
+    env = next(
+        s["env"]
+        for s in workflow["jobs"]["smoke"]["steps"]
+        if s.get("name") == "Smoke tests through Caddy"
+    )
+    assert env["LIVE_REQUIRED"] == "1"  # an unreachable stack fails the run instead of skipping

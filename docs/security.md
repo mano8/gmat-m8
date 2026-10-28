@@ -83,9 +83,21 @@ Sources: `docker/app/`, `docker/backup/`, `docker/postgres/initdb/`. CI builds b
 - **`restore --verify`** (weekly, and on demand) restores the newest dump into a private PostgreSQL started inside the backup container on a unix socket (no network, no write right on the real database), then compares every row count, the migration head and the newest audit event with the manifest. Tables whose data is excluded must come back empty.
 - **Exceptions** in `.trivyignore.yaml` are Debian base-image packages with no fixed version yet; each has a statement, an owner and an expiry at most 90 days away, and needs the maintainer's explicit approval in the PR.
 
+## The compose stack (step M1.5)
+
+Files in `docker_compose/gmat_m8/` (see its README); `tests/live` proves the points below against a running stack and the `compose-smoke` workflow runs it.
+
+- **Networks.** One internal network per database client (`db_web`, `db_worker`, `db_backup`, `db_migrate`), so `web`, `migrate`, `backup` and the worker share none and cannot reach each other. `edge` is internal and shared only by Caddy and `web` (no route out for `web`); Caddy alone sits on `ingress`, the one network that publishes ports. The database is never published (the development overlay publishes it on 127.0.0.1 only).
+- **Hardening.** `cap_drop: ALL`, `no-new-privileges`, read-only root filesystem, memory and process limits and log rotation on every service; `web`, `migrate` and `backup` run as uid 1000. Caddy runs as root inside its container with only `NET_BIND_SERVICE` (its data volumes are root-owned; nothing else is writable).
+- **Caddy.** Admin API off; `read_header` 10 s and `read_body` (`CADDY_READ_BODY_TIMEOUT`, 120 s) so a client that stops sending frees its Gunicorn thread; body limit `MAX_UPLOAD_SIZE`; no trusted proxies, so a client-sent `X-Forwarded-For` never reaches Django; `Server` header removed; HTTP/3 only where the UDP port is published. The admin prefix (`ADMIN_URL_PATH`, the same value in Django) is limited to `ADMIN_ALLOWED_CIDRS`.
+- **Maintenance gate.** `flags/maintenance.on` makes Caddy answer 503 with the maintenance page for every public request while `web` keeps running; the same page replaces a missing `web` (502/503/504).
+- **Log redaction.** Caddy's default and access logs replace the token paths (`/accounts/password/reset/key/…`, `/account/email-change/…`, `/invite/…`) and every query string with `REDACTED` and drop `Referer` and `HX-Current-URL`. Only paths under those prefixes are secrets to Caddy; Django's own filter also redacts any long random segment.
+- **Secrets.** `init.sh` generates every secret (mode 0600, never printed, redrawn if it resembles a placeholder). A secret is defined once in `.env` and reaches the services by interpolation; Django-only settings are in `app.env`. Only `*.example` templates are committed.
+- **Not yet.** The worker service and its heartbeat (M2.5), `deploy.sh` and `recover.sh` (M8.4), the signed image digests of the production overlay (M1.7).
+
 ## Still to come
 
 - M2.3: the access engine (`authorize_in_txn`, principals, privileged roles for MFA and session lifetimes, `GROUP_ADMIN` in the admin).
 - M2.5: outbox, worker, and the cache housekeeping (`SecurityDatabaseCache.purge_expired`).
 - M2.6: invitations, administrator email changes, offboarding, `bootstrap_admin`; their token pages join the no-referrer list and the log redaction prefixes.
-- M1.5 and M8.2: the same checks through Caddy (compose smoke) and a real browser (e2e).
+- M8.2: the same checks in a real browser (e2e).

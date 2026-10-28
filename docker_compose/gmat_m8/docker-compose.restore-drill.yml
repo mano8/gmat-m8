@@ -1,0 +1,35 @@
+# Restore drill (human, quarterly, on an isolated machine; plan §9): restored data contains
+# personal data, so nothing in this project can reach the outside world.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.restore-drill.yml up -d db
+#
+# - its own project name, therefore its own volumes: never touches a production stack;
+# - EVERY network is internal, `edge` and `ingress` included, so no restored container has a
+#   route out; nothing is published, checks run through `docker compose exec`;
+# - OUTBOUND_EMAIL=off: the worker (M2.5) never claims or sends a message.
+name: gmat-m8-restore-drill
+
+services:
+  caddy:
+    ports: !reset []
+  web:
+    environment:
+      OUTBOUND_EMAIL: "off"
+  db:
+    ports: !reset []
+
+networks:
+  edge:
+    internal: true
+  ingress:
+    internal: true
+  db_web:
+    internal: true
+  db_worker:
+    internal: true
+  db_backup:
+    internal: true
+  db_migrate:
+    internal: true
+  egress:
+    internal: true

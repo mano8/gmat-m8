@@ -5,6 +5,12 @@ CLAUDE.md
 .git/
 .github/
 
+# Not part of any image: tests, docs, CI guards and the compose stack itself
+tests/
+docs/
+scripts/
+docker_compose/
+
 # Environment files and secrets
 .env
 *.env

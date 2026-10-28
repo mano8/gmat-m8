@@ -28,6 +28,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - backup image `docker/backup` (`backup-now`, `restore --verify`, snapshot-consistent dumps without session and cache data, manifest queries in the same snapshot, append-only restic upload, 6-hour schedule);
   - `docker/postgres/initdb/10-roles.sh` creating the owner, runtime and backup roles with `scram-sha-256` and refusing weak or placeholder passwords;
   - the real `trivy-image` job (both images, HIGH and CRITICAL, no `--ignore-unfixed`) and a non-required arm64 build job; Dependabot watches both Dockerfiles.
+- Compose stack (M1.5) in `docker_compose/gmat_m8/`:
+  - `docker-compose.yml` (Caddy, migrate, web, PostgreSQL 18, backup) with one internal database network per client, an internal `edge` network shared only by Caddy and `web`, hardened read-only containers and resource limits;
+  - overlays for development (Mailpit, Tailwind watch, `runserver`), production (images by digest, ACME, ports 80/443) and the offline restore drill (every network internal);
+  - Caddyfile with the admin API off, header and body read timeouts, the maintenance gate (`flags/maintenance.on`), the fallback page, and a filtered access log that redacts token URLs, query strings, `Referer` and `HX-Current-URL`;
+  - `init.sh` generating env files and secrets (`--ci`, `--reset-db`), `.env.example`, `app.env.example`, `app.env.production.example`;
+  - `DJANGO_ADMIN_URL_PATH` to move the admin, shared with Caddy's `ADMIN_URL_PATH`;
+  - `tests/live` (18 smoke tests: headers, `check --deploy`, rate limits across workers, forged `X-Forwarded-For`, log sentinel, maintenance gate, stalled upload, network isolation, role privileges, backup then `restore --verify`) and the `compose-smoke.yaml` workflow (`scope` → `smoke` → `compose-smoke-gate`).
 
 ### Changed
 

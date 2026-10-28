@@ -1,7 +1,9 @@
 """Settings shared by every environment. Environment-specific modules extend this one."""
 
+import re
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 
 from config.env import env_int, env_str
@@ -43,6 +45,14 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+# URL prefix of the Django admin, without slashes. The compose stack passes the same value to
+# Caddy, which lets only the allowed networks reach it (plan §7.3).
+ADMIN_URL_PATH = env_str("DJANGO_ADMIN_URL_PATH", "admin")
+if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", ADMIN_URL_PATH):
+    raise ImproperlyConfigured(
+        "DJANGO_ADMIN_URL_PATH must be 1 to 64 letters, digits, '-' or '_' (no slashes)"
+    )
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 

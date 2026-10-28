@@ -71,7 +71,7 @@ Python 3.14 · Django 6.1 (6.2 LTS = B1) · PostgreSQL 18 + psycopg 3 · htmx **
 
 ## Commands
 
-Keep current. The Python commands exist since M1.1; the Docker and `e2e` ones arrive with M1.5 and M8.2.
+Keep current. The Python commands exist since M1.1, the Docker ones since M1.5; the `e2e` one arrives with M8.2.
 
 ```bash
 uv sync
@@ -87,16 +87,18 @@ uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/che
 uv run python scripts/check_migrations_reversible.py   # scratch database only: migrates to zero and back
 uv run pytest -m e2e     # M8.2: Playwright against the compose stack
 
-# M1.5 onwards
+# Compose stack (M1.5); docker_compose/gmat_m8/README.md has the rest
 cd docker_compose/gmat_m8 && bash init.sh
 docker compose up -d --build --wait                  # https://localhost:8443
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo   # arrives with M3
+LIVE_REQUIRED=1 uv run pytest -m live               # smoke tests against the running stack (CADDY_READ_BODY_TIMEOUT=5s in .env)
+docker build -f docker/app/Dockerfile --target runtime -t gmat-m8:local .   # images alone
 ```
 
 ## Layout
 
-`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, `logging.py` redaction, urls/wsgi/asgi) · `apps/<app>/` (`core`: security cache, checks, middleware, admin base classes; `accounts`: user, allauth/MFA adapters, sessions, admin site) · `templates/` · `static/` (`src/app.css` Tailwind entry, `js/`; built CSS in `dist/` is git-ignored) · `docker/{app,backup,postgres}` (image sources, entrypoint, backup scripts, DB role bootstrap) · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` (shared helpers in `tests/support.py`) · `docs/adr/` (decisions) · `docs/security.md` (security baseline) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest). Mail is configured with Django 6.1's `MAILERS`, not `EMAIL_BACKEND`.
+`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, `logging.py` redaction, urls/wsgi/asgi) · `apps/<app>/` (`core`: security cache, checks, middleware, admin base classes; `accounts`: user, allauth/MFA adapters, sessions, admin site) · `templates/` · `static/` (`src/app.css` Tailwind entry, `js/`; built CSS in `dist/` is git-ignored) · `docker/{app,backup,postgres}` (image sources, entrypoint, backup scripts, DB role bootstrap) · `docker_compose/gmat_m8/` (the stack: compose files and overlays, Caddyfile, env templates, `init.sh`) · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` (`live` runs against a started stack) (shared helpers in `tests/support.py`) · `docs/adr/` (decisions) · `docs/security.md` (security baseline) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest). Mail is configured with Django 6.1's `MAILERS`, not `EMAIL_BACKEND`.
 
 ## Testing
 

@@ -1,0 +1,11 @@
+# Environment files hold generated secrets: only the *.example templates are committed.
+.env
+*.env
+!*.env.example
+!*.env.production.example
+
+# Runtime state
+backups/
+flags/
+media/
+*.log

@@ -70,7 +70,12 @@ run_backup() {
     media="$BACKUP_DIR/$base.media"
 
     mkdir -p "$BACKUP_DIR"
-    chmod 0700 "$BACKUP_DIR"
+    # Files are 0600 whatever the directory mode; the directory itself should be 0700 and
+    # owned by uid 1000 (init.sh prepares it). A bind mount owned by someone else only warns.
+    if [ "$(stat -c %a "$BACKUP_DIR")" != 700 ]; then
+        chmod 0700 "$BACKUP_DIR" 2>/dev/null \
+            || log "WARNING: $BACKUP_DIR is not mode 0700 and cannot be changed by uid $(id -u)"
+    fi
     # Two backups never overlap (cron against a pre-deploy run).
     exec 9>"$BACKUP_DIR/.backup.lock"
     flock -n 9 || die "another backup is already running"
@@ -183,6 +188,11 @@ heartbeat() {
     curl -fsS -m 10 --retry 2 -o /dev/null "${BACKUP_HEARTBEAT_URL%/}${1:+/$1}" \
         || log "heartbeat ping failed"
 }
+
+# Invoked through the `backup-now` link: `backup-now --label X` is `backup.sh run --label X`.
+if [ "$(basename "$0")" = "backup-now" ]; then
+    set -- run "$@"
+fi
 
 case "${1:-daemon}" in
     daemon) daemon ;;

@@ -1,0 +1,251 @@
+# gmat-m8: the full stack with safe defaults (localhost, Caddy's internal CA, local build).
+#
+#   bash init.sh                                  # env files with generated secrets
+#   docker compose up -d --build --wait           # https://localhost:8443
+#
+# Overlays: docker-compose.dev.yml (development), docker-compose.production.yml (VPS, images
+# by digest), docker-compose.restore-drill.yml (offline restore drill). See README.md.
+#
+# Networks (plan §7.2, F64, F74): one internal network per database client, so web, worker,
+# backup and migrate never share a network and cannot reach each other; `edge` holds only
+# Caddy and web; only Caddy publishes ports, through `ingress`.
+name: gmat-m8
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardened: &hardened
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  logging: *logging
+
+x-app: &app
+  <<: *hardened
+  image: ${APP_IMAGE:-gmat-m8:local}
+  env_file: app.env
+  user: "1000:1000"
+  tmpfs: [/tmp]
+  pids_limit: 256
+
+services:
+  caddy:
+    <<: *hardened
+    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    # Root inside the container with every capability dropped except the one needed to bind
+    # the published ports: the data and config volumes are root-owned, and a read-only root
+    # filesystem plus no other capability leaves nothing to abuse. (uid 1000 would need a
+    # volume-ownership init step for no gain.)
+    cap_add: [NET_BIND_SERVICE]
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${HTTP_PORT:-8080}:${HTTP_PORT:-8080}"
+      - "${BIND_IP:-127.0.0.1}:${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-internal@localhost}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
+      HTTPS_PORT_SUFFIX: ":${HTTPS_PORT:-8443}"
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-15MB}
+      CADDY_READ_BODY_TIMEOUT: ${CADDY_READ_BODY_TIMEOUT:-120s}
+      HTTP_PROTOCOLS: ${HTTP_PROTOCOLS:-h1 h2}
+      ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
+      ADMIN_ALLOWED_CIDRS: ${ADMIN_ALLOWED_CIDRS:-0.0.0.0/0 ::/0}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/maintenance:/srv/maintenance:ro
+      - ./flags:/srv/flags:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs: [/tmp]
+    networks: [ingress, edge]
+    depends_on:
+      web:
+        condition: service_started
+    # TCP only: the maintenance gate answers 503 on purpose and must not make Caddy unhealthy.
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 $${HTTPS_PORT}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    mem_limit: 128m
+    pids_limit: 128
+
+  migrate:
+    <<: *app
+    command: ["migrate"]
+    restart: "no"
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-gmat}
+      DB_USER: ${GMAT_DB_OWNER_USER:?run init.sh}
+      DB_PASSWORD: ${GMAT_DB_OWNER_PASSWORD:?run init.sh}
+    networks: [db_migrate]
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 384m
+
+  web:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: docker/app/Dockerfile
+      target: runtime
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    command: ["web"]
+    expose: ["8000"]
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-gmat}
+      DB_USER: ${GMAT_DB_RUNTIME_USER:?run init.sh}
+      DB_PASSWORD: ${GMAT_DB_RUNTIME_PASSWORD:?run init.sh}
+      # Only Caddy, on the pinned edge subnet, may set forwarded headers.
+      FORWARDED_ALLOW_IPS: ${EDGE_SUBNET:-172.30.80.0/24}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      # The same prefix Caddy restricts to ADMIN_ALLOWED_CIDRS.
+      DJANGO_ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
+    networks: [edge, db_web]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/docker/app/entrypoint.sh", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    mem_limit: 512m
+
+  db:
+    <<: *hardened
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    # The entrypoint starts as root, prepares the data directory and drops to postgres.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    command:
+      - postgres
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=60
+      - -c
+      - log_min_duration_statement=1000
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gmat}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run init.sh}
+      POSTGRES_INITDB_ARGS: "--auth=scram-sha-256"
+      GMAT_DB_OWNER_USER: ${GMAT_DB_OWNER_USER:?run init.sh}
+      GMAT_DB_OWNER_PASSWORD: ${GMAT_DB_OWNER_PASSWORD:?run init.sh}
+      GMAT_DB_RUNTIME_USER: ${GMAT_DB_RUNTIME_USER:?run init.sh}
+      GMAT_DB_RUNTIME_PASSWORD: ${GMAT_DB_RUNTIME_PASSWORD:?run init.sh}
+      GMAT_DB_BACKUP_USER: ${GMAT_DB_BACKUP_USER:?run init.sh}
+      GMAT_DB_BACKUP_PASSWORD: ${GMAT_DB_BACKUP_PASSWORD:?run init.sh}
+    volumes:
+      - pg_data:/var/lib/postgresql
+      - ../../docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    # The database is never published. Every client has its own internal network.
+    networks: [db_web, db_worker, db_backup, db_migrate]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    stop_grace_period: 60s
+    mem_limit: 768m
+    pids_limit: 256
+
+  backup:
+    <<: *hardened
+    image: ${BACKUP_IMAGE:-gmat-m8-backup:local}
+    build:
+      context: ../..
+      dockerfile: docker/backup/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    user: "1000:1000"
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-gmat}
+      PGUSER: ${GMAT_DB_BACKUP_USER:?run init.sh}
+      PGPASSWORD: ${GMAT_DB_BACKUP_PASSWORD:?run init.sh}
+      APP_VERSION: ${APP_VERSION:-dev}
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-}
+      BACKUP_HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
+    volumes:
+      - ./backups:/backups
+    tmpfs:
+      - /tmp
+      # The base image declares a data volume; a tmpfs keeps Docker from creating an
+      # anonymous one on every start.
+      - /var/lib/postgresql
+      - /scratch:uid=1000,gid=1000,mode=0700,size=${BACKUP_SCRATCH_SIZE:-1g}
+    networks: [db_backup, egress]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Alive, and the last successful backup (if any) is younger than 7 hours.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pidof supercronic >/dev/null
+          && { [ ! -f /backups/.last-success ] || [ -n "$$(find /backups/.last-success -mmin -420)" ]; }
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 384m
+    pids_limit: 128
+
+networks:
+  # Shared only by Caddy and web; internal, so web has no route out.
+  edge:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.30.80.0/24}
+  # Caddy's way to the outside world (published ports, ACME). Nothing else joins it.
+  ingress: {}
+  db_web:
+    internal: true
+  db_worker:
+    internal: true
+  db_backup:
+    internal: true
+  db_migrate:
+    internal: true
+  # Outbound SMTP for the worker (M2.5) and offsite storage for the backup.
+  egress: {}
+
+volumes:
+  pg_data:
+  caddy_data:
+  caddy_config:

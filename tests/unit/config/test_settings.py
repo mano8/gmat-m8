@@ -39,7 +39,7 @@ def load_prod(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
 
     def _load(**overrides: str | None) -> object:
         env = {**GOOD_ENV, **overrides}
-        for name in [*GOOD_ENV, "DJANGO_DEBUG", "DJANGO_HSTS_SECONDS"]:
+        for name in [*GOOD_ENV, "DJANGO_DEBUG", "DJANGO_HSTS_SECONDS", "DJANGO_ADMIN_URL_PATH"]:
             monkeypatch.delenv(name, raising=False)
         for name, value in env.items():
             if value is not None:
@@ -63,6 +63,11 @@ def test_good_production_environment_loads(load_prod) -> None:  # type: ignore[n
     assert settings.CSRF_COOKIE_NAME == "__Host-csrftoken"
     assert settings.SECURE_HSTS_SECONDS == 31536000
     assert settings.MAILERS["default"]["BACKEND"] == "apps.core.mail.DisabledEmailBackend"
+
+
+def test_admin_url_path_is_configurable_and_defaults_to_admin(load_prod) -> None:  # type: ignore[no-untyped-def]
+    assert load_prod().ADMIN_URL_PATH == "admin"
+    assert load_prod(DJANGO_ADMIN_URL_PATH="ops-x7_k").ADMIN_URL_PATH == "ops-x7_k"
 
 
 def test_good_production_environment_passes_deploy_checks(load_prod) -> None:  # type: ignore[no-untyped-def]
@@ -103,6 +108,10 @@ def test_health_endpoints_are_exempt_from_the_https_redirect(load_prod) -> None:
         {"MFA_ENCRYPTION_KEYS": derived_fernet_key("development")},
         {"MFA_ENCRYPTION_KEYS": derived_fernet_key("test")},
         {"MFA_ENCRYPTION_KEYS": "change-me"},
+        {"DJANGO_ADMIN_URL_PATH": "ad/min"},
+        {"DJANGO_ADMIN_URL_PATH": "/admin"},
+        {"DJANGO_ADMIN_URL_PATH": "admin!"},
+        {"DJANGO_ADMIN_URL_PATH": "a" * 65},
     ],
 )
 def test_broken_production_environment_is_refused(load_prod, overrides) -> None:  # type: ignore[no-untyped-def]

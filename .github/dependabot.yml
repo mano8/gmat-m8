@@ -1,9 +1,8 @@
 version: 2
 
 # Monthly, minor and patch updates grouped. Major updates arrive as separate PRs.
-# The `docker-compose` ecosystem (docker_compose/gmat_m8) is added with the files it watches
-# in M1.5; Dependabot reports an error for a directory that does not exist. A base image that
-# moves for the application image (Python) moves for fa-auth-m8 too; review them together.
+# A base image that moves for the application image (Python) moves for fa-auth-m8 too;
+# review them together.
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -33,6 +32,16 @@ updates:
       prefix: "deps"
     groups:
       app-image:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "docker-compose"
+    directory: "/docker_compose/gmat_m8"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "deps"
+    groups:
+      stack-images:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "docker"
