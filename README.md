@@ -72,7 +72,7 @@ Coverage must stay at 90 % or more overall (100 % for `apps/access` and every `s
 | `typecheck` | mypy (strict, django-stubs) |
 | `security` | bandit (medium and above), pip-audit on the locked set, Trivy filesystem scan (HIGH and CRITICAL, no `--ignore-unfixed`) |
 | `test` | PostgreSQL 18 service, no missing migrations, pytest with the 90 % coverage floor, 100 % gate for `apps/access`, `services.py` and `selectors.py`, migrations reversible |
-| `trivy-image` | Trivy over the app and backup images (placeholder until M1.4) |
+| `trivy-image` | builds the app and backup images and gates both with Trivy |
 | `secret-scan` | gitleaks over the full history |
 | `compose-smoke-gate` | from `compose-smoke.yaml` (M1.5) |
 

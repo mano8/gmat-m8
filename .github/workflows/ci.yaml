@@ -222,15 +222,153 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-  # Placeholder until M1.4 adds the app and backup images. The job exists now so the
-  # required check name is stable; M1.4 replaces the body with build + Trivy gate
-  # (HIGH,CRITICAL, no --ignore-unfixed, .trivyignore.yaml) for both images.
+  # Builds both releasable images (amd64), proves the app image's run-time posture and holds
+  # each to the Trivy gate of plan §8.3: HIGH and CRITICAL, no --ignore-unfixed, exceptions
+  # only from .trivyignore.yaml.
   trivy-image:
     name: trivy-image
     runs-on: ubuntu-latest
     steps:
-      - name: No images yet
-        run: echo "No images are built before M1.4; nothing to scan."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build the application image (runtime target)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/app/Dockerfile
+          target: runtime
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: gmat-m8:ci-scan
+          build-args: |
+            VCS_REF=${{ github.sha }}
+
+      - name: Build the backup image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/backup/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: gmat-m8-backup:ci-scan
+          build-args: |
+            VCS_REF=${{ github.sha }}
+
+      # uid 1000, read-only root filesystem, no capabilities, and `check --deploy` with
+      # production settings and throwaway values (nothing here is a secret).
+      - name: App image runs as uid 1000 on a read-only root filesystem
+        run: |
+          set -euo pipefail
+          run=(docker run --rm --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges)
+          test "$("${run[@]}" --entrypoint id gmat-m8:ci-scan -u)" = "1000"
+          if "${run[@]}" --entrypoint touch gmat-m8:ci-scan /app/not-writable 2>/dev/null; then
+            echo "the root filesystem is writable" >&2
+            exit 1
+          fi
+          "${run[@]}" \
+            -e DJANGO_SECRET_KEY="$(openssl rand -base64 60 | tr -d '\n=+/')" \
+            -e MFA_ENCRYPTION_KEYS="$(openssl rand -base64 32 | tr '+/' '-_')" \
+            -e DJANGO_ALLOWED_HOSTS=localhost \
+            -e DJANGO_CSRF_TRUSTED_ORIGINS=https://localhost:8443 \
+            -e DB_NAME=gmat -e DB_USER=gmat -e DB_PASSWORD=unused-in-check -e DB_HOST=db \
+            gmat-m8:ci-scan check
+
+      - name: Backup image runs as uid 1000 and has no unused privilege helper
+        run: |
+          set -euo pipefail
+          run=(docker run --rm --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges)
+          test "$("${run[@]}" --entrypoint id gmat-m8-backup:ci-scan -u)" = "1000"
+          if "${run[@]}" --entrypoint sh gmat-m8-backup:ci-scan -c 'test -e /usr/local/bin/gosu'; then
+            echo "gosu must not be present" >&2
+            exit 1
+          fi
+
+      # Full report first (every severity, never fails), then the gate.
+      - name: Trivy report, application image (all severities)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_IGNOREFILE: ""
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: gmat-m8:ci-scan
+          format: json
+          output: trivy-gmat-m8-report.json
+          exit-code: "0"
+
+      - name: Trivy report, backup image (all severities)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_IGNOREFILE: ""
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: gmat-m8-backup:ci-scan
+          format: json
+          output: trivy-gmat-m8-backup-report.json
+          exit-code: "0"
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trivy-image-reports
+          path: trivy-*-report.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Trivy gate, application image (HIGH and CRITICAL, vulnerabilities and secrets)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: gmat-m8:ci-scan
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      - name: Trivy gate, backup image (HIGH and CRITICAL, vulnerabilities and secrets)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: gmat-m8-backup:ci-scan
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+  # Not a required check: proves both images also build for arm64 (published multi-arch in
+  # M1.7). Runs under emulation, so it is slow and kept out of the gate.
+  images-arm64:
+    name: images-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build the application image for arm64
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/app/Dockerfile
+          target: runtime
+          platforms: linux/arm64
+          push: false
+
+      - name: Build the backup image for arm64
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/backup/Dockerfile
+          platforms: linux/arm64
+          push: false
 
   secret-scan:
     name: secret-scan

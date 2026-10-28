@@ -1,0 +1,6 @@
+/* Tailwind v4 entry. `source(none)` plus explicit @source lines keep the scan to the
+   templates and the one small JS file; the UI shell (M1.6) adds the theme tokens. */
+@import "tailwindcss" source(none);
+@source "../../templates";
+@source "../../apps";
+@source "../js";

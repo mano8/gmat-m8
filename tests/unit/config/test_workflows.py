@@ -90,5 +90,42 @@ def test_trivy_gate_does_not_ignore_unfixed() -> None:
 def test_dependabot_covers_the_ecosystems_in_use() -> None:
     config = _load(ROOT / ".github" / "dependabot.yml")
     ecosystems = {update["package-ecosystem"] for update in config["updates"]}
-    assert {"github-actions", "uv"} <= ecosystems
+    assert {"github-actions", "uv", "docker"} <= ecosystems
+    docker_dirs = {u["directory"] for u in config["updates"] if u["package-ecosystem"] == "docker"}
+    assert docker_dirs == {"/docker/app", "/docker/backup"}
     assert all(update["schedule"]["interval"] == "monthly" for update in config["updates"])
+
+
+def test_trivy_image_job_builds_and_gates_both_images() -> None:
+    job = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["trivy-image"]
+    steps = job["steps"]
+    built = {
+        step["with"]["file"]: step["with"]
+        for step in steps
+        if str(step.get("uses", "")).startswith("docker/build-push-action@")
+    }
+    assert built.keys() == {"docker/app/Dockerfile", "docker/backup/Dockerfile"}
+    assert all(with_["load"] is True and with_["push"] is False for with_ in built.values())
+    gates = [
+        step["with"]
+        for step in steps
+        if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
+        and step["with"].get("exit-code") == "1"
+    ]
+    assert {gate["image-ref"] for gate in gates} == {"gmat-m8:ci-scan", "gmat-m8-backup:ci-scan"}
+    assert all(gate["severity"] == "CRITICAL,HIGH" for gate in gates)
+    # The all-severity reports ignore the exception file so they stay complete.
+    reports = [
+        step
+        for step in steps
+        if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
+        and step["with"].get("format") == "json"
+    ]
+    assert len(reports) == 2
+    assert all(report["env"]["TRIVY_IGNOREFILE"] == "" for report in reports)
+
+
+def test_arm64_images_build_outside_the_required_checks() -> None:
+    workflow = _load(ROOT / ".github" / "workflows" / "ci.yaml")
+    assert "images-arm64" in workflow["jobs"]
+    assert "images-arm64" not in REQUIRED_JOBS

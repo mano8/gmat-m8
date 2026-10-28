@@ -1,0 +1,8 @@
+# supercronic, user "backup" (uid 1000). All times UTC. Job output is logged by supercronic,
+# so `docker compose logs backup` shows every run.
+
+# Snapshot-consistent dump + manifest + offsite upload, every 6 hours.
+0 */6 * * * /usr/local/bin/backup.sh run
+
+# Weekly proof that the newest dump restores and matches its manifest (scratch database).
+30 3 * * 0 /usr/local/bin/restore.sh --verify

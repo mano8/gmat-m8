@@ -72,6 +72,17 @@ No mail is sent from a request. Until the outbox and worker exist (M2.5), produc
 
 `manage.py check --deploy` passes with zero warnings under production settings. M2.5 adds `OUTBOX_ENCRYPTION_KEYS` and makes the outbox the only production mail backend.
 
+## Images, database roles and backups (step M1.4)
+
+Sources: `docker/app/`, `docker/backup/`, `docker/postgres/initdb/`. CI builds both images and holds them to the Trivy gate (`trivy-image`).
+
+- **Application image** (`docker/app/Dockerfile`): `python:3.14-slim` pinned by digest, stages `assets` (Tailwind standalone CLI, sha256-verified) → `builder` (`uv sync --frozen --no-dev`, hashes from `uv.lock`) → `runtime`, plus a `dev` target. Runs as uid/gid 1000 on a read-only root filesystem; source is owned by root; pip is removed; `collectstatic` runs with `config.settings.build` (no database, no secret). `entrypoint.sh` is the only entry point (`web`, `migrate`, `check`, `migrate-plan`, `healthcheck`, `manage`; `worker` arrives with M2.5, `verify-internal` and `post-restore-reconcile` with M8.4).
+- **Gunicorn** (`gunicorn.conf.py`): `gthread`, access log off (Caddy is the access log), no control socket, and `FORWARDED_ALLOW_IPS` must list the edge subnet: it refuses to start with a wildcard or an empty value. Its error log uses the same JSON formatter and redaction filter as Django.
+- **Database roles** (`10-roles.sh`, run once at database initialisation, idempotent): `owner` (owns the schema; used only by the one-shot `migrate`), `runtime` (SELECT/INSERT/UPDATE/DELETE only; owns nothing, so it cannot alter or drop tables, triggers or the audit table) and `backup` (`pg_read_all_data`, read-only sessions). All use `scram-sha-256`. The script refuses placeholder or short passwords, repeated names or passwords, and a role password equal to the bootstrap superuser's.
+- **Backups** (`docker/backup/`): every 6 hours and on demand (`backup-now [--label]`). A psql session takes the advisory lock `gmat:media-backup` (key `hashtextextended('gmat:media-backup', 0)`; the worker's media purge uses the same key with `pg_try_advisory_lock`), opens a `REPEATABLE READ READ ONLY` transaction and exports its snapshot. `pg_dump -Fc --snapshot` leaves out the data of `django_session` and `django_cache`, and the manifest queries (row counts of every table, migration head, newest audit event) run in the same snapshot, so dump and manifest agree under concurrent writes. The media directory, when there is one, is copied under the lock and checksummed. Files are mode 0600 in a 0700 directory and kept 3 days locally. The offsite upload uses restic with a fixed host and tags and **never prunes**; `forget`/`prune` run only from the maintainer's machine (plan §9).
+- **`restore --verify`** (weekly, and on demand) restores the newest dump into a private PostgreSQL started inside the backup container on a unix socket (no network, no write right on the real database), then compares every row count, the migration head and the newest audit event with the manifest. Tables whose data is excluded must come back empty.
+- **Exceptions** in `.trivyignore.yaml` are Debian base-image packages with no fixed version yet; each has a statement, an owner and an expiry at most 90 days away, and needs the maintainer's explicit approval in the PR.
+
 ## Still to come
 
 - M2.3: the access engine (`authorize_in_txn`, principals, privileged roles for MFA and session lifetimes, `GROUP_ADMIN` in the admin).

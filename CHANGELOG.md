@@ -12,7 +12,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - `scripts/check_access_rules.py`, a static guard for banned constructs and forbidden workflow triggers.
 - Dependency management with uv (`pyproject.toml`, universal `uv.lock`) and tool configuration for ruff, mypy, pytest and coverage.
 - Repository hygiene files, pre-commit configuration, agent deny rules, architecture decision records (ADR-0001 to ADR-0013) and a pull-request template.
-- CI pipeline (`.github/workflows/ci.yaml`): `lint`, `typecheck`, `security`, `test`, `trivy-image` (placeholder until M1.4) and `secret-scan`, with a PostgreSQL 18 service, coverage gates, migration reversibility, Trivy policy without `--ignore-unfixed` and an empty `.trivyignore.yaml`.
+- CI pipeline (`.github/workflows/ci.yaml`): `lint`, `typecheck`, `security`, `test`, `trivy-image` and `secret-scan`, with a PostgreSQL 18 service, coverage gates, migration reversibility, Trivy policy without `--ignore-unfixed` and `.trivyignore.yaml` for documented, expiring exceptions.
 - Guards `scripts/check_security_floors.py`, `check_trivyignore.py`, `check_coverage_gates.py` and `check_migrations_reversible.py`, workflow policy tests and a monthly Dependabot configuration.
 - Security baseline ([docs/security.md](docs/security.md)):
   - django-allauth with email login, closed sign-up, no email-management, email-confirmation or login-by-code views, POST-only logout, no account enumeration, and a password reset that never logs in and is redeemed under the user-row lock;
@@ -23,6 +23,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - CSP, `Permissions-Policy`, `__Host-` cookies, `no-store` for authenticated and token pages, `Clear-Site-Data` on logout, request ids;
   - JSON logging with token redaction on every handler, a redacting error-report filter and an error-tracker scrubber;
   - fail-closed system checks (`gmat.E001`–`gmat.E017`).
+- Container images (M1.4):
+  - application image `docker/app` (digest-pinned Python base, Tailwind and uv build stages, uid 1000, read-only root filesystem, `entrypoint.sh` with `web`, `migrate`, `check`, `migrate-plan`, `healthcheck` and `manage`, Gunicorn `gthread` with the access log off and the error log redacted) and a `dev` target;
+  - backup image `docker/backup` (`backup-now`, `restore --verify`, snapshot-consistent dumps without session and cache data, manifest queries in the same snapshot, append-only restic upload, 6-hour schedule);
+  - `docker/postgres/initdb/10-roles.sh` creating the owner, runtime and backup roles with `scram-sha-256` and refusing weak or placeholder passwords;
+  - the real `trivy-image` job (both images, HIGH and CRITICAL, no `--ignore-unfixed`) and a non-required arm64 build job; Dependabot watches both Dockerfiles.
 
 ### Changed
 
