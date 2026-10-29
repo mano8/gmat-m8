@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Shared helpers for backup.sh and restore.sh. Sourced, never executed.
+# shellcheck disable=SC2034  # the variables below are used by the scripts that source this file
 
 : "${BACKUP_DIR:=/backups}"
 : "${BACKUP_SCRATCH_DIR:=/scratch}"

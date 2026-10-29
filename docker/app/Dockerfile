@@ -42,6 +42,9 @@ RUN tailwindcss --input static/src/app.css --output static/dist/app.css --minify
 # ---------- locale: compiled message catalogs (the .mo files are not committed) ----------
 FROM --platform=$BUILDPLATFORM ${PYTHON_IMAGE} AS locale
 
+# Build-only stage: nothing from it but the .mo files reaches the runtime image, and the base
+# image is pinned by digest, so the gettext version is not pinned separately.
+# hadolint ignore=DL3008
 RUN apt-get update     && apt-get install -y --no-install-recommends gettext     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY locale ./locale

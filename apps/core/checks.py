@@ -28,7 +28,7 @@ PRODUCTION_MAIL_BACKENDS = frozenset({"apps.core.mail.DisabledEmailBackend"})
 ALLAUTH_BASELINE: dict[str, Any] = {
     "ACCOUNT_PREVENT_ENUMERATION": True,
     "ACCOUNT_LOGOUT_ON_GET": False,
-    "ACCOUNT_LOGIN_ON_PASSWORD_RESET": False,
+    "ACCOUNT_LOGIN_ON_PASSWORD_RESET": False,  # nosec B105
     "ACCOUNT_LOGIN_BY_CODE_ENABLED": False,
     "ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS": False,
     "MFA_TRUST_ENABLED": False,

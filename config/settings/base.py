@@ -105,7 +105,7 @@ PASSWORD_RESET_TIMEOUT = 3600  # one hour (plan §5)
 
 # --- allauth (plan §5, "Identity, sessions and MFA"; floor 65.20.1) ---------------------
 ACCOUNT_ADAPTER = "apps.accounts.adapters.AccountAdapter"
-ACCOUNT_FORMS = {"reset_password_from_key": "apps.accounts.forms.ResetPasswordKeyForm"}
+ACCOUNT_FORMS = {"reset_password_from_key": "apps.accounts.forms.ResetPasswordKeyForm"}  # nosec B105
 ACCOUNT_LOGIN_METHODS = {"email"}
 # Sign-up is closed; the login form still reads the password field from this list.
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
@@ -126,10 +126,10 @@ ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
 ACCOUNT_EMAIL_SUBJECT_PREFIX = "[gmat-m8] "
 ACCOUNT_RATE_LIMITS = {
-    "change_password": "5/m/user",
-    "reset_password": "20/m/ip,5/m/key",
+    "change_password": "5/m/user",  # nosec B105
+    "reset_password": "20/m/ip,5/m/key",  # nosec B105
     "reauthenticate": "10/m/user",
-    "reset_password_from_key": "20/m/ip",
+    "reset_password_from_key": "20/m/ip",  # nosec B105
     "login": "30/m/ip",
     "login_failed": "10/m/ip,5/5m/key",
 }

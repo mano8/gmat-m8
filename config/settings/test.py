@@ -11,7 +11,7 @@ import os
 _TEST_ENV = {
     "DB_NAME": "gmat",
     "DB_USER": "gmat",
-    "DB_PASSWORD": "gmat_test_pw",
+    "DB_PASSWORD": "gmat_test_pw",  # nosec B105
     "DB_HOST": "localhost",
     "DB_PORT": "5432",
 }
@@ -23,7 +23,7 @@ from config.settings.base import *  # noqa: E402, F403
 from config.settings.base import database_from_env  # noqa: E402
 
 DEBUG = False
-SECRET_KEY = "test-only-secret-key-not-for-any-deployment-1234567890abcdefghijkl"  # noqa: S105
+SECRET_KEY = "test-only-secret-key-not-for-any-deployment-1234567890abcdefghijkl"  # noqa: S105  # nosec B105
 ALLOWED_HOSTS = ["testserver", "localhost"]
 DATABASES = {"default": database_from_env()}
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
