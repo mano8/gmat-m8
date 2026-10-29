@@ -2,14 +2,17 @@
 
 import hashlib
 import json
+import os
 import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
+from django.conf import settings
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.management import call_command
+from django.core.signals import setting_changed
 from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
 from django.test import Client, RequestFactory, override_settings
@@ -37,11 +40,20 @@ def assert_csp_clean(html: str) -> None:
 
 @pytest.fixture(scope="module")
 def compiled_locale() -> Iterator[None]:
-    """Compile the catalogs (the .mo files are not committed); skip without gettext."""
+    """Compile the catalogs (the .mo files are not committed); skip without gettext.
+
+    CI installs gettext, so there a missing tool is a failure rather than a silent skip.
+    """
     try:
         call_command("compilemessages", verbosity=0)
     except Exception as error:
+        if os.environ.get("CI"):
+            raise
         pytest.skip(f"gettext tools are not available: {error}")
+    # Earlier tests may have cached empty catalogs; Django's LOCALE_PATHS handler drops them.
+    setting_changed.send(
+        sender=None, setting="LOCALE_PATHS", value=settings.LOCALE_PATHS, enter=False
+    )
     yield
 
 
@@ -104,7 +116,7 @@ class TestBaseLayout:
 
 class TestAppShell:
     def test_signed_in_pages_have_both_navigations_and_the_active_entry(
-        self, client: Client, make_user: Callable[..., User]
+        self, client: Client, make_user: Callable[..., User], compiled_locale: None
     ) -> None:
         client.force_login(make_user())
         html = client.get(reverse("core:home")).content.decode()
@@ -121,7 +133,9 @@ class TestAppShell:
         html = client.get(reverse("core:home")).content.decode()
         assert not re.search(r"<a [^>]*href=\"/accounts/logout/\"", html)
 
-    def test_anonymous_pages_have_no_app_navigation(self, client: Client) -> None:
+    def test_anonymous_pages_have_no_app_navigation(
+        self, client: Client, compiled_locale: None
+    ) -> None:
         html = client.get(reverse("account_login")).content.decode()
         assert "Navegación principal" not in html
         assert 'id="language"' in html
