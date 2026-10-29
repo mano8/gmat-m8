@@ -1,0 +1,14 @@
+{% comment %}
+  Button or link styled as a button.
+  Parameters: label; variant ("primary", "danger", "link" or empty); type ("submit" or "button",
+  default "button"); href (renders a link instead); block (true for full width).
+{% endcomment %}
+{% if href %}
+  <a href="{{ href }}"
+     class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if block %} btn-block{% endif %}">{{ label }}</a>
+{% else %}
+  <button type="{{ type|default:'button' }}"
+          class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if block %} btn-block{% endif %}">
+    {{ label }}
+  </button>
+{% endif %}

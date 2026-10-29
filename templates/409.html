@@ -1,0 +1,12 @@
+{% extends "errors/base_error.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Conflict" %} · gmat-m8
+{% endblock head_title %}
+{% block code %}409{% endblock code %}
+{% block heading %}
+  {% translate "That conflicts with a recent change" %}
+{% endblock heading %}
+{% block message %}
+  {% translate "Reload the page to see the latest data, then try again." %}
+{% endblock message %}

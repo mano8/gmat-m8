@@ -1,0 +1,13 @@
+{% extends "errors/base_error.html" %}
+{% load i18n %}
+{% comment %}Django's CSRF failure view: an expired form, a stale tab, a missing or foreign token. The reason stays in the log.{% endcomment %}
+{% block head_title %}
+  {% translate "Form expired" %} · gmat-m8
+{% endblock head_title %}
+{% block code %}403{% endblock code %}
+{% block heading %}
+  {% translate "That form has expired" %}
+{% endblock heading %}
+{% block message %}
+  {% translate "Reload the page and send it again." %}
+{% endblock message %}

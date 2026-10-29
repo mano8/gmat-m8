@@ -1,0 +1,107 @@
+[project]
+name = "gmat-m8"
+version = "0.1.0"
+description = "Materials app for electrical-installation companies: requests, purchasing, receiving and handovers"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+license = { file = "LICENSE" }
+dependencies = [
+  "django>=6.1,<6.2",
+  "psycopg[binary]>=3.2",
+  "django-allauth[mfa]>=65.20.1",
+  "django-htmx>=1.23",
+  "whitenoise>=6.9",
+  "gunicorn>=23.0",
+  "argon2-cffi>=23.1",
+  "cryptography>=46.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-django>=4.9",
+  "pytest-cov>=6.0",
+  "factory-boy>=3.3",
+  "hypothesis>=6.120",
+  "ruff>=0.14",
+  "mypy>=1.14",
+  "django-stubs[compatible-mypy]>=5.1",
+  "djlint>=1.36",
+  "bandit>=1.8",
+  "pip-audit>=2.9",
+  "pyyaml>=6.0",
+  "types-pyyaml>=6.0",
+]
+e2e = [
+  "pytest-playwright>=0.7",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+# --- ruff ---------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+extend-exclude = ["**/migrations/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "S", "C4", "SIM", "RUF"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+# --- mypy ---------------------------------------------------------------
+[tool.mypy]
+python_version = "3.14"
+plugins = ["mypy_django_plugin.main"]
+strict = true
+warn_unreachable = true
+exclude = ["migrations/"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+# allauth ships annotations but no py.typed marker: analyze its source so its classes are
+# typed (errors inside it are not reported).
+[[tool.mypy.overrides]]
+module = ["allauth", "allauth.*"]
+follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+# --- pytest -------------------------------------------------------------
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+addopts = "--strict-markers --strict-config -ra"
+filterwarnings = [
+  # WhiteNoise warns when collectstatic has not run; irrelevant under test.
+  "ignore:No directory at:UserWarning",
+]
+markers = [
+  "integration: concurrency, constraints, triggers and migrations (PostgreSQL)",
+  "live: against the running compose stack",
+  "e2e: Playwright against the compose stack",
+]
+
+# --- coverage -----------------------------------------------------------
+[tool.coverage.run]
+branch = true
+source = ["apps", "config"]
+omit = ["*/migrations/*", "config/settings/build.py", "config/asgi.py", "config/wsgi.py"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]

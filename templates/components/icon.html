@@ -1,0 +1,24 @@
+{% comment %}Decorative 24px outline icon: `name` is home, shield, logout, check or alert.{% endcomment %}
+<svg xmlns="http://www.w3.org/2000/svg"
+     class="size-6 shrink-0"
+     fill="none"
+     viewBox="0 0 24 24"
+     stroke="currentColor"
+     stroke-width="1.8"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     aria-hidden="true"
+     focusable="false">
+  {% if name == "home" %}
+    <path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10" />
+  {% elif name == "shield" %}
+    <path d="M12 3 5 6v5.5c0 4.2 2.9 7.6 7 9.5 4.1-1.9 7-5.3 7-9.5V6l-7-3Z" />
+    <path d="m9 12 2 2 4-4" />
+  {% elif name == "logout" %}
+    <path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15M10 8l-4 4 4 4M6 12h10" />
+  {% elif name == "check" %}
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  {% elif name == "alert" %}
+    <path d="M12 4 3 19.5h18L12 4Zm0 6v4.5m0 2.5v.01" />
+  {% endif %}
+</svg>

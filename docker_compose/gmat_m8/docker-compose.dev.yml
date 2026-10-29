@@ -1,0 +1,91 @@
+# Development overlay: the `dev` image target with the source bind-mounted read-only,
+# `runserver`, Tailwind in watch mode, Mailpit, and the database on 127.0.0.1:5432.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo
+#
+# Development settings (DEBUG, plain-name cookies) sit behind the same Caddy, so the site is
+# still served over https://localhost:8443.
+
+x-dev-app: &dev-app
+  image: gmat-m8:dev
+  environment:
+    DJANGO_SETTINGS_MODULE: config.settings.dev
+
+services:
+  migrate:
+    <<: *dev-app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-gmat}
+      DB_USER: ${GMAT_DB_OWNER_USER:?run init.sh}
+      DB_PASSWORD: ${GMAT_DB_OWNER_PASSWORD:?run init.sh}
+    volumes:
+      - ../..:/app:ro
+
+  web:
+    <<: *dev-app
+    build:
+      context: ../..
+      dockerfile: docker/app/Dockerfile
+      target: dev
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    command: ["runserver"]
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-gmat}
+      DB_USER: ${GMAT_DB_RUNTIME_USER:?run init.sh}
+      DB_PASSWORD: ${GMAT_DB_RUNTIME_PASSWORD:?run init.sh}
+      FORWARDED_ALLOW_IPS: ${EDGE_SUBNET:-172.30.80.0/24}
+      DJANGO_ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
+    volumes:
+      - ../..:/app:ro
+    mem_limit: 768m
+
+  db:
+    # A container that is only on internal networks cannot publish a port: join one more, and
+    # make it the preferred (default-route) network, which is the one Docker publishes through.
+    networks:
+      db_web: {}
+      db_worker: {}
+      db_backup: {}
+      db_migrate: {}
+      devhost:
+        priority: 1000
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  mailpit:
+    image: axllent/mailpit:v1.31.3@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks: [egress]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Rebuilds static/dist/app.css whenever a template changes.
+  tailwind:
+    build:
+      context: ../..
+      dockerfile: docker/app/Dockerfile
+      target: assets
+    image: gmat-m8:assets
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /app
+    command: ["tailwindcss", "--input", "static/src/app.css", "--output", "static/dist/app.css", "--watch=always"]
+    volumes:
+      - ../..:/app
+    restart: unless-stopped
+    networks: [devhost]
+
+networks:
+  devhost: {}

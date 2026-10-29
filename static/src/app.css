@@ -1,0 +1,215 @@
+/* Tailwind v4 entry. `source(none)` plus explicit @source lines keep the scan to the
+   templates, the apps' templates and the one small JS file. Colours are semantic tokens
+   (surface, ink, brand...) defined once for light and dark. */
+@import "tailwindcss" source(none);
+@source "../../templates";
+@source "../../apps";
+@source "../js";
+
+:root {
+  color-scheme: light dark;
+  --surface: #f6f7f9;
+  --surface-raised: #ffffff;
+  --surface-sunken: #eceff3;
+  --line: #d5dae1;
+  --ink: #17202b;
+  --ink-soft: #4b5766;
+  --brand: #0b5cad;
+  --brand-ink: #ffffff;
+  --brand-soft: #dcebf9;
+  --danger: #b42318;
+  --danger-soft: #fde8e6;
+  --ok: #1a7f37;
+  --ok-soft: #dff3e4;
+  --warn: #8a5a00;
+  --warn-soft: #fcefd0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0f141a;
+    --surface-raised: #18202a;
+    --surface-sunken: #121920;
+    --line: #2d3947;
+    --ink: #e8edf3;
+    --ink-soft: #a7b3c2;
+    --brand: #6cb2f2;
+    --brand-ink: #08233f;
+    --brand-soft: #16304a;
+    --danger: #ff8a80;
+    --danger-soft: #3b1714;
+    --ok: #62d27e;
+    --ok-soft: #12301b;
+    --warn: #f2c261;
+    --warn-soft: #3a2b0a;
+  }
+}
+
+@theme inline {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-soft: var(--ink-soft);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-surface font-sans text-ink antialiased;
+  }
+  a {
+    @apply text-brand underline-offset-2 hover:underline;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand;
+  }
+  h1 {
+    @apply text-xl font-semibold tracking-tight sm:text-2xl;
+  }
+  h2 {
+    @apply text-lg font-semibold;
+  }
+}
+
+@layer components {
+  /* --- buttons ------------------------------------------------------------------- */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-raised px-4 py-2 text-base font-medium text-ink no-underline hover:bg-sunken hover:no-underline disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-brand bg-brand text-brand-ink hover:bg-brand/90;
+  }
+  .btn-danger {
+    @apply border-danger bg-danger-soft text-danger hover:bg-danger-soft/70;
+  }
+  .btn-link {
+    @apply border-transparent bg-transparent text-brand hover:bg-transparent hover:underline;
+  }
+  .btn-block {
+    @apply w-full;
+  }
+
+  /* --- surfaces -------------------------------------------------------------------- */
+  .card {
+    @apply rounded-xl border border-line bg-raised p-4 shadow-sm sm:p-6;
+  }
+  .card-title {
+    @apply mb-3 text-lg font-semibold;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full bg-sunken px-2.5 py-0.5 text-sm font-medium text-soft;
+  }
+  .chip-ok {
+    @apply bg-ok-soft text-ok;
+  }
+  .chip-warn {
+    @apply bg-warn-soft text-warn;
+  }
+  .chip-danger {
+    @apply bg-danger-soft text-danger;
+  }
+  .chip-brand {
+    @apply bg-brand-soft text-brand;
+  }
+
+  /* --- forms ------------------------------------------------------------------------ */
+  .field {
+    @apply mb-4;
+  }
+  .field label {
+    @apply mb-1 block text-sm font-medium;
+  }
+  .field input:not([type="checkbox"], [type="radio"], [type="hidden"]),
+  .field select,
+  .field textarea {
+    @apply block min-h-11 w-full rounded-lg border border-line bg-raised px-3 py-2 text-base text-ink placeholder:text-soft;
+  }
+  .field input[type="checkbox"],
+  .field input[type="radio"] {
+    @apply mr-2 size-5 align-middle accent-brand;
+  }
+  .field a {
+    @apply inline-flex min-h-11 items-center;
+  }
+  .field .helptext {
+    @apply mt-1 text-sm text-soft;
+  }
+  .field .helptext ul {
+    @apply list-disc pl-5;
+  }
+  .field-error input,
+  .field-error select,
+  .field-error textarea {
+    @apply border-danger;
+  }
+  .errorlist {
+    @apply mb-2 list-none text-sm text-danger;
+  }
+
+  /* --- messages (toasts) --------------------------------------------------------- */
+  .toast {
+    @apply flex items-start gap-3 rounded-lg border border-line bg-raised p-3 text-base shadow-md;
+  }
+  .toast-success {
+    @apply border-ok bg-ok-soft;
+  }
+  .toast-error {
+    @apply border-danger bg-danger-soft;
+  }
+  .toast-warning {
+    @apply border-warn bg-warn-soft;
+  }
+
+  /* --- table that collapses to cards below the sm breakpoint --------------------- */
+  .table-responsive {
+    @apply w-full border-collapse text-left;
+  }
+  .table-responsive th {
+    @apply px-3 py-2 text-sm font-semibold text-soft;
+  }
+  .table-responsive td {
+    @apply px-3 py-2;
+  }
+  @media (max-width: 639px) {
+    .table-responsive thead {
+      @apply sr-only;
+    }
+    .table-responsive tr {
+      @apply mb-3 block rounded-xl border border-line bg-raised p-2;
+    }
+    .table-responsive td {
+      @apply flex justify-between gap-4 border-b border-line/60 px-2 py-2 last:border-b-0;
+    }
+    .table-responsive td::before {
+      content: attr(data-label);
+      @apply font-medium text-soft;
+    }
+  }
+  @media (min-width: 640px) {
+    .table-responsive tbody tr {
+      @apply border-t border-line;
+    }
+  }
+
+  /* --- navigation ---------------------------------------------------------------------- */
+  .nav-link {
+    @apply flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 text-sm font-medium text-soft no-underline hover:bg-sunken hover:no-underline md:flex-none md:flex-row md:justify-start md:gap-3 md:px-3 md:text-base;
+  }
+  .nav-link[aria-current="page"] {
+    @apply bg-brand-soft text-brand;
+  }
+}

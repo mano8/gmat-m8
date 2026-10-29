@@ -1,0 +1,12 @@
+{% extends "errors/base_error.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Page not found" %} · gmat-m8
+{% endblock head_title %}
+{% block code %}404{% endblock code %}
+{% block heading %}
+  {% translate "We could not find that page" %}
+{% endblock heading %}
+{% block message %}
+  {% translate "The address may be wrong, or the page may no longer exist." %}
+{% endblock message %}

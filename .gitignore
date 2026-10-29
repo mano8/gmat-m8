@@ -45,6 +45,7 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+coverage.json
 *.cover
 *.py.cover
 *.lcov
@@ -221,3 +222,17 @@ __marimo__/
 
 # plans
 .plans/**
+
+# gmat-m8: environment files (only *.example templates are committed)
+*.env
+!*.env.example
+.env.*
+!.env.example
+
+# gmat-m8: backups, runtime flags, uploaded media, built static files
+backups/
+flags/
+media/
+staticfiles/
+static/dist/
+**/db_data/

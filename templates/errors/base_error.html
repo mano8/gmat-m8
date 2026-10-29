@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% comment %}
+  Shared by 400/403/404/405/409/429/500. Shows a code, a short heading and a generic sentence,
+  never a path, a query, an exception or a user. 500 renders without a request, so nothing here
+  depends on one.
+{% endcomment %}
+{% block body %}
+  <main id="main"
+        class="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
+    <p class="text-5xl font-bold text-brand" aria-hidden="true">
+      {% block code %}
+      {% endblock code %}
+    </p>
+    <h1>
+      {% block heading %}
+      {% endblock heading %}
+    </h1>
+    <p class="text-soft">
+      {% block message %}
+      {% endblock message %}
+    </p>
+    <div>
+      <a class="btn btn-primary" href="/">{% translate "Back to the start" %}</a>
+    </div>
+  </main>
+{% endblock body %}

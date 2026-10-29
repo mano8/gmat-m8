@@ -1,0 +1,108 @@
+# Trivy exceptions (plan §8.3). Every HIGH/CRITICAL finding, fixable or not, must be fixed,
+# or accepted here in a PR the maintainer approves. Entries expire after at most 90 days
+# (scripts/check_trivyignore.py); an expired entry makes CI fail again.
+#
+# Format (checked by scripts/check_trivyignore.py, enforced by Trivy via --ignorefile):
+#
+# vulnerabilities:
+#   - id: CVE-2026-00000
+#     paths:                      # optional: limit the exception to these files
+#       - "usr/local/lib/python3.14/site-packages/example-1.0.dist-info/METADATA"
+#     statement: >-               # why, which component, compensating control, owner (name)
+#       Why the finding is accepted, the affected component, the control that
+#       limits the exposure, and who owns the follow-up (name).
+#     expired_at: 2026-12-31      # required; in the future and at most 90 days away
+#
+# Other sections: misconfigurations, secrets, licenses (same fields).
+#
+# Added in M1.4 (2026-10-28) for the Debian 13 base image of the application image. Debian's
+# tracker lists these as "affected" or "fix_deferred" with no fixed version, so
+# `apt-get upgrade` cannot clear them and the python:3.14-slim digest has no newer base to
+# move to. Re-evaluate every entry when it expires or when Debian ships a fix, whichever
+# comes first, and drop the entry then.
+
+vulnerabilities:
+  - id: CVE-2026-76642
+    statement: >-
+      util-linux (bsdutils, libblkid1, libmount1, libsmartcols1, libuuid1,
+      liblastlog2-2, login, mount, util-linux) in the Debian 13 base image of the
+      application image has no fixed version yet (Debian tracker status 'affected'
+      on 2026-10-28). Affects mount(8) X-mount post-hooks after a failed helper,
+      which is not reachable from the service. The application image runs as uid
+      1000 with every capability dropped, no-new-privileges and a read-only root
+      filesystem, and the service never calls the affected tool. Compensating
+      control: those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-78408
+    statement: >-
+      util-linux (bsdutils, libblkid1, libmount1, libsmartcols1, libuuid1,
+      liblastlog2-2, login, mount, util-linux) in the Debian 13 base image of the
+      application image has no fixed version yet (Debian tracker status 'affected'
+      on 2026-10-28). Affects nsenter --join-cgroup, which is not reachable from the
+      service. The application image runs as uid 1000 with every capability dropped,
+      no-new-privileges and a read-only root filesystem, and the service never calls
+      the affected tool. Compensating control: those container limits, plus the entry's expiry, which forces a re-review. Owner:
+      maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-78409
+    statement: >-
+      util-linux (bsdutils, libblkid1, libmount1, libsmartcols1, libuuid1,
+      liblastlog2-2, login, mount, util-linux) in the Debian 13 base image of the
+      application image has no fixed version yet (Debian tracker status 'affected'
+      on 2026-10-28). Affects mount X-mount.subdir resolution, which is not
+      reachable from the service. The application image runs as uid 1000 with every
+      capability dropped, no-new-privileges and a read-only root filesystem, and the
+      service never calls the affected tool. Compensating control: those container
+      limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-78410
+    statement: >-
+      util-linux (bsdutils, libblkid1, libmount1, libsmartcols1, libuuid1,
+      liblastlog2-2, login, mount, util-linux) in the Debian 13 base image of the
+      application image has no fixed version yet (Debian tracker status 'affected'
+      on 2026-10-28). Affects restricted bind mounts through the setuid mount(8),
+      which is not reachable from the service. The application image runs as uid
+      1000 with every capability dropped, no-new-privileges and a read-only root
+      filesystem, and the service never calls the affected tool. Compensating
+      control: those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-54369
+    statement: >-
+      acl (libacl1) in the Debian 13 base image of the application image has no
+      fixed version yet (Debian tracker status 'affected' on 2026-10-28). Affects
+      symlink traversal in libacl's pathname functions for a privileged caller,
+      which is not reachable from the service. The application image runs as uid
+      1000 with every capability dropped, no-new-privileges and a read-only root
+      filesystem, and the service never calls the affected tool. Compensating
+      control: those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2025-69720
+    statement: >-
+      ncurses (libtinfo6, libncursesw6, ncurses-base, ncurses-bin) in the Debian 13
+      base image of the application image has no fixed version yet (Debian tracker
+      status 'affected' on 2026-10-28). Affects a stack overflow in the infocmp
+      tool, which is not reachable from the service. The application image runs as
+      uid 1000 with every capability dropped, no-new-privileges and a read-only root
+      filesystem, and the service never calls the affected tool. Compensating
+      control: those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-16742
+    statement: >-
+      systemd (libsystemd0, libudev1) in the Debian 13 base image of the application
+      image has no fixed version yet (Debian tracker status 'affected' on
+      2026-10-28). Affects systemd-homed, which does not exist in a container, which
+      is not reachable from the service. The application image runs as uid 1000 with
+      every capability dropped, no-new-privileges and a read-only root filesystem,
+      and the service never calls the affected tool. Compensating control: those
+      container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-9538
+    statement: >-
+      perl-base in the Debian 13 base image of the application image has no fixed
+      version yet (Debian tracker status 'fix_deferred' on 2026-10-28). Affects
+      Archive::Tar memory exhaustion on a crafted tar header, with no Perl code of
+      the service involved, which is not reachable from the service. The application
+      image runs as uid 1000 with every capability dropped, no-new-privileges and a
+      read-only root filesystem, and the service never calls the affected tool.
+      Compensating control: those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20

@@ -1,0 +1,27 @@
+---
+# Codacy mirrors the scopes of our own gates (pyproject.toml, ci.yaml) instead of its defaults.
+exclude_paths:
+  - "uv.lock"                             # generated lockfile
+  - "**/migrations/**"                    # generated; ruff excludes them too
+  - "static/vendor/**"                    # vendored htmx, checksum-pinned
+  - "static/dist/**"                      # built CSS
+  - "locale/**"                           # gettext catalogs
+  - "CLAUDE.md"                           # agent instructions, not code
+  - ".github/pull_request_template.md"    # opens with the title hint comment by design
+  - "**/*.sql"                            # PostgreSQL run through psql (:'name' variables);
+                                          # Codacy's SQL tools target other dialects
+
+engines:
+  bandit:
+    # CI runs bandit on apps, config and scripts; tests use ruff's S rules with test ignores.
+    exclude_paths:
+      - "tests/**"
+      - "docker/**"
+  lizard:
+    exclude_paths:
+      - "tests/**"
+  stylelint:
+    # Tailwind v4 entry file (@import "tailwindcss", @theme, @custom-variant); the Tailwind
+    # CLI validates it in the image build.
+    exclude_paths:
+      - "static/src/**"

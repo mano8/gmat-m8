@@ -1,0 +1,127 @@
+# Caddy for gmat-m8 (plan §7.3): TLS, compression, body and header limits, the maintenance
+# gate, the reverse proxy to Django, the redacted access log and the fallback page.
+#
+# Security headers are set by Django (one place, covered by tests), not here.
+# Caddy is the only HTTP access log. It never trusts a client-sent X-Forwarded-* header
+# (no trusted_proxies), so the client address Django sees is the one Caddy observed.
+{
+	# No admin API: nothing can reconfigure Caddy at run time.
+	admin off
+
+	# Listening ports. Inside the container they equal the published ones, so the automatic
+	# HTTP -> HTTPS redirect points at the port users actually reach.
+	http_port {$HTTP_PORT:8080}
+	https_port {$HTTPS_PORT:8443}
+
+	email {$ACME_EMAIL:internal@localhost}
+
+	# Never try to install the internal CA into the container's trust store (read-only
+	# root filesystem, no capabilities); browsers trust it by import or by accepting it.
+	skip_install_trust
+
+	servers {
+		# HTTP/3 needs the UDP port, which only the production overlay publishes.
+		protocols {$HTTP_PROTOCOLS:h1 h2}
+		timeouts {
+			read_header 10s
+			read_body {$CADDY_READ_BODY_TIMEOUT:120s}
+			idle 5m
+		}
+	}
+
+	# Runtime and error logs (they can carry request URIs) get the same redaction as the
+	# access log below.
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp "^(/accounts/password/reset/key/|/account/email-change/|/invite/)[^?]*|(\?).*$" "${1}${2}REDACTED"
+				request>headers>Referer delete
+				request>headers>Hx-Current-Url delete
+			}
+		}
+	}
+}
+
+# Plain HTTP only redirects, to the port users actually reach (HTTPS_PORT_SUFFIX is ":8443"
+# locally and empty in production). ACME HTTP challenges are answered before this route.
+http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
+	redir https://{host}{$HTTPS_PORT_SUFFIX}{uri} 308
+}
+
+{$APP_DOMAIN:localhost}:{$HTTPS_PORT:8443} {
+	encode zstd gzip
+
+	# Neither Caddy nor Gunicorn announces itself.
+	header -Server
+
+	request_body {
+		max_size {$MAX_UPLOAD_SIZE:15MB}
+	}
+
+	route {
+		# Maintenance gate: evaluated first, independent of whether web is running.
+		@maintenance file {
+			root /srv/flags
+			try_files maintenance.on
+		}
+		handle @maintenance {
+			root * /srv/maintenance
+			rewrite * /index.html
+			header Cache-Control "no-store"
+			header Retry-After "120"
+			file_server {
+				status 503
+			}
+		}
+
+		# The admin is reachable only from the allowed networks; anyone else sees a 404.
+		@admin path /{$ADMIN_URL_PATH:admin} /{$ADMIN_URL_PATH:admin}/*
+		handle @admin {
+			@blocked not remote_ip {$ADMIN_ALLOWED_CIDRS:0.0.0.0/0 ::/0}
+			respond @blocked 404
+			reverse_proxy web:8000 {
+				header_up X-Request-ID {http.request.uuid}
+				transport http {
+					dial_timeout 3s
+				}
+			}
+		}
+
+		handle {
+			reverse_proxy web:8000 {
+				header_up X-Request-ID {http.request.uuid}
+				transport http {
+					dial_timeout 3s
+				}
+			}
+		}
+	}
+
+	# web unreachable (restart, deploy): the same page as the gate.
+	handle_errors 502 503 504 {
+		root * /srv/maintenance
+		rewrite * /index.html
+		header Cache-Control "no-store"
+		header Retry-After "120"
+		file_server {
+			status 503
+		}
+	}
+
+	# The only access log. Token-bearing paths and every query string are redacted, and the
+	# headers that can carry a full URL are dropped. Credential headers (Cookie,
+	# Authorization) stay redacted by Caddy's default; never enable log_credentials.
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp "^(/accounts/password/reset/key/|/account/email-change/|/invite/)[^?]*|(\?).*$" "${1}${2}REDACTED"
+				request>headers>Referer delete
+				request>headers>Hx-Current-Url delete
+			}
+		}
+	}
+}

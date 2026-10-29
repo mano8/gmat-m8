@@ -1,0 +1,12 @@
+{% extends "errors/base_error.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Too many requests" %} · gmat-m8
+{% endblock head_title %}
+{% block code %}429{% endblock code %}
+{% block heading %}
+  {% translate "Too many attempts" %}
+{% endblock heading %}
+{% block message %}
+  {% translate "Wait a few minutes and try again." %}
+{% endblock message %}

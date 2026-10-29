@@ -1,0 +1,43 @@
+# Production overlay (human, on the VPS): a real domain with ACME, ports 80 and 443 only, and
+# both images pulled BY DIGEST from GHCR (never built here). The digests come from the signed
+# release manifest that `deploy.sh` (M8.4) verifies before it writes them to .env.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --wait
+#
+# Needs in .env: APP_DOMAIN (a public name), ACME_EMAIL, APP_DIGEST, BACKUP_DIGEST, and
+# app.env copied from app.env.production.example.
+
+services:
+  caddy:
+    ports: !override
+      - "80:80"
+      - "443:443/tcp"
+      - "443:443/udp"
+    environment:
+      HTTP_PORT: "80"
+      HTTPS_PORT: "443"
+      HTTPS_PORT_SUFFIX: ""
+      HTTP_PROTOCOLS: "h1 h2 h3"
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+    mem_limit: 128m
+
+  migrate:
+    image: ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}
+    pull_policy: missing
+
+  web:
+    image: ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}
+    build: !reset null
+    pull_policy: missing
+    mem_limit: 640m
+
+  db:
+    ports: !reset []
+    mem_limit: 768m
+
+  backup:
+    image: ghcr.io/mano8/gmat-m8-backup@${BACKUP_DIGEST:?set BACKUP_DIGEST in .env}
+    build: !reset null
+    pull_policy: missing
+    mem_limit: 384m

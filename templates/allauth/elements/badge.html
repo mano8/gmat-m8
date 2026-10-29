@@ -1,0 +1,6 @@
+{% load allauth %}
+<span class="chip {% if 'primary' in attrs.tags %}chip-brand{% endif %}"
+      {% if attrs.title %}title="{{ attrs.title }}"{% endif %}>
+  {% slot %}
+{% endslot %}
+</span>

@@ -11,10 +11,11 @@ Materials app for a group of electrical-installation companies and their branche
 ## Git, PRs, releases
 
 - **One phase = one branch = one PR** (M1, M2, …). Branch: `git switch --no-track -c m<phase>-<slug> origin/main` (e.g. `m2-org-access`). Human steps (`H*`) are skipped. Commit per step with Conventional Commits + step id: `feat(access): resolve dependent branch scope [M2.3]`. Never `--no-verify`.
+- **Release ordering (plan §0.2):** a step that publishes or releases (M1.7 `docker-publish.yaml`) never shares a PR with the code it builds. Open and merge the preceding PR first (M1: PR 1 = M1.1–M1.6 on `m1-foundation`), then cut `m1-release` from the updated `origin/main` for M1.7 in its own PR. Nothing is tagged, released or published before both are merged and H1.8 is done.
 - Agents use the configured owner account (`gh`/git): commit, `git push -u origin <branch>`, open the PR with `gh pr create --repo mano8/gmat-m8 --head <branch> --draft`, answer reviews.
 - **Never:** merge or approve a PR; push to `main` or force-push; create tags or GitHub Releases (`v*` tags publish images); run `gh workflow run` or `docker-publish`; deploy or touch production data; change repo settings, rulesets, secrets or tokens. GitHub will not stop the owner account, so these rules and `.claude/settings.json` are the guard.
 - **No attribution:** no `Co-Authored-By` lines, no "Generated with" footers and no AI tool or model names in commits, PR titles, descriptions or comments.
-- Mark the PR ready only when CI is green and every step's review gate (R1/R2/R3, see the plan's review legend) has run and been addressed. Then append `· PR #n` to each of the phase's step lines in the plan's TODO list; never tick boxes (the human does after merging).
+- When a step's job is done (implemented with tests, committed, pushed, local gates green), tick its box in the plan's TODO list and note anything only the phase PR can settle. Mark the PR ready only when CI is green and every step's review gate (R1/R2/R3, see the plan's review legend) has run and been addressed. Then append `· PR #n` to each of the phase's step lines. The human merges the PR at the end of the phase.
 - Never stage `.plans/` or use `git add -f`. Never commit secrets or real env files (`.env`, `*.env`, backups, keys); only `*.example` templates.
 - Workflows: never `pull_request_target` or `workflow_run`, never a PR check that needs a secret, never `on.paths` on a required workflow (scope job + always-running gate job, plan §8.4). Flag any `.github/workflows/` change for explicit review.
 
@@ -52,7 +53,7 @@ Materials app for a group of electrical-installation companies and their branche
 
 ## Security
 
-- **Browser:** strict CSP (no inline script/style/handlers); htmx via `<meta name="htmx-config">` with `historyCacheSize: 0`, CSRF in `hx-headers` on `<body>`; authenticated responses `Cache-Control: no-store, private`; token and pre-auth pages also `Referrer-Policy: no-referrer`; token URLs redirect to a token-less URL.
+- **Browser:** strict CSP (no inline script/style/handlers); htmx via `<meta name="htmx-config">` with `historyCacheSize: 0`, CSRF in `hx-headers` on `<body>`; authenticated responses `Cache-Control: no-store, private`; pre-auth pages also `no-store`; a URL that carries a token is `Referrer-Policy: no-referrer` and redirects to a token-less URL (pages with a form stay `same-origin`: `no-referrer` makes browsers send `Origin: null` on POST, which CSRF refuses).
 - **Banned** outside the `scripts/check_access_rules.py` allowlist: `|safe`, `mark_safe`, `csrf_exempt` (only the upload entry point), `.raw()`, `.extra()`. Mutating views are POST-only; GET/HEAD never call a service.
 - **Admin:** every `ModelAdmin` on the service-backed base; access and document models read-only; no deletes.
 - **Exposure:** prices only with `price.view`; partners never see prices, suppliers or others' requests; site managers get only expected-deliveries fields (plan §3.4).
@@ -71,7 +72,7 @@ Python 3.14 · Django 6.1 (6.2 LTS = B1) · PostgreSQL 18 + psycopg 3 · htmx **
 
 ## Commands
 
-Available from M1.1; keep current.
+Keep current. The Python commands exist since M1.1, the Docker ones since M1.5; the `e2e` one arrives with M8.2.
 
 ```bash
 uv sync
@@ -79,15 +80,26 @@ uv run ruff format . && uv run ruff check .
 uv run mypy .
 uv run djlint --check templates apps
 uv run python scripts/check_access_rules.py
+uv run python scripts/check_security_floors.py   # uv.lock vs. security floors
+uv run python scripts/check_trivyignore.py       # .trivyignore.yaml entries valid and unexpired
 uv run python manage.py makemigrations --check --dry-run
-uv run pytest            # needs PostgreSQL 18
-uv run pytest -m e2e     # Playwright against the compose stack
+uv run pytest            # needs PostgreSQL 18; DB_* env, defaults in config/settings/test.py
+uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
+uv run python scripts/check_migrations_reversible.py   # scratch database only: migrates to zero and back
+uv run pytest -m e2e     # M8.2: Playwright against the compose stack
 
+# Compose stack (M1.5); docker_compose/gmat_m8/README.md has the rest
 cd docker_compose/gmat_m8 && bash init.sh
 docker compose up -d --build --wait                  # https://localhost:8443
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo   # arrives with M3
+LIVE_REQUIRED=1 uv run pytest -m live               # smoke tests against the running stack (CADDY_READ_BODY_TIMEOUT=5s in .env)
+docker build -f docker/app/Dockerfile --target runtime -t gmat-m8:local .   # images alone
 ```
+
+## Layout
+
+`config/` (settings `base`/`dev`/`test`/`prod`/`build`, `env.py` fail-closed helpers, `logging.py` redaction, urls/wsgi/asgi) · `apps/<app>/` (`core`: security cache, checks, middleware, admin base classes; `accounts`: user, allauth/MFA adapters, sessions, admin site) · `templates/` (`layouts/`, `components/`, `partials/`, `allauth/` and `django/forms/` overrides, error pages) · `locale/` (es, en, fr; `.mo` compiled in the image build) · `static/` (`src/app.css` Tailwind entry, `js/`, `vendor/` htmx with its checksum record; built CSS in `dist/` is git-ignored) · `docker/{app,backup,postgres}` (image sources, entrypoint, backup scripts, DB role bootstrap) · `docker_compose/gmat_m8/` (the stack: compose files and overlays, Caddyfile, env templates, `init.sh`) · `scripts/` (CI guards) · `.github/` (workflows, Dependabot; workflow changes need maintainer review) · `tests/{unit,access,integration,live,e2e}` (`live` runs against a started stack) (shared helpers in `tests/support.py`) · `docs/adr/` (decisions) · `docs/security.md` (security baseline) · `docs/release.md`. Settings load only through `config/env.py` helpers; `prod` refuses to start on a missing or placeholder value. Test DB defaults are seeded in `config/settings/test.py` (pytest-django imports settings before any conftest). Mail is configured with Django 6.1's `MAILERS`, not `EMAIL_BACKEND`.
 
 ## Testing
 
@@ -99,7 +111,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web mana
 ## Conventions
 
 - English code, comments and commits; UI strings via gettext; default language `es`, also `en`, `fr`.
-- Mobile-first templates (check at 360 px); page template + `{% partialdef %}` partials.
+- Mobile-first templates (check at 360 px); page template + `{% partialdef %}` partials; shared pieces are includes under `templates/components/`. After editing templates rebuild the CSS (dev compose runs Tailwind in watch mode), and after adding strings run `makemessages -l es -l en -l fr` and `compilemessages`.
 - Migrations expand/contract and reversible (or flagged in PR and release notes); CI checks.
 - Windows dev machine, LF endings; `docker/` and `docker_compose/` scripts are bash for Linux.
 - Reference repo for CI/compose/tests: `E:\Dev\fa-workspace\fa-auth-m8` (read only).

@@ -1,0 +1,44 @@
+# Agent and planning material never goes into an image
+.plans/
+.claude/
+CLAUDE.md
+.git/
+.github/
+
+# Not part of any image: tests, docs, CI guards and the compose stack itself
+tests/
+docs/
+scripts/
+docker_compose/
+
+# Environment files and secrets
+.env
+*.env
+!*.env.example
+*.pem
+*.key
+*.crt
+**/keys/
+
+# Backups, runtime flags and data
+backups/
+flags/
+media/
+**/db_data/
+
+# Python and tool artifacts
+.venv/
+**/__pycache__/
+**/*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Built output is produced inside the image build
+staticfiles/
+static/dist/

@@ -1,0 +1,157 @@
+name: Compose smoke
+
+# Brings the compose stack up from a fresh checkout and exercises it through Caddy (plan §8.1
+# layer C, §8.4): health and headers, `check --deploy`, rate limits across workers, forged
+# X-Forwarded-For, the log sentinel, the maintenance gate, a stalled upload, network
+# isolation, role privileges and backup -> restore --verify. The tests are tests/live.
+#
+# Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
+# `on.paths` filter, no job that needs a secret, every action pinned by full commit SHA.
+# The `compose-smoke-gate` job is the required check. GitHub leaves the checks of a
+# workflow skipped at workflow level "Pending", which blocks merging; so the decision to run
+# the stack is taken INSIDE the workflow (`scope`), and the gate passes on a deliberate skip.
+# A change under .github/workflows/ needs the maintainer's explicit review.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: compose-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  UV_PYTHON_DOWNLOADS: never
+  UV_VERSION: "0.13.5"
+
+jobs:
+  # Decides from the changed files whether the stack must run. Push to main, the nightly run
+  # and a manual run always run it in full.
+  scope:
+    name: scope
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      reason: ${{ steps.decide.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether the stack must run
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=$EVENT_NAME: the stack always runs in full" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags origin "$BASE_REF"
+          changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
+          echo "Changed files:"
+          echo "$changed"
+          # Everything that ends up in an image, in the stack's configuration, or in the tests
+          # that exercise it.
+          pattern='^(docker/|docker_compose/|apps/|config/|templates/|static/|locale/|tests/live/)'
+          pattern="$pattern|^(pyproject\.toml|uv\.lock|manage\.py)$"
+          pattern="$pattern|^\.github/workflows/compose-smoke\.yaml$"
+          if echo "$changed" | grep -qE "$pattern"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=files that affect the stack changed" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no file that affects the stack changed" >> "$GITHUB_OUTPUT"
+          fi
+
+  smoke:
+    name: smoke
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install test dependencies
+        run: uv sync --locked
+
+      - name: Prepare the env files (generated secrets, CI directory modes)
+        working-directory: docker_compose/gmat_m8
+        run: |
+          set -euo pipefail
+          bash init.sh --ci
+          # A stalled upload must be cut within seconds for the test to be quick.
+          sed -i 's/^CADDY_READ_BODY_TIMEOUT=.*/CADDY_READ_BODY_TIMEOUT=5s/' .env
+
+      - name: Build and start the stack
+        working-directory: docker_compose/gmat_m8
+        run: docker compose up -d --build --wait --wait-timeout 600
+
+      - name: Smoke tests through Caddy
+        env:
+          LIVE_REQUIRED: "1"
+          LIVE_BASE_URL: https://localhost:8443
+        run: uv run pytest -m live -p no:cacheprovider
+
+      - name: Dump the logs of every service
+        if: failure()
+        working-directory: docker_compose/gmat_m8
+        run: docker compose ps --all && docker compose logs --no-color --timestamps --tail 300
+
+      - name: Tear down
+        if: always()
+        working-directory: docker_compose/gmat_m8
+        run: docker compose down --volumes --remove-orphans
+
+  # The required check. Passes when the smoke test passed, or when `scope` decided that no
+  # file affecting the stack changed. Fails on anything else, a failed `scope` included.
+  compose-smoke-gate:
+    name: compose-smoke-gate
+    needs: [scope, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          SCOPE_RUN: ${{ needs.scope.outputs.run }}
+          SCOPE_REASON: ${{ needs.scope.outputs.reason }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          set -euo pipefail
+          echo "scope: $SCOPE_RESULT (run=$SCOPE_RUN, $SCOPE_REASON); smoke: $SMOKE_RESULT"
+          if [ "$SCOPE_RESULT" != "success" ]; then
+            echo "scope did not succeed" >&2
+            exit 1
+          fi
+          if [ "$SCOPE_RUN" = "true" ] && [ "$SMOKE_RESULT" = "success" ]; then
+            exit 0
+          fi
+          if [ "$SCOPE_RUN" = "false" ] && [ "$SMOKE_RESULT" = "skipped" ]; then
+            echo "stack not affected; the smoke test was skipped on purpose"
+            exit 0
+          fi
+          echo "the smoke test did not pass" >&2
+          exit 1

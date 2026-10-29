@@ -1,0 +1,10 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Home" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-1">{% translate "Home" %}</h1>
+  <p class="mb-4 text-soft">{% blocktranslate with email=request.user.email %}Signed in as {{ email }}.{% endblocktranslate %}</p>
+  {% include "components/empty_state.html" with title=_("Nothing here yet") text=_("Your requests and tasks will appear here once the first features are switched on.") %}
+{% endblock content %}
