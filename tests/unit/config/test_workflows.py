@@ -168,7 +168,7 @@ def test_compose_smoke_runs_the_live_tests_against_a_fresh_stack() -> None:
 
 PUBLISH = ROOT / ".github" / "workflows" / "docker-publish.yaml"
 IMAGE_SCAN = ROOT / ".github" / "workflows" / "image-scan.yaml"
-ONLY_ON_PUSH = "env.PUSH == 'true'"
+ONLY_ON_PUSH = "needs.verify.outputs.push == 'true'"
 
 
 def _uses(step: dict[str, Any], action: str) -> bool:
@@ -198,7 +198,8 @@ def test_only_the_release_workflows_hold_write_permissions(path: Path) -> None:
     if path.name == "docker-publish.yaml":
         assert granted == {
             "verify": set(),
-            "images": {"packages", "id-token", "attestations"},
+            "scan": set(),
+            "publish": {"packages", "id-token", "attestations"},
             "release": {"contents", "id-token"},
         }
     elif path.name == "image-scan.yaml":
@@ -213,12 +214,16 @@ def test_publish_runs_on_version_tags_and_manual_dispatch_only() -> None:
     assert triggers["push"] == {"tags": ["v*"]}  # no branch trigger: a tag push is the release
 
 
-def test_publish_verifies_before_it_builds_and_releases_last() -> None:
+def test_publish_verifies_first_and_pushes_only_on_a_tag_push() -> None:
     jobs = _load(PUBLISH)["jobs"]
-    assert jobs.keys() == {"verify", "images", "release"}
-    assert jobs["images"]["needs"] == "verify"
-    assert set(jobs["release"]["needs"]) == {"verify", "images"}
-    assert jobs["release"]["if"] == "github.event_name == 'push'"
+    assert jobs.keys() == {"verify", "scan", "publish", "release"}
+    assert "if" not in jobs["verify"]
+    assert jobs["scan"]["needs"] == "verify"
+    assert "if" not in jobs["scan"]  # a dispatch builds and scans
+    assert set(jobs["publish"]["needs"]) == {"verify", "scan"}
+    assert jobs["publish"]["if"] == ONLY_ON_PUSH
+    assert set(jobs["release"]["needs"]) == {"verify", "publish"}
+    assert jobs["release"]["if"] == ONLY_ON_PUSH
 
 
 def test_publish_verification_checks_main_and_the_required_runs() -> None:
@@ -232,64 +237,79 @@ def test_publish_verification_checks_main_and_the_required_runs() -> None:
     assert "release_tools.py notes" in commands  # no notes, no release, and it fails early
 
 
-def test_publish_builds_scans_and_gates_both_images_for_both_architectures() -> None:
-    job = _load(PUBLISH)["jobs"]["images"]
-    entries = {entry["key"]: entry for entry in job["strategy"]["matrix"]["include"]}
-    assert {key: entry["dockerfile"] for key, entry in entries.items()} == {
-        "app": "docker/app/Dockerfile",
-        "backup": "docker/backup/Dockerfile",
+def test_scan_builds_and_gates_both_images_for_both_architectures() -> None:
+    job = _load(PUBLISH)["jobs"]["scan"]
+    assert job["permissions"] == {"contents": "read"}  # nothing to push, sign or release here
+    legs = {(entry["key"], entry["arch"]): entry for entry in job["strategy"]["matrix"]["include"]}
+    assert legs.keys() == {
+        ("app", "amd64"),
+        ("app", "arm64"),
+        ("backup", "amd64"),
+        ("backup", "arm64"),
+    }
+    assert {entry["dockerfile"] for entry in legs.values()} == {
+        "docker/app/Dockerfile",
+        "docker/backup/Dockerfile",
     }
     steps = job["steps"]
 
-    scan_builds = [
-        step["with"]
-        for step in steps
-        if _uses(step, "docker/build-push-action") and step["with"]["push"] is False
-    ]
-    assert sorted(build["platforms"] for build in scan_builds) == ["linux/amd64", "linux/arm64"]
-    assert all(build["load"] is True for build in scan_builds)
+    builds = [step["with"] for step in steps if _uses(step, "docker/build-push-action")]
+    assert len(builds) == 1
+    assert builds[0]["platforms"] == "linux/${{ matrix.arch }}"
+    assert builds[0]["push"] is False
+    assert builds[0]["load"] is True
 
     trivy = [step for step in steps if _uses(step, "aquasecurity/trivy-action")]
     gates = [step["with"] for step in trivy if step["with"].get("exit-code") == "1"]
-    assert len(gates) == 2
-    assert all(gate["severity"] == "CRITICAL,HIGH" for gate in gates)
-    assert {gate["image-ref"].rsplit(":", 1)[1] for gate in gates} == {"scan-amd64", "scan-arm64"}
+    assert len(gates) == 1
+    assert gates[0]["severity"] == "CRITICAL,HIGH"
     reports = [step for step in trivy if step["with"].get("format") == "json"]
-    assert len(reports) == 2
-    assert all(report["env"]["TRIVY_IGNOREFILE"] == "" for report in reports)
+    assert len(reports) == 1
+    assert reports[0]["env"]["TRIVY_IGNOREFILE"] == ""  # the report keeps accepted findings
 
     sboms = [step["with"] for step in steps if _uses(step, "anchore/sbom-action")]
-    assert {sbom["format"] for sbom in sboms} == {"spdx-json"}
-    assert len(sboms) == 2
+    assert [sbom["format"] for sbom in sboms] == ["spdx-json"]
 
 
-def test_publish_pushes_signs_and_attests_only_on_a_tag_push() -> None:
-    job = _load(PUBLISH)["jobs"]["images"]
-    assert job["env"]["PUSH"] == "${{ needs.verify.outputs.push }}"
-    publishing = [
-        step
-        for step in job["steps"]
-        if _uses(step, "docker/login-action")
-        or _uses(step, "sigstore/cosign-installer")
-        or _uses(step, "actions/attest-build-provenance")
-        or "cosign" in step.get("run", "")
-        or "digest-" in step.get("run", "")
-        or (_uses(step, "docker/build-push-action") and step["with"]["push"] is True)
-    ]
-    assert len(publishing) >= 7  # login, push, digest, installer, sign, verify, attest
-    for step in publishing:
-        assert step.get("if") == ONLY_ON_PUSH, f"not gated on a tag push: {step.get('name')}"
+def test_scan_cannot_publish() -> None:
+    for step in _load(PUBLISH)["jobs"]["scan"]["steps"]:
+        assert not _uses(step, "docker/login-action")
+        assert not _uses(step, "sigstore/cosign-installer")
+        assert not _uses(step, "actions/attest-build-provenance")
+        assert "cosign" not in step.get("run", "")
+        assert step.get("with", {}).get("push") is not True
 
 
 def test_publish_pushes_both_architectures_by_digest_without_extra_attestations() -> None:
-    steps = _load(PUBLISH)["jobs"]["images"]["steps"]
-    push = next(s for s in steps if _uses(s, "docker/build-push-action") and s["with"]["push"])
+    job = _load(PUBLISH)["jobs"]["publish"]
+    keys = {entry["key"] for entry in job["strategy"]["matrix"]["include"]}
+    assert keys == {"app", "backup"}
+    steps = job["steps"]
+    push = next(s for s in steps if _uses(s, "docker/build-push-action"))
+    assert push["with"]["push"] is True
     assert push["with"]["platforms"] == "linux/amd64,linux/arm64"
     assert push["with"]["provenance"] is False
     assert push["with"]["sbom"] is False
     attest = next(s for s in steps if _uses(s, "actions/attest-build-provenance"))
     assert attest["with"]["subject-digest"] == "${{ steps.push.outputs.digest }}"
     assert attest["with"]["push-to-registry"] is True
+
+
+def test_publish_gates_the_pushed_digest_before_it_signs() -> None:
+    """What is signed is what was scanned, whatever the build cache did."""
+    steps = _load(PUBLISH)["jobs"]["publish"]["steps"]
+    pushed = next(i for i, step in enumerate(steps) if _uses(step, "docker/build-push-action"))
+    signed = next(i for i, step in enumerate(steps) if "cosign sign --yes" in step.get("run", ""))
+    gates = [
+        (i, step)
+        for i, step in enumerate(steps)
+        if _uses(step, "aquasecurity/trivy-action") and step["with"].get("exit-code") == "1"
+    ]
+    assert [step["env"]["TRIVY_PLATFORM"] for _, step in gates] == ["linux/amd64", "linux/arm64"]
+    for index, step in gates:
+        assert pushed < index < signed
+        assert step["with"]["image-ref"] == "${{ env.IMAGE }}@${{ steps.push.outputs.digest }}"
+        assert step["with"]["severity"] == "CRITICAL,HIGH"
 
 
 def test_publish_signs_and_verifies_with_the_workflow_identity() -> None:
@@ -320,6 +340,17 @@ def test_publish_release_attaches_the_signed_manifest_sboms_and_reports() -> Non
     assert commands.index("cosign sign-blob") < commands.index("gh release create")
 
 
+def test_publish_artifacts_feed_the_release_by_name() -> None:
+    """The release job downloads `release-*`; every artifact it needs must match that."""
+    jobs = _load(PUBLISH)["jobs"]
+    download = next(s for s in jobs["release"]["steps"] if _uses(s, "actions/download-artifact"))
+    assert download["with"]["pattern"] == "release-*"
+    for job_id in ("scan", "publish"):
+        uploads = [s for s in jobs[job_id]["steps"] if _uses(s, "actions/upload-artifact")]
+        assert uploads
+        assert all(upload["with"]["name"].startswith("release-") for upload in uploads)
+
+
 def test_publish_inputs_are_not_expanded_into_scripts() -> None:
     """Tag and ref names reach shell steps through `env`, never as `${{ }}` text."""
     for step in _steps(_load(PUBLISH)):
@@ -344,6 +375,10 @@ def test_image_scan_gate_and_issue_flow() -> None:
     assert jobs.keys() == {"targets", "scan", "report"}
     assert jobs["scan"]["strategy"]["matrix"] == "${{ fromJSON(needs.targets.outputs.matrix) }}"
     assert jobs["scan"]["strategy"]["fail-fast"] is False
+    trivy = [s for s in jobs["scan"]["steps"] if _uses(s, "aquasecurity/trivy-action")]
+    assert len(trivy) == 2
+    # Each image is an amd64 + arm64 index: both Trivy steps scan the matrix leg's platform.
+    assert all(s["env"]["TRIVY_PLATFORM"] == "${{ matrix.platform }}" for s in trivy)
     gate = next(step for step in jobs["scan"]["steps"] if step.get("id") == "gate")
     assert gate["continue-on-error"] is True
     assert gate["with"]["severity"] == "CRITICAL,HIGH"
@@ -353,3 +388,15 @@ def test_image_scan_gate_and_issue_flow() -> None:
     assert jobs["report"]["if"] == "always() && needs.targets.result == 'success'"
     assert jobs["report"]["permissions"]["issues"] == "write"
     assert jobs["scan"]["permissions"] == {"contents": "read", "packages": "read"}
+
+
+def test_image_scan_closes_the_issue_only_after_a_complete_clean_run() -> None:
+    step = next(
+        s
+        for s in _load(IMAGE_SCAN)["jobs"]["report"]["steps"]
+        if s.get("name") == "Open, update or close the issue"
+    )
+    assert step["env"]["SCAN_RESULT"] == "${{ needs.scan.result }}"
+    assert '[ "$SCAN_RESULT" = "success" ]' in step["run"]
+    assert "gh issue close" in step["run"]
+    assert step["run"].index("gh issue create") < step["run"].index("gh issue close")

@@ -3,19 +3,23 @@ name: Docker publish
 # Publishes BOTH images (application and backup) to GHCR, signed, with a signed
 # release-manifest.json (plan §8.4, §9 "Release flow").
 #
-#   push of a `v*` tag  maintainer only (tag ruleset, CLAUDE.md): verify, build, scan, push,
-#                       sign, attest, create the GitHub Release.
+#   push of a `v*` tag  maintainer only (tag ruleset, CLAUDE.md): verify, scan, push, sign,
+#                       attest, create the GitHub Release.
 #   workflow_dispatch   build-only: the same verification, builds, scans and SBOMs, but nothing
-#                       is pushed, signed or released. Agents never run it (CLAUDE.md).
+#                       is pushed, signed or released (`publish` and `release` do not run).
+#                       Agents never run it (CLAUDE.md).
 #
-# Order, and why each step is where it is:
+# Jobs, and why each is where it is:
 #   1. verify   the tag is a semantic version with CHANGELOG notes, its commit is an ancestor of
 #               origin/main, and ci.yaml, compose-smoke.yaml (and e2e.yaml once it exists) have a
 #               successful run on that exact SHA (scripts/verify_release.py).
-#   2. images   per image: build amd64 and arm64, Trivy gate on each (HIGH and CRITICAL, no
-#               --ignore-unfixed, exceptions only from .trivyignore.yaml), SBOMs, then push by
-#               digest, cosign keyless signature and a GitHub build-provenance attestation.
-#   3. release  release-manifest.json (version, commit, both digests, scan summary, SBOM names),
+#   2. scan     per image and architecture (read-only token): build, Trivy gate (HIGH and
+#               CRITICAL, no --ignore-unfixed, exceptions only from .trivyignore.yaml), SBOM.
+#   3. publish  per image, tag push only, after every scan passed: push the amd64 + arm64 index
+#               by digest, gate the PUSHED digest with Trivy again (so what is signed is what
+#               was scanned, whatever the build cache did), then cosign keyless signature and a
+#               GitHub build-provenance attestation.
+#   4. release  release-manifest.json (version, commit, both digests, scan summary, SBOM names),
 #               signed with `cosign sign-blob`, then the GitHub Release with notes from
 #               CHANGELOG.md, the SBOMs, the Trivy reports and the signed manifest.
 # Nothing is signed or released unless every earlier step passed. deploy.sh (M8.4) verifies the
@@ -105,9 +109,113 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
         run: python scripts/release_tools.py notes --version "$VERSION"
 
-  images:
-    name: image (${{ matrix.key }})
+  # One leg per image and architecture. Read-only: a dispatch runs only verify and this job.
+  scan:
+    name: scan (${{ matrix.key }}, ${{ matrix.arch }})
     needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - key: app
+            name: gmat-m8
+            dockerfile: docker/app/Dockerfile
+            target: runtime
+            arch: amd64
+          - key: app
+            name: gmat-m8
+            dockerfile: docker/app/Dockerfile
+            target: runtime
+            arch: arm64
+          - key: backup
+            name: gmat-m8-backup
+            dockerfile: docker/backup/Dockerfile
+            target: ""
+            arch: amd64
+          - key: backup
+            name: gmat-m8-backup
+            dockerfile: docker/backup/Dockerfile
+            target: ""
+            arch: arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        if: matrix.arch == 'arm64'
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # `publish` pushes what this build produced: it reuses these layers through the build
+      # cache (one scope per image and architecture) and then scans the pushed digest again.
+      - name: Build for scanning
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          platforms: linux/${{ matrix.arch }}
+          push: false
+          load: true
+          tags: ${{ matrix.name }}:scan
+          build-args: |
+            APP_VERSION=${{ needs.verify.outputs.version }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.key }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.key }}-${{ matrix.arch }}
+
+      # Full report first (every severity, never fails, exceptions not applied), then the gate.
+      - name: Trivy report (all severities)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_IGNOREFILE: ""
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ matrix.name }}:scan
+          format: json
+          output: trivy-${{ matrix.name }}-${{ matrix.arch }}-report.json
+          exit-code: "0"
+
+      - name: Trivy gate (HIGH and CRITICAL, vulnerabilities and secrets)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ matrix.name }}:scan
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      - name: SBOM (SPDX JSON)
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ matrix.name }}:scan
+          format: spdx-json
+          output-file: sbom-${{ matrix.name }}-${{ matrix.arch }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Upload the SBOM and the scan report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-scan-${{ matrix.key }}-${{ matrix.arch }}
+          path: |
+            sbom-${{ matrix.name }}-${{ matrix.arch }}.spdx.json
+            trivy-${{ matrix.name }}-${{ matrix.arch }}-report.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+  # Tag push only, and only once every scan leg passed. The whole job is conditional, so no
+  # step below needs its own guard.
+  publish:
+    name: publish (${{ matrix.key }})
+    needs: [verify, scan]
+    if: needs.verify.outputs.push == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -128,119 +236,17 @@ jobs:
             dockerfile: docker/backup/Dockerfile
             target: ""
     env:
-      PUSH: ${{ needs.verify.outputs.push }}
       VERSION: ${{ needs.verify.outputs.version }}
       IMAGE: ${{ needs.verify.outputs.registry }}/${{ matrix.name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Needed only if the cache is cold and a layer has to be built again for arm64.
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
-      # One scan build per architecture, each loaded and held to the Trivy gate before anything
-      # is pushed. The push build below reuses these layers through the build cache (same run,
-      # one cache scope per architecture), so what is pushed is what was scanned.
-      - name: Build for scanning (amd64)
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.target }}
-          platforms: linux/amd64
-          push: false
-          load: true
-          tags: ${{ matrix.name }}:scan-amd64
-          build-args: |
-            APP_VERSION=${{ needs.verify.outputs.version }}
-            VCS_REF=${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.key }}-amd64
-          cache-to: type=gha,mode=max,scope=${{ matrix.key }}-amd64
-
-      - name: Build for scanning (arm64)
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.target }}
-          platforms: linux/arm64
-          push: false
-          load: true
-          tags: ${{ matrix.name }}:scan-arm64
-          build-args: |
-            APP_VERSION=${{ needs.verify.outputs.version }}
-            VCS_REF=${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.key }}-arm64
-          cache-to: type=gha,mode=max,scope=${{ matrix.key }}-arm64
-
-      # Full reports first (every severity, never fails, exceptions not applied), then the gate.
-      - name: Trivy report, amd64 (all severities)
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
-        env:
-          TRIVY_IGNOREFILE: ""
-        with:
-          version: ${{ env.TRIVY_VERSION }}
-          scan-type: image
-          image-ref: ${{ matrix.name }}:scan-amd64
-          format: json
-          output: trivy-${{ matrix.name }}-amd64-report.json
-          exit-code: "0"
-
-      - name: Trivy report, arm64 (all severities)
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
-        env:
-          TRIVY_IGNOREFILE: ""
-        with:
-          version: ${{ env.TRIVY_VERSION }}
-          scan-type: image
-          image-ref: ${{ matrix.name }}:scan-arm64
-          format: json
-          output: trivy-${{ matrix.name }}-arm64-report.json
-          exit-code: "0"
-
-      - name: Trivy gate, amd64 (HIGH and CRITICAL, vulnerabilities and secrets)
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
-        with:
-          version: ${{ env.TRIVY_VERSION }}
-          scan-type: image
-          image-ref: ${{ matrix.name }}:scan-amd64
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          format: table
-
-      - name: Trivy gate, arm64 (HIGH and CRITICAL, vulnerabilities and secrets)
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
-        with:
-          version: ${{ env.TRIVY_VERSION }}
-          scan-type: image
-          image-ref: ${{ matrix.name }}:scan-arm64
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          format: table
-
-      - name: SBOM, amd64 (SPDX JSON)
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
-        with:
-          image: ${{ matrix.name }}:scan-amd64
-          format: spdx-json
-          output-file: sbom-${{ matrix.name }}-amd64.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
-
-      - name: SBOM, arm64 (SPDX JSON)
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
-        with:
-          image: ${{ matrix.name }}:scan-arm64
-          format: spdx-json
-          output-file: sbom-${{ matrix.name }}-arm64.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
-
-      # ---- Everything below runs only for a tag push; a dispatch stops after the SBOMs. ----
-
-      - name: Log in to GHCR
-        if: env.PUSH == 'true'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -251,7 +257,6 @@ jobs:
       # by digest.
       - name: Build and push by digest (amd64 + arm64)
         id: push
-        if: env.PUSH == 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -269,8 +274,59 @@ jobs:
             type=gha,scope=${{ matrix.key }}-amd64
             type=gha,scope=${{ matrix.key }}-arm64
 
+      # The scan legs gated the images they built; this gates the digest that is about to be
+      # signed. A finding here stops the job before the signature, and nothing trusts an
+      # unsigned digest.
+      - name: Trivy gate on the pushed digest, amd64
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_PLATFORM: linux/amd64
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      - name: Trivy gate on the pushed digest, arm64
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the image (keyless)
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      # The same check deploy.sh makes on the VPS, so a wrong identity fails here and not at
+      # the first deploy.
+      - name: The signature verifies against this workflow's identity
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign verify \
+            --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "${IMAGE}@${DIGEST}"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
       - name: Record the digest
-        if: env.PUSH == 'true'
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
           NAME: ${{ matrix.name }}
@@ -283,51 +339,17 @@ jobs:
             echo "\`${IMAGE}@${DIGEST}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        if: env.PUSH == 'true'
-
-      - name: Sign the image (keyless)
-        if: env.PUSH == 'true'
-        env:
-          DIGEST: ${{ steps.push.outputs.digest }}
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
-
-      # The same check deploy.sh makes on the VPS, so a wrong identity fails here and not at
-      # the first deploy.
-      - name: The signature verifies against this workflow's identity
-        if: env.PUSH == 'true'
-        env:
-          DIGEST: ${{ steps.push.outputs.digest }}
-        run: |
-          cosign verify \
-            --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            "${IMAGE}@${DIGEST}"
-
-      - name: Attest build provenance
-        if: env.PUSH == 'true'
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          subject-name: ${{ env.IMAGE }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
-
-      - name: Upload SBOMs, scan reports and digest
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: release-${{ matrix.key }}
-          path: |
-            sbom-${{ matrix.name }}-*.spdx.json
-            trivy-${{ matrix.name }}-*-report.json
-            digest-${{ matrix.name }}.txt
+          name: release-digest-${{ matrix.key }}
+          path: digest-${{ matrix.name }}.txt
           retention-days: 90
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   release:
     name: release
-    needs: [verify, images]
-    if: github.event_name == 'push'
+    needs: [verify, publish]
+    if: needs.verify.outputs.push == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release and attach its files
@@ -342,6 +364,7 @@ jobs:
         with:
           python-version: "3.14"
 
+      # release-scan-<key>-<arch> (SBOM, report) and release-digest-<key>.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: release-*

@@ -12,6 +12,7 @@ DIGEST_APP = "sha256:" + "1" * 64
 DIGEST_BACKUP = "sha256:" + "2" * 64
 RUN_URL = "https://github.com/mano8/gmat-m8/actions/runs/1"
 CREATED = "2026-11-01T10:00:00Z"
+IGNOREFILE = Path(__file__).resolve().parents[3] / ".trivyignore.yaml"
 
 CHANGELOG = """\
 # Changelog
@@ -88,6 +89,7 @@ def _manifest_args(directory: Path, **overrides: Any) -> dict[str, Any]:
         "images": {"app": "gmat-m8", "backup": "gmat-m8-backup"},
         "run_url": RUN_URL,
         "created_at": CREATED,
+        "ignorefile": IGNOREFILE,
     }
     return args | overrides
 
@@ -180,16 +182,12 @@ def test_manifest_lists_both_images(tools: ModuleType, tmp_path: Path) -> None:
     }
 
 
-def test_manifest_without_an_ignorefile_says_so_by_omission(
-    tools: ModuleType, tmp_path: Path
-) -> None:
+def test_manifest_refuses_a_missing_exception_file(tools: ModuleType, tmp_path: Path) -> None:
     files = tmp_path / "files"
     files.mkdir()
-    manifest = tools.build_manifest(
-        **_manifest_args(_release_dir(files), ignorefile=tmp_path / "missing.yaml")
-    )
-    assert "ignorefile" not in manifest["scan_gate"]
-    assert manifest["scan_gate"]["ignore_unfixed"] is False
+    args = _manifest_args(_release_dir(files), ignorefile=tmp_path / "missing.yaml")
+    with pytest.raises(tools.ReleaseError, match=r"exception file .* not found"):
+        tools.build_manifest(**args)
 
 
 @pytest.mark.parametrize("version", ["v1.1.0", "1.1", "latest", ""])
@@ -230,7 +228,7 @@ def test_manifest_refuses_an_image_without_an_sbom(tools: ModuleType, tmp_path: 
     directory = _release_dir(tmp_path)
     for path in directory.glob("sbom-gmat-m8-backup-*"):
         path.unlink()
-    with pytest.raises(tools.ReleaseError, match="no SBOM for gmat-m8-backup"):
+    with pytest.raises(tools.ReleaseError, match=r"no SBOM for gmat-m8-backup \(amd64, arm64\)"):
         tools.build_manifest(**_manifest_args(directory))
 
 
@@ -238,7 +236,21 @@ def test_manifest_refuses_an_image_without_a_scan(tools: ModuleType, tmp_path: P
     directory = _release_dir(tmp_path)
     for arch in ("amd64", "arm64"):
         (directory / f"trivy-gmat-m8-{arch}-report.json").unlink()
-    with pytest.raises(tools.ReleaseError, match="no Trivy report for gmat-m8"):
+    with pytest.raises(tools.ReleaseError, match=r"no Trivy report for gmat-m8 \(amd64, arm64\)"):
+        tools.build_manifest(**_manifest_args(directory))
+
+
+@pytest.mark.parametrize(
+    "kind", ["sbom-{name}-{arch}.spdx.json", "trivy-{name}-{arch}-report.json"]
+)
+@pytest.mark.parametrize("arch", ["amd64", "arm64"])
+def test_manifest_refuses_a_missing_architecture(
+    tools: ModuleType, tmp_path: Path, kind: str, arch: str
+) -> None:
+    """One architecture short is as bad as none: the signed manifest would vouch for less."""
+    directory = _release_dir(tmp_path)
+    (directory / kind.format(name="gmat-m8-backup", arch=arch)).unlink()
+    with pytest.raises(tools.ReleaseError, match=rf"for gmat-m8-backup \({arch}\)"):
         tools.build_manifest(**_manifest_args(directory))
 
 
@@ -274,9 +286,12 @@ COMPOSE = (
 
 
 def test_targets_without_a_release(tools: ModuleType) -> None:
+    """Every image is scanned for both architectures the release gate covers."""
     assert tools.scan_targets(COMPOSE, None) == [
-        {"name": "caddy", "ref": CADDY_REF},
-        {"name": "postgres", "ref": POSTGRES_REF},
+        {"name": "caddy-amd64", "ref": CADDY_REF, "platform": "linux/amd64"},
+        {"name": "caddy-arm64", "ref": CADDY_REF, "platform": "linux/arm64"},
+        {"name": "postgres-amd64", "ref": POSTGRES_REF, "platform": "linux/amd64"},
+        {"name": "postgres-arm64", "ref": POSTGRES_REF, "platform": "linux/arm64"},
     ]
 
 
@@ -288,13 +303,51 @@ def test_targets_include_the_released_images(tools: ModuleType) -> None:
         }
     }
     targets = tools.scan_targets(COMPOSE, manifest)
-    assert [t["name"] for t in targets] == ["caddy", "postgres", "released-app", "released-backup"]
-    assert targets[2]["ref"] == f"ghcr.io/mano8/gmat-m8@{DIGEST_APP}"
+    assert [t["name"] for t in targets[::2]] == [
+        "caddy-amd64",
+        "postgres-amd64",
+        "released-app-amd64",
+        "released-backup-amd64",
+    ]
+    released = {t["name"]: t for t in targets}["released-app-arm64"]
+    assert released == {
+        "name": "released-app-arm64",
+        "ref": f"ghcr.io/mano8/gmat-m8@{DIGEST_APP}",
+        "platform": "linux/arm64",
+    }
 
 
 def test_repository_compose_file_yields_caddy_and_postgres(tools: ModuleType) -> None:
     compose = (tools.ROOT / "docker_compose/gmat_m8/docker-compose.yml").read_text(encoding="utf-8")
-    assert [t["name"] for t in tools.scan_targets(compose, None)] == ["caddy", "postgres"]
+    names = [t["name"] for t in tools.scan_targets(compose, None)]
+    assert names == ["caddy-amd64", "caddy-arm64", "postgres-amd64", "postgres-arm64"]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "image: caddy:2.11.7-alpine",  # a tag is not a pin
+        "image: caddy@sha256:abc",  # truncated digest
+        "image:",  # empty
+        "image: caddy@sha256:" + "G" * 64,
+    ],
+)
+def test_an_image_line_that_is_not_pinned_is_an_error(tools: ModuleType, line: str) -> None:
+    """A line the scan cannot parse must stop the run, not shrink the matrix."""
+    with pytest.raises(tools.ReleaseError, match="not pinned by digest"):
+        tools.scan_targets(f"services:\n  x:\n    {line}\n", None)
+
+
+def test_quoted_and_commented_image_lines_are_still_found(tools: ModuleType) -> None:
+    text = f'services:\n  a:\n    image: "{CADDY_REF}"\n  b:\n    image: {POSTGRES_REF}  # pinned\n'
+    refs = {t["ref"] for t in tools.scan_targets(text, None)}
+    assert refs == {CADDY_REF, POSTGRES_REF}
+
+
+def test_variable_images_are_the_ones_built_here(tools: ModuleType) -> None:
+    assert (
+        tools.scan_targets("services:\n  a:\n    image: ${APP_IMAGE:-gmat-m8:local}\n", None) == []
+    )
 
 
 # --------------------------------------------------------------------- nightly issue
@@ -313,13 +366,39 @@ def test_issue_body_lists_findings_worst_first(tools: ModuleType) -> None:
     critical = body.index("| released-app | CRITICAL |")
     high = body.index("| caddy | HIGH |")
     assert critical < high
-    assert "| 1.1 |" in body  # a fix is available
+    assert "| `1.1` |" in body  # a fix is available
     assert "Per image: caddy 1, released-app 1" in body
 
 
 def test_issue_body_marks_unfixed_findings(tools: ModuleType) -> None:
     body = tools.scan_issue_body({"caddy": _report(HIGH=2)}, RUN_URL)
     assert "none yet" in body
+
+
+def test_issue_body_shows_scanner_text_literally(tools: ModuleType) -> None:
+    """A title with a pipe, a newline, a mention or a link must not break the table or ping."""
+    report = {
+        "Results": [
+            {
+                "Secrets": [
+                    {
+                        "RuleID": "aws|key",
+                        "Severity": "HIGH",
+                        "Title": "leak @maintainer\nsee #12 `x`",
+                    }
+                ],
+                "Vulnerabilities": [
+                    {"VulnerabilityID": "CVE-1", "PkgName": "", "Severity": "NOPE"}
+                ],
+            }
+        ]
+    }
+    body = tools.scan_issue_body({"caddy": report}, RUN_URL)
+    rows = [line for line in body.splitlines() if line.startswith("| caddy ")]
+    assert len(rows) == 2
+    assert all(row.count("|") == 7 for row in rows)  # six cells, no stray pipe
+    assert "| `aws/key` | `leak @maintainer see #12 'x'` |" in body
+    assert "| UNKNOWN | `CVE-1` | - |" in body  # an unknown severity is still listed
 
 
 def test_issue_body_is_capped(tools: ModuleType) -> None:
@@ -418,12 +497,14 @@ def test_cli_scan_targets(
 
     assert tools.main(["scan-targets", "--compose", str(compose)]) == 0
     captured = capsys.readouterr()
-    assert [t["name"] for t in json.loads(captured.out)["include"]] == ["caddy", "postgres"]
+    include = json.loads(captured.out)["include"]
+    assert [t["name"] for t in include[::2]] == ["caddy-amd64", "postgres-amd64"]
+    assert {t["platform"] for t in include} == {"linux/amd64", "linux/arm64"}
     assert "no release manifest" in captured.err
 
     assert tools.main(["scan-targets", "--compose", str(compose), "--manifest", str(manifest)]) == 0
     captured = capsys.readouterr()
-    assert [t["name"] for t in json.loads(captured.out)["include"]][-1] == "released-app"
+    assert [t["name"] for t in json.loads(captured.out)["include"]][-1] == "released-app-arm64"
     assert captured.err == ""
 
 
@@ -451,3 +532,20 @@ def test_cli_scan_issue_needs_reports(
     argv = ["scan-issue", "--dir", str(tmp_path), "--run-url", RUN_URL]
     assert tools.main(argv) == 1
     assert "no gate-*.json reports" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------- grammar agreement
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["0.1.0", "1.20.3", "1.0.0-rc.1", "2.0.0-beta", "1", "1.0", "1.0.0.0", "v1.0.0", "1.0.0-", ""],
+)
+def test_the_release_gate_and_the_manifest_accept_the_same_versions(
+    tools: ModuleType, load_script: Callable[[str], ModuleType], version: str
+) -> None:
+    """The tag check (verify_release) and the manifest (release_tools) must not disagree."""
+    gate = load_script("verify_release")
+    tag_ok = not gate.check_tag(f"v{version}")
+    assert tag_ok == bool(tools.VERSION_PATTERN.match(version))
+    assert gate.SHA_PATTERN.pattern == tools.SHA_PATTERN.pattern

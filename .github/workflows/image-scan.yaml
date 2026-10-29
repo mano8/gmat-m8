@@ -6,10 +6,11 @@ name: Image scan
 # green PR says nothing about an image that has been running for a month.
 #
 # The gate is the one of ci.yaml and docker-publish.yaml: HIGH and CRITICAL, no
-# --ignore-unfixed, exceptions only from .trivyignore.yaml. A failing scan opens, or updates, ONE
-# issue listing what is not covered; the full all-severity reports are kept as artifacts for
-# 90 days. Before the first release there are no released images yet and only Caddy and
-# PostgreSQL are scanned.
+# --ignore-unfixed, exceptions only from .trivyignore.yaml, and both architectures (each image
+# is an amd64 + arm64 index, and Trivy would otherwise scan only the runner's). A failing scan
+# opens, or updates, ONE issue listing what is not covered, and a fully clean run closes it; the
+# full all-severity reports are kept as artifacts for 90 days. Before the first release there
+# are no released images yet and only Caddy and PostgreSQL are scanned.
 #
 # Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
 # `on.paths` filter, no secret other than the run's GITHUB_TOKEN, every action pinned by full
@@ -96,6 +97,7 @@ jobs:
         uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
         env:
           TRIVY_IGNOREFILE: ""
+          TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
           version: ${{ env.TRIVY_VERSION }}
           scan-type: image
@@ -110,6 +112,8 @@ jobs:
         id: gate
         continue-on-error: true
         uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
           version: ${{ env.TRIVY_VERSION }}
           scan-type: image
@@ -170,18 +174,26 @@ jobs:
           --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           --output scan-issue.md
 
-      - name: Open or update the issue when there are findings
+      # Findings: open the issue or refresh its body. No findings: close it, but only when every
+      # scan leg ran to the end (a leg that could not pull its image proves nothing).
+      - name: Open, update or close the issue
+        env:
+          SCAN_RESULT: ${{ needs.scan.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          if [ ! -s scan-issue.md ]; then
-            echo "no findings outside the accepted exceptions"
-            exit 0
-          fi
           number="$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" \
             --json number,title --jq '[.[] | select(.title == env.ISSUE_TITLE)] | .[0].number // empty')"
-          if [ -n "$number" ]; then
-            gh issue edit "$number" --body-file scan-issue.md
-            echo "updated issue #$number"
+          if [ -s scan-issue.md ]; then
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --body-file scan-issue.md
+              echo "updated issue #$number"
+            else
+              gh issue create --title "$ISSUE_TITLE" --body-file scan-issue.md
+            fi
+          elif [ -n "$number" ] && [ "$SCAN_RESULT" = "success" ]; then
+            gh issue close "$number" --comment "Clean scan, no findings outside the accepted exceptions: $RUN_URL"
+            echo "closed issue #$number"
           else
-            gh issue create --title "$ISSUE_TITLE" --body-file scan-issue.md
+            echo "no findings outside the accepted exceptions"
           fi

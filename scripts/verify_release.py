@@ -59,7 +59,10 @@ def gh_api(path: str) -> Any:
         raise ApiError(str(error)) from error
     if result.returncode != 0:
         raise ApiError(result.stderr.strip() or f"gh api exited with {result.returncode}")
-    return json.loads(result.stdout)
+    try:
+        return json.loads(result.stdout)
+    except ValueError as error:
+        raise ApiError(f"gh api returned something that is not JSON: {error}") from error
 
 
 def check_tag(tag: str) -> list[str]:

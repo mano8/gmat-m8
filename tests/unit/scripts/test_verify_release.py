@@ -286,6 +286,23 @@ def test_gh_api_without_a_message_still_explains(
         script.gh_api("repos/x/y")
 
 
+@pytest.mark.parametrize("stdout", ["", "not json", "<html>"])
+def test_gh_api_output_that_is_not_json_raises_api_error(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch, stdout: str
+) -> None:
+    """A malformed answer is a listed problem (the other workflows still get checked)."""
+
+    def fake_run(command: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(script.subprocess, "run", fake_run)
+    with pytest.raises(script.ApiError, match="not JSON"):
+        script.gh_api("repos/x/y")
+    problems = script.check_runs(script.gh_api, REPO, "a" * 40, ["ci.yaml", "compose-smoke.yaml"])
+    assert len(problems) == 2
+    assert all("cannot read the runs" in problem for problem in problems)
+
+
 def test_gh_api_missing_binary_raises(script: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(*_args: Any, **_kwargs: Any) -> None:
         raise FileNotFoundError("gh")
