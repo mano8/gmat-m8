@@ -46,6 +46,18 @@ def _entry_problems(label: str, entry: Any, today: datetime.date) -> list[str]:
     return problems
 
 
+def _section_problems(name: str, section: str, entries: Any, today: datetime.date) -> list[str]:
+    if not isinstance(entries, list):
+        return [f"{name}: '{section}' must be a list"]
+    problems: list[str] = []
+    for index, entry in enumerate(entries):
+        label = f"{name}: {section}[{index}]"
+        if isinstance(entry, dict) and entry.get("id"):
+            label += f" ({entry['id']})"
+        problems.extend(_entry_problems(label, entry, today))
+    return problems
+
+
 def check(path: Path = IGNORE_FILE, today: datetime.date | None = None) -> list[str]:
     """Return every policy violation in the ignore file (none for an empty file)."""
     today = today or datetime.datetime.now(datetime.UTC).date()
@@ -56,15 +68,7 @@ def check(path: Path = IGNORE_FILE, today: datetime.date | None = None) -> list[
         return [f"{path.name}: top level must be a mapping"]
     problems = [f"{path.name}: unknown section '{key}'" for key in data if key not in SECTIONS]
     for section in SECTIONS:
-        entries = data.get(section) or []
-        if not isinstance(entries, list):
-            problems.append(f"{path.name}: '{section}' must be a list")
-            continue
-        for index, entry in enumerate(entries):
-            label = f"{path.name}: {section}[{index}]"
-            if isinstance(entry, dict) and entry.get("id"):
-                label += f" ({entry['id']})"
-            problems.extend(_entry_problems(label, entry, today))
+        problems.extend(_section_problems(path.name, section, data.get(section) or [], today))
     return problems
 
 

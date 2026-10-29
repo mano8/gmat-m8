@@ -134,8 +134,7 @@ def check_admin_base_class(app_configs: Any, **kwargs: Any) -> list[CheckMessage
     ]
 
 
-@register(deploy=True)
-def check_deployment(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+def _secret_errors() -> list[CheckMessage]:
     errors: list[CheckMessage] = []
     if settings.DEBUG:
         errors.append(Error("DEBUG must be off", id="gmat.E010"))
@@ -149,22 +148,34 @@ def check_deployment(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
             list(getattr(settings, "MFA_ENCRYPTION_KEYS", [])), refused=refused
         )
     )
+    return errors
+
+
+def _host_errors() -> list[CheckMessage]:
+    errors: list[CheckMessage] = []
     hosts = list(settings.ALLOWED_HOSTS)
     if not hosts or "*" in hosts:
         errors.append(Error("ALLOWED_HOSTS is empty or has a wildcard", id="gmat.E013"))
     origins = list(getattr(settings, "CSRF_TRUSTED_ORIGINS", []))
     if not origins or not all(origin.startswith("https://") for origin in origins):
         errors.append(Error("CSRF_TRUSTED_ORIGINS must list https origins", id="gmat.E014"))
+    return errors
+
+
+def _cookie_errors() -> list[CheckMessage]:
     cookies_ok = (
         settings.SESSION_COOKIE_NAME.startswith("__Host-")
         and settings.CSRF_COOKIE_NAME.startswith("__Host-")
         and settings.SESSION_COOKIE_SECURE
         and settings.CSRF_COOKIE_SECURE
     )
-    if not cookies_ok:
-        errors.append(
-            Error("Session and CSRF cookies must be Secure __Host- cookies", id="gmat.E015")
-        )
+    if cookies_ok:
+        return []
+    return [Error("Session and CSRF cookies must be Secure __Host- cookies", id="gmat.E015")]
+
+
+def _hasher_and_mail_errors() -> list[CheckMessage]:
+    errors: list[CheckMessage] = []
     if not settings.PASSWORD_HASHERS or settings.PASSWORD_HASHERS[0] != ARGON2:
         errors.append(Error("Argon2 must be the first password hasher", id="gmat.E016"))
     mailer = getattr(settings, "MAILERS", {}).get("default", {}).get("BACKEND")
@@ -177,3 +188,8 @@ def check_deployment(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
             )
         )
     return errors
+
+
+@register(deploy=True)
+def check_deployment(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+    return [*_secret_errors(), *_host_errors(), *_cookie_errors(), *_hasher_and_mail_errors()]

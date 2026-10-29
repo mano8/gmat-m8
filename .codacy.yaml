@@ -8,6 +8,8 @@ exclude_paths:
   - "locale/**"                           # gettext catalogs
   - "CLAUDE.md"                           # agent instructions, not code
   - ".github/pull_request_template.md"    # opens with the title hint comment by design
+  - "**/*.sql"                            # PostgreSQL run through psql (:'name' variables);
+                                          # Codacy's SQL tools target other dialects
 
 engines:
   bandit:
@@ -23,11 +25,3 @@ engines:
     # CLI validates it in the image build.
     exclude_paths:
       - "static/src/**"
-  tsqllint:
-    # SQL Server rules; our SQL is PostgreSQL run through psql.
-    exclude_paths:
-      - "**/*.sql"
-  sqlint:
-    # Cannot parse psql variables (:'name').
-    exclude_paths:
-      - "**/*.sql"
