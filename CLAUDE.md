@@ -11,6 +11,7 @@ Materials app for a group of electrical-installation companies and their branche
 ## Git, PRs, releases
 
 - **One phase = one branch = one PR** (M1, M2, …). Branch: `git switch --no-track -c m<phase>-<slug> origin/main` (e.g. `m2-org-access`). Human steps (`H*`) are skipped. Commit per step with Conventional Commits + step id: `feat(access): resolve dependent branch scope [M2.3]`. Never `--no-verify`.
+- **Release ordering (plan §0.2):** a step that publishes or releases (M1.7 `docker-publish.yaml`) never shares a PR with the code it builds. Open and merge the preceding PR first (M1: PR 1 = M1.1–M1.6 on `m1-foundation`), then cut `m1-release` from the updated `origin/main` for M1.7 in its own PR. Nothing is tagged, released or published before both are merged and H1.8 is done.
 - Agents use the configured owner account (`gh`/git): commit, `git push -u origin <branch>`, open the PR with `gh pr create --repo mano8/gmat-m8 --head <branch> --draft`, answer reviews.
 - **Never:** merge or approve a PR; push to `main` or force-push; create tags or GitHub Releases (`v*` tags publish images); run `gh workflow run` or `docker-publish`; deploy or touch production data; change repo settings, rulesets, secrets or tokens. GitHub will not stop the owner account, so these rules and `.claude/settings.json` are the guard.
 - **No attribution:** no `Co-Authored-By` lines, no "Generated with" footers and no AI tool or model names in commits, PR titles, descriptions or comments.
