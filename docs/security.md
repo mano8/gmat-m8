@@ -94,7 +94,7 @@ Files in `docker_compose/gmat_m8/` (see its README); `tests/live` proves the poi
 - **Maintenance gate.** `flags/maintenance.on` makes Caddy answer 503 with the maintenance page for every public request while `web` keeps running; the same page replaces a missing `web` (502/503/504).
 - **Log redaction.** Caddy's default and access logs replace the token paths (`/accounts/password/reset/key/…`, `/account/email-change/…`, `/invite/…`) and every query string with `REDACTED` and drop `Referer` and `HX-Current-URL`. Only paths under those prefixes are secrets to Caddy; Django's own filter also redacts any long random segment.
 - **Secrets.** `init.sh` generates every secret (mode 0600, never printed, redrawn if it resembles a placeholder). A secret is defined once in `.env` and reaches the services by interpolation; Django-only settings are in `app.env`. Only `*.example` templates are committed.
-- **Not yet.** The worker service and its heartbeat (M2.5), `deploy.sh` and `recover.sh` (M8.4), the signed image digests of the production overlay (M1.7).
+- **Not yet.** The worker service and its heartbeat (M2.5), `deploy.sh` and `recover.sh` (M8.4), which will verify the signed release manifest and image digests that the publish pipeline (M1.7, [release.md](release.md)) produces before writing them into the production overlay.
 
 ## The UI shell (step M1.6)
 

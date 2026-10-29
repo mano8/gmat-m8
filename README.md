@@ -76,6 +76,8 @@ Coverage must stay at 90 % or more overall (100 % for `apps/access` and every `s
 | `secret-scan` | gitleaks over the full history |
 | `compose-smoke-gate` | from `compose-smoke.yaml` (M1.5) |
 
+Two more workflows are not PR checks. `docker-publish.yaml` publishes both images, signed, with a signed release manifest, when the maintainer pushes a `v*` tag (a manual run builds without pushing); it refuses a commit that is not on `main` or lacks green `ci.yaml` and `compose-smoke.yaml` runs. `image-scan.yaml` scans the released images, Caddy and PostgreSQL every night and keeps one issue up to date. Both are described in [docs/release.md](docs/release.md).
+
 Trivy exceptions live in `.trivyignore.yaml` (empty; the entry format is documented in the file). Each needs a statement and an expiry at most 90 days away, and is added only in a pull request the maintainer approves. Reports of the Trivy and bandit scans are kept as workflow artifacts for 90 days.
 
 ## Health endpoints
