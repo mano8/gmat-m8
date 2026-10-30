@@ -85,7 +85,7 @@ def lock_for_user_change(
     return actor
 
 
-def elevate_privilege(user_id: UUID) -> None:
+def _elevate_privilege(user_id: UUID) -> None:
     """Granting a privileged role moves ``privilege_elevated_at`` to now (plan §3.6).
 
     The database clock of the grant; never moved back. Sessions must complete MFA after it
@@ -420,7 +420,7 @@ def grant_membership(
         _check_membership_target(membership, user)
         membership.save()
         if membership.role in PRIVILEGED_ROLES:
-            elevate_privilege(user.pk)
+            _elevate_privilege(user.pk)
         record(
             principal.audit_identity,
             "membership.granted",
@@ -497,7 +497,7 @@ def change_membership_validity(
     membership.full_clean()
     membership.save(update_fields=["valid_from", "valid_until", "updated_at"])
     if membership.role in PRIVILEGED_ROLES:
-        elevate_privilege(user_id)
+        _elevate_privilege(user_id)
     record(
         principal.audit_identity,
         "membership.validity_changed",
