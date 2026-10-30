@@ -12,6 +12,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+from django.test import override_settings
 
 from apps.access import principals
 from apps.access.principals import SessionPrincipal
@@ -35,6 +36,21 @@ def _tests_may_construct_principals() -> Iterator[None]:
     with pytest.MonkeyPatch.context() as patch:
         for name, modules in list(principals.CONSTRUCTOR_MODULES.items()):
             patch.setitem(principals.CONSTRUCTOR_MODULES, name, modules | {"tests"})
+        yield
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _mail_goes_through_the_outbox(django_test_environment: None) -> Iterator[None]:
+    """Requests queue mail in the outbox, as in production.
+
+    Django's test runner replaces every mailer with locmem; this puts the outbox back as the
+    default mailer. The worker's ``outbound`` mailer stays locmem (``django.core.mail.outbox``).
+    """
+    mailers = {
+        "default": {"BACKEND": "apps.notifications.backends.OutboxEmailBackend"},
+        "outbound": {"BACKEND": "django.core.mail.backends.locmem.EmailBackend"},
+    }
+    with override_settings(MAILERS=mailers):
         yield
 
 

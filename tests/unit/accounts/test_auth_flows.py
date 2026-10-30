@@ -12,7 +12,7 @@ from django.urls import NoReverseMatch, reverse
 
 from apps.accounts.adapters import AccountAdapter, PasswordResetTokenInvalid
 from apps.accounts.models import User
-from tests.support import PASSWORD, password_login
+from tests.support import PASSWORD, password_login, queued_security_mail
 
 pytestmark = pytest.mark.django_db
 
@@ -115,14 +115,15 @@ class TestPasswordReset:
         unknown = client.post(reverse("account_reset_password"), {"email": "nobody@example.org"})
         assert known.status_code == unknown.status_code == 302
         assert known["Location"] == unknown["Location"]
-        assert [message.to for message in mail.outbox] == [["tech@example.org"]]
+        assert [address for address, _, _ in queued_security_mail()] == ["tech@example.org"]
+        assert mail.outbox == []  # queued for the worker, never sent from the request
 
     def test_inactive_accounts_receive_no_reset_email(
         self, client: Client, make_user: Callable[..., User]
     ) -> None:
         make_user(is_active=False)
         client.post(reverse("account_reset_password"), {"email": "tech@example.org"})
-        assert mail.outbox == []
+        assert queued_security_mail() == []
 
     def test_reset_redirects_to_a_keyless_url_and_never_logs_in(
         self, client: Client, make_user: Callable[..., User]
@@ -130,7 +131,7 @@ class TestPasswordReset:
         user = make_user()
         client.post(reverse("account_reset_password"), {"email": "tech@example.org"})
         link = re.search(
-            r"https?://[^/\s]+(/accounts/password/reset/key/\S+/)", str(mail.outbox[0].body)
+            r"https?://[^/\s]+(/accounts/password/reset/key/\S+/)", queued_security_mail()[0][2]
         )
         assert link is not None
         response = client.get(link.group(1))

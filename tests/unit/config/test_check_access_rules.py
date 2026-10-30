@@ -469,7 +469,7 @@ class TestMail:
     def test_the_worker_and_backends_are_fine(self, script: ModuleType, tmp_path: Path) -> None:
         files = {
             "apps/notifications/worker.py": "from django.core.mail import get_connection\n",
-            "apps/core/mail.py": (
+            "apps/notifications/backends.py": (
                 "from django.core.mail.backends.base import BaseEmailBackend\n"
                 "class B(BaseEmailBackend):\n    def send_messages(self, m):\n        return 0\n"
             ),

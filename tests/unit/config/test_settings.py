@@ -14,12 +14,15 @@ from config.env import derived_fernet_key
 
 MFA_KEY = Fernet.generate_key().decode()
 OLD_MFA_KEY = Fernet.generate_key().decode()
+OUTBOX_KEY = Fernet.generate_key().decode()
+SMTP_ENV = ("OUTBOUND_EMAIL", "EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD")
 
 GOOD_ENV = {
     "DJANGO_SECRET_KEY": "Zq8vN2xLp4Rt7WmB9cYd3GhJ6KsFa1UeVo5XnTi0PbQrCwEyAz",
     "DJANGO_ALLOWED_HOSTS": "app.example.org",
     "DJANGO_CSRF_TRUSTED_ORIGINS": "https://app.example.org",
     "MFA_ENCRYPTION_KEYS": f"{MFA_KEY},{OLD_MFA_KEY}",
+    "OUTBOX_ENCRYPTION_KEYS": OUTBOX_KEY,
     "DB_NAME": "gmat",
     "DB_USER": "gmat",
     "DB_PASSWORD": "pw",
@@ -39,7 +42,14 @@ def load_prod(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
 
     def _load(**overrides: str | None) -> object:
         env = {**GOOD_ENV, **overrides}
-        for name in [*GOOD_ENV, "DJANGO_DEBUG", "DJANGO_HSTS_SECONDS", "DJANGO_ADMIN_URL_PATH"]:
+        unset = [
+            *GOOD_ENV,
+            *SMTP_ENV,
+            "DJANGO_DEBUG",
+            "DJANGO_HSTS_SECONDS",
+            "DJANGO_ADMIN_URL_PATH",
+        ]
+        for name in unset:
             monkeypatch.delenv(name, raising=False)
         for name, value in env.items():
             if value is not None:
@@ -62,7 +72,31 @@ def test_good_production_environment_loads(load_prod) -> None:  # type: ignore[n
     assert settings.SESSION_COOKIE_NAME == "__Host-sessionid"
     assert settings.CSRF_COOKIE_NAME == "__Host-csrftoken"
     assert settings.SECURE_HSTS_SECONDS == 31536000
-    assert settings.MAILERS["default"]["BACKEND"] == "apps.core.mail.DisabledEmailBackend"
+    assert settings.OUTBOX_ENCRYPTION_KEYS == [OUTBOX_KEY]
+    assert (
+        settings.MAILERS["default"]["BACKEND"] == "apps.notifications.backends.OutboxEmailBackend"
+    )
+    # Nothing leaves without OUTBOUND_EMAIL=on.
+    assert settings.OUTBOUND_EMAIL is False
+    assert settings.MAILERS["outbound"]["BACKEND"] == "django.core.mail.backends.smtp.EmailBackend"
+
+
+def test_outbound_email_needs_an_smtp_host(load_prod) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(ImproperlyConfigured):
+        load_prod(OUTBOUND_EMAIL="on")
+    settings = load_prod(
+        OUTBOUND_EMAIL="on",
+        EMAIL_HOST="smtp.example.org",
+        EMAIL_HOST_USER="mailer",
+        EMAIL_HOST_PASSWORD="smtp-pw-123",
+    )
+    options = settings.MAILERS["outbound"]["OPTIONS"]
+    assert settings.OUTBOUND_EMAIL is True
+    assert options["host"] == "smtp.example.org"
+    assert options["port"] == 587
+    assert options["use_tls"] is True
+    assert options["username"] == "mailer"
+    assert options["timeout"] == 10
 
 
 def test_admin_url_path_is_configurable_and_defaults_to_admin(load_prod) -> None:  # type: ignore[no-untyped-def]
@@ -108,6 +142,14 @@ def test_health_endpoints_are_exempt_from_the_https_redirect(load_prod) -> None:
         {"MFA_ENCRYPTION_KEYS": derived_fernet_key("development")},
         {"MFA_ENCRYPTION_KEYS": derived_fernet_key("test")},
         {"MFA_ENCRYPTION_KEYS": "change-me"},
+        {"OUTBOX_ENCRYPTION_KEYS": None},
+        {"OUTBOX_ENCRYPTION_KEYS": "not-a-fernet-key"},
+        {"OUTBOX_ENCRYPTION_KEYS": derived_fernet_key("outbox-test")},
+        {"OUTBOX_ENCRYPTION_KEYS": derived_fernet_key("development")},
+        {"OUTBOX_ENCRYPTION_KEYS": MFA_KEY},
+        {"OUTBOX_ENCRYPTION_KEYS": f"{OUTBOX_KEY},{OLD_MFA_KEY}"},
+        {"OUTBOUND_EMAIL": "maybe"},
+        {"OUTBOUND_EMAIL": "on", "EMAIL_PORT": "0"},
         {"DJANGO_ADMIN_URL_PATH": "ad/min"},
         {"DJANGO_ADMIN_URL_PATH": "/admin"},
         {"DJANGO_ADMIN_URL_PATH": "admin!"},
@@ -145,6 +187,9 @@ def test_dev_settings_default_to_local_hosts(monkeypatch: pytest.MonkeyPatch) ->
     dev = importlib.import_module("config.settings.dev")
     assert dev.DEBUG is True
     assert "localhost" in dev.ALLOWED_HOSTS
+    # Mail goes to the outbox; the worker delivers to a local SMTP sink (Mailpit).
+    assert dev.MAILERS["default"]["BACKEND"] == "apps.notifications.backends.OutboxEmailBackend"
+    assert dev.MAILERS["outbound"]["OPTIONS"]["port"] == 1025
     sys.modules.pop("config.settings.dev", None)
 
 

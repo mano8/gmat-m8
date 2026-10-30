@@ -6,7 +6,7 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 
-from config.env import env_int, env_str
+from config.env import env_bool, env_int, env_str
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.humanize",  # allauth's passkey list (mfa/webauthn) loads it
+    "django.contrib.postgres",  # ArrayField (outbox recipients); trigram search later (M3.1)
     "apps.core.apps.StaticFilesConfig",  # django.contrib.staticfiles, minus the Tailwind input
     "django.forms",  # lets the project override the form templates (TemplatesSetting)
     "allauth",
@@ -30,6 +31,7 @@ INSTALLED_APPS = [
     "apps.organizations",
     "apps.projects",
     "apps.locations",
+    "apps.notifications",
 ]
 
 # Order matters (plan §3.6): session auth → session epoch → MFA enforcement → access context.
@@ -197,10 +199,30 @@ SECURE_CSP = {
     "object-src": [CSP.NONE],
 }
 
-# --- email ----------------------------------------------------------------------------
-# Never SMTP inside a request. M2.5 replaces this with the outbox backend.
-MAILERS = {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}}
+# --- email (plan §5, "Email: outbox and worker") --------------------------------------
+# Never SMTP inside a request: the default mailer writes EmailOutbox rows (allauth's mail
+# included) and only the worker sends them, through the "outbound" mailer that dev, test and
+# prod add. Business email is queued with apps.notifications.outbox.
+OUTBOX_BACKEND = "apps.notifications.backends.OutboxEmailBackend"
+SMTP_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+MAILERS: dict[str, dict[str, object]] = {"default": {"BACKEND": OUTBOX_BACKEND}}
 DEFAULT_FROM_EMAIL = env_str("DJANGO_DEFAULT_FROM_EMAIL", "gmat-m8 <no-reply@localhost>")
+# Off unless switched on: with it off the worker never claims or opens an SMTP connection.
+OUTBOUND_EMAIL = env_bool("OUTBOUND_EMAIL", False)
+# Seconds per SMTP socket operation (the plan's EMAIL_TIMEOUT; Django reserves that name).
+OUTBOX_SMTP_TIMEOUT = 10
+OUTBOX_SEND_DEADLINE = 60  # seconds per message, every stage included (SIGALRM)
+# An attempt still without outcome this long after the deadline is AMBIGUOUS (abandoned).
+OUTBOX_ABANDON_GRACE = 30
+# A security email not sent within this time is wiped and EXPIRED; the user asks again.
+OUTBOX_SENSITIVE_TTL = 3600
+# The worker: the deploy and recovery flag directory (read only), its heartbeat file (read
+# by `entrypoint.sh worker-healthcheck`) and its timers, in seconds.
+WORKER_FLAGS_DIR = env_str("WORKER_FLAGS_DIR", "/srv/flags")
+WORKER_HEARTBEAT_FILE = env_str("WORKER_HEARTBEAT_FILE", "/tmp/gmat-worker.heartbeat")  # noqa: S108  # nosec B108
+WORKER_POLL_INTERVAL = 2
+WORKER_RECONCILE_INTERVAL = 60
+WORKER_HOUSEKEEPING_INTERVAL = 3600
 
 LANGUAGE_CODE = "es"
 LANGUAGES = [("es", "Español"), ("en", "English"), ("fr", "Français")]
@@ -265,4 +287,25 @@ def database_from_env() -> dict[str, object]:
         "PORT": env_int("DB_PORT", 5432, minimum=1, maximum=65535),
         "CONN_MAX_AGE": 0,
         "OPTIONS": {"connect_timeout": 5},
+    }
+
+
+def outbound_mailer_from_env(
+    *, host: str | None = None, port: int = 587, use_tls: bool = True
+) -> dict[str, object]:
+    """The worker's SMTP mailer from ``EMAIL_*``; ``host`` is ``EMAIL_HOST``'s default.
+
+    The password usually reaches only the worker container (compose passes it there).
+    """
+    return {
+        "BACKEND": SMTP_BACKEND,
+        "OPTIONS": {
+            "host": env_str("EMAIL_HOST", host),
+            "port": env_int("EMAIL_PORT", port, minimum=1, maximum=65535),
+            "username": env_str("EMAIL_HOST_USER", "", min_length=0),
+            "password": env_str("EMAIL_HOST_PASSWORD", "", min_length=0),
+            "use_tls": env_bool("EMAIL_USE_TLS", use_tls),
+            "use_ssl": env_bool("EMAIL_USE_SSL", False),
+            "timeout": OUTBOX_SMTP_TIMEOUT,
+        },
     }

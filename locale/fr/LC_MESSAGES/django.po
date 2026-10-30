@@ -3,341 +3,549 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-30 23:10+0000\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-msgid "Home"
-msgstr "Accueil"
-
-msgid "Signed in as %(email)s."
-msgstr "Connecté en tant que %(email)s."
-
-msgid "Nothing here yet"
-msgstr "Rien ici pour le moment"
-
-msgid "Your requests and tasks will appear here once the first features are switched on."
-msgstr "Vos demandes et tâches apparaîtront ici dès que les premières fonctions seront activées."
-
-msgid "Bad request"
-msgstr "Requête incorrecte"
-
-msgid "We could not understand that request"
-msgstr "Nous n'avons pas pu comprendre cette requête"
-
-msgid "Go back and try again. If it keeps happening, contact your administrator."
-msgstr "Revenez en arrière et réessayez. Si le problème persiste, contactez votre administrateur."
-
-msgid "Not allowed"
-msgstr "Non autorisé"
-
-msgid "You are not allowed to do that"
-msgstr "Vous n'avez pas le droit de faire cela"
-
-msgid "Your account does not have access to this action. If you think it should, ask your administrator."
-msgstr "Votre compte n'a pas accès à cette action. Si vous pensez que ce devrait être le cas, demandez à votre administrateur."
-
-msgid "Form expired"
-msgstr "Formulaire expiré"
-
-msgid "That form has expired"
-msgstr "Ce formulaire a expiré"
-
-msgid "Reload the page and send it again."
-msgstr "Rechargez la page et envoyez-le à nouveau."
-
-msgid "Page not found"
-msgstr "Page introuvable"
-
-msgid "We could not find that page"
-msgstr "Nous n'avons pas trouvé cette page"
-
-msgid "The address may be wrong, or the page may no longer exist."
-msgstr "L'adresse est peut-être erronée, ou la page n'existe plus."
-
-msgid "Not available"
-msgstr "Indisponible"
-
-msgid "That action is not available here"
-msgstr "Cette action n'est pas disponible ici"
-
-msgid "Use the buttons and links of the page instead of typing the address."
-msgstr "Utilisez les boutons et les liens de la page plutôt que de saisir l'adresse."
-
-msgid "Conflict"
-msgstr "Conflit"
-
-msgid "That conflicts with a recent change"
-msgstr "Cela entre en conflit avec une modification récente"
-
-msgid "Reload the page to see the latest data, then try again."
-msgstr "Rechargez la page pour voir les données les plus récentes, puis réessayez."
-
-msgid "Too many requests"
-msgstr "Trop de requêtes"
-
-msgid "Too many attempts"
-msgstr "Trop de tentatives"
-
-msgid "Wait a few minutes and try again."
-msgstr "Attendez quelques minutes puis réessayez."
-
-msgid "Something went wrong"
-msgstr "Une erreur est survenue"
-
-msgid "Something went wrong on our side"
-msgstr "Une erreur est survenue de notre côté"
-
-msgid "The problem has been recorded. Try again in a moment."
-msgstr "Le problème a été enregistré. Réessayez dans un instant."
-
-msgid "Sign In"
-msgstr "Connexion"
-
-msgid "Accounts are created by invitation. Ask your administrator if you do not have one."
-msgstr "Les comptes sont créés sur invitation. Demandez à votre administrateur si vous n'en avez pas."
-
-msgid "Skip to content"
-msgstr "Aller au contenu"
-
-msgid "Notifications"
-msgstr "Notifications"
-
-msgid "Dismiss"
-msgstr "Fermer"
-
-msgid "Pagination"
-msgstr "Pagination"
-
-msgid "Previous"
-msgstr "Précédent"
-
-msgid "Page %(number)s of %(total)s"
-msgstr "Page %(number)s sur %(total)s"
-
-msgid "Next"
-msgstr "Suivant"
-
-msgid "Back to the start"
-msgstr "Retour à l'accueil"
-
-msgid "Main navigation"
-msgstr "Navigation principale"
-
-msgid "Language"
-msgstr "Langue"
-
-msgid "Change"
-msgstr "Changer"
-
-msgid "Security"
-msgstr "Sécurité"
-
-msgid "Sign out"
-msgstr "Se déconnecter"
-
+#: apps/access/roles.py:23
 msgid "Group administrator"
 msgstr "Administrateur du groupe"
 
+#: apps/access/roles.py:24
 msgid "Material manager"
 msgstr "Chargé de matériel"
 
+#: apps/access/roles.py:25
 msgid "Warehouse operator"
 msgstr "Magasinier"
 
+#: apps/access/roles.py:26
 msgid "Technician"
 msgstr "Technicien"
 
+#: apps/access/roles.py:27 apps/projects/models.py:83
 msgid "Site manager"
 msgstr "Responsable de chantier"
 
+#: apps/access/roles.py:28
 msgid "Partner requester"
 msgstr "Demandeur partenaire"
 
-msgid "Use upper-case letters, digits, '-' and '_', starting with a letter or digit."
-msgstr "Utilisez des majuscules, des chiffres, « - » et « _ », en commençant par une lettre ou un chiffre."
+#: apps/core/templates/core/home.html:4 apps/core/templates/core/home.html:7
+#: templates/partials/nav_items.html:10
+msgid "Home"
+msgstr "Accueil"
 
-msgid "code"
-msgstr "code"
+#: apps/core/templates/core/home.html:8
+#, python-format
+msgid "Signed in as %(email)s."
+msgstr "Connecté en tant que %(email)s."
 
-msgid "legal name"
-msgstr "raison sociale"
+#: apps/core/templates/core/home.html:9
+msgid "Nothing here yet"
+msgstr "Rien ici pour le moment"
 
-msgid "tax id"
-msgstr "numéro fiscal"
+#: apps/core/templates/core/home.html:9
+msgid ""
+"Your requests and tasks will appear here once the first features are "
+"switched on."
+msgstr ""
+"Vos demandes et tâches apparaîtront ici dès que les premières fonctions "
+"seront activées."
 
-msgid "kind"
-msgstr "type"
-
-msgid "active"
-msgstr "actif"
-
-msgid "company"
-msgstr "société"
-
-msgid "companies"
-msgstr "sociétés"
-
-msgid "share (%)"
-msgstr "participation (%)"
-
-msgid "joint-venture member"
-msgstr "membre du groupement"
-
-msgid "joint-venture members"
-msgstr "membres du groupement"
-
-msgid "name"
-msgstr "nom"
-
-msgid "city"
-msgstr "ville"
-
-msgid "address"
-msgstr "adresse"
-
-msgid "allow self-approval"
-msgstr "autoriser l'auto-approbation"
-
-msgid "branch"
-msgstr "agence"
-
-msgid "branches"
-msgstr "agences"
-
-msgid "role"
-msgstr "rôle"
-
-msgid "valid from"
-msgstr "valide à partir du"
-
-msgid "valid until"
-msgstr "valide jusqu'au"
-
-msgid "revoked at"
-msgstr "révoqué le"
-
-msgid "membership"
-msgstr "affectation"
-
-msgid "memberships"
-msgstr "affectations"
-
-msgid "Standard"
-msgstr "Standard"
-
-msgid "Joint venture"
-msgstr "Groupement"
-
-msgid "venture"
-msgstr "groupement"
-
-msgid "member"
-msgstr "membre"
-
-msgid "managed by"
-msgstr "gérée par"
-
-msgid "default warehouse"
-msgstr "entrepôt par défaut"
-
-msgid "user"
-msgstr "utilisateur"
-
-msgid "revoked by"
-msgstr "révoqué par"
-
-msgid "A branch cannot manage itself."
-msgstr "Une agence ne peut pas se gérer elle-même."
-
-msgid "A managed branch cannot manage other branches."
-msgstr "Une agence gérée ne peut pas gérer d'autres agences."
-
-msgid "A branch that manages others cannot be managed."
-msgstr "Une agence qui en gère d'autres ne peut pas être gérée."
-
-msgid "This membership is already revoked."
-msgstr "Cette affectation est déjà révoquée."
-
-msgid "A joint venture with members must stay a joint venture."
-msgstr "Un groupement qui a des membres doit rester un groupement."
-
-msgid "Choose an active warehouse of this branch."
-msgstr "Choisissez un entrepôt actif de cette agence."
-
-msgid "The company is inactive."
-msgstr "La société est inactive."
-
-msgid "Revoke the partner memberships on the previous company first."
-msgstr "Révoquez d'abord les affectations de partenaire sur la société précédente."
-
-msgid "Only a joint venture has members."
-msgstr "Seul un groupement a des membres."
-
-msgid "The branch is inactive."
-msgstr "L'agence est inactive."
-
-msgid "A partner's membership is on the company that employs them."
-msgstr "L'affectation d'un partenaire porte sur la société qui l'emploie."
-
-msgid "Cannot deactivate while these documents are open: %(documents)s"
-msgstr "Impossible de désactiver tant que ces documents sont ouverts : %(documents)s"
-
-msgid "client"
-msgstr "client"
-
-msgid "status"
-msgstr "statut"
-
-msgid "start date"
-msgstr "date de début"
-
-msgid "end date"
-msgstr "date de fin"
-
-msgid "project"
-msgstr "chantier"
-
-msgid "projects"
-msgstr "chantiers"
-
-msgid "project assignment"
-msgstr "affectation au chantier"
-
-msgid "project assignments"
-msgstr "affectations aux chantiers"
-
-msgid "Active"
-msgstr "Actif"
-
-msgid "On hold"
-msgstr "En pause"
-
-msgid "Closed"
-msgstr "Clôturé"
-
-msgid "procurement branch"
-msgstr "agence d'achat"
-
-msgid "Partner"
-msgstr "Partenaire"
-
-msgid "This assignment is already revoked."
-msgstr "Cette affectation est déjà révoquée."
-
-msgid "location"
-msgstr "emplacement"
-
-msgid "locations"
-msgstr "emplacements"
-
+#: apps/locations/models.py:31
 msgid "Warehouse"
 msgstr "Entrepôt"
 
+#: apps/locations/models.py:32
 msgid "Worksite"
 msgstr "Chantier"
 
+#: apps/locations/models.py:34 apps/organizations/models.py:32
+#: apps/projects/models.py:95
+msgid "kind"
+msgstr "type"
+
+#: apps/locations/models.py:36 apps/organizations/models.py:146
+#: apps/organizations/models.py:227 apps/projects/models.py:37
+msgid "branch"
+msgstr "agence"
+
+#: apps/locations/models.py:44 apps/projects/models.py:52
+#: apps/projects/models.py:87
+msgid "project"
+msgstr "chantier"
+
+#: apps/locations/models.py:46 apps/organizations/models.py:121
+#: apps/projects/models.py:33
+msgid "name"
+msgstr "nom"
+
+#: apps/locations/models.py:47 apps/organizations/models.py:123
+#: apps/projects/models.py:35
+msgid "address"
+msgstr "adresse"
+
+#: apps/locations/models.py:48 apps/organizations/models.py:33
+#: apps/organizations/models.py:141
+msgid "active"
+msgstr "actif"
+
+#: apps/locations/models.py:53
+msgid "location"
+msgstr "emplacement"
+
+#: apps/locations/models.py:54
+msgid "locations"
+msgstr "emplacements"
+
+#: apps/locations/services.py:51 apps/organizations/services.py:368
+#: apps/projects/services.py:76
+msgid "The branch is inactive."
+msgstr "L'agence est inactive."
+
+#: apps/locations/services.py:95
 msgid "This is the branch's default warehouse; choose another first."
-msgstr "C'est l'entrepôt par défaut de l'agence ; choisissez-en d'abord un autre."
+msgstr ""
+"C'est l'entrepôt par défaut de l'agence ; choisissez-en d'abord un autre."
+
+#: apps/notifications/models.py:22
+msgid "Notification"
+msgstr "Notification"
+
+#: apps/notifications/models.py:23
+msgid "Security email"
+msgstr "E-mail de sécurité"
+
+#: apps/notifications/models.py:24
+msgid "Purchase order"
+msgstr "Bon de commande"
+
+#: apps/notifications/models.py:25
+msgid "Purchase-order cancellation"
+msgstr "Annulation de bon de commande"
+
+#: apps/notifications/models.py:33
+msgid "Queued"
+msgstr "En file d'attente"
+
+#: apps/notifications/models.py:34
+msgid "Sending"
+msgstr "En cours d'envoi"
+
+#: apps/notifications/models.py:35 apps/notifications/models.py:48
+msgid "Sent"
+msgstr "Envoyé"
+
+#: apps/notifications/models.py:36 apps/notifications/models.py:50
+msgid "Failed"
+msgstr "Échec"
+
+#: apps/notifications/models.py:37 apps/notifications/models.py:52
+msgid "Ambiguous"
+msgstr "Ambigu"
+
+#: apps/notifications/models.py:38
+msgid "Superseded"
+msgstr "Remplacé"
+
+#: apps/notifications/models.py:39
+msgid "Cancelled"
+msgstr "Annulé"
+
+#: apps/notifications/models.py:40
+msgid "Suppressed"
+msgstr "Écarté"
+
+#: apps/notifications/models.py:41
+msgid "Expired"
+msgstr "Expiré"
+
+#: apps/notifications/models.py:42
+msgid "Quarantined"
+msgstr "En quarantaine"
+
+#: apps/organizations/deactivation.py:57
+#, python-format
+msgid "Cannot deactivate while these documents are open: %(documents)s"
+msgstr ""
+"Impossible de désactiver tant que ces documents sont ouverts : %(documents)s"
+
+#: apps/organizations/models.py:20
+msgid ""
+"Use upper-case letters, digits, '-' and '_', starting with a letter or digit."
+msgstr ""
+"Utilisez des majuscules, des chiffres, « - » et « _ », en commençant par une "
+"lettre ou un chiffre."
+
+#: apps/organizations/models.py:26
+msgid "Standard"
+msgstr "Standard"
+
+#: apps/organizations/models.py:27
+msgid "Joint venture"
+msgstr "Groupement"
+
+#: apps/organizations/models.py:29 apps/organizations/models.py:120
+#: apps/projects/models.py:32
+msgid "code"
+msgstr "code"
+
+#: apps/organizations/models.py:30
+msgid "legal name"
+msgstr "raison sociale"
+
+#: apps/organizations/models.py:31
+msgid "tax id"
+msgstr "numéro fiscal"
+
+#: apps/organizations/models.py:36 apps/organizations/models.py:118
+#: apps/organizations/models.py:235
+msgid "company"
+msgstr "société"
+
+#: apps/organizations/models.py:37
+msgid "companies"
+msgstr "sociétés"
+
+#: apps/organizations/models.py:70
+msgid "venture"
+msgstr "groupement"
+
+#: apps/organizations/models.py:76
+msgid "member"
+msgstr "membre"
+
+#: apps/organizations/models.py:79
+msgid "share (%)"
+msgstr "participation (%)"
+
+#: apps/organizations/models.py:83
+msgid "joint-venture member"
+msgstr "membre du groupement"
+
+#: apps/organizations/models.py:84
+msgid "joint-venture members"
+msgstr "membres du groupement"
+
+#: apps/organizations/models.py:122
+msgid "city"
+msgstr "ville"
+
+#: apps/organizations/models.py:130
+msgid "managed by"
+msgstr "gérée par"
+
+#: apps/organizations/models.py:132
+msgid "allow self-approval"
+msgstr "autoriser l'auto-approbation"
+
+#: apps/organizations/models.py:139
+msgid "default warehouse"
+msgstr "entrepôt par défaut"
+
+#: apps/organizations/models.py:147
+msgid "branches"
+msgstr "agences"
+
+#: apps/organizations/models.py:170
+msgid "A branch cannot manage itself."
+msgstr "Une agence ne peut pas se gérer elle-même."
+
+#: apps/organizations/models.py:178
+msgid "A managed branch cannot manage other branches."
+msgstr "Une agence gérée ne peut pas gérer d'autres agences."
+
+#: apps/organizations/models.py:187
+msgid "A branch that manages others cannot be managed."
+msgstr "Une agence qui en gère d'autres ne peut pas être gérée."
+
+#: apps/organizations/models.py:218 apps/projects/models.py:93
+msgid "user"
+msgstr "utilisateur"
+
+#: apps/organizations/models.py:220
+msgid "role"
+msgstr "rôle"
+
+#: apps/organizations/models.py:237 apps/projects/models.py:96
+msgid "valid from"
+msgstr "valide à partir du"
+
+#: apps/organizations/models.py:238 apps/projects/models.py:97
+msgid "valid until"
+msgstr "valide jusqu'au"
+
+#: apps/organizations/models.py:239 apps/projects/models.py:98
+msgid "revoked at"
+msgstr "révoqué le"
+
+#: apps/organizations/models.py:246 apps/projects/models.py:105
+msgid "revoked by"
+msgstr "révoqué par"
+
+#: apps/organizations/models.py:250
+msgid "membership"
+msgstr "affectation"
+
+#: apps/organizations/models.py:251
+msgid "memberships"
+msgstr "affectations"
+
+#: apps/organizations/services.py:177
+msgid "A joint venture with members must stay a joint venture."
+msgstr "Un groupement qui a des membres doit rester un groupement."
+
+#: apps/organizations/services.py:215
+msgid "Only a joint venture has members."
+msgstr "Seul un groupement a des membres."
+
+#: apps/organizations/services.py:271
+msgid "Choose an active warehouse of this branch."
+msgstr "Choisissez un entrepôt actif de cette agence."
+
+#: apps/organizations/services.py:307 apps/organizations/services.py:373
+#: apps/organizations/services.py:529
+msgid "The company is inactive."
+msgstr "La société est inactive."
+
+#: apps/organizations/services.py:379
+msgid "A partner's membership is on the company that employs them."
+msgstr "L'affectation d'un partenaire porte sur la société qui l'emploie."
+
+#: apps/organizations/services.py:453
+msgid "This membership is already revoked."
+msgstr "Cette affectation est déjà révoquée."
+
+#: apps/organizations/services.py:540
+msgid "Revoke the partner memberships on the previous company first."
+msgstr ""
+"Révoquez d'abord les affectations de partenaire sur la société précédente."
+
+#: apps/projects/models.py:28
+msgid "Active"
+msgstr "Actif"
+
+#: apps/projects/models.py:29
+msgid "On hold"
+msgstr "En pause"
+
+#: apps/projects/models.py:30
+msgid "Closed"
+msgstr "Clôturé"
+
+#: apps/projects/models.py:34
+msgid "client"
+msgstr "client"
+
+#: apps/projects/models.py:43
+msgid "procurement branch"
+msgstr "agence d'achat"
+
+#: apps/projects/models.py:45
+msgid "status"
+msgstr "statut"
+
+#: apps/projects/models.py:46
+msgid "start date"
+msgstr "date de début"
+
+#: apps/projects/models.py:47
+msgid "end date"
+msgstr "date de fin"
+
+#: apps/projects/models.py:53
+msgid "projects"
+msgstr "chantiers"
+
+#: apps/projects/models.py:84
+msgid "Partner"
+msgstr "Partenaire"
+
+#: apps/projects/models.py:109
+msgid "project assignment"
+msgstr "affectation au chantier"
+
+#: apps/projects/models.py:110
+msgid "project assignments"
+msgstr "affectations aux chantiers"
+
+#: apps/projects/services.py:271
+msgid "This assignment is already revoked."
+msgstr "Cette affectation est déjà révoquée."
+
+#: templates/400.html:4
+msgid "Bad request"
+msgstr "Requête incorrecte"
+
+#: templates/400.html:8
+msgid "We could not understand that request"
+msgstr "Nous n'avons pas pu comprendre cette requête"
+
+#: templates/400.html:11
+msgid ""
+"Go back and try again. If it keeps happening, contact your administrator."
+msgstr ""
+"Revenez en arrière et réessayez. Si le problème persiste, contactez votre "
+"administrateur."
+
+#: templates/403.html:4
+msgid "Not allowed"
+msgstr "Non autorisé"
+
+#: templates/403.html:8
+msgid "You are not allowed to do that"
+msgstr "Vous n'avez pas le droit de faire cela"
+
+#: templates/403.html:11
+msgid ""
+"Your account does not have access to this action. If you think it should, "
+"ask your administrator."
+msgstr ""
+"Votre compte n'a pas accès à cette action. Si vous pensez que ce devrait "
+"être le cas, demandez à votre administrateur."
+
+#: templates/403_csrf.html:6
+msgid "Form expired"
+msgstr "Formulaire expiré"
+
+#: templates/403_csrf.html:10
+msgid "That form has expired"
+msgstr "Ce formulaire a expiré"
+
+#: templates/403_csrf.html:13
+msgid "Reload the page and send it again."
+msgstr "Rechargez la page et envoyez-le à nouveau."
+
+#: templates/404.html:4
+msgid "Page not found"
+msgstr "Page introuvable"
+
+#: templates/404.html:8
+msgid "We could not find that page"
+msgstr "Nous n'avons pas trouvé cette page"
+
+#: templates/404.html:11
+msgid "The address may be wrong, or the page may no longer exist."
+msgstr "L'adresse est peut-être erronée, ou la page n'existe plus."
+
+#: templates/405.html:4
+msgid "Not available"
+msgstr "Indisponible"
+
+#: templates/405.html:8
+msgid "That action is not available here"
+msgstr "Cette action n'est pas disponible ici"
+
+#: templates/405.html:11
+msgid "Use the buttons and links of the page instead of typing the address."
+msgstr ""
+"Utilisez les boutons et les liens de la page plutôt que de saisir l'adresse."
+
+#: templates/409.html:4
+msgid "Conflict"
+msgstr "Conflit"
+
+#: templates/409.html:8
+msgid "That conflicts with a recent change"
+msgstr "Cela entre en conflit avec une modification récente"
+
+#: templates/409.html:11
+msgid "Reload the page to see the latest data, then try again."
+msgstr ""
+"Rechargez la page pour voir les données les plus récentes, puis réessayez."
+
+#: templates/429.html:4
+msgid "Too many requests"
+msgstr "Trop de requêtes"
+
+#: templates/429.html:8
+msgid "Too many attempts"
+msgstr "Trop de tentatives"
+
+#: templates/429.html:11
+msgid "Wait a few minutes and try again."
+msgstr "Attendez quelques minutes puis réessayez."
+
+#: templates/500.html:4
+msgid "Something went wrong"
+msgstr "Une erreur est survenue"
+
+#: templates/500.html:8
+msgid "Something went wrong on our side"
+msgstr "Une erreur est survenue de notre côté"
+
+#: templates/500.html:11
+msgid "The problem has been recorded. Try again in a moment."
+msgstr "Le problème a été enregistré. Réessayez dans un instant."
+
+#: templates/account/login.html:8 templates/account/login.html:12
+#: templates/account/login.html:24
+msgid "Sign In"
+msgstr "Connexion"
+
+#: templates/account/login.html:29
+msgid ""
+"Accounts are created by invitation. Ask your administrator if you do not "
+"have one."
+msgstr ""
+"Les comptes sont créés sur invitation. Demandez à votre administrateur si "
+"vous n'en avez pas."
+
+#: templates/base.html:32
+msgid "Skip to content"
+msgstr "Aller au contenu"
+
+#: templates/components/messages.html:7
+msgid "Notifications"
+msgstr "Notifications"
+
+#: templates/components/messages.html:16
+msgid "Dismiss"
+msgstr "Fermer"
+
+#: templates/components/pagination.html:8
+msgid "Pagination"
+msgstr "Pagination"
+
+#: templates/components/pagination.html:12
+#: templates/components/pagination.html:14
+msgid "Previous"
+msgstr "Précédent"
+
+#: templates/components/pagination.html:17
+#, python-format
+msgid "Page %(number)s of %(total)s"
+msgstr "Page %(number)s sur %(total)s"
+
+#: templates/components/pagination.html:22
+#: templates/components/pagination.html:24
+msgid "Next"
+msgstr "Suivant"
+
+#: templates/errors/base_error.html:24
+msgid "Back to the start"
+msgstr "Retour à l'accueil"
+
+#: templates/layouts/app.html:10 templates/layouts/app.html:31
+msgid "Main navigation"
+msgstr "Navigation principale"
+
+#: templates/partials/language_switcher.html:8
+msgid "Language"
+msgstr "Langue"
+
+#: templates/partials/language_switcher.html:20
+msgid "Change"
+msgstr "Changer"
+
+#: templates/partials/nav_items.html:16
+msgid "Security"
+msgstr "Sécurité"
+
+#: templates/partials/nav_items.html:24
+msgid "Sign out"
+msgstr "Se déconnecter"

@@ -14,6 +14,8 @@ from django.utils import timezone
 from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role
 from apps.accounts.models import User
+from apps.notifications.crypto import unseal
+from apps.notifications.models import EmailOutbox, Kind
 from apps.organizations.models import Branch, Company, Membership
 
 PASSWORD = "a-long-test-password-1"
@@ -95,3 +97,9 @@ def principal_for(user: User, *, mfa_at: float | EllipsisType | None = ...) -> S
 
 def authz_generation(user: User) -> int:
     return User.objects.values_list("authz_generation", flat=True).get(pk=user.pk)
+
+
+def queued_security_mail() -> list[tuple[str, str, str]]:
+    """``(address, subject, body)`` of each queued security email, oldest first, unsealed."""
+    rows = EmailOutbox.objects.filter(kind=Kind.SECURITY).order_by("created_at", "id")
+    return [(row.recipient_address, row.subject, unseal(row.body)) for row in rows]

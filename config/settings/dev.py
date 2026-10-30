@@ -2,7 +2,7 @@
 
 from config.env import derived_fernet_key, env_bool, env_list, env_str
 from config.settings.base import *  # noqa: F403
-from config.settings.base import database_from_env
+from config.settings.base import OUTBOX_BACKEND, database_from_env, outbound_mailer_from_env
 
 DEBUG = env_bool("DJANGO_DEBUG", True)
 SECRET_KEY = env_str(
@@ -11,6 +11,14 @@ SECRET_KEY = env_str(
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1", "[::1]"])
 DATABASES = {"default": database_from_env()}
 MFA_ENCRYPTION_KEYS = [derived_fernet_key("development")]
+OUTBOX_ENCRYPTION_KEYS = [derived_fernet_key("outbox-development")]
+# The worker delivers to a local SMTP sink: Mailpit in the compose dev overlay (EMAIL_HOST=
+# mailpit), or anything listening on localhost:1025.
+OUTBOUND_EMAIL = env_bool("OUTBOUND_EMAIL", True)
+MAILERS = {
+    "default": {"BACKEND": OUTBOX_BACKEND},
+    "outbound": outbound_mailer_from_env(host="localhost", port=1025, use_tls=False),
+}
 
 # `manage.py runserver` speaks plain HTTP: browsers refuse Secure and `__Host-` cookies
 # there. The compose stack (HTTPS through Caddy) uses the production values.

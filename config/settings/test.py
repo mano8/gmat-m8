@@ -20,7 +20,7 @@ for _key, _value in _TEST_ENV.items():
 
 from config.env import derived_fernet_key  # noqa: E402
 from config.settings.base import *  # noqa: E402, F403
-from config.settings.base import database_from_env  # noqa: E402
+from config.settings.base import OUTBOX_BACKEND, database_from_env  # noqa: E402
 
 DEBUG = False
 SECRET_KEY = "test-only-secret-key-not-for-any-deployment-1234567890abcdefghijkl"  # noqa: S105  # nosec B105
@@ -28,8 +28,15 @@ ALLOWED_HOSTS = ["testserver", "localhost"]
 DATABASES = {"default": database_from_env()}
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 MFA_ENCRYPTION_KEYS = [derived_fernet_key("test")]
+OUTBOX_ENCRYPTION_KEYS = [derived_fernet_key("outbox-test")]
+OUTBOUND_EMAIL = True
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
-MAILERS = {"default": {"BACKEND": "django.core.mail.backends.locmem.EmailBackend"}}
+# Django's test runner replaces every mailer with locmem; tests/conftest.py puts the outbox
+# back as the default mailer, so requests queue mail as in production.
+MAILERS = {
+    "default": {"BACKEND": OUTBOX_BACKEND},
+    "outbound": {"BACKEND": "django.core.mail.backends.locmem.EmailBackend"},
+}
