@@ -34,8 +34,8 @@ from apps.access.principals import (
 from apps.access.roles import Capability, Role
 from apps.accounts.models import User
 from apps.core.locking import LockLevel, LockOrder
+from tests.org import Org
 from tests.support import principal_for
-from tests.unit.access.conftest import Org
 
 pytestmark = pytest.mark.django_db
 

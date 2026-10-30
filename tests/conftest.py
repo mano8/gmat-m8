@@ -18,6 +18,8 @@ from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role
 from apps.accounts.models import User
 from apps.organizations.models import Branch, Company
+from tests.org import Org, People, build_org, build_people
+from tests.org import member as org_member
 from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -54,6 +56,31 @@ def load_script() -> Callable[[str], ModuleType]:
 def make_user(db: None) -> Callable[..., User]:
     def make(email: str = "tech@example.org", password: str = PASSWORD, **extra: Any) -> User:
         return User.objects.create_user(email, password, **extra)
+
+    return make
+
+
+@pytest.fixture
+def org(db: None) -> Org:
+    """The A/B/C organization of plan §3.2 (``tests/org.py``)."""
+    return build_org()
+
+
+@pytest.fixture
+def people(org: Org) -> People:
+    """One user per role and the mixed, expired, revoked and inactive cases (plan §8.1)."""
+    return build_people(org)
+
+
+@pytest.fixture
+def member(db: None) -> Callable[..., User]:
+    """A user with one membership: ``member(Role.X, branch=…, company=…, **validity)``."""
+    count = iter(range(1000))
+
+    def make(role: Role, *, email: str | None = None, **kwargs: Any) -> User:
+        return org_member(
+            role, email=email or f"{role.lower()}-{next(count)}@example.org", **kwargs
+        )
 
     return make
 

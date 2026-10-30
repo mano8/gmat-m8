@@ -1,4 +1,4 @@
-"""Scope rules S1-S10 of plan §3.5, one class per rule (the org of ``conftest.py``)."""
+"""Scope rules S1-S10 of plan §3.5, one class per rule (the org of ``tests/org.py``)."""
 
 from collections.abc import Callable
 from datetime import timedelta
@@ -20,8 +20,8 @@ from apps.core.locking import LockOrder, LockOutsideTransaction
 from apps.locations.models import Location
 from apps.organizations.models import Branch, Company
 from apps.projects.models import Project, ProjectAssignment
+from tests.org import HOUR, Org, also, assign
 from tests.support import principal_for
-from tests.unit.access.conftest import HOUR, Org, also, assign
 
 pytestmark = pytest.mark.django_db
 

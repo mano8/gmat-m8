@@ -30,7 +30,7 @@ from apps.access.roles import Capability, Role
 from apps.accounts.models import User
 from apps.accounts.sessions import SESSION_EPOCH_KEY
 from apps.organizations.models import Branch
-from tests.unit.access.conftest import Org
+from tests.org import Org
 
 pytestmark = pytest.mark.django_db
 

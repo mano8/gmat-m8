@@ -17,7 +17,7 @@ from apps.access.scopes import (
 )
 from apps.accounts.models import User
 from apps.organizations.models import Branch
-from tests.unit.access.conftest import Org
+from tests.org import Org
 
 pytestmark = pytest.mark.django_db
 
