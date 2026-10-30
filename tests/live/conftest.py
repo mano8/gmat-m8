@@ -8,7 +8,8 @@ Environment:
 
 - ``LIVE_BASE_URL``      public address of the stack (default ``https://localhost:8443``);
 - ``LIVE_COMPOSE_DIR``   the compose directory (default ``docker_compose/gmat_m8``);
-- ``LIVE_COMPOSE_FILES`` space-separated ``-f`` files (default ``docker-compose.yml``);
+- ``LIVE_COMPOSE_FILES`` space-separated ``-f`` files (default: none, so compose reads
+  ``COMPOSE_FILE`` from the stack's ``.env``, as ``docker compose up`` did);
 - ``LIVE_REQUIRED=1``    a stack that does not answer fails the run instead of skipping it.
 """
 
@@ -154,7 +155,7 @@ class Stack:
 @pytest.fixture(scope="session")
 def stack() -> Iterator[Stack]:
     compose_dir = Path(os.environ.get("LIVE_COMPOSE_DIR", ROOT / "docker_compose" / "gmat_m8"))
-    files = os.environ.get("LIVE_COMPOSE_FILES", "docker-compose.yml").split()
+    files = os.environ.get("LIVE_COMPOSE_FILES", "").split()
     candidate = Stack(
         base_url=os.environ.get("LIVE_BASE_URL", "https://localhost:8443"),
         compose_dir=compose_dir,

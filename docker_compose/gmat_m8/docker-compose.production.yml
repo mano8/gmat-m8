@@ -36,6 +36,11 @@ services:
     ports: !reset []
     mem_limit: 768m
 
+  worker:
+    image: ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}
+    pull_policy: missing
+    mem_limit: 256m
+
   backup:
     image: ghcr.io/mano8/gmat-m8-backup@${BACKUP_DIGEST:?set BACKUP_DIGEST in .env}
     build: !reset null

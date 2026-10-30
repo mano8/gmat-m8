@@ -3,7 +3,8 @@
 #
 #   web                     Gunicorn (gthread), the only long-running web process
 #   runserver               Django's development server (the `dev` target only)
-#   worker                  outbox sender + housekeeping (arrives with M2.5)
+#   worker                  outbox sender + housekeeping (honours flags/worker.paused, OUTBOUND_EMAIL)
+#   worker-healthcheck      exit 0 when the worker's heartbeat is recent (paused or not)
 #   migrate                 migrate + createcachetable, run once by the `migrate` service
 #   check                   manage.py check --deploy; any warning is a failure
 #   migrate-plan            lists pending migrations, read only
@@ -35,7 +36,26 @@ case "$command" in
         exec python manage.py runserver 0.0.0.0:8000
         ;;
     worker)
-        not_yet worker M2.5
+        exec python manage.py worker
+        ;;
+    worker-healthcheck)
+        # The worker rewrites its heartbeat every loop, also while paused; a send lasts at most
+        # OUTBOX_SEND_DEADLINE (60 s). No Django import: this runs every 30 s.
+        exec python - <<'PY'
+import json
+import os
+import sys
+import time
+
+path = os.environ.get("WORKER_HEARTBEAT_FILE", "/tmp/gmat-worker.heartbeat")
+max_age = float(os.environ.get("WORKER_HEARTBEAT_MAX_AGE", "120"))
+try:
+    with open(path, encoding="utf-8") as handle:
+        beat = json.load(handle)
+    sys.exit(0 if time.time() - float(beat["at"]) <= max_age else 1)
+except Exception:
+    sys.exit(1)
+PY
         ;;
     migrate)
         python manage.py migrate --noinput
@@ -77,7 +97,7 @@ PY
         ;;
     *)
         echo "entrypoint: unknown command '$command'" >&2
-        echo "usage: entrypoint.sh {web|runserver|worker|migrate|check|migrate-plan|verify-internal|post-restore-reconcile|healthcheck|manage <args>}" >&2
+        echo "usage: entrypoint.sh {web|runserver|worker|worker-healthcheck|migrate|check|migrate-plan|verify-internal|post-restore-reconcile|healthcheck|manage <args>}" >&2
         exit 64
         ;;
 esac
