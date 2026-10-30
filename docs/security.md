@@ -15,7 +15,7 @@ What the application enforces today (step M1.3), where it lives, and what later 
 ## Sessions (`apps/accounts/sessions.py`, `middleware.py`)
 
 - Each session stores the user's `session_epoch` and its login time. `SessionGuardMiddleware` ends a session whose epoch is stale or whose lifetime is over: 12 hours for privileged accounts (staff and superusers today, privileged roles from M2.3), 14 days for the others.
-- A database trigger (`accounts.0002`) bumps `session_epoch` on a password change, an email change and a deactivation, and keeps `session_epoch` and `authz_generation` from ever decreasing. `authz_generation` is bumped when `is_active`, `is_staff` or `is_superuser` changes.
+- A database trigger (`accounts.0002`) bumps `session_epoch` on a password change, an email change and a deactivation, and keeps `session_epoch` and `authz_generation` from ever decreasing. `authz_generation` is bumped when `is_active`, `is_staff`, `is_superuser` or `employer_company` changes, and (`access.0002`) when a membership or project assignment of the user is created or changed.
 - A password change and an MFA reset (`apps.accounts.mfa.reset_mfa`) end every session of the user; removing one's own factor ends the user's other sessions.
 - Cookies: `__Host-sessionid` and `__Host-csrftoken`, `Secure`, `SameSite=Lax`, both `HttpOnly` (htmx reads the CSRF token from the page). `dev` uses plain names over HTTP.
 
@@ -29,7 +29,8 @@ What the application enforces today (step M1.3), where it lives, and what later 
 
 ## Admin (`apps/accounts/admin_site.py`, `apps/core/admin.py`)
 
-- Logging in to the admin goes through allauth (`secure_admin_login`); Django's admin login form is never processed. Admin URLs need an active staff account and a session that completed MFA: a GET is sent to MFA reauthentication (or enrollment), anything else gets 403. `GROUP_ADMIN` access arrives with M2.3.
+- Logging in to the admin goes through allauth (`secure_admin_login` sends anonymous visitors to its login page); Django's admin login form is never processed. Admin URLs need an active superuser or a user with a valid `GROUP_ADMIN` membership (`apps.access.authorization.may_use_admin`), and a session that completed MFA: a GET is sent to MFA reauthentication (or enrollment), anything else gets 403.
+- Whoever the site admits may view every registered model. Only master data (companies, joint-venture members, branches, locations) can be added or changed, and only by a group administrator (`org.manage`); a platform operator without that membership only views. `is_superuser` grants no business capability. Users, memberships, projects, assignments and the access state are read-only, so a group administrator cannot edit a staff account or its flags; the services also refuse to change a staff account's memberships, assignments or employer unless the actor is a superuser.
 - Every `ModelAdmin` is built on `ServiceBackedModelAdmin` (system check `gmat.E005`): saves go through a service, deletes and the bulk delete action do not exist. Users, email addresses and authenticators are read-only, and MFA secrets and password hashes are never displayed. Django's groups are not registered.
 
 ## Rate limits and the security cache (`apps/core/cache.py`)
@@ -110,7 +111,7 @@ Templates in `templates/`, styles in `static/src/app.css`, code in `static/js/ap
 
 ## Still to come
 
-- M2.3: the access engine (`authorize_in_txn`, principals, privileged roles for MFA and session lifetimes, `GROUP_ADMIN` in the admin).
+- M2.3: the access engine. M2.2 ships an interim, fail-closed `authorize_in_txn` (a valid `GROUP_ADMIN` membership only, for `org.manage` and `project.manage`); M2.3 replaces it with the capability matrix, scopes, every principal type, the session epoch and MFA checks, and the privileged roles for MFA and session lifetimes.
 - M2.5: outbox, worker, and the cache housekeeping (`SecurityDatabaseCache.purge_expired`).
 - M2.6: invitations, administrator email changes, offboarding, `bootstrap_admin`; their token pages join the no-referrer list and the log redaction prefixes.
 - M8.2: the same checks in a real browser (e2e).

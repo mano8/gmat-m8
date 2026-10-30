@@ -48,9 +48,17 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - the lock protocol (`apps.core.locking`): levels L0–L9 with L4b, an order-enforcing `LockOrder`, discover → lock → verify, the shared retry wrapper for deadlocks, lock timeouts and serialization failures, and named advisory locks;
   - composite foreign-key migration operations, quantity (`Decimal(12,3)`) and price (`Decimal(14,4)`) fields that refuse floats, the `--operator` management-command base and an admin base that leaves related objects to the service;
   - `apps/audit`: `AuditEvent` with `record()`, append-only through a database trigger.
+- Organizations and projects (M2.2):
+  - `apps/organizations`: `Company` (head-office branch created with it), `JointVentureMember` (a venture with members stays a joint venture, by composite foreign key), `Branch` (`managed_by` one level deep, held by a trigger; the default warehouse is one of its own locations) and `Membership` (one CHECK per role shape, half-open validity, revoked and never deleted); `User.employer_company`;
+  - `apps/projects`: `Project` (procurement branch defaults to the managing branch, worksite location created with it) and `ProjectAssignment` (one open row per project, user and kind); `apps/locations`: `Location` (warehouses and worksites);
+  - `apps/access`: `Role`, the `AccessState` singleton, L0 lock helpers, `SessionPrincipal` and an interim, fail-closed `authorize_in_txn` (`GROUP_ADMIN` only, until M2.3);
+  - database triggers that bump `AccessState.org_generation` and `User.authz_generation` on every scope-defining change, whatever code path makes it;
+  - services for companies, joint-venture members, branches, warehouses, projects, memberships, assignments and employers (locked, authorized, idempotent creates, audited, events), and deactivation preconditions that list the open documents later steps register;
+  - admin: group administrators are admitted (with session MFA) and edit master data through the services; memberships, projects, assignments and the access state are read-only; a group administrator cannot edit staff accounts.
 
 ### Changed
 
 - Pre-authentication form pages keep `Referrer-Policy: same-origin`; only a URL that carries a token is `no-referrer` (browsers send `Origin: null` on a form POST under `no-referrer`, which CSRF refuses, so login failed in a real browser).
 - Production settings now also require `DJANGO_CSRF_TRUSTED_ORIGINS` (https only) and `MFA_ENCRYPTION_KEYS`.
 - Mail is configured through Django 6.1's `MAILERS`. Production uses a backend that sends nothing until the outbox arrives (M2.5).
+- The admin admits active superusers and group administrators (was: staff accounts); a staff account without superuser status no longer reaches it.
