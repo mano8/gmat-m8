@@ -39,6 +39,8 @@ SESSION_OUT=""
 session_run() {
     local sql="$1" line
     SESSION_OUT=""
+    # bash unsets PSQL once the coprocess has exited (a failed statement ends psql).
+    [ -n "${PSQL[1]:-}" ] || die "database session is gone"
     printf '%s\n\\echo __SESSION_END__\n' "$sql" >&"${PSQL[1]}" || die "database session is gone"
     while IFS= read -r -u "${PSQL[0]}" line; do
         [ "$line" = "__SESSION_END__" ] && return 0
@@ -50,8 +52,10 @@ session_run() {
 session_end() {
     if [ "${SESSION_OPEN:-0}" = 1 ]; then
         SESSION_OPEN=0
-        printf '\\q\n' >&"${PSQL[1]}" 2>/dev/null || true
-        wait "$PSQL_PID" 2>/dev/null || true
+        if [ -n "${PSQL[1]:-}" ]; then
+            printf '\\q\n' >&"${PSQL[1]}" 2>/dev/null || true
+        fi
+        [ -z "${PSQL_PID:-}" ] || wait "$PSQL_PID" 2>/dev/null || true
     fi
 }
 
