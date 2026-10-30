@@ -20,6 +20,7 @@ import json
 import re
 import sys
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -126,8 +127,7 @@ def _load_json(path: Path) -> Any:
         raise ReleaseError(f"cannot read {path.name}: {error}") from error
 
 
-def _image_entry(directory: Path, name: str, registry: str, tag: str) -> dict[str, Any]:
-    """One image of the manifest, from the files its build job left in ``directory``."""
+def _read_digest(directory: Path, name: str) -> str:
     digest_file = directory / f"digest-{name}.txt"
     try:
         digest = digest_file.read_text(encoding="utf-8").strip()
@@ -135,20 +135,29 @@ def _image_entry(directory: Path, name: str, registry: str, tag: str) -> dict[st
         raise ReleaseError(f"cannot read {digest_file.name}: {error}") from error
     if not DIGEST_PATTERN.match(digest):
         raise ReleaseError(f"{digest_file.name} does not hold a sha256 digest: {digest!r}")
+    return digest
 
+
+def _per_architecture(directory: Path, name: str, pattern: str, what: str) -> dict[str, Path]:
+    """The files of ``directory`` named by ``pattern`` (``{arch}`` is the architecture), one
+    per architecture. The signed manifest vouches for what it lists, so a missing
+    architecture is an error and not a shorter list."""
     # Exact names: `gmat-m8` must not pick up the files of `gmat-m8-backup`.
-    sbom_pattern = re.compile(rf"^sbom-{re.escape(name)}-(?P<arch>[a-z0-9]+)\.spdx\.json$")
-    report_pattern = re.compile(rf"^trivy-{re.escape(name)}-(?P<arch>[a-z0-9]+)-report\.json$")
-    files = sorted(directory.iterdir())
-    sboms = {m["arch"]: path.name for path in files if (m := sbom_pattern.match(path.name))}
-    reports = {m["arch"]: path for path in files if (m := report_pattern.match(path.name))}
-    # The signed manifest vouches for what is listed: a missing architecture is an error, not
-    # a shorter list.
-    for what, found in (("SBOM", sboms), ("Trivy report", reports)):
-        missing = sorted(set(ARCHITECTURES) - found.keys())
-        if missing:
-            raise ReleaseError(f"no {what} for {name} ({', '.join(missing)}) in {directory}")
+    regex = re.compile(pattern.format(name=re.escape(name), arch="(?P<arch>[a-z0-9]+)"))
+    found = {m["arch"]: path for path in directory.iterdir() if (m := regex.fullmatch(path.name))}
+    missing = [arch for arch in ARCHITECTURES if arch not in found]
+    if missing:
+        raise ReleaseError(f"no {what} for {name} ({', '.join(missing)}) in {directory}")
+    return found
 
+
+def _image_entry(directory: Path, name: str, registry: str, tag: str) -> dict[str, Any]:
+    """One image of the manifest, from the files its build job left in ``directory``."""
+    digest = _read_digest(directory, name)
+    sboms = _per_architecture(directory, name, r"sbom-{name}-{arch}\.spdx\.json", "SBOM")
+    reports = _per_architecture(
+        directory, name, r"trivy-{name}-{arch}-report\.json", "Trivy report"
+    )
     scan = {f"linux/{arch}": severity_counts(_load_json(reports[arch])) for arch in ARCHITECTURES}
     repository = f"{registry}/{name}"
     return {
@@ -157,28 +166,32 @@ def _image_entry(directory: Path, name: str, registry: str, tag: str) -> dict[st
         "digest": digest,
         "ref": f"{repository}@{digest}",
         "platforms": list(scan),
-        "sboms": [sboms[arch] for arch in ARCHITECTURES],
+        "sboms": [sboms[arch].name for arch in ARCHITECTURES],
         "scan": scan,
     }
 
 
+@dataclass(frozen=True)
+class Release:
+    """What identifies a release; the same facts go into the manifest header."""
+
+    version: str  # X.Y.Z, without the leading v
+    commit: str
+    repository: str  # owner/name
+    registry: str  # e.g. ghcr.io/owner
+    run_url: str
+    created_at: str
+
+
 def build_manifest(
-    *,
-    directory: Path,
-    version: str,
-    commit: str,
-    repository: str,
-    registry: str,
-    images: dict[str, str],
-    run_url: str,
-    created_at: str,
-    ignorefile: Path,
+    release: Release, *, directory: Path, images: dict[str, str], ignorefile: Path
 ) -> dict[str, Any]:
     """Return the release manifest; ``images`` maps a role (``app``) to an image name."""
+    version = release.version
     if not VERSION_PATTERN.match(version):
         raise ReleaseError(f"{version!r} is not a semantic version")
-    if not SHA_PATTERN.match(commit):
-        raise ReleaseError(f"{commit!r} is not a full commit SHA")
+    if not SHA_PATTERN.match(release.commit):
+        raise ReleaseError(f"{release.commit!r} is not a full commit SHA")
     if not images:
         raise ReleaseError("no images given")
 
@@ -195,12 +208,12 @@ def build_manifest(
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "version": version,
         "tag": f"v{version}",
-        "commit": commit,
-        "repository": repository,
-        "run_url": run_url,
-        "created_at": created_at,
+        "commit": release.commit,
+        "repository": release.repository,
+        "run_url": release.run_url,
+        "created_at": release.created_at,
         "images": {
-            role: _image_entry(directory, name, registry, version)
+            role: _image_entry(directory, name, release.registry, version)
             for role, name in sorted(images.items())
         },
         "scan_gate": gate,
@@ -299,16 +312,19 @@ def _parse_images(items: list[str]) -> dict[str, str]:
 
 def _cmd_manifest(args: argparse.Namespace) -> int:
     images = _parse_images(args.image)
-    manifest = build_manifest(
-        directory=Path(args.dir),
+    release = Release(
         version=args.version,
         commit=args.commit,
         repository=args.repository,
         registry=args.registry,
-        images=images,
         run_url=args.run_url,
         created_at=args.created_at
         or datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+    manifest = build_manifest(
+        release,
+        directory=Path(args.dir),
+        images=images,
         ignorefile=Path(args.ignorefile),
     )
     Path(args.output).write_text(

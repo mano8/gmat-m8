@@ -18,7 +18,7 @@ can be rehearsed on any commit without pushing a tag:
 import argparse
 import json
 import re
-import subprocess
+import subprocess  # nosec B404 - fixed argv only, see the two calls below
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -48,7 +48,7 @@ class ApiError(Exception):
 def gh_api(path: str) -> Any:
     """GET ``path`` through the GitHub CLI and return the decoded JSON."""
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # noqa: S603  # nosec B603 B607 - fixed argv; `path` is built from validated values
             ["gh", "api", path],  # noqa: S607
             capture_output=True,
             text=True,
@@ -76,7 +76,7 @@ def check_on_base(sha: str, base_ref: str, root: Path = ROOT) -> list[str]:
     if not SHA_PATTERN.match(sha):
         return [f"{sha!r} is not a full 40-character commit SHA"]
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # noqa: S603  # nosec B603 B607 - fixed argv; `sha` passed the 40-hex check
             ["git", "merge-base", "--is-ancestor", sha, base_ref],  # noqa: S607
             cwd=root,
             capture_output=True,

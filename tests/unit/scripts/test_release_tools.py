@@ -80,18 +80,29 @@ def _release_dir(tmp_path: Path, *, backup: bool = True) -> Path:
 
 
 def _manifest_args(directory: Path, **overrides: Any) -> dict[str, Any]:
-    args: dict[str, Any] = {
-        "directory": directory,
+    """Arguments for ``_build``: the fields of the ``Release`` under "release", the rest as is."""
+    release: dict[str, Any] = {
         "version": "1.1.0",
         "commit": SHA,
         "repository": "mano8/gmat-m8",
         "registry": "ghcr.io/mano8",
-        "images": {"app": "gmat-m8", "backup": "gmat-m8-backup"},
         "run_url": RUN_URL,
         "created_at": CREATED,
+    }
+    args: dict[str, Any] = {
+        "directory": directory,
+        "images": {"app": "gmat-m8", "backup": "gmat-m8-backup"},
         "ignorefile": IGNOREFILE,
     }
-    return args | overrides
+    for key, value in overrides.items():
+        (release if key in release else args)[key] = value
+    return {"release": release, **args}
+
+
+def _build(tools: ModuleType, args: dict[str, Any]) -> dict[str, Any]:
+    rest = {key: value for key, value in args.items() if key != "release"}
+    manifest: dict[str, Any] = tools.build_manifest(tools.Release(**args["release"]), **rest)
+    return manifest
 
 
 # ---------------------------------------------------------------------------- notes
@@ -152,7 +163,7 @@ def test_manifest_lists_both_images(tools: ModuleType, tmp_path: Path) -> None:
     ignorefile.write_bytes(b"# nothing\n")  # bytes: no newline translation on Windows
     files = tmp_path / "files"
     files.mkdir()
-    manifest = tools.build_manifest(**_manifest_args(_release_dir(files), ignorefile=ignorefile))
+    manifest = _build(tools, _manifest_args(_release_dir(files), ignorefile=ignorefile))
     assert manifest["schema_version"] == 1
     assert manifest["version"] == "1.1.0"
     assert manifest["tag"] == "v1.1.0"
@@ -187,7 +198,7 @@ def test_manifest_refuses_a_missing_exception_file(tools: ModuleType, tmp_path: 
     files.mkdir()
     args = _manifest_args(_release_dir(files), ignorefile=tmp_path / "missing.yaml")
     with pytest.raises(tools.ReleaseError, match=r"exception file .* not found"):
-        tools.build_manifest(**args)
+        _build(tools, args)
 
 
 @pytest.mark.parametrize("version", ["v1.1.0", "1.1", "latest", ""])
@@ -195,23 +206,23 @@ def test_manifest_refuses_a_non_semantic_version(
     tools: ModuleType, tmp_path: Path, version: str
 ) -> None:
     with pytest.raises(tools.ReleaseError, match="semantic version"):
-        tools.build_manifest(**_manifest_args(_release_dir(tmp_path), version=version))
+        _build(tools, _manifest_args(_release_dir(tmp_path), version=version))
 
 
 @pytest.mark.parametrize("commit", ["main", "abc", "A" * 40])
 def test_manifest_refuses_a_bad_commit(tools: ModuleType, tmp_path: Path, commit: str) -> None:
     with pytest.raises(tools.ReleaseError, match="commit SHA"):
-        tools.build_manifest(**_manifest_args(_release_dir(tmp_path), commit=commit))
+        _build(tools, _manifest_args(_release_dir(tmp_path), commit=commit))
 
 
 def test_manifest_needs_images(tools: ModuleType, tmp_path: Path) -> None:
     with pytest.raises(tools.ReleaseError, match="no images"):
-        tools.build_manifest(**_manifest_args(_release_dir(tmp_path), images={}))
+        _build(tools, _manifest_args(_release_dir(tmp_path), images={}))
 
 
 def test_manifest_refuses_a_missing_image(tools: ModuleType, tmp_path: Path) -> None:
     with pytest.raises(tools.ReleaseError, match=r"digest-gmat-m8-backup\.txt"):
-        tools.build_manifest(**_manifest_args(_release_dir(tmp_path, backup=False)))
+        _build(tools, _manifest_args(_release_dir(tmp_path, backup=False)))
 
 
 @pytest.mark.parametrize("digest", ["", "latest", "sha256:abc", "sha256:" + "G" * 64, "1" * 64])
@@ -221,7 +232,7 @@ def test_manifest_refuses_a_malformed_digest(
     directory = _release_dir(tmp_path)
     (directory / "digest-gmat-m8.txt").write_text(digest, encoding="utf-8")
     with pytest.raises(tools.ReleaseError, match="sha256 digest"):
-        tools.build_manifest(**_manifest_args(directory))
+        _build(tools, _manifest_args(directory))
 
 
 def test_manifest_refuses_an_image_without_an_sbom(tools: ModuleType, tmp_path: Path) -> None:
@@ -229,7 +240,7 @@ def test_manifest_refuses_an_image_without_an_sbom(tools: ModuleType, tmp_path: 
     for path in directory.glob("sbom-gmat-m8-backup-*"):
         path.unlink()
     with pytest.raises(tools.ReleaseError, match=r"no SBOM for gmat-m8-backup \(amd64, arm64\)"):
-        tools.build_manifest(**_manifest_args(directory))
+        _build(tools, _manifest_args(directory))
 
 
 def test_manifest_refuses_an_image_without_a_scan(tools: ModuleType, tmp_path: Path) -> None:
@@ -237,7 +248,7 @@ def test_manifest_refuses_an_image_without_a_scan(tools: ModuleType, tmp_path: P
     for arch in ("amd64", "arm64"):
         (directory / f"trivy-gmat-m8-{arch}-report.json").unlink()
     with pytest.raises(tools.ReleaseError, match=r"no Trivy report for gmat-m8 \(amd64, arm64\)"):
-        tools.build_manifest(**_manifest_args(directory))
+        _build(tools, _manifest_args(directory))
 
 
 @pytest.mark.parametrize(
@@ -251,14 +262,14 @@ def test_manifest_refuses_a_missing_architecture(
     directory = _release_dir(tmp_path)
     (directory / kind.format(name="gmat-m8-backup", arch=arch)).unlink()
     with pytest.raises(tools.ReleaseError, match=rf"for gmat-m8-backup \({arch}\)"):
-        tools.build_manifest(**_manifest_args(directory))
+        _build(tools, _manifest_args(directory))
 
 
 def test_manifest_refuses_an_unreadable_report(tools: ModuleType, tmp_path: Path) -> None:
     directory = _release_dir(tmp_path)
     (directory / "trivy-gmat-m8-amd64-report.json").write_text("{not json", encoding="utf-8")
     with pytest.raises(tools.ReleaseError, match=r"cannot read trivy-gmat-m8-amd64-report\.json"):
-        tools.build_manifest(**_manifest_args(directory))
+        _build(tools, _manifest_args(directory))
 
 
 def test_backup_image_name_does_not_pick_up_the_app_files(
@@ -266,7 +277,7 @@ def test_backup_image_name_does_not_pick_up_the_app_files(
 ) -> None:
     """`sbom-gmat-m8-*` also matches `sbom-gmat-m8-backup-*`: the app must not list them."""
     directory = _release_dir(tmp_path)
-    app = tools.build_manifest(**_manifest_args(directory))["images"]["app"]
+    app = _build(tools, _manifest_args(directory))["images"]["app"]
     assert all("backup" not in name for name in app["sboms"])
     assert sorted(app["scan"]) == ["linux/amd64", "linux/arm64"]
 
