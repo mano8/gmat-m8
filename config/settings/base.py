@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.humanize",  # allauth's passkey list (mfa/webauthn) loads it
     "apps.core.apps.StaticFilesConfig",  # django.contrib.staticfiles, minus the Tailwind input
     "django.forms",  # lets the project override the form templates (TemplatesSetting)
     "allauth",

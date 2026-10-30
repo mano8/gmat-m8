@@ -24,6 +24,9 @@ class SecureAdminSite(admin.AdminSite):
       MFA after their last privilege elevation; ``MFARequiredMiddleware`` sends any other
       session to the MFA step-up first. Both are read once per request (``request.access``).
     - **Logout** hands over to allauth's logout, which sends ``Clear-Site-Data``.
+    - **Password change** hands over to allauth's page too: Django's admin form would be a
+      second way to change a password, without allauth's rate limit (found by the access
+      matrix, M2.4).
     """
 
     site_header = "gmat-m8"
@@ -52,6 +55,16 @@ class SecureAdminSite(admin.AdminSite):
         guarded = secure_admin_login(lambda request: HttpResponse())  # type: ignore[no-untyped-call]
         response: HttpResponse = guarded(request)
         return response
+
+    def password_change(  # type: ignore[override]  # a redirect, not a TemplateResponse
+        self, request: HttpRequest, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        return HttpResponseRedirect(resolve_url("account_change_password"))
+
+    def password_change_done(  # type: ignore[override]
+        self, request: HttpRequest, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        return HttpResponseRedirect(resolve_url("account_change_password"))
 
     def logout(  # type: ignore[override]  # a redirect, not Django's TemplateResponse
         self, request: HttpRequest, extra_context: dict[str, Any] | None = None
