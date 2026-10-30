@@ -61,6 +61,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - `authorize_in_txn` for every principal type, in full inside each write: session epoch, memberships at the transaction's clock, object scope (404 for an invisible object with `read`), session MFA after the last elevation for privileged grants; `TokenPrincipal`, `SystemPrincipal` and `OperatorPrincipal` constructible only in their allowlisted modules;
   - `require()` (404/403/405), `@require_capability`, `@mutating`, `CapabilityRequiredMixin`, `MutatingViewMixin`, the `{% can %}` tag and `CapabilityModelAdmin`; the self-approval rule;
   - race and staleness tests: a revocation committed after the page load, a revocation waiting behind a running write, an expiry, a password, email or MFA change, and an elevation without step-up all deny the write.
+- Access guardrails and the acceptance matrix (M2.4, [docs/security.md](docs/security.md#guardrails-and-the-acceptance-matrix-step-m24)):
+  - `scripts/check_access_rules.py` parses the code (comments and docstrings never match) and refuses a scoped model's manager in views, forms and template tags, `is_superuser` outside `apps/access` (templates included), a public service that writes without reaching `authorize_in_txn`, a view that reaches a service without being POST-only, a plain `ModelAdmin` or `site.register(Model)`, a token, system or operator principal constructed outside `CONSTRUCTOR_MODULES` (read from `apps/access/principals.py`), and SMTP or Django's mail API outside the outbox worker;
+  - the shared fixture of plan §8.1 (`tests/org.py`): the A/B/C organization, one user per role, a mixed-membership user, expired, revoked, inactive-branch, inactive-company-partner and deactivated users, and sentinel values matched in their localized renderings;
+  - `tests/access/test_acceptance_matrix.py`: every URL pattern and method as 20 actors, with the expected status and redirect target, the forbidden sentinels checked absent from every response, a failure for a URL without a row, the admin rules, and the changes between page load and submit that refuse an admin write; `tests/access/test_matrix_guards.py` shows the matrix failing on an unscoped view, an unregistered URL, a leaked price, a GET view calling a service, a system principal in a view and a plain `ModelAdmin`.
 
 ### Changed
 
@@ -70,3 +74,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - The admin admits active superusers and group administrators (was: staff accounts); a staff account without superuser status no longer reaches it.
 - Holders of a privileged role (`GROUP_ADMIN`, `MATERIAL_MANAGER`) now have 12-hour sessions, keep a second factor and need session MFA on every page, like platform operators. Granting a privileged role elevates at the grant time, including for a membership that starts later (was: at its start, which locked out an already privileged user until then).
 - Material managers hold `project.manage` within their branches; the project services check each project and branch. The password reset runs as a `TokenPrincipal`, and `OperatorCommand` commands as an `OperatorPrincipal` checked by the access engine.
+- Every URL answers 405 to any method but GET, HEAD and POST (`AllowedMethodsMiddleware`); the admin and allauth used to treat `PUT` or `OPTIONS` as a page load or a form post.
+- The admin's password-change pages hand over to allauth's (rate limit included); Django's admin form was a second way to change a password.
+- `elevate_privilege` is private to the organization services (`_elevate_privilege`): it writes without authorizing, so only an authorized service may call it.
+
+### Fixed
+
+- The passkey list (`/accounts/2fa/webauthn/`) failed with a server error for every signed-in user: allauth's template loads `humanize`, which was not installed (found by the acceptance matrix).
