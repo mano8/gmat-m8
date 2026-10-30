@@ -5,7 +5,7 @@ import re
 import uuid
 from collections.abc import Callable
 
-from django.http import HttpRequest, HttpResponse, HttpResponseBase
+from django.http import HttpRequest, HttpResponse, HttpResponseBase, HttpResponseNotAllowed
 from django.shortcuts import render
 from django.template import TemplateDoesNotExist
 from django.utils.cache import patch_cache_control, patch_vary_headers
@@ -139,6 +139,9 @@ class CacheUnavailableMiddleware:
 
 ERROR_PAGES = {405: "405.html", 409: "409.html", 429: "429.html"}
 
+# HTML pages, forms and htmx need nothing else (plan §3.5 S7, §8.2): no API, no CORS.
+ALLOWED_METHODS = ("GET", "HEAD", "POST")
+
 
 class ErrorPagesMiddleware:
     """Gives a bare 405, 409 or 429 answer a page that shows no internals.
@@ -162,3 +165,20 @@ class ErrorPagesMiddleware:
             if header in response:
                 page[header] = response[header]
         return page
+
+
+class AllowedMethodsMiddleware:
+    """Answers 405 to any method but GET, HEAD and POST, on every URL (S7, plan §8.2).
+
+    Third-party views (the admin, allauth) would otherwise treat ``PUT`` or ``OPTIONS`` as a
+    ``GET`` or a form post. Placed after ``ErrorPagesMiddleware``, which gives the answer its
+    page. Views narrow further (``@mutating``: POST only; ``require_safe``: GET and HEAD).
+    """
+
+    def __init__(self, get_response: GetResponse) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        if request.method not in ALLOWED_METHODS:
+            return HttpResponseNotAllowed(ALLOWED_METHODS)
+        return self.get_response(request)

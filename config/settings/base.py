@@ -51,8 +51,10 @@ MIDDLEWARE = [
     "apps.access.middleware.AccessContextMiddleware",
     "apps.core.middleware.SecurityHeadersMiddleware",
     "apps.core.middleware.CacheUnavailableMiddleware",
-    # Innermost: gives a bare 405/409/429 answer a page (the security headers apply after).
+    # Gives a bare 405/409/429 answer a page (the security headers apply after).
     "apps.core.middleware.ErrorPagesMiddleware",
+    # Inside it, so its 405 gets the error page: GET, HEAD and POST only.
+    "apps.core.middleware.AllowedMethodsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
