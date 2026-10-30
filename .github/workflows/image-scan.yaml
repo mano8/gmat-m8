@@ -1,0 +1,199 @@
+name: Image scan
+
+# Nightly Trivy scan of the production image set (plan §8.3, §8.4): the released application and
+# backup images (the digests in the latest release's release-manifest.json), Caddy and
+# PostgreSQL (the digests in docker-compose.yml). New CVEs appear without code changes, so a
+# green PR says nothing about an image that has been running for a month.
+#
+# The gate is the one of ci.yaml and docker-publish.yaml: HIGH and CRITICAL, no
+# --ignore-unfixed, exceptions only from .trivyignore.yaml, and both architectures (each image
+# is an amd64 + arm64 index, and Trivy would otherwise scan only the runner's). A failing scan
+# opens, or updates, ONE issue listing what is not covered, and a fully clean run closes it; the
+# full all-severity reports are kept as artifacts for 90 days. Before the first release there
+# are no released images yet and only Caddy and PostgreSQL are scanned.
+#
+# Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
+# `on.paths` filter, no secret other than the run's GITHUB_TOKEN, every action pinned by full
+# commit SHA, least privilege per job. A change under .github/workflows/ needs the
+# maintainer's explicit review.
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: image-scan-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TRIVY_VERSION: "v0.75.0"
+  TRIVY_IGNOREFILE: .trivyignore.yaml
+
+jobs:
+  # Builds the matrix: the images of docker-compose.yml plus the latest release's two images.
+  targets:
+    name: targets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Resolve the images to scan
+        id: matrix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # "No release yet" is the only case that skips the released images: any other API
+          # failure fails the step instead of quietly scanning less.
+          tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=1" --jq '.[0].tag_name // empty')"
+          args=()
+          if [ -n "$tag" ]; then
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+              --pattern release-manifest.json --dir latest
+            args+=(--manifest latest/release-manifest.json)
+            echo "latest release: $tag"
+          fi
+          matrix="$(python scripts/release_tools.py scan-targets "${args[@]}")"
+          echo "$matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  scan:
+    name: scan (${{ matrix.name }})
+    needs: targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read # the released images are private until the maintainer publishes them
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Trivy reads the Docker credentials of the registry it pulls from, so Docker Hub and
+      # Quay pulls stay anonymous.
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Trivy report (all severities, exceptions not applied)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_IGNOREFILE: ""
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ matrix.ref }}
+          format: json
+          output: trivy-${{ matrix.name }}-report.json
+          exit-code: "0"
+
+      # The gate writes JSON too, so the report job can list exactly the findings that no
+      # exception covers; the step's outcome (not the job's) decides the cell's result.
+      - name: Trivy gate (HIGH and CRITICAL, vulnerabilities and secrets)
+        id: gate
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ matrix.ref }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: json
+          output: gate-${{ matrix.name }}.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: scan-${{ matrix.name }}
+          path: |
+            trivy-${{ matrix.name }}-report.json
+            gate-${{ matrix.name }}.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Fail when the gate found something
+        if: steps.gate.outcome == 'failure'
+        env:
+          NAME: ${{ matrix.name }}
+        run: |
+          echo "$NAME: unresolved HIGH or CRITICAL findings (see the report job)" >&2
+          exit 1
+
+  # One issue for the whole run, not one per image.
+  report:
+    name: report
+    needs: [targets, scan]
+    if: always() && needs.targets.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ISSUE_TITLE: "Nightly image scan: unresolved HIGH/CRITICAL findings"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: scan-*
+          merge-multiple: true
+          path: reports
+
+      - name: Build the issue text
+        run: >-
+          python scripts/release_tools.py scan-issue
+          --dir reports
+          --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          --output scan-issue.md
+
+      # Findings: open the issue or refresh its body. No findings: close it, but only when every
+      # scan leg ran to the end (a leg that could not pull its image proves nothing).
+      - name: Open, update or close the issue
+        env:
+          SCAN_RESULT: ${{ needs.scan.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          number="$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" \
+            --json number,title --jq '[.[] | select(.title == env.ISSUE_TITLE)] | .[0].number // empty')"
+          if [ -s scan-issue.md ]; then
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --body-file scan-issue.md
+              echo "updated issue #$number"
+            else
+              gh issue create --title "$ISSUE_TITLE" --body-file scan-issue.md
+            fi
+          elif [ -n "$number" ] && [ "$SCAN_RESULT" = "success" ]; then
+            gh issue close "$number" --comment "Clean scan, no findings outside the accepted exceptions: $RUN_URL"
+            echo "closed issue #$number"
+          else
+            echo "no findings outside the accepted exceptions"
+          fi
