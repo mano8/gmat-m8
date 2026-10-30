@@ -1,12 +1,11 @@
 """allauth adapters (plan §3.6 and §5).
 
 This module is one of the allowlisted homes of non-session principals: the password-reset
-redemption below is the password-reset ``TokenPrincipal`` of plan §3.6 (the principal
-classes themselves arrive with the access engine in M2.3).
+redemption below runs as the password-reset ``TokenPrincipal`` of plan §3.6.
 """
 
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.account.forms import default_token_generator
@@ -15,13 +14,22 @@ from allauth.mfa.adapter import DefaultMFAAdapter
 from allauth.mfa.models import Authenticator
 from cryptography.fernet import Fernet, MultiFernet
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.http import HttpRequest
 
-from apps.accounts.sessions import is_privileged
+from apps.access.authorization import authorize_in_txn
+from apps.access.exceptions import TokenRejected
+from apps.access.policy import is_privileged
+from apps.access.principals import TokenKind, TokenPrincipal
 from apps.core.db import atomic_with_lock_timeout
 from apps.core.http import client_ip
+from apps.core.locking import LockOrder
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
+
+# The one operation a password-reset token grants.
+PASSWORD_RESET_OPERATION = "account.reset_password"  # noqa: S105  # nosec B105 - not a secret
 
 
 class PasswordResetTokenInvalid(Exception):
@@ -56,16 +64,39 @@ class AccountAdapter(DefaultAccountAdapter):
         """Set ``password`` only if ``key`` still verifies under the user-row lock.
 
         allauth checks the stateless token before showing the form, then sets the password
-        without a lock, so two concurrent submissions could both succeed. Here the row is
-        locked ``FOR UPDATE`` and the token checked again: the first redemption changes the
-        password hash, which invalidates the token for the second. Inactive accounts are
-        refused even with a token issued while they were active.
+        without a lock, so two concurrent submissions could both succeed. Here the
+        redemption is a ``TokenPrincipal``: ``authorize_in_txn`` locks the user row and the
+        token is checked again under that lock. The first redemption changes the password
+        hash, which invalidates the token for the second; setting it bumps
+        ``session_epoch``. Inactive accounts are refused even with a token issued while
+        they were active.
         """
-        with atomic_with_lock_timeout():
-            locked = get_user_model().objects.select_for_update().get(pk=user.pk)
-            if not locked.is_active or not default_token_generator.check_token(locked, key):
-                raise PasswordResetTokenInvalid
-            self.set_password(locked, password)
+
+        def check_token(target: User | None, locks: LockOrder) -> None:
+            if (
+                target is None
+                or not target.is_active
+                or not default_token_generator.check_token(target, key)
+            ):
+                raise TokenRejected("The password-reset link is no longer valid")
+
+        principal = TokenPrincipal(
+            kind=TokenKind.PASSWORD_RESET,
+            operation=PASSWORD_RESET_OPERATION,
+            target_user_id=user.pk,
+            target_email=user.email,
+            check_token=check_token,
+        )
+        try:
+            with atomic_with_lock_timeout():
+                # A principal with a target always yields that target's locked row.
+                locked = cast(
+                    "User",
+                    authorize_in_txn(principal, PASSWORD_RESET_OPERATION, locks=LockOrder()),
+                )
+                self.set_password(locked, password)
+        except TokenRejected as exc:
+            raise PasswordResetTokenInvalid from exc
 
 
 @lru_cache(maxsize=4)

@@ -20,8 +20,14 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 
+from apps.access.policy import is_privileged, mfa_satisfied
 from apps.accounts.sessions import bump_session_epoch
 from apps.core.db import atomic_with_lock_timeout
+
+# Reachable without session MFA, so that a privileged user can complete it, sign out or
+# change the language: allauth's account and MFA pages, the language switch, health checks.
+MFA_EXEMPT_URL_NAMES = frozenset({"set_language", "healthz", "readyz"})
+MFA_EXEMPT_URL_PREFIXES = ("account_", "mfa_")
 
 
 def _mfa_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -56,11 +62,8 @@ def session_mfa_at(request: HttpRequest) -> float | None:
 
 def session_passed_mfa(request: HttpRequest) -> bool:
     """True if this session completed MFA after the user's last privilege elevation."""
-    completed_at = session_mfa_at(request)
-    if completed_at is None:
-        return False
     elevated = getattr(request.user, "privilege_elevated_at", None)
-    return elevated is None or completed_at >= elevated.timestamp()
+    return mfa_satisfied(session_mfa_at(request), elevated)
 
 
 def keep_own_records(request: HttpRequest, user: Any) -> None:
@@ -86,12 +89,19 @@ def keep_own_records(request: HttpRequest, user: Any) -> None:
 def mfa_required_for(request: HttpRequest) -> bool:
     """The step-up hook: does this request need a session that passed MFA?
 
-    Today every admin URL does. M2.3 adds the privileged roles' business URLs.
+    Every admin URL does. For a privileged user (platform operator or holder of a
+    privileged role) every other URL does too, except the exempt ones above; a session
+    that completed MFA before the user's last privilege elevation steps up again.
     """
     match = request.resolver_match
-    if match is None or "admin" not in match.app_names:
+    if match is None:
         return False
-    return match.url_name not in {"login", "logout"}
+    if "admin" in match.app_names:
+        return match.url_name not in {"login", "logout"}
+    name = match.url_name or ""
+    if name in MFA_EXEMPT_URL_NAMES or name.startswith(MFA_EXEMPT_URL_PREFIXES):
+        return False
+    return is_privileged(request.user)
 
 
 def step_up_response(request: HttpRequest) -> HttpResponse:

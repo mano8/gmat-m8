@@ -10,13 +10,14 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.access.authorization import AccessDenied
+from apps.access.exceptions import AccessDenied
 from apps.access.generations import org_generation
 from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.core import events
+from apps.core.db import db_now
 from apps.core.idempotency import IdempotencyConflict, issue_key
 from apps.locations.models import Location
 from apps.organizations import services
@@ -67,7 +68,7 @@ def blocking_documents() -> Iterator[list[OpenDocument]]:
 
 @pytest.fixture
 def outsider(make_user: Callable[..., User], branch: Branch) -> SessionPrincipal:
-    """A material manager: holds ``project.manage`` in M2.3, never ``org.manage``."""
+    """A material manager: holds ``project.manage`` within its branch, never ``org.manage``."""
     user = make_user("mm@example.org")
     grant(user, Role.MATERIAL_MANAGER, branch=branch)
     return principal_for(user)
@@ -463,22 +464,33 @@ class TestMemberships:
                 valid_until=now,
             )
 
-    def test_privileged_roles_elevate(
+    def test_privileged_roles_elevate_at_the_grant(
         self, admin_principal: SessionPrincipal, technician: User, branch: Branch
     ) -> None:
+        """Even for a later start: MFA done after the grant counts once it starts."""
         later = timezone.now() + timedelta(days=2)
-        services.grant_membership(
-            admin_principal,
-            user_id=technician.pk,
-            role=Role.MATERIAL_MANAGER,
-            branch_id=branch.pk,
-            valid_from=later,
-        )
+        with transaction.atomic():
+            granted_at = db_now()
+            services.grant_membership(
+                admin_principal,
+                user_id=technician.pk,
+                role=Role.MATERIAL_MANAGER,
+                branch_id=branch.pk,
+                valid_from=later,
+            )
         technician.refresh_from_db()
-        assert technician.privilege_elevated_at == later
+        # The database clock of the grant (``Now()`` is the statement's time), not the start.
+        assert technician.privilege_elevated_at is not None
+        assert granted_at <= technician.privilege_elevated_at < later
+
+    def test_elevation_never_moves_back(
+        self, admin_principal: SessionPrincipal, technician: User
+    ) -> None:
+        ahead = timezone.now() + timedelta(days=2)
+        User.objects.filter(pk=technician.pk).update(privilege_elevated_at=ahead)
         services.grant_membership(admin_principal, user_id=technician.pk, role=Role.GROUP_ADMIN)
         technician.refresh_from_db()
-        assert technician.privilege_elevated_at == later  # never moves back
+        assert technician.privilege_elevated_at == ahead
 
     def test_inactive_branch_or_company_is_refused(
         self,

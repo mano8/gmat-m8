@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.roles import BRANCH_ROLES, INSTALLATION_ROLES, Role
+from apps.access.scopes import Scope, ScopedQuerySet
 from apps.core.models import BaseModel
 
 CODE_PATTERN = r"^[A-Z0-9][A-Z0-9_-]*$"
@@ -99,6 +100,12 @@ class JointVentureMember(BaseModel):
         return f"{self.venture_id} ← {self.member_id}"
 
 
+class BranchQuerySet(ScopedQuerySet["Branch"]):
+    def scope_q(self, scope: Scope) -> Q:
+        """The branches of a branch-scoped grant (S1, after S9) or all of them (S2)."""
+        return scope.branch_q("pk")
+
+
 class Branch(BaseModel):
     """A separately managed unit of a company (plan §3.3).
 
@@ -132,6 +139,8 @@ class Branch(BaseModel):
         verbose_name=_("default warehouse"),
     )
     is_active = models.BooleanField(_("active"), default=True)
+
+    objects = BranchQuerySet.as_manager()
 
     class Meta:
         verbose_name = _("branch")

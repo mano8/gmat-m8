@@ -10,9 +10,10 @@ from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from apps.access.authorization import ORG_MANAGE, authorize_in_txn
+from apps.access.authorization import authorize_in_txn
 from apps.access.generations import lock_access_state
 from apps.access.principals import Principal
+from apps.access.roles import Capability
 from apps.audit.recorder import record
 from apps.core import events
 from apps.core.changes import apply_changes
@@ -27,7 +28,7 @@ LOCATION_FIELDS = frozenset({"name", "address", "is_active"})
 def _org_change(principal: Principal) -> None:
     locks = LockOrder()
     lock_access_state(locks, mode=LockMode.UPDATE)
-    authorize_in_txn(principal, ORG_MANAGE, locks=locks)
+    authorize_in_txn(principal, Capability.ORG_MANAGE, locks=locks)
 
 
 @transactional

@@ -7,8 +7,17 @@ from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from apps.access.scopes import Scope, ScopedQuerySet
 from apps.core.models import BaseModel
 from apps.organizations.models import Branch
+
+
+class LocationQuerySet(ScopedQuerySet["Location"]):
+    def scope_q(self, scope: Scope) -> Q:
+        """A warehouse with its branch (S1, S2); a worksite with its project (S3, S4)."""
+        return (Q(project__isnull=True) & scope.branch_q("branch")) | (
+            Q(project__isnull=False) & scope.project_q("project__")
+        )
 
 
 class Location(BaseModel):
@@ -37,6 +46,8 @@ class Location(BaseModel):
     name = models.CharField(_("name"), max_length=200)
     address = models.TextField(_("address"), blank=True)
     is_active = models.BooleanField(_("active"), default=True)
+
+    objects = LocationQuerySet.as_manager()
 
     class Meta:
         verbose_name = _("location")

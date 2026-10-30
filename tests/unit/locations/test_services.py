@@ -5,7 +5,7 @@ from collections.abc import Callable
 import pytest
 from django.core.exceptions import ValidationError
 
-from apps.access.authorization import AccessDenied
+from apps.access.exceptions import AccessDenied
 from apps.access.generations import org_generation
 from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role

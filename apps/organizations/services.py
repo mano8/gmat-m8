@@ -8,6 +8,7 @@ wrapper, in the write order of plan §4.7:
    organization change. A change to a user's authority locks ``AccessState`` ``FOR SHARE``
    and then the target and actor ``User`` rows ``FOR NO KEY UPDATE`` in id order.
 2. ``authorize_in_txn`` (``org.manage``), and ``require_may_manage_account`` for a user.
+   Group administrators alone hold ``org.manage``, everywhere (S2).
 3. The idempotency record, for a create that carries a key.
 4. Validation (``full_clean`` plus the cross-row rules), the write, ``audit.record`` and
    ``events.publish``.
@@ -21,14 +22,15 @@ from typing import Any
 from uuid import UUID
 
 from django.core.exceptions import ValidationError
-from django.db.models import F, Value
-from django.db.models.functions import Coalesce, Greatest
+from django.db.models import F, Model
+from django.db.models.functions import Coalesce, Greatest, Now
 from django.utils.translation import gettext_lazy as _
 
-from apps.access.authorization import ORG_MANAGE, authorize_in_txn, require_may_manage_account
+from apps.access.authorization import authorize_in_txn
 from apps.access.generations import lock_access_state, lock_users
+from apps.access.policy import require_may_manage_account
 from apps.access.principals import Principal
-from apps.access.roles import COMPANY_ROLES, PRIVILEGED_ROLES, Role
+from apps.access.roles import COMPANY_ROLES, PRIVILEGED_ROLES, Capability, Role
 from apps.accounts.models import User
 from apps.audit.recorder import record
 from apps.core import events
@@ -59,31 +61,40 @@ def _org_change(principal: Principal) -> User:
     """L0 for an organization change, then the authorization; return the actor."""
     locks = LockOrder()
     lock_access_state(locks, mode=LockMode.UPDATE)
-    return authorize_in_txn(principal, ORG_MANAGE, locks=locks)
+    return authorize_in_txn(principal, Capability.ORG_MANAGE, locks=locks)
 
 
-def lock_for_user_change(principal: Principal, user_id: UUID, capability: str) -> User:
+def lock_for_user_change(
+    principal: Principal,
+    user_id: UUID,
+    capability: str,
+    *objects: Model,
+    read: str | None = None,
+) -> User:
     """L0 for a change to ``user_id``'s authority, then the authorization; return the actor.
 
-    Also used by the project-assignment services. Raises ``User.DoesNotExist``.
+    ``objects`` must be in the actor's scope for ``capability`` (the project of an
+    assignment); with ``read``, one the actor cannot see is ``NotInScope``. Also used by
+    the project-assignment services. Raises ``User.DoesNotExist``.
     """
     locks = LockOrder()
     lock_access_state(locks)
     lock_users(locks, {user_id, principal.user_id}, mode=LockMode.NO_KEY_UPDATE)
-    actor = authorize_in_txn(principal, capability, locks=locks)
+    actor = authorize_in_txn(principal, capability, *objects, locks=locks, read=read)
     require_may_manage_account(actor, User.objects.get(pk=user_id))
     return actor
 
 
-def elevate_privilege(user_id: UUID, effective_from: datetime) -> None:
-    """Granting a privileged role moves ``privilege_elevated_at`` forward (plan §3.6).
+def elevate_privilege(user_id: UUID) -> None:
+    """Granting a privileged role moves ``privilege_elevated_at`` to now (plan §3.6).
 
-    Sessions must complete MFA after that time before they use the role. A membership that
-    starts later elevates at its start, so MFA done before it does not count.
+    The database clock of the grant; never moved back. Sessions must complete MFA after it
+    before they use any privileged grant, including one that starts later: an elevation in
+    the future would refuse every MFA done before then, even a step-up, and lock an
+    already privileged user out until that time.
     """
-    effective = Greatest(Value(effective_from), Value(db_now()))
     User.objects.filter(pk=user_id).update(
-        privilege_elevated_at=Greatest(Coalesce(F("privilege_elevated_at"), effective), effective)
+        privilege_elevated_at=Greatest(Coalesce(F("privilege_elevated_at"), Now()), Now())
     )
 
 
@@ -385,7 +396,7 @@ def grant_membership(
     idempotency_key: str | None = None,
 ) -> Membership:
     """Grant ``role`` to a user; ``valid_from`` defaults to the database clock (S8)."""
-    actor = lock_for_user_change(principal, user_id, ORG_MANAGE)
+    actor = lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
     payload = {
         "user_id": user_id,
         "role": role,
@@ -409,7 +420,7 @@ def grant_membership(
         _check_membership_target(membership, user)
         membership.save()
         if membership.role in PRIVILEGED_ROLES:
-            elevate_privilege(user.pk, membership.valid_from)
+            elevate_privilege(user.pk)
         record(
             principal.audit_identity,
             "membership.granted",
@@ -448,7 +459,7 @@ def revoke_membership(principal: Principal, membership_id: UUID) -> Membership:
     """Revoke a membership now (database clock); it is never deleted."""
     # Discover the user to lock; a membership's user never changes, so no re-check.
     user_id = Membership.objects.values_list("user_id", flat=True).get(pk=membership_id)
-    actor = lock_for_user_change(principal, user_id, ORG_MANAGE)
+    actor = lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
     membership = _open_membership(membership_id)
     membership.revoked_at = db_now()
     membership.revoked_by = actor
@@ -474,7 +485,7 @@ def change_membership_validity(
 ) -> Membership:
     """Move a membership's validity window; a privileged role elevates again."""
     user_id = Membership.objects.values_list("user_id", flat=True).get(pk=membership_id)
-    lock_for_user_change(principal, user_id, ORG_MANAGE)
+    lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
     membership = _open_membership(membership_id)
     diff = apply_changes(
         membership,
@@ -486,7 +497,7 @@ def change_membership_validity(
     membership.full_clean()
     membership.save(update_fields=["valid_from", "valid_until", "updated_at"])
     if membership.role in PRIVILEGED_ROLES:
-        elevate_privilege(user_id, membership.valid_from)
+        elevate_privilege(user_id)
     record(
         principal.audit_identity,
         "membership.validity_changed",
@@ -505,7 +516,7 @@ def set_employer_company(principal: Principal, user_id: UUID, company_id: UUID |
     Refused while the user holds an open partner membership on another company: that
     membership is on the employer (plan §3.4).
     """
-    lock_for_user_change(principal, user_id, ORG_MANAGE)
+    lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
     user = User.objects.get(pk=user_id)
     diff = apply_changes(user, {"employer_company_id": company_id}, {"employer_company_id"})
     if not diff:

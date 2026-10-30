@@ -5,8 +5,15 @@ from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from apps.access.scopes import Scope, ScopedQuerySet
 from apps.core.models import BaseModel
 from apps.organizations.models import CODE_PATTERN, Branch, code_validator
+
+
+class ProjectQuerySet(ScopedQuerySet["Project"]):
+    def scope_q(self, scope: Scope) -> Q:
+        """Projects of the grants' branches (S3) or assigned to the user (S4)."""
+        return scope.project_q()
 
 
 class Project(BaseModel):
@@ -38,6 +45,8 @@ class Project(BaseModel):
     status = models.CharField(_("status"), max_length=10, choices=Status, default=Status.ACTIVE)
     start_date = models.DateField(_("start date"), null=True, blank=True)
     end_date = models.DateField(_("end date"), null=True, blank=True)
+
+    objects = ProjectQuerySet.as_manager()
 
     class Meta:
         verbose_name = _("project")

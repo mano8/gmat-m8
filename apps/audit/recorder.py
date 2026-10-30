@@ -24,7 +24,7 @@ ACTION = re.compile(r"[a-z][a-z_]*(\.[a-z][a-z_]*)+")
 class AuditIdentity:
     """Who acted, as the audit shows it (plan §3.6, "Audit identity").
 
-    Principals (M2.3) expose one: a user (``user_id`` + email), the worker
+    Principals (``apps.access.principals``) expose one: a user (``user_id`` + email), the worker
     (``system:worker``, no user) or an operator (``via="cli:<command>"``).
     """
 

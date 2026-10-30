@@ -1,4 +1,4 @@
-"""Management-command base class requiring ``--operator`` (apps.core.commands)."""
+"""Management-command base class requiring ``--operator`` (apps.core.commands, plan §3.6)."""
 
 from collections.abc import Callable
 from typing import Any
@@ -7,25 +7,34 @@ import pytest
 from django.core.management import CommandError, call_command
 from django.utils import timezone
 
+from apps.access.principals import OperatorPrincipal
+from apps.access.roles import Role
 from apps.accounts.models import User
-from apps.core.commands import Operator, OperatorCommand
+from apps.core.commands import OperatorCommand
+from apps.organizations.models import Branch
+from tests.support import grant
 
 pytestmark = pytest.mark.django_db
 
 
 class ImportThings(OperatorCommand):
     required_capability = "catalog.manage"
-    seen: list[Operator]
+    seen: list[OperatorPrincipal]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.seen = []
 
-    def authorize_operator(self, operator: Operator) -> None:  # M2.3 wires the access engine
-        pass
+    def handle_operator(self, principal: OperatorPrincipal, *args: Any, **options: Any) -> None:
+        self.seen.append(principal)
 
-    def handle_operator(self, operator: Operator, *args: Any, **options: Any) -> None:
-        self.seen.append(operator)
+
+@pytest.fixture
+def manager(make_user: Callable[..., User], branch: Branch) -> User:
+    """A material manager: ``catalog.manage`` within the branch."""
+    user = make_user("ops@example.org")
+    grant(user, Role.MATERIAL_MANAGER, branch=branch)
+    return user
 
 
 def test_operator_is_required() -> None:
@@ -33,14 +42,18 @@ def test_operator_is_required() -> None:
         call_command(ImportThings())
 
 
-def test_the_operator_is_resolved(make_user: Callable[..., User]) -> None:
-    user = make_user("ops@example.org")
+def test_the_operator_runs_as_an_operator_principal(manager: User) -> None:
     command = ImportThings()
     call_command(command, operator="  OPS@example.org ")
-    (operator,) = command.seen
-    assert operator.user == user
-    assert operator.command == "test_commands"
-    assert operator.via == "cli:test_commands"
+    (principal,) = command.seen
+    assert principal == OperatorPrincipal(
+        user_id=manager.pk,
+        email=manager.email,
+        command="test_commands",
+        capability="catalog.manage",
+    )
+    assert principal.via == "cli:test_commands"
+    assert principal.audit_identity.via == "cli:test_commands"
 
 
 @pytest.mark.parametrize("state", [{"is_active": False}, {"offboarded_at": timezone.now()}, None])
@@ -55,17 +68,21 @@ def test_inactive_offboarded_or_unknown_operators_are_refused(
     assert command.seen == []
 
 
-def test_until_m2_3_the_base_refuses_to_authorize(make_user: Callable[..., User]) -> None:
-    make_user("ops@example.org")
+def test_an_operator_lacking_the_capability_is_refused(
+    make_user: Callable[..., User], branch: Branch
+) -> None:
+    technician = make_user("ops@example.org")
+    grant(technician, Role.TECHNICIAN, branch=branch)
+    command = ImportThings()
+    with pytest.raises(CommandError, match=r"does not hold catalog\.manage"):
+        call_command(command, operator="ops@example.org")
+    assert command.seen == []
 
-    class Unwired(OperatorCommand):
-        required_capability = "catalog.manage"
 
-        def handle_operator(self, operator: Operator, *args: Any, **options: Any) -> None:
-            raise AssertionError("must not run")
-
-    with pytest.raises(CommandError, match="not available yet"):
-        call_command(Unwired(), operator="ops@example.org")
+def test_a_superuser_alone_is_refused(make_user: Callable[..., User]) -> None:
+    make_user("ops@example.org", is_staff=True, is_superuser=True)
+    with pytest.raises(CommandError, match="does not hold"):
+        call_command(ImportThings(), operator="ops@example.org")
 
 
 def test_a_command_must_declare_its_capability() -> None:
@@ -75,13 +92,9 @@ def test_a_command_must_declare_its_capability() -> None:
             pass
 
 
-def test_handle_operator_is_abstract(make_user: Callable[..., User]) -> None:
+def test_handle_operator_is_abstract(manager: User) -> None:
     class Bare(OperatorCommand):
         required_capability = "catalog.manage"
 
-        def authorize_operator(self, operator: Operator) -> None:
-            pass
-
-    make_user("ops@example.org")
     with pytest.raises(NotImplementedError):
         call_command(Bare(), operator="ops@example.org")

@@ -5,31 +5,23 @@ not offboarded user, and that user's memberships must grant the command's
 ``required_capability``. Shell access already implies privilege; no session MFA is possible,
 and the audit records the identity as the operator with ``via=cli:<command>``.
 
-M2.1 resolves and validates the operator. M2.3 wires ``authorize_operator`` to the access
-engine (``OperatorPrincipal`` and the capability check); until then the base refuses to run
-any command, so nothing can act with an unchecked operator.
+This module is the allowlisted home of ``OperatorPrincipal``. The principal grants the
+command's one capability; every service the command calls authorizes it again, in full,
+for its own objects.
 """
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
+from apps.access.authorization import authorize_in_txn
+from apps.access.exceptions import AccessDenied
+from apps.access.principals import OperatorPrincipal
+from apps.core.locking import LockOrder, run_in_transaction
+
 if TYPE_CHECKING:
     from apps.accounts.models import User
-
-
-@dataclass(frozen=True)
-class Operator:
-    """The validated ``--operator`` of one command run."""
-
-    user: User
-    command: str
-
-    @property
-    def via(self) -> str:
-        return f"cli:{self.command}"
 
 
 class OperatorCommand(BaseCommand):
@@ -54,23 +46,36 @@ class OperatorCommand(BaseCommand):
             help="Email of the active user on whose authority the command runs",
         )
 
-    def resolve_operator(self, email: str) -> Operator:
+    def resolve_operator(self, email: str) -> User:
         user_model: type[User] = get_user_model()
         user = user_model.objects.filter(email=email.strip().lower()).first()
         if user is None or not user.is_active or user.offboarded_at is not None:
             raise CommandError("--operator must name an active user")
-        return Operator(user=user, command=self.command_name)
+        return user
 
-    def authorize_operator(self, operator: Operator) -> None:
-        """Check ``required_capability`` for the operator (M2.3: the access engine)."""
-        raise CommandError(
-            f"{self.command_name}: operator authorization is not available yet (M2.3)"
+    def authorize_operator(self, user: User) -> OperatorPrincipal:
+        """The operator's principal, once the engine grants ``required_capability``."""
+        principal = OperatorPrincipal(
+            user_id=user.pk,
+            email=user.email,
+            command=self.command_name,
+            capability=self.required_capability,
         )
+        try:
+            run_in_transaction(
+                lambda: authorize_in_txn(principal, self.required_capability, locks=LockOrder())
+            )
+        except AccessDenied as exc:
+            raise CommandError(
+                f"{self.command_name}: the operator does not hold {self.required_capability}"
+            ) from exc
+        return principal
 
     def handle(self, *args: Any, **options: Any) -> str | None:
-        operator = self.resolve_operator(options.pop("operator"))
-        self.authorize_operator(operator)
-        return self.handle_operator(operator, *args, **options)
+        principal = self.authorize_operator(self.resolve_operator(options.pop("operator")))
+        return self.handle_operator(principal, *args, **options)
 
-    def handle_operator(self, operator: Operator, *args: Any, **options: Any) -> str | None:
+    def handle_operator(
+        self, principal: OperatorPrincipal, *args: Any, **options: Any
+    ) -> str | None:
         raise NotImplementedError

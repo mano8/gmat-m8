@@ -19,12 +19,13 @@ class ServiceBackedModelAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     """Saves through ``save_via_service``; deletes and the bulk delete action are disabled.
 
     Whoever the admin site admits may view; nobody may add or change unless a subclass's
-    ``may_edit`` says so. Subclasses for editable master data implement ``may_edit`` and
-    ``save_via_service``. Extra bulk actions are allowed only when they call a service.
+    ``may_edit`` says so (``apps.access.admin.CapabilityModelAdmin`` asks the access
+    engine). Subclasses for editable master data also implement ``save_via_service``.
+    Extra bulk actions are allowed only when they call a service.
     """
 
-    def may_edit(self, request: HttpRequest) -> bool:
-        """Whether this user may add and change records here; the service checks again."""
+    def may_edit(self, request: HttpRequest, obj: Model | None = None) -> bool:
+        """Whether this user may add, or change ``obj``; the service checks again."""
         return False
 
     def has_module_permission(self, request: HttpRequest) -> bool:
@@ -37,7 +38,7 @@ class ServiceBackedModelAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return self.admin_site.has_permission(request) and self.may_edit(request)
 
     def has_change_permission(self, request: HttpRequest, obj: Model | None = None) -> bool:
-        return self.admin_site.has_permission(request) and self.may_edit(request)
+        return self.admin_site.has_permission(request) and self.may_edit(request, obj)
 
     def save_via_service(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
         raise NotImplementedError(f"{type(self).__name__} must save through a service")

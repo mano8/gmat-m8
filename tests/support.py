@@ -1,6 +1,8 @@
 """Helpers shared by the test modules (fixtures live in ``tests/conftest.py``)."""
 
+import time
 from datetime import datetime, timedelta
+from types import EllipsisType
 from typing import Any
 
 from allauth.mfa.models import Authenticator
@@ -76,8 +78,19 @@ def grant(
     )
 
 
-def principal_for(user: User) -> SessionPrincipal:
-    return SessionPrincipal(user_id=user.pk, email=user.email)
+def principal_for(user: User, *, mfa_at: float | EllipsisType | None = ...) -> SessionPrincipal:
+    """The principal of a session that just logged in with MFA: the user's current epoch.
+
+    ``mfa_at`` overrides when the session completed MFA (``None``: never).
+    """
+    epoch = User.objects.values_list("session_epoch", flat=True).get(pk=user.pk)
+    completed = time.time() if mfa_at is ... else mfa_at
+    return SessionPrincipal(
+        user_id=user.pk,
+        email=user.email,
+        session_epoch=epoch,
+        mfa_at=completed if isinstance(completed, float) else None,
+    )
 
 
 def authz_generation(user: User) -> int:

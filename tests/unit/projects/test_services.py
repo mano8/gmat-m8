@@ -7,7 +7,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from apps.access.authorization import AccessDenied
+from apps.access.exceptions import AccessDenied, MFARequired, NotInScope
 from apps.access.generations import org_generation
 from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role
@@ -270,8 +270,9 @@ class TestAssignments:
     def test_needs_project_manage(
         self, make_user: Callable[..., User], project: Project, site_manager: User
     ) -> None:
+        """Without any membership the project is out of scope: as if it did not exist."""
         stranger = principal_for(make_user("stranger@example.org"))
-        with pytest.raises(AccessDenied):
+        with pytest.raises(NotInScope):
             services.assign_to_project(
                 stranger,
                 project_id=project.pk,
@@ -280,3 +281,103 @@ class TestAssignments:
                 valid_from=timezone.now(),
             )
         assert not ProjectAssignment.objects.exists()
+
+
+class TestMaterialManagerScope:
+    """``project.manage`` within the manager's branch and the branches it manages (S1, S3)."""
+
+    @pytest.fixture
+    def sevilla(self, admin_principal: SessionPrincipal, company: Company) -> Branch:
+        return create_branch(admin_principal, company_id=company.pk, code="SEV", name="Sevilla")
+
+    @pytest.fixture
+    def manager(self, make_user: Callable[..., User], branch: Branch) -> SessionPrincipal:
+        """The material manager of ``A-MAD``, whose session completed MFA."""
+        user = make_user("mm@example.org")
+        grant(user, Role.MATERIAL_MANAGER, branch=branch)
+        return principal_for(user)
+
+    def test_creates_in_its_branch_and_the_branches_it_manages(
+        self, manager: SessionPrincipal, branch: Branch, b_mad: Branch
+    ) -> None:
+        own = services.create_project(manager, code="P-1", name="P1", branch_id=branch.pk)
+        managed = services.create_project(manager, code="P-2", name="P2", branch_id=b_mad.pk)
+        assert own.procurement_branch_id == managed.procurement_branch_id == branch.pk
+        services.update_project(manager, managed.pk, name="P2 bis")
+
+    def test_nothing_outside_its_scope(
+        self,
+        admin_principal: SessionPrincipal,
+        manager: SessionPrincipal,
+        branch: Branch,
+        sevilla: Branch,
+    ) -> None:
+        with pytest.raises(NotInScope):
+            services.create_project(manager, code="P-9", name="P", branch_id=sevilla.pk)
+        with pytest.raises(NotInScope):  # buying for a branch out of scope
+            services.create_project(
+                manager,
+                code="P-9",
+                name="P",
+                branch_id=branch.pk,
+                procurement_branch_id=sevilla.pk,
+            )
+        foreign = services.create_project(
+            admin_principal, code="SEV-1", name="S", branch_id=sevilla.pk
+        )
+        with pytest.raises(NotInScope):
+            services.update_project(manager, foreign.pk, name="X")
+        assert not Project.objects.filter(code="P-9").exists()
+
+    def test_cannot_move_a_project_out_of_its_scope(
+        self, manager: SessionPrincipal, branch: Branch, sevilla: Branch
+    ) -> None:
+        project = services.create_project(manager, code="P-1", name="P1", branch_id=branch.pk)
+        for field in ("branch_id", "procurement_branch_id"):
+            with pytest.raises(NotInScope):
+                services.update_project(manager, project.pk, **{field: sevilla.pk})
+        project.refresh_from_db()
+        assert project.branch_id == project.procurement_branch_id == branch.pk
+
+    def test_assigns_only_on_projects_in_scope(
+        self,
+        admin_principal: SessionPrincipal,
+        manager: SessionPrincipal,
+        make_user: Callable[..., User],
+        branch: Branch,
+        sevilla: Branch,
+    ) -> None:
+        site_manager = make_user("site@example.org")
+        own = services.create_project(manager, code="P-1", name="P1", branch_id=branch.pk)
+        assignment = services.assign_to_project(
+            manager, project_id=own.pk, user_id=site_manager.pk, kind=ProjectAssignment.Kind.MANAGER
+        )
+        services.revoke_project_assignment(manager, assignment.pk)
+        foreign = services.create_project(
+            admin_principal, code="SEV-1", name="S", branch_id=sevilla.pk
+        )
+        foreign_assignment = services.assign_to_project(
+            admin_principal,
+            project_id=foreign.pk,
+            user_id=site_manager.pk,
+            kind=ProjectAssignment.Kind.MANAGER,
+        )
+        with pytest.raises(NotInScope):
+            services.assign_to_project(
+                manager,
+                project_id=foreign.pk,
+                user_id=site_manager.pk,
+                kind=ProjectAssignment.Kind.PARTNER,
+            )
+        with pytest.raises(NotInScope):
+            services.revoke_project_assignment(manager, foreign_assignment.pk)
+
+    def test_a_session_without_mfa_is_refused(
+        self, make_user: Callable[..., User], branch: Branch
+    ) -> None:
+        user = make_user("mm@example.org")
+        grant(user, Role.MATERIAL_MANAGER, branch=branch)
+        with pytest.raises(MFARequired):
+            services.create_project(
+                principal_for(user, mfa_at=None), code="P-1", name="P1", branch_id=branch.pk
+            )

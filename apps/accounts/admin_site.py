@@ -10,7 +10,7 @@ from django.shortcuts import resolve_url
 from django.urls import reverse
 
 from apps.access.authorization import may_use_admin
-from apps.accounts.mfa import session_passed_mfa
+from apps.access.middleware import access_for
 
 
 class SecureAdminSite(admin.AdminSite):
@@ -19,9 +19,10 @@ class SecureAdminSite(admin.AdminSite):
     - **Login** goes through allauth: anonymous visitors are sent to the allauth login
       page (``secure_admin_login``), so rate limits and MFA apply. Django's admin login form,
       which would authenticate with a password only, is never rendered or processed.
-    - **Permission** needs an active superuser or a user with a valid ``GROUP_ADMIN``
-      membership (``apps.access``), whose *current session* completed MFA;
-      ``MFARequiredMiddleware`` sends any other session to the MFA step-up first.
+    - **Permission** needs an active superuser or a holder of ``org.manage`` (a group
+      administrator), as the access engine resolves it, whose *current session* completed
+      MFA after their last privilege elevation; ``MFARequiredMiddleware`` sends any other
+      session to the MFA step-up first. Both are read once per request (``request.access``).
     - **Logout** hands over to allauth's logout, which sends ``Clear-Site-Data``.
     """
 
@@ -30,7 +31,8 @@ class SecureAdminSite(admin.AdminSite):
     index_title = "Administration"
 
     def has_permission(self, request: HttpRequest) -> bool:
-        return may_use_admin(request.user) and session_passed_mfa(request)
+        ctx = access_for(request)
+        return may_use_admin(ctx) and ctx.mfa_passed
 
     def login(
         self, request: HttpRequest, extra_context: dict[str, Any] | None = None
@@ -43,7 +45,7 @@ class SecureAdminSite(admin.AdminSite):
         """
         index = reverse("admin:index", current_app=self.name)
         if request.user.is_authenticated:
-            if not may_use_admin(request.user):
+            if not may_use_admin(access_for(request)):
                 raise PermissionDenied
             next_url = request.GET.get("next", "")
             return HttpResponseRedirect(next_url if next_url.startswith(index) else index)

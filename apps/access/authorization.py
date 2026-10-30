@@ -1,93 +1,177 @@
-"""Interim authorization for the organization and project services (M2.2, plan §3.6).
+"""``authorize_in_txn``: the full access check inside every write (plan §3.6, S10).
 
-M2.3 replaces this module's policy with the access engine (``ROLE_CAPABILITIES``, scopes
-S1-S10, every principal type, session epoch and MFA checks). Until then it fails closed:
+Every mutating service calls it first in its transaction, after the L0 rows the service
+itself changes (those are locked ``FOR UPDATE`` before this ``FOR SHARE``). There is no
+shortcut when nothing seems to have changed: each call runs the whole check of its
+principal type.
 
-- ``authorize_in_txn`` takes the L0 locks and admits only an active, not offboarded user
-  who holds a valid ``GROUP_ADMIN`` membership at the database clock, and only for
-  ``org.manage`` and ``project.manage``. ``MATERIAL_MANAGER``'s ``project.manage`` within
-  its scope arrives with M2.3; every other capability is refused.
-- ``is_superuser`` grants no business capability. It only lets a platform operator reach
-  the admin and act on staff accounts (plan §3.4); those checks live here, in
-  ``apps/access``, as CLAUDE.md requires.
+**Session principal** (§3.6 steps 1-6):
+
+1. lock ``AccessState`` and the actor's ``User`` row ``FOR SHARE``;
+2. the user is active and not offboarded, and the session's epoch equals the user's
+   ``session_epoch`` (``StaleSession`` otherwise: a password, email or MFA change or a
+   deactivation since the page load);
+3. reload the memberships and assignments and evaluate them at the transaction's clock
+   (S8, S9), so an expiry that bumped no counter is caught;
+4. every object of this operation is in the capability's scope (S6: one membership's
+   grant has to cover it); with ``read``, an object the user cannot even see is
+   ``NotInScope`` (404) rather than ``AccessDenied`` (403, S7);
+5. when only privileged grants cover the operation, the session completed MFA after
+   ``privilege_elevated_at`` (``MFARequired``);
+6. any denial raises, and the service's transaction rolls back.
+
+**Operator principal**: steps 1-4 for the command's one capability; no session exists, so
+neither the epoch nor MFA applies (the audit shows ``via=cli:<command>``).
+
+**Token principal**: exactly its one operation. Locks the target and initiator ``User``
+rows in id order, lets the token's own check lock and verify the token row, then requires
+that the initiator still holds ``org.manage`` (a superuser for a staff target, F71).
+
+**System principal**: only its closed capability set; never a business capability.
 """
 
-from typing import Any
+from typing import cast, overload
 from uuid import UUID
 
-from django.core.exceptions import PermissionDenied
-from django.db.models import Q
-from django.db.models.functions import Now
+from django.db import connections
+from django.db.models import Model
 
+from apps.access.context import AccessContext
+from apps.access.exceptions import (
+    AccessDenied,
+    MFARequired,
+    NotInScope,
+    StaleSession,
+    TokenRejected,
+)
 from apps.access.generations import lock_access_state, lock_users
-from apps.access.principals import Principal
-from apps.access.roles import Role
+from apps.access.policy import mfa_satisfied, require_may_manage_account
+from apps.access.principals import (
+    AnyPrincipal,
+    OperatorPrincipal,
+    SessionPrincipal,
+    SystemPrincipal,
+    TokenPrincipal,
+)
+from apps.access.roles import Capability
+from apps.access.scopes import Scope, object_in_scope
 from apps.accounts.models import User
-from apps.core.locking import LockOrder
-from apps.organizations.models import Membership
-
-ORG_MANAGE = "org.manage"
-PROJECT_MANAGE = "project.manage"
-GROUP_ADMIN_CAPABILITIES = frozenset({ORG_MANAGE, PROJECT_MANAGE})
+from apps.core.locking import LockMode, LockOrder, LockOutsideTransaction
 
 
-class AccessDenied(PermissionDenied):
-    """The principal may not perform this operation (403)."""
+@overload
+def authorize_in_txn(
+    principal: SessionPrincipal | OperatorPrincipal,
+    capability: str,
+    *objects: Model,
+    locks: LockOrder,
+    read: str | None = None,
+) -> User: ...
 
 
-def valid_now() -> Q:
-    """S8: not revoked and ``valid_from ≤ now < valid_until`` at the database clock."""
-    return Q(revoked_at__isnull=True, valid_from__lte=Now()) & (
-        Q(valid_until__isnull=True) | Q(valid_until__gt=Now())
-    )
+@overload
+def authorize_in_txn(
+    principal: TokenPrincipal, capability: str, *, locks: LockOrder
+) -> User | None: ...
 
 
-def holds_group_admin(user_id: UUID) -> bool:
-    """A valid ``GROUP_ADMIN`` membership (it has no branch or company, so S9 cannot apply)."""
-    return Membership.objects.filter(valid_now(), user_id=user_id, role=Role.GROUP_ADMIN).exists()
+@overload
+def authorize_in_txn(principal: SystemPrincipal, capability: str, *, locks: LockOrder) -> None: ...
 
 
-def authorize_in_txn(principal: Principal, capability: str, *, locks: LockOrder) -> User:
-    """Lock L0 and check ``capability`` for ``principal``; return the actor's ``User`` row.
+def authorize_in_txn(
+    principal: AnyPrincipal,
+    capability: str,
+    *objects: Model,
+    locks: LockOrder,
+    read: str | None = None,
+) -> User | None:
+    """Check ``capability`` (on ``objects``) for ``principal``; return the acting user.
 
-    Call it first in the service transaction, after the L0 rows that the service changes
-    (those are locked ``FOR UPDATE`` before this ``FOR SHARE``). Raises ``AccessDenied``.
+    Session and operator principals get their ``User`` row; a token principal its target
+    (``None`` before a new account exists); the system principal ``None``.
     """
+    if not connections[locks.using].in_atomic_block:
+        raise LockOutsideTransaction("authorize_in_txn runs inside the service transaction")
+    if isinstance(principal, SessionPrincipal | OperatorPrincipal):
+        return _authorize_user(principal, capability, objects, read, locks)
+    if objects or read is not None:
+        raise TypeError(f"{type(principal).__name__} is not authorized on objects")
+    if isinstance(principal, TokenPrincipal):
+        return _authorize_token(principal, capability, locks)
+    if not principal.may(capability):
+        raise AccessDenied(capability)
+    return None
+
+
+def _covers(scope: Scope, obj: Model | None) -> bool:
+    return bool(scope) if obj is None else object_in_scope(obj, scope)
+
+
+def _authorize_user(
+    principal: SessionPrincipal | OperatorPrincipal,
+    capability: str,
+    objects: tuple[Model, ...],
+    read: str | None,
+    locks: LockOrder,
+) -> User:
     lock_access_state(locks)
     lock_users(locks, [principal.user_id])
-    actor = User.objects.filter(
-        pk=principal.user_id, is_active=True, offboarded_at__isnull=True
-    ).first()
-    if (
-        actor is None
-        or capability not in GROUP_ADMIN_CAPABILITIES
-        or not holds_group_admin(actor.pk)
-    ):
+    user = User.objects.filter(pk=principal.user_id).first()
+    if user is None or not user.is_active or user.offboarded_at is not None:
         raise AccessDenied(capability)
-    return actor
+    if isinstance(principal, SessionPrincipal):
+        if principal.session_epoch != user.session_epoch:
+            raise StaleSession("The session predates a change to this account")
+    elif capability != principal.capability:
+        raise AccessDenied(f"{principal.via} runs with {principal.capability} only")
+    ctx = AccessContext.for_user(user)
+    if read is not None:
+        visible = ctx.scope_for(read)
+        if not all(object_in_scope(obj, visible) for obj in objects):
+            raise NotInScope(read)
+    scope = ctx.scope_for(capability)
+    ordinary, privileged = scope.only(privileged=False), scope.only(privileged=True)
+    needs_mfa = False
+    for obj in objects or (None,):
+        if _covers(ordinary, obj):
+            continue
+        if not _covers(privileged, obj):
+            raise AccessDenied(capability)
+        needs_mfa = True
+    if (
+        needs_mfa
+        and isinstance(principal, SessionPrincipal)
+        and not mfa_satisfied(principal.mfa_at, user.privilege_elevated_at)
+    ):
+        raise MFARequired(capability)
+    return user
 
 
-def require_may_manage_account(actor: User, target: User) -> None:
-    """Only a superuser acts on a staff or superuser account (plan §3.4)."""
-    if (target.is_staff or target.is_superuser) and not actor.is_superuser:
-        raise AccessDenied("Only a platform operator can manage a staff account")
+def _authorize_token(principal: TokenPrincipal, capability: str, locks: LockOrder) -> User | None:
+    if capability != principal.operation:
+        raise AccessDenied(f"This token grants {principal.operation} only")
+    lock_access_state(locks)
+    user_ids = {principal.target_user_id, principal.initiator_user_id} - {None}
+    lock_users(locks, cast(set[UUID], user_ids), mode=LockMode.NO_KEY_UPDATE)
+    target = None
+    if principal.target_user_id is not None:
+        target = User.objects.filter(pk=principal.target_user_id).first()
+        if target is None:
+            raise TokenRejected("The token's account no longer exists")
+    principal.check_token(target, locks)
+    if principal.initiator_user_id is not None:
+        initiator = User.objects.filter(pk=principal.initiator_user_id).first()
+        if initiator is None or not AccessContext.for_user(initiator).has(Capability.ORG_MANAGE):
+            raise TokenRejected("The token's issuer no longer holds that authority")
+        if target is not None:
+            require_may_manage_account(initiator, target)
+    return target
 
 
-def may_use_admin(user: Any) -> bool:
-    """Superusers and group administrators reach the admin (plan §5, "Django Admin").
+def may_use_admin(ctx: AccessContext) -> bool:
+    """Platform operators and group administrators reach the admin (plan §5).
 
     The admin site adds the session-MFA requirement on top.
     """
-    if not getattr(user, "is_active", False) or not user.is_authenticated:
-        return False
-    return bool(user.is_superuser) or holds_group_admin(user.pk)
-
-
-def may_manage_organization(user: Any) -> bool:
-    """Whether the admin offers master-data edits; the service checks again under lock."""
-    return bool(
-        getattr(user, "is_active", False)
-        and user.is_authenticated
-        and user.offboarded_at is None
-        and holds_group_admin(user.pk)
-    )
+    return ctx.is_platform_operator or ctx.has(Capability.ORG_MANAGE)

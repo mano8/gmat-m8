@@ -11,19 +11,19 @@ from django.contrib import admin
 from django.forms import ModelChoiceField
 from django.http import HttpRequest
 
-from apps.access.authorization import may_manage_organization
+from apps.access.admin import CapabilityModelAdmin
 from apps.access.principals import SessionPrincipal
-from apps.core.admin import ReadOnlyModelAdmin, ServiceBackedModelAdmin
+from apps.access.roles import Capability
+from apps.core.admin import ReadOnlyModelAdmin
 from apps.locations.models import Location
 from apps.organizations import services
 from apps.organizations.models import Branch, Company, JointVentureMember, Membership
 
 
-class MasterDataAdmin(ServiceBackedModelAdmin):
+class MasterDataAdmin(CapabilityModelAdmin):
     """Editable by users who hold ``org.manage``; platform operators alone only view."""
 
-    def may_edit(self, request: HttpRequest) -> bool:
-        return may_manage_organization(request.user)
+    edit_capability = Capability.ORG_MANAGE
 
 
 @admin.register(Company)

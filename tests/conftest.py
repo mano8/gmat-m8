@@ -6,13 +6,14 @@ live in ``tests/support.py``.
 """
 
 import importlib.util
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
 
+from apps.access import principals
 from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role
 from apps.accounts.models import User
@@ -20,6 +21,19 @@ from apps.organizations.models import Branch, Company
 from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _tests_may_construct_principals() -> Iterator[None]:
+    """Tests build token, system and operator principals directly.
+
+    Production code may only construct them in their allowlisted modules; ``tests/`` is
+    not part of any image (``.dockerignore``).
+    """
+    with pytest.MonkeyPatch.context() as patch:
+        for name, modules in list(principals.CONSTRUCTOR_MODULES.items()):
+            patch.setitem(principals.CONSTRUCTOR_MODULES, name, modules | {"tests"})
+        yield
 
 
 @pytest.fixture(scope="session")

@@ -3,7 +3,13 @@
 Projects are organization changes (``AccessState`` ``FOR UPDATE``: a project's branches
 and status define scopes); assignments change one user's authority (that ``User`` row
 ``FOR NO KEY UPDATE``). Same write order as ``apps.organizations.services``; the
-capability is ``project.manage``.
+capability is ``project.manage``, held everywhere by group administrators and within
+their branches by material managers (S1, S3):
+
+- creating a project needs its branch and its procurement branch in scope;
+- changing one needs the project in scope (else ``NotInScope``, 404 for a project the
+  actor cannot see), and any new branch or procurement branch too;
+- an assignment needs its project in scope.
 """
 
 from datetime import date, datetime
@@ -11,11 +17,14 @@ from typing import Any
 from uuid import UUID
 
 from django.core.exceptions import ValidationError
+from django.db.models import Model
 from django.utils.translation import gettext_lazy as _
 
-from apps.access.authorization import PROJECT_MANAGE, authorize_in_txn
+from apps.access.authorization import authorize_in_txn
 from apps.access.generations import lock_access_state
 from apps.access.principals import Principal
+from apps.access.roles import Capability
+from apps.accounts.models import User
 from apps.audit.recorder import record
 from apps.core import events
 from apps.core.changes import apply_changes
@@ -41,10 +50,22 @@ PROJECT_FIELDS = frozenset(
 )
 
 
-def _project_change(principal: Principal) -> None:
+def _lock_project_change() -> LockOrder:
     locks = LockOrder()
     lock_access_state(locks, mode=LockMode.UPDATE)
-    authorize_in_txn(principal, PROJECT_MANAGE, locks=locks)
+    return locks
+
+
+def _authorize(principal: Principal, locks: LockOrder, *objects: Model) -> None:
+    """``project.manage`` on every object; one the actor cannot see is ``NotInScope``."""
+    authorize_in_txn(
+        principal, Capability.PROJECT_MANAGE, *objects, locks=locks, read=Capability.PROJECT_VIEW
+    )
+
+
+def _branches(*branch_ids: UUID | None) -> list[Branch]:
+    """The existing branches among ``branch_ids``, to authorize before validating them."""
+    return list(Branch.objects.filter(pk__in={pk for pk in branch_ids if pk is not None}))
 
 
 def _active_branch(branch_id: UUID, field: str) -> Branch:
@@ -76,7 +97,12 @@ def create_project(
     ``procurement_branch`` defaults to the branch that manages ``branch``, or ``branch``
     itself (Q2: the procurement branch buys for the project).
     """
-    _project_change(principal)
+    locks = _lock_project_change()
+    branch = Branch.objects.filter(pk=branch_id).first()
+    default_procurement = (branch.managed_by_id or branch.pk) if branch is not None else None
+    _authorize(
+        principal, locks, *_branches(branch_id, procurement_branch_id or default_procurement)
+    )
     payload = {
         "code": code,
         "name": name,
@@ -150,8 +176,10 @@ def create_project(
 @transactional
 def update_project(principal: Principal, project_id: UUID, **changes: Any) -> Project:
     """Change a project; ``code`` is fixed. Its worksite follows a change of ``branch``."""
-    _project_change(principal)
+    locks = _lock_project_change()
     project = Project.objects.get(pk=project_id)
+    new_branches = _branches(changes.get("branch_id"), changes.get("procurement_branch_id"))
+    _authorize(principal, locks, project, *new_branches)
     diff = apply_changes(project, changes, PROJECT_FIELDS)
     if not diff:
         return project
@@ -189,7 +217,10 @@ def assign_to_project(
     idempotency_key: str | None = None,
 ) -> ProjectAssignment:
     """Share a project with a site manager or a partner (S4)."""
-    lock_for_user_change(principal, user_id, PROJECT_MANAGE)
+    project = Project.objects.get(pk=project_id)
+    lock_for_user_change(
+        principal, user_id, Capability.PROJECT_MANAGE, project, read=Capability.PROJECT_VIEW
+    )
     payload = {
         "project_id": project_id,
         "user_id": user_id,
@@ -200,7 +231,7 @@ def assign_to_project(
 
     def execute() -> ProjectAssignment:
         assignment = ProjectAssignment(
-            project=Project.objects.get(pk=project_id),
+            project=project,
             user_id=user_id,
             kind=kind,
             valid_from=valid_from or db_now(),
@@ -241,19 +272,29 @@ def _open_assignment(assignment_id: UUID) -> ProjectAssignment:
     return assignment
 
 
-def _assignment_user(assignment_id: UUID) -> UUID:
-    # Discover the user to lock; an assignment's user never changes, so no re-check.
-    user_id: UUID = ProjectAssignment.objects.values_list("user_id", flat=True).get(
+def _lock_assignment_change(principal: Principal, assignment_id: UUID) -> tuple[User, UUID]:
+    """Lock and authorize a change to an assignment; return the actor and its user's id.
+
+    Discovers the user to lock and the project to authorize on: an assignment's user and
+    project never change, so they need no re-check under the locks.
+    """
+    user_id, project_id = ProjectAssignment.objects.values_list("user_id", "project_id").get(
         pk=assignment_id
     )
-    return user_id
+    actor = lock_for_user_change(
+        principal,
+        user_id,
+        Capability.PROJECT_MANAGE,
+        Project.objects.get(pk=project_id),
+        read=Capability.PROJECT_VIEW,
+    )
+    return actor, user_id
 
 
 @transactional
 def revoke_project_assignment(principal: Principal, assignment_id: UUID) -> ProjectAssignment:
     """Revoke an assignment now (database clock); it is never deleted."""
-    user_id = _assignment_user(assignment_id)
-    actor = lock_for_user_change(principal, user_id, PROJECT_MANAGE)
+    actor, user_id = _lock_assignment_change(principal, assignment_id)
     assignment = _open_assignment(assignment_id)
     assignment.revoked_at = db_now()
     assignment.revoked_by = actor
@@ -277,8 +318,7 @@ def change_assignment_validity(
     valid_from: datetime,
     valid_until: datetime | None,
 ) -> ProjectAssignment:
-    user_id = _assignment_user(assignment_id)
-    lock_for_user_change(principal, user_id, PROJECT_MANAGE)
+    _actor, user_id = _lock_assignment_change(principal, assignment_id)
     assignment = _open_assignment(assignment_id)
     diff = apply_changes(
         assignment,

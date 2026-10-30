@@ -31,7 +31,7 @@ INSTALLED_APPS = [
     "apps.locations",
 ]
 
-# Order matters (plan §3.6): session auth → session epoch → MFA enforcement.
+# Order matters (plan §3.6): session auth → session epoch → MFA enforcement → access context.
 MIDDLEWARE = [
     "apps.core.middleware.RequestIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -48,6 +48,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "apps.accounts.middleware.MFARequiredMiddleware",
+    "apps.access.middleware.AccessContextMiddleware",
     "apps.core.middleware.SecurityHeadersMiddleware",
     "apps.core.middleware.CacheUnavailableMiddleware",
     # Innermost: gives a bare 405/409/429 answer a page (the security headers apply after).
