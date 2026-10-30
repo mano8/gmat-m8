@@ -55,6 +55,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - database triggers that bump `AccessState.org_generation` and `User.authz_generation` on every scope-defining change, whatever code path makes it;
   - services for companies, joint-venture members, branches, warehouses, projects, memberships, assignments and employers (locked, authorized, idempotent creates, audited, events), and deactivation preconditions that list the open documents later steps register;
   - admin: group administrators are admitted (with session MFA) and edit master data through the services; memberships, projects, assignments and the access state are read-only; a group administrator cannot edit staff accounts.
+- Access policy engine (M2.3, [docs/security.md](docs/security.md#authorization-appsaccess-step-m23)):
+  - the `Capability` enum and the `ROLE_CAPABILITIES` matrix as data, checked against the plan's table;
+  - `AccessContext` (`request.access`, lazy, with the session's epoch and MFA time) and `scope_for(capability)`, one grant per membership (S6), with rules S1-S9, partners of an inactive company included; `visible_to()` for branches, projects and locations; a hypothesis test against a reference implementation;
+  - `authorize_in_txn` for every principal type, in full inside each write: session epoch, memberships at the transaction's clock, object scope (404 for an invisible object with `read`), session MFA after the last elevation for privileged grants; `TokenPrincipal`, `SystemPrincipal` and `OperatorPrincipal` constructible only in their allowlisted modules;
+  - `require()` (404/403/405), `@require_capability`, `@mutating`, `CapabilityRequiredMixin`, `MutatingViewMixin`, the `{% can %}` tag and `CapabilityModelAdmin`; the self-approval rule;
+  - race and staleness tests: a revocation committed after the page load, a revocation waiting behind a running write, an expiry, a password, email or MFA change, and an elevation without step-up all deny the write.
 
 ### Changed
 
@@ -62,3 +68,5 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Production settings now also require `DJANGO_CSRF_TRUSTED_ORIGINS` (https only) and `MFA_ENCRYPTION_KEYS`.
 - Mail is configured through Django 6.1's `MAILERS`. Production uses a backend that sends nothing until the outbox arrives (M2.5).
 - The admin admits active superusers and group administrators (was: staff accounts); a staff account without superuser status no longer reaches it.
+- Holders of a privileged role (`GROUP_ADMIN`, `MATERIAL_MANAGER`) now have 12-hour sessions, keep a second factor and need session MFA on every page, like platform operators. Granting a privileged role elevates at the grant time, including for a membership that starts later (was: at its start, which locked out an already privileged user until then).
+- Material managers hold `project.manage` within their branches; the project services check each project and branch. The password reset runs as a `TokenPrincipal`, and `OperatorCommand` commands as an `OperatorPrincipal` checked by the access engine.
