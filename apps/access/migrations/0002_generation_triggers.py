@@ -15,13 +15,13 @@ function.
 
 from django.db import migrations
 
-ACCESS_STATE_ID = "00000000-0000-0000-0000-000000000001"
-
-FORWARD = f"""
+# The singleton's id (``apps.access.models.ACCESS_STATE_ID``) is written into the SQL as a
+# literal: the text is fixed, nothing is interpolated.
+FORWARD = """
 CREATE FUNCTION access_bump_org_generation() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    INSERT INTO access_accessstate (id, org_generation) VALUES ('{ACCESS_STATE_ID}', 1)
+    INSERT INTO access_accessstate (id, org_generation) VALUES ('00000000-0000-0000-0000-000000000001', 1)
     ON CONFLICT (id) DO UPDATE SET org_generation = access_accessstate.org_generation + 1;
     RETURN NULL;
 END;
