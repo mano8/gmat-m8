@@ -22,7 +22,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - `SecurityDatabaseCache` for rate limits: atomic, never evicts live entries, JSON only, 429 when full;
   - CSP, `Permissions-Policy`, `__Host-` cookies, `no-store` for authenticated and token pages, `Clear-Site-Data` on logout, request ids;
   - JSON logging with token redaction on every handler, a redacting error-report filter and an error-tracker scrubber;
-  - fail-closed system checks (`gmat.E001`–`gmat.E017`).
+  - fail-closed system checks (`gmat.E001`–`gmat.E019`).
 - Container images (M1.4):
   - application image `docker/app` (digest-pinned Python base, Tailwind and uv build stages, uid 1000, read-only root filesystem, `entrypoint.sh` with `web`, `migrate`, `check`, `migrate-plan`, `healthcheck` and `manage`, Gunicorn `gthread` with the access log off and the error log redacted) and a `dev` target;
   - backup image `docker/backup` (`backup-now`, `restore --verify`, snapshot-consistent dumps without session and cache data, manifest queries in the same snapshot, append-only restic upload, 6-hour schedule);
@@ -66,11 +66,18 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - the shared fixture of plan §8.1 (`tests/org.py`): the A/B/C organization, one user per role, a mixed-membership user, expired, revoked, inactive-branch, inactive-company-partner and deactivated users, and sentinel values matched in their localized renderings;
   - `tests/access/test_acceptance_matrix.py`: every URL pattern and method as 20 actors, with the expected status and redirect target, the forbidden sentinels checked absent from every response, a failure for a URL without a row, the admin rules, and the changes between page load and submit that refuse an admin write; `tests/access/test_matrix_guards.py` shows the matrix failing on an unscoped view, an unregistered URL, a leaked price, a GET view calling a service, a system principal in a view and a plain `ModelAdmin`.
 
+- Email outbox and worker (M2.5, [docs/security.md](docs/security.md#email-the-outbox-and-the-worker-step-m25)):
+  - `apps/notifications`: `EmailOutbox` and `EmailAttempt` with every kind and status of plan §4.2, content frozen by a trigger, `current_attempt` kept on the message's own attempts by a composite key; the outbox mailer as `MAILERS["default"]` for all mail, allauth's included; `queue_notification` (user ids, a capability on an object, at most 20 BCC recipients per message), `queue_security_email` (sealed with `OUTBOX_ENCRYPTION_KEYS`, one-hour expiry) and `queue_dispatch` (orders arrive in M5);
+  - `manage.py worker` as `system:worker`: claim with `SKIP LOCKED` and the eligibility re-check in the claim transaction, committed before any I/O; supplier dispatches lock their order first (L4 → L4b) through a source the purchasing app registers; a step-by-step SMTP dialogue with a 10 s per-operation timeout and a 60 s `SIGALRM` deadline; outcomes conditional on the attempt; abandoned attempts turned `AMBIGUOUS`; retry policy per kind; hourly housekeeping; the `worker.paused` flag and the `OUTBOUND_EMAIL` switch; a heartbeat file;
+  - the compose `worker` service (`db_worker` and `egress` only, hardened like `web`, heartbeat healthcheck, `./flags` read-only), Mailpit for local and CI stacks (`docker-compose.local-mail.yml`), `entrypoint.sh worker` and `worker-healthcheck`, `init.sh` adding new template keys to existing env files;
+  - checks `gmat.E007`, `gmat.E018` and `gmat.E019`; live tests deliver a password-reset email to Mailpit through the worker, hold mail while the worker is paused, and show the worker cannot reach `web`.
+
 ### Changed
 
 - Pre-authentication form pages keep `Referrer-Policy: same-origin`; only a URL that carries a token is `no-referrer` (browsers send `Origin: null` on a form POST under `no-referrer`, which CSRF refuses, so login failed in a real browser).
 - Production settings now also require `DJANGO_CSRF_TRUSTED_ORIGINS` (https only) and `MFA_ENCRYPTION_KEYS`.
-- Mail is configured through Django 6.1's `MAILERS`. Production uses a backend that sends nothing until the outbox arrives (M2.5).
+- Mail is configured through Django 6.1's `MAILERS`: the outbox is the default mailer everywhere and the worker sends through `MAILERS["outbound"]` (SMTP; Mailpit in development). The interim `apps.core.mail.DisabledEmailBackend` is gone. Production sends nothing until `OUTBOUND_EMAIL=on` and requires `OUTBOX_ENCRYPTION_KEYS`.
+- `django.contrib.postgres` is installed (array fields of the outbox).
 - The admin admits active superusers and group administrators (was: staff accounts); a staff account without superuser status no longer reaches it.
 - Holders of a privileged role (`GROUP_ADMIN`, `MATERIAL_MANAGER`) now have 12-hour sessions, keep a second factor and need session MFA on every page, like platform operators. Granting a privileged role elevates at the grant time, including for a membership that starts later (was: at its start, which locked out an already privileged user until then).
 - Material managers hold `project.manage` within their branches; the project services check each project and branch. The password reset runs as a `TokenPrincipal`, and `OperatorCommand` commands as an `OperatorPrincipal` checked by the access engine.
