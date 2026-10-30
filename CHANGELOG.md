@@ -41,6 +41,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - `image-scan.yaml`, a nightly Trivy scan (amd64 and arm64) of the released images, Caddy and PostgreSQL that opens, updates and closes one issue;
   - `scripts/verify_release.py` (the release gate, runnable on any commit without a tag) and `scripts/release_tools.py` (release notes, manifest, scan matrix, issue text), with unit and workflow-policy tests;
   - the release procedure, manifest format and manual verification commands in [docs/release.md](docs/release.md).
+- Core building blocks (M2.1):
+  - `BaseModel` (UUIDv7 key, creation and update times) and `DocumentSequence` with `next_number()`: gapless numbers per scope from one locked upsert, returned on rollback;
+  - in-transaction domain events (`apps.core.events`): synchronous subscribers that commit or roll back with the publisher;
+  - idempotent create commands (`apps.core.idempotency`): signed keys bound to actor and operation, valid 24 hours, `IdempotencyRecord` kept 7 days (system check `gmat.E006`), canonical payload hashes, replay re-authorization and 409 on a reused key;
+  - the lock protocol (`apps.core.locking`): levels L0–L9 with L4b, an order-enforcing `LockOrder`, discover → lock → verify, the shared retry wrapper for deadlocks, lock timeouts and serialization failures, and named advisory locks;
+  - composite foreign-key migration operations, quantity (`Decimal(12,3)`) and price (`Decimal(14,4)`) fields that refuse floats, the `--operator` management-command base and an admin base that leaves related objects to the service;
+  - `apps/audit`: `AuditEvent` with `record()`, append-only through a database trigger.
 
 ### Changed
 
