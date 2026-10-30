@@ -13,8 +13,11 @@ from typing import Any
 
 import pytest
 
+from apps.access.principals import SessionPrincipal
+from apps.access.roles import Role
 from apps.accounts.models import User
-from tests.support import PASSWORD, TOTP_COUNTER
+from apps.organizations.models import Branch, Company
+from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
@@ -49,3 +52,34 @@ def frozen_totp(monkeypatch: pytest.MonkeyPatch) -> int:
         lambda: iter([TOTP_COUNTER]),
     )
     return TOTP_COUNTER
+
+
+@pytest.fixture
+def group_admin(make_user: Callable[..., User]) -> User:
+    """A user with a valid ``GROUP_ADMIN`` membership (``org.manage``, ``project.manage``)."""
+    user = make_user("admin@example.org")
+    grant(user, Role.GROUP_ADMIN)
+    return user
+
+
+@pytest.fixture
+def admin_principal(group_admin: User) -> SessionPrincipal:
+    return principal_for(group_admin)
+
+
+@pytest.fixture
+def company(admin_principal: SessionPrincipal) -> Company:
+    """Company ``A`` with its automatic head-office branch ``HQ``."""
+    from apps.organizations.services import create_company
+
+    return create_company(admin_principal, code="A", legal_name="Company A")
+
+
+@pytest.fixture
+def branch(admin_principal: SessionPrincipal, company: Company) -> Branch:
+    """Branch ``A-MAD`` of company ``A``."""
+    from apps.organizations.services import create_branch
+
+    return create_branch(
+        admin_principal, company_id=company.pk, code="MAD", name="Madrid", city="Madrid"
+    )

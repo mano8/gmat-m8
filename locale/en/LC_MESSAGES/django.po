@@ -137,3 +137,207 @@ msgstr ""
 
 msgid "Sign out"
 msgstr ""
+
+msgid "Group administrator"
+msgstr ""
+
+msgid "Material manager"
+msgstr ""
+
+msgid "Warehouse operator"
+msgstr ""
+
+msgid "Technician"
+msgstr ""
+
+msgid "Site manager"
+msgstr ""
+
+msgid "Partner requester"
+msgstr ""
+
+msgid "Use upper-case letters, digits, '-' and '_', starting with a letter or digit."
+msgstr ""
+
+msgid "code"
+msgstr ""
+
+msgid "legal name"
+msgstr ""
+
+msgid "tax id"
+msgstr ""
+
+msgid "kind"
+msgstr ""
+
+msgid "active"
+msgstr ""
+
+msgid "company"
+msgstr ""
+
+msgid "companies"
+msgstr ""
+
+msgid "share (%)"
+msgstr ""
+
+msgid "joint-venture member"
+msgstr ""
+
+msgid "joint-venture members"
+msgstr ""
+
+msgid "name"
+msgstr ""
+
+msgid "city"
+msgstr ""
+
+msgid "address"
+msgstr ""
+
+msgid "allow self-approval"
+msgstr ""
+
+msgid "branch"
+msgstr ""
+
+msgid "branches"
+msgstr ""
+
+msgid "role"
+msgstr ""
+
+msgid "valid from"
+msgstr ""
+
+msgid "valid until"
+msgstr ""
+
+msgid "revoked at"
+msgstr ""
+
+msgid "membership"
+msgstr ""
+
+msgid "memberships"
+msgstr ""
+
+msgid "Standard"
+msgstr ""
+
+msgid "Joint venture"
+msgstr ""
+
+msgid "venture"
+msgstr ""
+
+msgid "member"
+msgstr ""
+
+msgid "managed by"
+msgstr ""
+
+msgid "default warehouse"
+msgstr ""
+
+msgid "user"
+msgstr ""
+
+msgid "revoked by"
+msgstr ""
+
+msgid "A branch cannot manage itself."
+msgstr ""
+
+msgid "A managed branch cannot manage other branches."
+msgstr ""
+
+msgid "A branch that manages others cannot be managed."
+msgstr ""
+
+msgid "This membership is already revoked."
+msgstr ""
+
+msgid "A joint venture with members must stay a joint venture."
+msgstr ""
+
+msgid "Choose an active warehouse of this branch."
+msgstr ""
+
+msgid "The company is inactive."
+msgstr ""
+
+msgid "Revoke the partner memberships on the previous company first."
+msgstr ""
+
+msgid "Only a joint venture has members."
+msgstr ""
+
+msgid "The branch is inactive."
+msgstr ""
+
+msgid "A partner's membership is on the company that employs them."
+msgstr ""
+
+msgid "Cannot deactivate while these documents are open: %(documents)s"
+msgstr ""
+
+msgid "client"
+msgstr ""
+
+msgid "status"
+msgstr ""
+
+msgid "start date"
+msgstr ""
+
+msgid "end date"
+msgstr ""
+
+msgid "project"
+msgstr ""
+
+msgid "projects"
+msgstr ""
+
+msgid "project assignment"
+msgstr ""
+
+msgid "project assignments"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "On hold"
+msgstr ""
+
+msgid "Closed"
+msgstr ""
+
+msgid "procurement branch"
+msgstr ""
+
+msgid "Partner"
+msgstr ""
+
+msgid "This assignment is already revoked."
+msgstr ""
+
+msgid "location"
+msgstr ""
+
+msgid "locations"
+msgstr ""
+
+msgid "Warehouse"
+msgstr ""
+
+msgid "Worksite"
+msgstr ""
+
+msgid "This is the branch's default warehouse; choose another first."
+msgstr ""

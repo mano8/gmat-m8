@@ -137,3 +137,207 @@ msgstr "Sécurité"
 
 msgid "Sign out"
 msgstr "Se déconnecter"
+
+msgid "Group administrator"
+msgstr "Administrateur du groupe"
+
+msgid "Material manager"
+msgstr "Chargé de matériel"
+
+msgid "Warehouse operator"
+msgstr "Magasinier"
+
+msgid "Technician"
+msgstr "Technicien"
+
+msgid "Site manager"
+msgstr "Responsable de chantier"
+
+msgid "Partner requester"
+msgstr "Demandeur partenaire"
+
+msgid "Use upper-case letters, digits, '-' and '_', starting with a letter or digit."
+msgstr "Utilisez des majuscules, des chiffres, « - » et « _ », en commençant par une lettre ou un chiffre."
+
+msgid "code"
+msgstr "code"
+
+msgid "legal name"
+msgstr "raison sociale"
+
+msgid "tax id"
+msgstr "numéro fiscal"
+
+msgid "kind"
+msgstr "type"
+
+msgid "active"
+msgstr "actif"
+
+msgid "company"
+msgstr "société"
+
+msgid "companies"
+msgstr "sociétés"
+
+msgid "share (%)"
+msgstr "participation (%)"
+
+msgid "joint-venture member"
+msgstr "membre du groupement"
+
+msgid "joint-venture members"
+msgstr "membres du groupement"
+
+msgid "name"
+msgstr "nom"
+
+msgid "city"
+msgstr "ville"
+
+msgid "address"
+msgstr "adresse"
+
+msgid "allow self-approval"
+msgstr "autoriser l'auto-approbation"
+
+msgid "branch"
+msgstr "agence"
+
+msgid "branches"
+msgstr "agences"
+
+msgid "role"
+msgstr "rôle"
+
+msgid "valid from"
+msgstr "valide à partir du"
+
+msgid "valid until"
+msgstr "valide jusqu'au"
+
+msgid "revoked at"
+msgstr "révoqué le"
+
+msgid "membership"
+msgstr "affectation"
+
+msgid "memberships"
+msgstr "affectations"
+
+msgid "Standard"
+msgstr "Standard"
+
+msgid "Joint venture"
+msgstr "Groupement"
+
+msgid "venture"
+msgstr "groupement"
+
+msgid "member"
+msgstr "membre"
+
+msgid "managed by"
+msgstr "gérée par"
+
+msgid "default warehouse"
+msgstr "entrepôt par défaut"
+
+msgid "user"
+msgstr "utilisateur"
+
+msgid "revoked by"
+msgstr "révoqué par"
+
+msgid "A branch cannot manage itself."
+msgstr "Une agence ne peut pas se gérer elle-même."
+
+msgid "A managed branch cannot manage other branches."
+msgstr "Une agence gérée ne peut pas gérer d'autres agences."
+
+msgid "A branch that manages others cannot be managed."
+msgstr "Une agence qui en gère d'autres ne peut pas être gérée."
+
+msgid "This membership is already revoked."
+msgstr "Cette affectation est déjà révoquée."
+
+msgid "A joint venture with members must stay a joint venture."
+msgstr "Un groupement qui a des membres doit rester un groupement."
+
+msgid "Choose an active warehouse of this branch."
+msgstr "Choisissez un entrepôt actif de cette agence."
+
+msgid "The company is inactive."
+msgstr "La société est inactive."
+
+msgid "Revoke the partner memberships on the previous company first."
+msgstr "Révoquez d'abord les affectations de partenaire sur la société précédente."
+
+msgid "Only a joint venture has members."
+msgstr "Seul un groupement a des membres."
+
+msgid "The branch is inactive."
+msgstr "L'agence est inactive."
+
+msgid "A partner's membership is on the company that employs them."
+msgstr "L'affectation d'un partenaire porte sur la société qui l'emploie."
+
+msgid "Cannot deactivate while these documents are open: %(documents)s"
+msgstr "Impossible de désactiver tant que ces documents sont ouverts : %(documents)s"
+
+msgid "client"
+msgstr "client"
+
+msgid "status"
+msgstr "statut"
+
+msgid "start date"
+msgstr "date de début"
+
+msgid "end date"
+msgstr "date de fin"
+
+msgid "project"
+msgstr "chantier"
+
+msgid "projects"
+msgstr "chantiers"
+
+msgid "project assignment"
+msgstr "affectation au chantier"
+
+msgid "project assignments"
+msgstr "affectations aux chantiers"
+
+msgid "Active"
+msgstr "Actif"
+
+msgid "On hold"
+msgstr "En pause"
+
+msgid "Closed"
+msgstr "Clôturé"
+
+msgid "procurement branch"
+msgstr "agence d'achat"
+
+msgid "Partner"
+msgstr "Partenaire"
+
+msgid "This assignment is already revoked."
+msgstr "Cette affectation est déjà révoquée."
+
+msgid "location"
+msgstr "emplacement"
+
+msgid "locations"
+msgstr "emplacements"
+
+msgid "Warehouse"
+msgstr "Entrepôt"
+
+msgid "Worksite"
+msgstr "Chantier"
+
+msgid "This is the branch's default warehouse; choose another first."
+msgstr "C'est l'entrepôt par défaut de l'agence ; choisissez-en d'abord un autre."

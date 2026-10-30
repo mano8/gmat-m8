@@ -25,6 +25,7 @@ from apps.core.idempotency import (
     IdempotencyKeyInvalid,
     IdempotencyOutsideTransaction,
     IdempotentResult,
+    execute_once,
     idempotent,
     issue_key,
     payload_hash,
@@ -295,6 +296,33 @@ class TestIdempotent:
                 execute=Command().execute,
                 replay=Command().replay,
             )
+
+
+class TestExecuteOnce:
+    def run(self, command: Command, actor: User, key: str | None) -> DocumentSequence:
+        with transaction.atomic():
+            return execute_once(
+                actor_id=actor.pk,
+                key=key,
+                operation=OPERATION,
+                payload={"qty": Decimal("1.500")},
+                execute=command.execute,
+                replay=command.replay,
+            )
+
+    def test_without_a_key_it_just_executes(self, actor: User) -> None:
+        command = Command()
+        self.run(command, actor, None)
+        self.run(command, actor, None)
+        assert command.executions == 2
+        assert not IdempotencyRecord.objects.exists()
+
+    def test_with_a_key_it_runs_once(self, actor: User) -> None:
+        command = Command()
+        key = issue_key(actor.pk, OPERATION)
+        first = self.run(command, actor, key)
+        assert self.run(command, actor, key) == first
+        assert command.executions == 1
 
 
 class TestPurge:

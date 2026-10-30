@@ -25,6 +25,10 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.accounts.apps.AccountsConfig",
     "apps.audit",
+    "apps.access",
+    "apps.organizations",
+    "apps.projects",
+    "apps.locations",
 ]
 
 # Order matters (plan §3.6): session auth → session epoch → MFA enforcement.

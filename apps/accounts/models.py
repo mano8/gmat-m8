@@ -48,6 +48,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Bumped on password, email or MFA change and on deactivation; older sessions stop working.
     session_epoch = models.PositiveBigIntegerField(default=0)
     privilege_elevated_at = models.DateTimeField(null=True, blank=True)
+    # The company that employs the user; a partner's memberships are on this company (§3.4).
+    employer_company = models.ForeignKey(
+        "organizations.Company",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employees",
+    )
 
     objects = UserManager()
 

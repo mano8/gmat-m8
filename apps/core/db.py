@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 
 from django.db import DEFAULT_DB_ALIAS, OperationalError, connections, transaction
 
@@ -33,3 +34,11 @@ def atomic_with_lock_timeout(
         if getattr(exc.__cause__, "sqlstate", None) == _LOCK_NOT_AVAILABLE:
             raise LockTimeout(str(exc)) from exc
         raise
+
+
+def db_now(*, using: str = DEFAULT_DB_ALIAS) -> datetime:
+    """The database clock: the start time of the current transaction (plan §3.5, S8)."""
+    with connections[using].cursor() as cursor:
+        cursor.execute("SELECT now()")
+        (now,) = cursor.fetchone()
+    return now  # type: ignore[no-any-return]

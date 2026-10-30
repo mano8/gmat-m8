@@ -1,13 +1,18 @@
 """Helpers shared by the test modules (fixtures live in ``tests/conftest.py``)."""
 
+from datetime import datetime, timedelta
 from typing import Any
 
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import TOTP, format_hotp_value, generate_totp_secret, hotp_value
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
+from apps.access.principals import SessionPrincipal
+from apps.access.roles import Role
 from apps.accounts.models import User
+from apps.organizations.models import Branch, Company, Membership
 
 PASSWORD = "a-long-test-password-1"
 # A fixed TOTP time step (see the ``frozen_totp`` fixture): codes are deterministic and
@@ -43,3 +48,37 @@ def mfa_login(client: Client, email: str, secret: str, password: str = PASSWORD)
     assert response.status_code == 302, response.content
     assert response["Location"] == reverse("mfa_authenticate")
     return client.post(reverse("mfa_authenticate"), {"code": totp_code(secret)})
+
+
+def grant(
+    user: User,
+    role: Role,
+    *,
+    branch: Branch | None = None,
+    company: Company | None = None,
+    valid_from: datetime | None = None,
+    valid_until: datetime | None = None,
+    revoked_at: datetime | None = None,
+) -> Membership:
+    """A membership written directly (fixtures only; the app grants through services).
+
+    ``valid_from`` defaults to an hour ago: the database clock of a test is the start of
+    its transaction, which is earlier than Python's clock.
+    """
+    return Membership.objects.create(
+        user=user,
+        role=role,
+        branch=branch,
+        company=company,
+        valid_from=valid_from or timezone.now() - timedelta(hours=1),
+        valid_until=valid_until,
+        revoked_at=revoked_at,
+    )
+
+
+def principal_for(user: User) -> SessionPrincipal:
+    return SessionPrincipal(user_id=user.pk, email=user.email)
+
+
+def authz_generation(user: User) -> int:
+    return User.objects.values_list("authz_generation", flat=True).get(pk=user.pk)

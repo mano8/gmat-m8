@@ -137,3 +137,207 @@ msgstr "Seguridad"
 
 msgid "Sign out"
 msgstr "Cerrar sesión"
+
+msgid "Group administrator"
+msgstr "Administrador del grupo"
+
+msgid "Material manager"
+msgstr "Encargado de material"
+
+msgid "Warehouse operator"
+msgstr "Operario de almacén"
+
+msgid "Technician"
+msgstr "Técnico"
+
+msgid "Site manager"
+msgstr "Responsable de obra"
+
+msgid "Partner requester"
+msgstr "Solicitante asociado"
+
+msgid "Use upper-case letters, digits, '-' and '_', starting with a letter or digit."
+msgstr "Usa mayúsculas, dígitos, '-' y '_', empezando por una letra o un dígito."
+
+msgid "code"
+msgstr "código"
+
+msgid "legal name"
+msgstr "razón social"
+
+msgid "tax id"
+msgstr "NIF"
+
+msgid "kind"
+msgstr "tipo"
+
+msgid "active"
+msgstr "activo"
+
+msgid "company"
+msgstr "empresa"
+
+msgid "companies"
+msgstr "empresas"
+
+msgid "share (%)"
+msgstr "participación (%)"
+
+msgid "joint-venture member"
+msgstr "miembro de la UTE"
+
+msgid "joint-venture members"
+msgstr "miembros de la UTE"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "city"
+msgstr "ciudad"
+
+msgid "address"
+msgstr "dirección"
+
+msgid "allow self-approval"
+msgstr "permitir autoaprobación"
+
+msgid "branch"
+msgstr "delegación"
+
+msgid "branches"
+msgstr "delegaciones"
+
+msgid "role"
+msgstr "rol"
+
+msgid "valid from"
+msgstr "válido desde"
+
+msgid "valid until"
+msgstr "válido hasta"
+
+msgid "revoked at"
+msgstr "revocado el"
+
+msgid "membership"
+msgstr "pertenencia"
+
+msgid "memberships"
+msgstr "pertenencias"
+
+msgid "Standard"
+msgstr "Estándar"
+
+msgid "Joint venture"
+msgstr "UTE"
+
+msgid "venture"
+msgstr "UTE"
+
+msgid "member"
+msgstr "miembro"
+
+msgid "managed by"
+msgstr "gestionada por"
+
+msgid "default warehouse"
+msgstr "almacén por defecto"
+
+msgid "user"
+msgstr "usuario"
+
+msgid "revoked by"
+msgstr "revocado por"
+
+msgid "A branch cannot manage itself."
+msgstr "Una delegación no puede gestionarse a sí misma."
+
+msgid "A managed branch cannot manage other branches."
+msgstr "Una delegación gestionada no puede gestionar otras delegaciones."
+
+msgid "A branch that manages others cannot be managed."
+msgstr "Una delegación que gestiona otras no puede estar gestionada."
+
+msgid "This membership is already revoked."
+msgstr "Esta pertenencia ya está revocada."
+
+msgid "A joint venture with members must stay a joint venture."
+msgstr "Una UTE con miembros debe seguir siendo una UTE."
+
+msgid "Choose an active warehouse of this branch."
+msgstr "Elige un almacén activo de esta delegación."
+
+msgid "The company is inactive."
+msgstr "La empresa está inactiva."
+
+msgid "Revoke the partner memberships on the previous company first."
+msgstr "Revoca primero las pertenencias de asociado en la empresa anterior."
+
+msgid "Only a joint venture has members."
+msgstr "Solo una UTE tiene miembros."
+
+msgid "The branch is inactive."
+msgstr "La delegación está inactiva."
+
+msgid "A partner's membership is on the company that employs them."
+msgstr "La pertenencia de un asociado es en la empresa que lo emplea."
+
+msgid "Cannot deactivate while these documents are open: %(documents)s"
+msgstr "No se puede desactivar mientras estos documentos estén abiertos: %(documents)s"
+
+msgid "client"
+msgstr "cliente"
+
+msgid "status"
+msgstr "estado"
+
+msgid "start date"
+msgstr "fecha de inicio"
+
+msgid "end date"
+msgstr "fecha de fin"
+
+msgid "project"
+msgstr "obra"
+
+msgid "projects"
+msgstr "obras"
+
+msgid "project assignment"
+msgstr "asignación a obra"
+
+msgid "project assignments"
+msgstr "asignaciones a obra"
+
+msgid "Active"
+msgstr "Activa"
+
+msgid "On hold"
+msgstr "En pausa"
+
+msgid "Closed"
+msgstr "Cerrada"
+
+msgid "procurement branch"
+msgstr "delegación de compras"
+
+msgid "Partner"
+msgstr "Asociado"
+
+msgid "This assignment is already revoked."
+msgstr "Esta asignación ya está revocada."
+
+msgid "location"
+msgstr "ubicación"
+
+msgid "locations"
+msgstr "ubicaciones"
+
+msgid "Warehouse"
+msgstr "Almacén"
+
+msgid "Worksite"
+msgstr "Obra"
+
+msgid "This is the branch's default warehouse; choose another first."
+msgstr "Es el almacén por defecto de la delegación; elige otro primero."

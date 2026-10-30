@@ -191,3 +191,30 @@ def purge_expired_records(*, using: str = DEFAULT_DB_ALIAS) -> int:
     cutoff = Now() - timedelta(seconds=int(settings.IDEMPOTENCY_RECORD_RETENTION))
     deleted, _ = IdempotencyRecord.objects.using(using).filter(created_at__lt=cutoff).delete()
     return deleted
+
+
+def execute_once[M: Model](
+    *,
+    actor_id: UUID,
+    key: str | None,
+    operation: str,
+    payload: Mapping[str, Any],
+    execute: Callable[[], M],
+    replay: Callable[[str, UUID], M],
+    using: str = DEFAULT_DB_ALIAS,
+) -> M:
+    """``idempotent()`` when the caller sent a key, otherwise just ``execute()``.
+
+    Create forms of the app always send a key (plan §4.8); the admin's forms carry none.
+    """
+    if key is None:
+        return execute()
+    return idempotent(
+        actor_id=actor_id,
+        key=key,
+        operation=operation,
+        payload=payload,
+        execute=execute,
+        replay=replay,
+        using=using,
+    ).value
