@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     # Project apps last: their admin modules replace third-party registrations.
     "apps.core",
     "apps.accounts.apps.AccountsConfig",
+    "apps.audit",
 ]
 
 # Order matters (plan §3.6): session auth → session epoch → MFA enforcement.
