@@ -103,6 +103,11 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 PASSWORD_RESET_TIMEOUT = 3600  # one hour (plan §5)
 
+# Idempotency of create forms (plan §4.8): a key is valid 24 h; its record is kept 7 days, so a
+# key that is still valid always finds its record (check gmat.E006).
+IDEMPOTENCY_KEY_MAX_AGE = 24 * 3600
+IDEMPOTENCY_RECORD_RETENTION = 7 * 24 * 3600
+
 # --- allauth (plan §5, "Identity, sessions and MFA"; floor 65.20.1) ---------------------
 ACCOUNT_ADAPTER = "apps.accounts.adapters.AccountAdapter"
 ACCOUNT_FORMS = {"reset_password_from_key": "apps.accounts.forms.ResetPasswordKeyForm"}  # nosec B105

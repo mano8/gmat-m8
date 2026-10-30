@@ -134,6 +134,21 @@ def check_admin_base_class(app_configs: Any, **kwargs: Any) -> list[CheckMessage
     ]
 
 
+@register()
+def check_idempotency_windows(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+    """A record must outlive its key, or a purge could turn a replay into a new command."""
+    max_age = int(getattr(settings, "IDEMPOTENCY_KEY_MAX_AGE", 0))
+    retention = int(getattr(settings, "IDEMPOTENCY_RECORD_RETENTION", 0))
+    if max_age <= 0 or retention <= max_age:
+        return [
+            Error(
+                "IDEMPOTENCY_RECORD_RETENTION must be longer than IDEMPOTENCY_KEY_MAX_AGE (> 0)",
+                id="gmat.E006",
+            )
+        ]
+    return []
+
+
 def _secret_errors() -> list[CheckMessage]:
     errors: list[CheckMessage] = []
     if settings.DEBUG:

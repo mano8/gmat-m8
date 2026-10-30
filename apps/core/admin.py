@@ -27,6 +27,16 @@ class ServiceBackedModelAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
         self.save_via_service(request, obj, form, change)
 
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        """Many-to-many fields and inlines are the service's job, never a direct save.
+
+        Django would call ``form.save_m2m()`` and save each inline formset here, outside
+        the service. ``save_via_service`` reads them from the form instead; an admin that
+        shows inlines must override this and hand them to a service too.
+        """
+        if formsets:
+            raise NotImplementedError(f"{type(self).__name__} must save its inlines via a service")
+
     def delete_model(self, request: HttpRequest, obj: Any) -> None:
         raise PermissionError("Records are deactivated through their service, never deleted")
 

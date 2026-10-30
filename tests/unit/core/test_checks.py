@@ -38,6 +38,18 @@ class TestAlwaysOnChecks:
         assert checks.check_security_cache(None) == []
         assert checks.check_logging(None) == []
         assert checks.check_admin_base_class(None) == []
+        assert checks.check_idempotency_windows(None) == []
+
+    @pytest.mark.parametrize(
+        ("max_age", "retention"), [(86_400, 86_400), (86_400, 3_600), (0, 3_600)]
+    )
+    def test_idempotency_records_must_outlive_their_keys(
+        self, max_age: int, retention: int
+    ) -> None:
+        with override_settings(
+            IDEMPOTENCY_KEY_MAX_AGE=max_age, IDEMPOTENCY_RECORD_RETENTION=retention
+        ):
+            assert ids(checks.check_idempotency_windows(None)) == {"gmat.E006"}
 
     def test_floor_matches_the_lock_check(self, load_script: Any) -> None:
         floors = load_script("check_security_floors")

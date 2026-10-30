@@ -69,6 +69,7 @@ No mail is sent from a request. Until the outbox and worker exist (M2.5), produc
 | `gmat.E003` | a default cache other than `SecurityDatabaseCache` |
 | `gmat.E004` | a logging handler without redaction, or an email handler on Django's loggers |
 | `gmat.E005` | a `ModelAdmin` not built on `ServiceBackedModelAdmin` |
+| `gmat.E006` | idempotency records kept no longer than their keys are valid (a purge could turn a replay into a new command) |
 | `gmat.E010`–`E017` (deploy) | `DEBUG`, a weak or placeholder `SECRET_KEY`, missing or development `MFA_ENCRYPTION_KEYS`, empty or wildcard `ALLOWED_HOSTS`, non-https `CSRF_TRUSTED_ORIGINS`, cookies that are not `Secure __Host-`, a first hasher other than Argon2, a production mailer that could send from a request |
 
 `manage.py check --deploy` passes with zero warnings under production settings. M2.5 adds `OUTBOX_ENCRYPTION_KEYS` and makes the outbox the only production mail backend.
