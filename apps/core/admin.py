@@ -8,21 +8,80 @@ from the admin: records are deactivated through their service instead.
 
 from typing import Any
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin import ActionLocation
+from django.core.exceptions import ValidationError
 from django.db.models import Model
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 
 
 class ServiceBackedModelAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     """Saves through ``save_via_service``; deletes and the bulk delete action are disabled.
 
-    Subclasses for editable master data implement ``save_via_service``. Extra bulk actions
-    are allowed only when they call a service.
+    Whoever the admin site admits may view; nobody may add or change unless a subclass's
+    ``may_edit`` says so. Subclasses for editable master data implement ``may_edit`` and
+    ``save_via_service``. Extra bulk actions are allowed only when they call a service.
     """
+
+    def may_edit(self, request: HttpRequest) -> bool:
+        """Whether this user may add and change records here; the service checks again."""
+        return False
+
+    def has_module_permission(self, request: HttpRequest) -> bool:
+        return self.admin_site.has_permission(request)
+
+    def has_view_permission(self, request: HttpRequest, obj: Model | None = None) -> bool:
+        return self.admin_site.has_permission(request)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return self.admin_site.has_permission(request) and self.may_edit(request)
+
+    def has_change_permission(self, request: HttpRequest, obj: Model | None = None) -> bool:
+        return self.admin_site.has_permission(request) and self.may_edit(request)
 
     def save_via_service(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
         raise NotImplementedError(f"{type(self).__name__} must save through a service")
+
+    def form_values(self, form: Any, names: Any = None) -> dict[str, Any]:
+        """Cleaned form values keyed for a service call (``branch`` → ``branch_id``).
+
+        ``names`` defaults to the fields the user changed.
+        """
+        values: dict[str, Any] = {}
+        for name in form.changed_data if names is None else names:
+            field = self.model._meta.get_field(name)
+            value = form.cleaned_data[name]
+            if field.is_relation:
+                values[str(field.attname)] = value.pk if value is not None else None
+            else:
+                values[name] = value
+        return values
+
+    @staticmethod
+    def adopt(obj: Model, saved: Model) -> None:
+        """Point the form's instance at the row the service saved (for logging, redirect)."""
+        obj.pk = saved.pk
+        obj._state.adding = False
+        obj._state.db = saved._state.db
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """A service's refusal (checked under its locks) is shown, not a server error.
+
+        The form validates the same rules first; this covers what only the service can
+        see, such as open documents or a concurrent change. Nothing was saved.
+        """
+        try:
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        except ValidationError as exc:
+            for message in exc.messages:
+                self.message_user(request, message, level=messages.ERROR)
+            return HttpResponseRedirect(request.get_full_path())
 
     def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
         self.save_via_service(request, obj, form, change)

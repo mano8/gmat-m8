@@ -4,22 +4,24 @@ from typing import Any
 
 from allauth.account.decorators import secure_admin_login
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import resolve_url
 from django.urls import reverse
 
+from apps.access.authorization import may_use_admin
 from apps.accounts.mfa import session_passed_mfa
 
 
 class SecureAdminSite(admin.AdminSite):
     """The default ``AdminSite`` (installed through ``apps.accounts.apps.AdminConfig``).
 
-    - **Login** goes through allauth (``secure_admin_login``): anonymous visitors are sent
-      to the allauth login page, so rate limits and MFA apply. Django's admin login form,
+    - **Login** goes through allauth: anonymous visitors are sent to the allauth login
+      page (``secure_admin_login``), so rate limits and MFA apply. Django's admin login form,
       which would authenticate with a password only, is never rendered or processed.
-    - **Permission** needs an active staff account whose *current session* completed MFA;
-      ``MFARequiredMiddleware`` sends any other session to the MFA step-up first. M2.3
-      admits ``GROUP_ADMIN``.
+    - **Permission** needs an active superuser or a user with a valid ``GROUP_ADMIN``
+      membership (``apps.access``), whose *current session* completed MFA;
+      ``MFARequiredMiddleware`` sends any other session to the MFA step-up first.
     - **Logout** hands over to allauth's logout, which sends ``Clear-Site-Data``.
     """
 
@@ -28,19 +30,24 @@ class SecureAdminSite(admin.AdminSite):
     index_title = "Administration"
 
     def has_permission(self, request: HttpRequest) -> bool:
-        user = request.user
-        return bool(user.is_active and user.is_staff and session_passed_mfa(request))
+        return may_use_admin(request.user) and session_passed_mfa(request)
 
     def login(
         self, request: HttpRequest, extra_context: dict[str, Any] | None = None
     ) -> HttpResponse:
-        index = reverse("admin:index", current_app=self.name)
+        """Anonymous visitors go to allauth's login; admitted users go to ``next``.
 
-        def authenticated_staff(request: HttpRequest) -> HttpResponse:
+        allauth's ``secure_admin_login`` refuses every authenticated user who is not
+        ``is_staff``, which a group administrator is not, so it only handles the anonymous
+        case here; ``may_use_admin`` decides for an authenticated user (403 otherwise).
+        """
+        index = reverse("admin:index", current_app=self.name)
+        if request.user.is_authenticated:
+            if not may_use_admin(request.user):
+                raise PermissionDenied
             next_url = request.GET.get("next", "")
             return HttpResponseRedirect(next_url if next_url.startswith(index) else index)
-
-        guarded = secure_admin_login(authenticated_staff)  # type: ignore[no-untyped-call]
+        guarded = secure_admin_login(lambda request: HttpResponse())  # type: ignore[no-untyped-call]
         response: HttpResponse = guarded(request)
         return response
 
