@@ -13,8 +13,9 @@ sentinel is checked absent from every response. A URL with an object adds one ro
 object position (``Route.position``).
 
 The account pages (allauth), the admin, the health checks, the token pages (invitations,
-email changes) and the screens of M2.6 (projects, people, invitations) have rows; later
-business screens add theirs with the steps that build them.
+email changes), the screens of M2.6 (projects, people, invitations) and the master-data
+screens of M3 (catalog, suppliers) have rows; later business screens add theirs with the
+steps that build them.
 """
 
 import re
@@ -31,12 +32,12 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.access.admin import CapabilityModelAdmin
 from apps.access.models import AccessState
 from apps.accounts.models import User
 from apps.accounts.sessions import bump_session_epoch
 from apps.audit.models import AuditEvent
 from apps.core.admin import ReadOnlyModelAdmin, ServiceBackedModelAdmin
-from apps.organizations.admin import MasterDataAdmin
 from apps.organizations.models import Company, Membership
 from tests.access.matrix import (
     ACTOR_NAMES,
@@ -150,10 +151,12 @@ READ_ONLY_MODELS = {
     "access": ("accessstate",),
     "organizations": ("membership",),
     "projects": ("project", "projectassignment"),
+    "catalog": ("unitofmeasure",),
 }
 MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),
     "locations": ("location",),
+    "catalog": ("materialcategory", "material"),
 }
 
 
@@ -289,6 +292,16 @@ def _person_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.people.tech_mad.pk])
 
 
+UNKNOWN_ID = "00000000-0000-7000-8000-000000000000"
+# Every account with a valid membership reads the catalog; managers change it (M3.1).
+CATALOG_VIEWERS = (*PROJECT_VIEWERS, "revoked_assignment")
+CATALOG_MANAGERS = PROJECT_MANAGERS
+
+
+def _unknown_url(name: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[UNKNOWN_ID])
+
+
 PROJECT_POSITIONS = (
     ("own scope", "hospital", HOSPITAL_VIEWERS),
     ("foreign scope", "sev_works", SEV_VIEWERS),
@@ -348,6 +361,80 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, REDIRECT),
             path=_object_url("projects:assignment_validity", "projectassignment"),
             note="an empty form: reported, then back to the project",
+        ),
+    ),
+    # Catalog (M3.1): installation-wide master data. Every valid membership views it (also a
+    # site manager whose assignments are all revoked); managers change it.
+    "catalog:list": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "catalog:search": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "catalog:detail": (
+        Route(
+            app_page(**_each(OK, CATALOG_VIEWERS)),
+            position="a material",
+            path=_object_url("catalog:detail", "material"),
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, CATALOG_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("catalog:detail"),
+        ),
+    ),
+    "catalog:new": (Route(app_page(**_each(OK, CATALOG_MANAGERS))),),
+    "catalog:create": (
+        Route(app_action(**_each(OK, CATALOG_MANAGERS)), note="an empty form: 200 with errors"),
+    ),
+    "catalog:edit": (
+        Route(
+            app_page(**_each(OK, CATALOG_MANAGERS)),
+            position="a material",
+            path=_object_url("catalog:edit", "material"),
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, CATALOG_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("catalog:edit"),
+        ),
+    ),
+    "catalog:update": (
+        Route(
+            app_action(**_each(OK, CATALOG_MANAGERS)),
+            path=_object_url("catalog:update", "material"),
+            note="an empty form: 200 with errors",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, CATALOG_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("catalog:update"),
+        ),
+    ),
+    "catalog:deactivate": (
+        Route(
+            app_action(**_each(REDIRECT, CATALOG_MANAGERS)),
+            path=_object_url("catalog:deactivate", "material"),
+        ),
+    ),
+    "catalog:reactivate": (
+        Route(
+            app_action(**_each(REDIRECT, CATALOG_MANAGERS)),
+            path=_object_url("catalog:reactivate", "material"),
+        ),
+    ),
+    "catalog:categories": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "catalog:category_new": (Route(app_page(**_each(OK, CATALOG_MANAGERS))),),
+    "catalog:category_create": (
+        Route(app_action(**_each(OK, CATALOG_MANAGERS)), note="an empty form: 200 with errors"),
+    ),
+    "catalog:category_edit": (
+        Route(
+            app_page(**_each(OK, CATALOG_MANAGERS)),
+            path=_object_url("catalog:category_edit", "materialcategory"),
+        ),
+    ),
+    "catalog:category_update": (
+        Route(
+            app_action(**_each(OK, CATALOG_MANAGERS)),
+            path=_object_url("catalog:category_update", "materialcategory"),
+            note="an empty form: 200 with errors",
         ),
     ),
     # Group administrators only (org.manage); the target is the A-MAD technician.
@@ -555,7 +642,7 @@ class TestAdmin:
         for key in read_only:
             assert isinstance(registered[key], ReadOnlyModelAdmin), key
         for key in master:
-            assert isinstance(registered[key], MasterDataAdmin), key
+            assert isinstance(registered[key], CapabilityModelAdmin), key
 
     def test_no_admin_offers_the_bulk_delete(self, world: World) -> None:
         client = world.client("group_admin")

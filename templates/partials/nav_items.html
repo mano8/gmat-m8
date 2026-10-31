@@ -17,6 +17,14 @@
     <span>{% translate "Projects" %}</span>
   </a>
 {% endcan %}
+{% can "catalog.view" %}
+  <a href="{% url 'catalog:list' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'catalog' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="box" %}
+    <span>{% translate "Catalog" %}</span>
+  </a>
+{% endcan %}
 {% can "org.manage" %}
   <a href="{% url 'org:people' %}"
      class="nav-link"

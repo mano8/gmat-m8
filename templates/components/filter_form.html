@@ -1,11 +1,13 @@
 {% load i18n %}
 {% comment %}
   A GET filter form that refreshes `target` through htmx as the user types or picks, and still
-  works without JavaScript (its button). Parameters: form, target (a CSS selector), action.
+  works without JavaScript (its button). Parameters: form, target (a CSS selector), action, and
+  optionally grid (the Tailwind column classes from the sm breakpoint up, one track per field
+  plus one for the button).
 {% endcomment %}
 <form method="get"
       action="{{ action }}"
-      class="mb-4 grid gap-x-3 sm:grid-cols-[1fr_12rem_auto] sm:items-end"
+      class="mb-4 grid gap-x-3 {{ grid|default:'sm:grid-cols-[1fr_12rem_auto]' }} sm:items-end"
       hx-get="{{ action }}"
       hx-target="{{ target }}"
       hx-swap="outerHTML"

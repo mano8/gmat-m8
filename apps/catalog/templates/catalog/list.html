@@ -1,0 +1,53 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Catalog" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Catalog" %}</h1>
+    <div class="flex flex-wrap gap-3">
+      {% url 'catalog:categories' as categories_url %}
+      {% include "components/button.html" with href=categories_url label=_("Categories") %}
+      {% if manageable %}
+        {% url 'catalog:new' as new_url %}
+        {% include "components/button.html" with href=new_url label=_("New material") variant="primary" %}
+      {% endif %}
+    </div>
+  </div>
+  {% url 'catalog:list' as list_url %}
+  {% include "components/filter_form.html" with form=filters target="#material-results" action=list_url grid="sm:grid-cols-[1fr_14rem_9rem_auto]" %}
+  {% partialdef results inline %}
+    <div id="material-results">
+      {% if page_obj.object_list %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Reference" %}</th>
+              <th scope="col">{% translate "Name" %}</th>
+              <th scope="col">{% translate "Category" %}</th>
+              <th scope="col">{% translate "Unit" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for material in page_obj.object_list %}
+              <tr>
+                <td data-label="{% translate 'Reference' %}">
+                  <a href="{% url 'catalog:detail' material_id=material.pk %}">{{ material.reference }}</a>
+                </td>
+                <td data-label="{% translate 'Name' %}">{{ material.name }}</td>
+                <td data-label="{% translate 'Category' %}">{{ material.category|default:"—" }}</td>
+                <td data-label="{% translate 'Unit' %}">{{ material.unit.code }}</td>
+                <td data-label="{% translate 'Status' %}">{% include "catalog/status.html" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No materials") text=_("No material matches the filters.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

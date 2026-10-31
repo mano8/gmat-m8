@@ -18,6 +18,7 @@ from apps.accounts.models import EmailChangeRequest, Invitation
 from apps.accounts.tokens import new_token
 from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
+from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
 from tests.access.matrix import World, build_world
@@ -35,6 +36,15 @@ def _admin_rows(world: World) -> None:
     )
     world.objects["jointventuremember"] = JointVentureMember.objects.create(
         venture=org.b, member=org.a
+    )
+    unit = UnitOfMeasure.objects.get(code="UD")
+    world.objects["unitofmeasure"] = unit
+    world.objects["materialcategory"] = MaterialCategory.objects.create(name="Cables")
+    world.objects["material"] = Material.objects.create(
+        reference="CAB-25",
+        name="Cable H07V-K 1x2,5 mm²",
+        unit=unit,
+        category=world.objects["materialcategory"],
     )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)

@@ -1,0 +1,33 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Categories" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Categories" %}</h1>
+    <div class="flex flex-wrap gap-3">
+      {% url 'catalog:list' as list_url %}
+      {% include "components/button.html" with href=list_url label=_("Catalog") %}
+      {% if manageable %}
+        {% url 'catalog:category_new' as new_url %}
+        {% include "components/button.html" with href=new_url label=_("New category") variant="primary" %}
+      {% endif %}
+    </div>
+  </div>
+  {% if categories %}
+    <ul class="card divide-y divide-line">
+      {% for category in categories %}
+        <li class="flex flex-wrap items-center justify-between gap-2 py-3">
+          <a class="{% if category.parent_id %}ml-6{% else %}font-semibold{% endif %}"
+             href="{% url 'catalog:list' %}?category={{ category.pk }}">{{ category.name }}</a>
+          {% if manageable %}
+            <a href="{% url 'catalog:category_edit' category_id=category.pk %}">{% translate "Edit" %}</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {% include "components/empty_state.html" with title=_("No categories") text=_("The catalog has no categories yet.") %}
+  {% endif %}
+{% endblock content %}

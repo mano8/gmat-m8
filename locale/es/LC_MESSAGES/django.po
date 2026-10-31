@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 09:22+0000\n"
+"POT-Creation-Date: 2026-10-31 12:12+0000\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -178,7 +178,8 @@ msgstr "Tu dirección de correo va a cambiar"
 
 #: apps/accounts/services.py:338
 msgid "This address already has a pending invitation: resend or revoke it."
-msgstr "Esta dirección ya tiene una invitación pendiente: reenvíala o revócala."
+msgstr ""
+"Esta dirección ya tiene una invitación pendiente: reenvíala o revócala."
 
 #: apps/accounts/services.py:349
 msgid "An active account keeps its employer."
@@ -190,7 +191,9 @@ msgstr "Esta invitación ya no está pendiente."
 
 #: apps/accounts/services.py:406
 msgid "Run bootstrap_admin again to replace a first-administrator link."
-msgstr "Ejecuta bootstrap_admin de nuevo para sustituir un enlace de primer administrador."
+msgstr ""
+"Ejecuta bootstrap_admin de nuevo para sustituir un enlace de primer "
+"administrador."
 
 #: apps/accounts/services.py:584
 msgid "You cannot offboard your own account."
@@ -227,37 +230,48 @@ msgstr "La empresa está inactiva."
 
 #: apps/accounts/templates/accounts/email/email_change_confirm.txt:1
 msgid "An administrator asked to use this address for your gmat-m8 account."
-msgstr "Un administrador ha pedido usar esta dirección para tu cuenta de gmat-m8."
+msgstr ""
+"Un administrador ha pedido usar esta dirección para tu cuenta de gmat-m8."
 
 #: apps/accounts/templates/accounts/email/email_change_confirm.txt:3
 #, python-format
 msgid "Open this link to confirm it. It works once, for %(hours)s hours:"
-msgstr "Abre este enlace para confirmarla. Funciona una sola vez, durante %(hours)s horas:"
+msgstr ""
+"Abre este enlace para confirmarla. Funciona una sola vez, durante %(hours)s "
+"horas:"
 
 #: apps/accounts/templates/accounts/email/email_change_confirm.txt:7
 #, python-format
 msgid ""
 "The change takes effect %(cooling_off_hours)s hours after you confirm, "
 "unless it is cancelled from the current address."
-msgstr "El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, salvo que se cancele desde la dirección actual."
+msgstr ""
+"El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, "
+"salvo que se cancele desde la dirección actual."
 
 #: apps/accounts/templates/accounts/email/email_change_notice.txt:1
 msgid ""
 "An administrator asked to change the email address of your gmat-m8 account."
-msgstr "Un administrador ha pedido cambiar la dirección de correo de tu cuenta de gmat-m8."
+msgstr ""
+"Un administrador ha pedido cambiar la dirección de correo de tu cuenta de "
+"gmat-m8."
 
 #: apps/accounts/templates/accounts/email/email_change_notice.txt:3
 #, python-format
 msgid ""
 "If the new address confirms, the change takes effect %(cooling_off_hours)s "
 "hours later and every session of your account ends."
-msgstr "Si la nueva dirección lo confirma, el cambio se aplica %(cooling_off_hours)s horas después y se cierran todas las sesiones de tu cuenta."
+msgstr ""
+"Si la nueva dirección lo confirma, el cambio se aplica %(cooling_off_hours)s "
+"horas después y se cierran todas las sesiones de tu cuenta."
 
 #: apps/accounts/templates/accounts/email/email_change_notice.txt:5
 msgid ""
 "If you did not expect this, cancel the change with this link before it takes "
 "effect:"
-msgstr "Si no lo esperabas, cancela el cambio con este enlace antes de que se aplique:"
+msgstr ""
+"Si no lo esperabas, cancela el cambio con este enlace antes de que se "
+"aplique:"
 
 #: apps/accounts/templates/accounts/email/invitation.txt:1
 msgid "You have been invited to gmat-m8, the materials app of your company."
@@ -267,7 +281,9 @@ msgstr "Te han invitado a gmat-m8, la aplicación de material de tu empresa."
 #, python-format
 msgid ""
 "Open this link to accept the invitation. It works once, for %(hours)s hours:"
-msgstr "Abre este enlace para aceptar la invitación. Funciona una sola vez, durante %(hours)s horas:"
+msgstr ""
+"Abre este enlace para aceptar la invitación. Funciona una sola vez, durante "
+"%(hours)s horas:"
 
 #: apps/accounts/templates/accounts/email/invitation.txt:7
 msgid "If you did not expect this invitation, ignore this message."
@@ -292,7 +308,10 @@ msgid ""
 "The change applies %(cooling_off_hours)s hours after you confirm, unless it "
 "is cancelled from the current address. Every session of the account then "
 "ends."
-msgstr "El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, salvo que se cancele desde la dirección actual. Entonces se cierran todas las sesiones de la cuenta."
+msgstr ""
+"El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, "
+"salvo que se cancele desde la dirección actual. Entonces se cierran todas "
+"las sesiones de la cuenta."
 
 #: apps/accounts/templates/accounts/email_change.html:17
 msgid "Confirm"
@@ -306,7 +325,9 @@ msgstr "Cancelar el cambio de correo"
 msgid ""
 "An administrator asked to change the address of your account. Cancel it if "
 "you did not expect this."
-msgstr "Un administrador ha pedido cambiar la dirección de tu cuenta. Cancélalo si no lo esperabas."
+msgstr ""
+"Un administrador ha pedido cambiar la dirección de tu cuenta. Cancélalo si "
+"no lo esperabas."
 
 #: apps/accounts/templates/accounts/email_change.html:26
 msgid "Cancel the change"
@@ -321,7 +342,10 @@ msgstr "Aceptar la invitación"
 msgid ""
 "Choose a password of at least 12 characters. Administrators and material "
 "managers then set up a second factor when they first sign in."
-msgstr "Elige una contraseña de al menos 12 caracteres. Los administradores y encargados de material configuran después un segundo factor al iniciar sesión por primera vez."
+msgstr ""
+"Elige una contraseña de al menos 12 caracteres. Los administradores y "
+"encargados de material configuran después un segundo factor al iniciar "
+"sesión por primera vez."
 
 #: apps/accounts/templates/accounts/invitation_accept.html:16
 msgid "Set password and accept"
@@ -331,7 +355,9 @@ msgstr "Guardar contraseña y aceptar"
 msgid ""
 "Your account receives the access in this invitation. Your password and "
 "second factor do not change."
-msgstr "Tu cuenta recibe el acceso de esta invitación. Tu contraseña y tu segundo factor no cambian."
+msgstr ""
+"Tu cuenta recibe el acceso de esta invitación. Tu contraseña y tu segundo "
+"factor no cambian."
 
 #: apps/accounts/templates/accounts/invitation_accept.html:19
 msgid "Accept"
@@ -347,7 +373,9 @@ msgstr "Invitación"
 msgid ""
 "This invitation is for the existing account %(email)s. Sign in with it, then "
 "open the link again."
-msgstr "Esta invitación es para la cuenta existente %(email)s. Inicia sesión con ella y abre el enlace otra vez."
+msgstr ""
+"Esta invitación es para la cuenta existente %(email)s. Inicia sesión con "
+"ella y abre el enlace otra vez."
 
 #: apps/accounts/templates/accounts/invitation_account.html:13
 msgid "Sign in"
@@ -356,10 +384,12 @@ msgstr "Iniciar sesión"
 #: apps/accounts/templates/accounts/invitation_account.html:16
 msgid ""
 "You are signed in with another account. Sign out, then open the link again."
-msgstr "Has iniciado sesión con otra cuenta. Cierra la sesión y abre el enlace otra vez."
+msgstr ""
+"Has iniciado sesión con otra cuenta. Cierra la sesión y abre el enlace otra "
+"vez."
 
 #: apps/accounts/templates/accounts/invitation_account.html:20
-#: templates/partials/nav_items.html:40
+#: templates/partials/nav_items.html:48
 msgid "Sign out"
 msgstr "Cerrar sesión"
 
@@ -375,7 +405,9 @@ msgstr "Este enlace no es válido"
 msgid ""
 "It may have expired, been used already, or been replaced by a newer one. Ask "
 "your administrator for a new link."
-msgstr "Puede haber caducado, haberse usado ya o haber sido sustituido por uno más reciente. Pide un enlace nuevo a tu administrador."
+msgstr ""
+"Puede haber caducado, haberse usado ya o haber sido sustituido por uno más "
+"reciente. Pide un enlace nuevo a tu administrador."
 
 #: apps/accounts/templates/accounts/token_invalid.html:12
 msgid "Go to sign in"
@@ -396,6 +428,361 @@ msgstr "Dirección confirmada. El cambio se aplica tras el periodo de espera."
 #: apps/accounts/views.py:216
 msgid "The email change is cancelled."
 msgstr "El cambio de correo está cancelado."
+
+#: apps/catalog/forms.py:26 apps/organizations/forms.py:20
+#: apps/organizations/forms.py:25 apps/projects/forms.py:21
+msgid "Search"
+msgstr "Buscar"
+
+#: apps/catalog/forms.py:28 apps/catalog/forms.py:50
+#: apps/catalog/templates/catalog/detail.html:35
+#: apps/catalog/templates/catalog/list.html:28
+#: apps/catalog/templates/catalog/list.html:40
+msgid "Category"
+msgstr "Categoría"
+
+#: apps/catalog/forms.py:28
+#, fuzzy
+#| msgid "All statuses"
+msgid "All categories"
+msgstr "Todos los estados"
+
+#: apps/catalog/forms.py:31 apps/catalog/templates/catalog/list.html:30
+#: apps/catalog/templates/catalog/list.html:42 apps/organizations/forms.py:21
+#: apps/organizations/templates/organizations/people.html:23
+#: apps/organizations/templates/organizations/people.html:34
+#: apps/projects/forms.py:22 apps/projects/forms.py:53
+#: apps/projects/templates/projects/list.html:25
+#: apps/projects/templates/projects/list.html:36
+msgid "Status"
+msgstr "Estado"
+
+#: apps/catalog/forms.py:34 apps/catalog/templates/catalog/status.html:3
+#: apps/organizations/forms.py:16
+#: apps/organizations/templates/organizations/account_status.html:7
+#: apps/projects/models.py:28
+msgid "Active"
+msgstr "Activa"
+
+#: apps/catalog/forms.py:35 apps/catalog/templates/catalog/status.html:5
+#: apps/organizations/forms.py:16
+#: apps/organizations/templates/organizations/account_status.html:5
+msgid "Inactive"
+msgstr "Inactiva"
+
+#: apps/catalog/forms.py:36
+msgid "All"
+msgstr "Todos"
+
+#: apps/catalog/forms.py:48 apps/catalog/forms.py:123
+#: apps/catalog/templates/catalog/list.html:27
+#: apps/catalog/templates/catalog/list.html:39
+#: apps/organizations/templates/organizations/people.html:21
+#: apps/organizations/templates/organizations/people.html:32
+#: apps/projects/forms.py:39 apps/projects/templates/projects/list.html:23
+#: apps/projects/templates/projects/list.html:34
+msgid "Name"
+msgstr "Nombre"
+
+#: apps/catalog/forms.py:49 apps/catalog/templates/catalog/detail.html:41
+msgid "Unit of measure"
+msgstr "Unidad de medida"
+
+#: apps/catalog/forms.py:52 apps/catalog/templates/catalog/detail.html:75
+msgid "Description"
+msgstr "Descripción"
+
+#: apps/catalog/forms.py:54 apps/catalog/templates/catalog/detail.html:47
+msgid "Manufacturer"
+msgstr "Fabricante"
+
+#: apps/catalog/forms.py:56 apps/catalog/templates/catalog/detail.html:53
+msgid "Manufacturer reference"
+msgstr "Referencia del fabricante"
+
+#: apps/catalog/forms.py:59 apps/catalog/models.py:162
+#: apps/catalog/templates/catalog/detail.html:59
+msgid "EAN / barcode"
+msgstr "EAN / código de barras"
+
+#: apps/catalog/forms.py:63 apps/catalog/models.py:25
+msgid "Use 8 to 14 digits."
+msgstr "Use de 8 a 14 dígitos."
+
+#: apps/catalog/forms.py:66 apps/catalog/templates/catalog/detail.html:65
+msgid "Stock item"
+msgstr "Artículo de almacén"
+
+#: apps/catalog/forms.py:68 apps/catalog/models.py:167
+msgid "Kept in the warehouse, so it can be handed over from stock."
+msgstr "Se guarda en el almacén, por lo que puede entregarse desde existencias."
+
+#: apps/catalog/forms.py:108 apps/catalog/templates/catalog/list.html:26
+#: apps/catalog/templates/catalog/list.html:36
+msgid "Reference"
+msgstr "Referencia"
+
+#: apps/catalog/forms.py:110
+msgid "Your own code for the material. It cannot change later."
+msgstr "Su propio código del material. No se puede cambiar después."
+
+#: apps/catalog/forms.py:125
+msgid "Parent category"
+msgstr "Categoría superior"
+
+#: apps/catalog/forms.py:128 apps/catalog/services.py:64
+#: apps/catalog/services.py:98
+msgid "Categories have two levels at most."
+msgstr "Las categorías tienen dos niveles como máximo."
+
+#: apps/catalog/models.py:23
+msgid "A reference is one line of text without control characters."
+msgstr "Una referencia es una sola línea de texto sin caracteres de control."
+
+#: apps/catalog/models.py:58 apps/catalog/models.py:104
+#: apps/catalog/models.py:142 apps/locations/models.py:46
+#: apps/organizations/models.py:121 apps/projects/models.py:33
+msgid "name"
+msgstr "nombre"
+
+#: apps/catalog/models.py:65
+msgid "parent category"
+msgstr "categoría superior"
+
+#: apps/catalog/models.py:71
+#, fuzzy
+#| msgid "Material manager"
+msgid "material category"
+msgstr "Encargado de material"
+
+#: apps/catalog/models.py:72
+#, fuzzy
+#| msgid "Material manager"
+msgid "material categories"
+msgstr "Encargado de material"
+
+#: apps/catalog/models.py:103 apps/organizations/models.py:29
+#: apps/organizations/models.py:120 apps/projects/models.py:32
+msgid "code"
+msgstr "código"
+
+#: apps/catalog/models.py:106
+msgid "decimals"
+msgstr "decimales"
+
+#: apps/catalog/models.py:109
+msgid "How many decimal places a quantity in this unit may have."
+msgstr "Cuántos decimales puede tener una cantidad en esta unidad."
+
+#: apps/catalog/models.py:115 apps/catalog/models.py:156
+msgid "unit of measure"
+msgstr "unidad de medida"
+
+#: apps/catalog/models.py:116
+msgid "units of measure"
+msgstr "unidades de medida"
+
+#: apps/catalog/models.py:141
+msgid "reference"
+msgstr "referencia"
+
+#: apps/catalog/models.py:143
+msgid "description"
+msgstr "descripción"
+
+#: apps/catalog/models.py:150
+msgid "category"
+msgstr "categoría"
+
+#: apps/catalog/models.py:158
+msgid "manufacturer"
+msgstr "fabricante"
+
+#: apps/catalog/models.py:159
+msgid "manufacturer reference"
+msgstr "referencia del fabricante"
+
+#: apps/catalog/models.py:165
+msgid "stock item"
+msgstr "artículo de almacén"
+
+#: apps/catalog/models.py:169 apps/locations/models.py:48
+#: apps/organizations/models.py:33 apps/organizations/models.py:141
+msgid "active"
+msgstr "activo"
+
+#: apps/catalog/models.py:174
+msgid "material"
+msgstr "material"
+
+#: apps/catalog/models.py:175
+msgid "materials"
+msgstr "materiales"
+
+#: apps/catalog/services.py:53
+#, fuzzy
+#| msgid "An account with this email exists."
+msgid "A category with this name already exists."
+msgstr "Ya existe una cuenta con este correo."
+
+#: apps/catalog/services.py:56
+msgid "This category already has a subcategory with this name."
+msgstr "Esta categoría ya tiene una subcategoría con este nombre."
+
+#: apps/catalog/services.py:60
+msgid "A category cannot be its own parent."
+msgstr "Una categoría no puede ser su propia categoría superior."
+
+#: apps/catalog/services.py:68
+#, fuzzy
+#| msgid "An account with this email exists."
+msgid "A material with this reference exists."
+msgstr "Ya existe una cuenta con este correo."
+
+#: apps/catalog/services.py:107
+msgid "A category with subcategories cannot be placed under another."
+msgstr "Una categoría con subcategorías no puede colocarse bajo otra."
+
+#: apps/catalog/services.py:247
+msgid "A material that documents use keeps its unit."
+msgstr "Un material usado en documentos conserva su unidad."
+
+#: apps/catalog/templates/catalog/category_form.html:4
+#: apps/catalog/templates/catalog/category_form.html:11
+#: apps/catalog/templates/catalog/category_list.html:14
+msgid "New category"
+msgstr "Nueva categoría"
+
+#: apps/catalog/templates/catalog/category_form.html:9
+#, fuzzy, python-format
+#| msgid "Edit project %(code)s"
+msgid "Edit category %(name)s"
+msgstr "Editar la obra %(code)s"
+
+#: apps/catalog/templates/catalog/category_form.html:20
+#: apps/catalog/templates/catalog/form.html:20
+#: apps/organizations/templates/organizations/person.html:66
+#: apps/organizations/templates/organizations/person.html:115
+#: apps/projects/templates/projects/detail.html:98
+#: apps/projects/templates/projects/form.html:20
+msgid "Save"
+msgstr "Guardar"
+
+#: apps/catalog/templates/catalog/category_form.html:22
+#: apps/catalog/templates/catalog/form.html:26
+#: apps/organizations/templates/organizations/invitation_form.html:19
+#: apps/projects/templates/projects/form.html:26
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: apps/catalog/templates/catalog/category_list.html:4
+#: apps/catalog/templates/catalog/category_list.html:8
+#: apps/catalog/templates/catalog/list.html:11
+msgid "Categories"
+msgstr "Categorías"
+
+#: apps/catalog/templates/catalog/category_list.html:11
+#: apps/catalog/templates/catalog/list.html:4
+#: apps/catalog/templates/catalog/list.html:8
+#: templates/partials/nav_items.html:25
+msgid "Catalog"
+msgstr "Catálogo"
+
+#: apps/catalog/templates/catalog/category_list.html:25
+#: apps/catalog/templates/catalog/detail.html:15
+#: apps/projects/templates/projects/detail.html:14
+msgid "Edit"
+msgstr "Editar"
+
+#: apps/catalog/templates/catalog/category_list.html:31
+msgid "No categories"
+msgstr "Sin categorías"
+
+#: apps/catalog/templates/catalog/category_list.html:31
+msgid "The catalog has no categories yet."
+msgstr "El catálogo aún no tiene categorías."
+
+#: apps/catalog/templates/catalog/detail.html:20
+#, fuzzy
+#| msgid "active"
+msgid "Deactivate"
+msgstr "activo"
+
+#: apps/catalog/templates/catalog/detail.html:26
+#, fuzzy
+#| msgid "active"
+msgid "Reactivate"
+msgstr "activo"
+
+#: apps/catalog/templates/catalog/detail.html:68
+msgid "Yes"
+msgstr "Sí"
+
+#: apps/catalog/templates/catalog/detail.html:70
+msgid "No"
+msgstr "No"
+
+#: apps/catalog/templates/catalog/form.html:4
+#: apps/catalog/templates/catalog/form.html:11
+#: apps/catalog/templates/catalog/list.html:14
+#, fuzzy
+#| msgid "New email"
+msgid "New material"
+msgstr "Correo nuevo"
+
+#: apps/catalog/templates/catalog/form.html:9
+#, python-format
+msgid "Edit material %(reference)s"
+msgstr "Editar material %(reference)s"
+
+#: apps/catalog/templates/catalog/list.html:29
+#: apps/catalog/templates/catalog/list.html:41
+msgid "Unit"
+msgstr "Unidad"
+
+#: apps/catalog/templates/catalog/list.html:49
+msgid "No materials"
+msgstr "Sin materiales"
+
+#: apps/catalog/templates/catalog/list.html:49
+msgid "No material matches the filters."
+msgstr "Ningún material coincide con los filtros."
+
+#: apps/catalog/templates/catalog/search_results.html:19
+#, fuzzy
+#| msgid "Material manager"
+msgid "No material matches."
+msgstr "Encargado de material"
+
+#: apps/catalog/views.py:129
+#, python-format
+msgid "Material %(reference)s added."
+msgstr "Material %(reference)s añadido."
+
+#: apps/catalog/views.py:158
+#, python-format
+msgid "Material %(reference)s saved."
+msgstr "Material %(reference)s guardado."
+
+#: apps/catalog/views.py:177
+#, python-format
+msgid "Material %(reference)s reactivated."
+msgstr "Material %(reference)s reactivado."
+
+#: apps/catalog/views.py:179
+#, python-format
+msgid "Material %(reference)s deactivated."
+msgstr "Material %(reference)s desactivado."
+
+#: apps/catalog/views.py:227
+#, python-format
+msgid "Category %(name)s added."
+msgstr "Categoría %(name)s añadida."
+
+#: apps/catalog/views.py:260
+#, python-format
+msgid "Category %(name)s saved."
+msgstr "Categoría %(name)s guardada."
 
 #: apps/core/forms.py:49 apps/organizations/forms.py:70
 #: apps/organizations/templates/organizations/person.html:52
@@ -458,20 +845,10 @@ msgstr "delegación"
 msgid "project"
 msgstr "obra"
 
-#: apps/locations/models.py:46 apps/organizations/models.py:121
-#: apps/projects/models.py:33
-msgid "name"
-msgstr "nombre"
-
 #: apps/locations/models.py:47 apps/organizations/models.py:123
 #: apps/projects/models.py:35
 msgid "address"
 msgstr "dirección"
-
-#: apps/locations/models.py:48 apps/organizations/models.py:33
-#: apps/organizations/models.py:141
-msgid "active"
-msgstr "activo"
 
 #: apps/locations/models.py:53
 msgid "location"
@@ -556,31 +933,6 @@ msgstr ""
 #: apps/organizations/forms.py:16
 msgid "Everyone"
 msgstr "Todos"
-
-#: apps/organizations/forms.py:16
-#: apps/organizations/templates/organizations/account_status.html:7
-#: apps/projects/models.py:28
-msgid "Active"
-msgstr "Activa"
-
-#: apps/organizations/forms.py:16
-#: apps/organizations/templates/organizations/account_status.html:5
-msgid "Inactive"
-msgstr "Inactiva"
-
-#: apps/organizations/forms.py:20 apps/organizations/forms.py:25
-#: apps/projects/forms.py:21
-msgid "Search"
-msgstr "Buscar"
-
-#: apps/organizations/forms.py:21
-#: apps/organizations/templates/organizations/people.html:23
-#: apps/organizations/templates/organizations/people.html:34
-#: apps/projects/forms.py:22 apps/projects/forms.py:53
-#: apps/projects/templates/projects/list.html:25
-#: apps/projects/templates/projects/list.html:36
-msgid "Status"
-msgstr "Estado"
 
 #: apps/organizations/forms.py:40
 msgid "Role"
@@ -686,11 +1038,6 @@ msgstr "Estándar"
 #: apps/organizations/models.py:27
 msgid "Joint venture"
 msgstr "UTE"
-
-#: apps/organizations/models.py:29 apps/organizations/models.py:120
-#: apps/projects/models.py:32
-msgid "code"
-msgstr "código"
 
 #: apps/organizations/models.py:30
 msgid "legal name"
@@ -828,16 +1175,13 @@ msgstr "Invitar a alguien"
 msgid ""
 "The address receives a link valid for 72 hours. A new person sets a "
 "password; an existing account accepts while signed in."
-msgstr "La dirección recibe un enlace válido durante 72 horas. Una persona nueva elige una contraseña; una cuenta existente acepta con la sesión iniciada."
+msgstr ""
+"La dirección recibe un enlace válido durante 72 horas. Una persona nueva "
+"elige una contraseña; una cuenta existente acepta con la sesión iniciada."
 
 #: apps/organizations/templates/organizations/invitation_form.html:17
 msgid "Send invitation"
 msgstr "Enviar invitación"
-
-#: apps/organizations/templates/organizations/invitation_form.html:19
-#: apps/projects/templates/projects/form.html:26
-msgid "Cancel"
-msgstr "Cancelar"
 
 #: apps/organizations/templates/organizations/invitations.html:4
 #: apps/organizations/templates/organizations/person.html:161
@@ -870,16 +1214,9 @@ msgstr "No hay invitaciones pendientes"
 
 #: apps/organizations/templates/organizations/people.html:4
 #: apps/organizations/templates/organizations/people.html:8
-#: templates/partials/nav_items.html:25
+#: templates/partials/nav_items.html:33
 msgid "People"
 msgstr "Personas"
-
-#: apps/organizations/templates/organizations/people.html:21
-#: apps/organizations/templates/organizations/people.html:32
-#: apps/projects/forms.py:39 apps/projects/templates/projects/list.html:23
-#: apps/projects/templates/projects/list.html:34
-msgid "Name"
-msgstr "Nombre"
 
 #: apps/organizations/templates/organizations/people.html:41
 msgid "Nobody found"
@@ -907,13 +1244,6 @@ msgstr "Revocado"
 #: apps/projects/templates/projects/detail.html:78
 msgid "Change validity"
 msgstr "Cambiar validez"
-
-#: apps/organizations/templates/organizations/person.html:66
-#: apps/organizations/templates/organizations/person.html:115
-#: apps/projects/templates/projects/detail.html:98
-#: apps/projects/templates/projects/form.html:20
-msgid "Save"
-msgstr "Guardar"
 
 #: apps/organizations/templates/organizations/person.html:74
 msgid "No roles yet."
@@ -958,7 +1288,9 @@ msgstr "Cambiar"
 msgid ""
 "The new address confirms the change; the current one can cancel it. It "
 "applies 24 hours after confirmation and ends every session of the account."
-msgstr "La nueva dirección confirma el cambio; la actual puede cancelarlo. Se aplica 24 horas después de la confirmación y cierra todas las sesiones de la cuenta."
+msgstr ""
+"La nueva dirección confirma el cambio; la actual puede cancelarlo. Se aplica "
+"24 horas después de la confirmación y cierra todas las sesiones de la cuenta."
 
 #: apps/organizations/templates/organizations/person.html:145
 #: apps/organizations/templates/organizations/person.html:154
@@ -969,7 +1301,10 @@ msgstr "Dar de baja"
 msgid ""
 "Deactivates the account, ends its sessions, revokes every role, project and "
 "pending invitation or email change, including those this person issued."
-msgstr "Desactiva la cuenta, cierra sus sesiones y revoca todos sus roles, obras e invitaciones o cambios de correo pendientes, incluidos los que esta persona emitió."
+msgstr ""
+"Desactiva la cuenta, cierra sus sesiones y revoca todos sus roles, obras e "
+"invitaciones o cambios de correo pendientes, incluidos los que esta persona "
+"emitió."
 
 #: apps/organizations/templates/organizations/person.html:167
 msgid "accepted"
@@ -1050,7 +1385,8 @@ msgstr "Delegación de compras"
 
 #: apps/projects/forms.py:51
 msgid "Buys for the project. Empty: the branch that manages it, or itself."
-msgstr "Compra para la obra. Vacío: la delegación que la gestiona, o ella misma."
+msgstr ""
+"Compra para la obra. Vacío: la delegación que la gestiona, o ella misma."
 
 #: apps/projects/forms.py:54
 msgid "Start date"
@@ -1132,10 +1468,6 @@ msgstr "asignaciones a obra"
 #: apps/projects/services.py:271
 msgid "This assignment is already revoked."
 msgstr "Esta asignación ya está revocada."
-
-#: apps/projects/templates/projects/detail.html:14
-msgid "Edit"
-msgstr "Editar"
 
 #: apps/projects/templates/projects/detail.html:44
 msgid "Dates"
@@ -1322,7 +1654,7 @@ msgstr ""
 msgid "Skip to content"
 msgstr "Saltar al contenido"
 
-#: templates/components/filter_form.html:17
+#: templates/components/filter_form.html:19
 msgid "Filter"
 msgstr "Filtrar"
 
@@ -1365,6 +1697,6 @@ msgstr "Navegación principal"
 msgid "Language"
 msgstr "Idioma"
 
-#: templates/partials/nav_items.html:32
+#: templates/partials/nav_items.html:40
 msgid "Security"
 msgstr "Seguridad"

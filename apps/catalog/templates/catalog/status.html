@@ -1,0 +1,6 @@
+{% load i18n %}
+{% if material.is_active %}
+  {% include "components/status_chip.html" with label=_("Active") tone="ok" %}
+{% else %}
+  {% include "components/status_chip.html" with label=_("Inactive") %}
+{% endif %}

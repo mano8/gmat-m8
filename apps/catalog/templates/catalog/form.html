@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% if material %}{{ material.reference }}{% else %}{% translate "New material" %}{% endif %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-4">
+    {% if material %}
+      {% blocktranslate with reference=material.reference %}Edit material {{ reference }}{% endblocktranslate %}
+    {% else %}
+      {% translate "New material" %}
+    {% endif %}
+  </h1>
+  <form method="post"
+        class="card max-w-2xl"
+        action="{% if material %}{% url 'catalog:update' material_id=material.pk %}{% else %}{% url 'catalog:create' %}{% endif %}">
+    {% csrf_token %}
+    {{ form }}
+    <div class="flex flex-wrap gap-3">
+      {% include "components/button.html" with type="submit" label=_("Save") variant="primary" %}
+      {% if material %}
+        {% url 'catalog:detail' material_id=material.pk as back_url %}
+      {% else %}
+        {% url 'catalog:list' as back_url %}
+      {% endif %}
+      {% include "components/button.html" with href=back_url label=_("Cancel") %}
+    </div>
+  </form>
+{% endblock content %}
