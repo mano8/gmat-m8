@@ -43,7 +43,13 @@ docker compose up -d --build --wait           # https://localhost:8443 (accept o
 
 `init.sh` never overwrites an existing env file and prints no secret. Run it again after an upgrade: it appends to existing env files only the keys a newer template added (generating secrets such as `OUTBOX_ENCRYPTION_KEYS`) and prints their names. Flags: `--ci` (for a CI runner), `--reset-db [--yes]` (deletes the database volume after asking).
 
-The first administrator is created with `manage bootstrap_admin` (arrives with M2.6); until then the site shows the login page only.
+The first administrator is invited from a shell, while no active group administrator exists (a second run is refused once one does):
+
+```bash
+docker compose run --rm web manage bootstrap_admin --email you@example.com --company-code A [--company-name "Company A"] [--superuser]
+```
+
+It creates the company and its head office if they are missing and prints a one-time setup link (valid 72 hours, shown only in this terminal). Open it at `https://localhost:8443` to set the password; the first sign-in then enrolls MFA. Running it again before the link is used replaces the link. `createsuperuser` is disabled: `--superuser` also makes the account a platform operator. Everyone else is invited from the app (People → Invite someone).
 
 ## Configuration
 

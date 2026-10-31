@@ -5,7 +5,7 @@ What the application enforces today (step M1.3), where it lives, and what later 
 ## Authentication (`config/settings/base.py`, `apps/accounts/`)
 
 - django-allauth (floor 65.20.1, checked in CI and by system check `gmat.E001`) is the only authentication backend. Login is by email and password, then MFA when the account has a factor.
-- **Closed surface.** Sign-up, allauth's email management and email confirmation, login by code and "set first password" have no URL (`apps/accounts/urls.py`). Accounts arrive through invitations and email addresses change through the administrator flow (both M2.6).
+- **Closed surface.** Sign-up, allauth's email management and email confirmation, login by code and "set first password" have no URL (`apps/accounts/urls.py`). Accounts arrive through invitations and email addresses change through the administrator flow (both below); `createsuperuser` is disabled and the first administrator comes from `manage bootstrap_admin`.
 - **No enumeration.** A wrong password and an unknown email give the same answer; a reset request for an unknown or inactive address sends nothing and looks the same.
 - **Logout is POST-only** and answers with `Clear-Site-Data: "cache", "storage"`.
 - **Password reset**: one-hour token, never logs anyone in, and is redeemed as a password-reset `TokenPrincipal` (`AccountAdapter.redeem_password_reset`): `authorize_in_txn` locks the user row and the token is checked again under that lock, so two concurrent redemptions cannot both succeed. Inactive accounts are refused.
@@ -77,14 +77,14 @@ What the application enforces today (step M1.3), where it lives, and what later 
 | `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()` | every response |
 | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Cross-Origin-Opener-Policy: same-origin`, `Referrer-Policy: same-origin` | every response |
 | `Cache-Control: no-store, private` and `Vary: Cookie` | every response to an authenticated user |
-| `Cache-Control: no-store` | login, logout, reauthentication, all password-reset steps, MFA authenticate and reauthenticate, anonymous visitors included (invitation and email-change pages join in M2.6) |
-| `Referrer-Policy: no-referrer` | only a URL that carries a token (`/accounts/password/reset/key/<token>/`, which redirects to a key-less URL). Pages with a form keep `same-origin`: under `no-referrer` browsers send `Origin: null` on a form POST and Django's CSRF check refuses it (found in a real browser in M1.6) |
+| `Cache-Control: no-store` | login, logout, reauthentication, all password-reset steps, MFA authenticate and reauthenticate, the invitation and email-change pages, anonymous visitors included |
+| `Referrer-Policy: no-referrer` | only a URL that carries a token (`/accounts/password/reset/key/<token>/`, `/invite/<token>/`, `/account/email-change/<token>/`, each redirecting to a token-less URL). Pages with a form keep `same-origin`: under `no-referrer` browsers send `Origin: null` on a form POST and Django's CSRF check refuses it (found in a real browser in M1.6) |
 | HSTS (one year), HTTPS redirect, `SECURE_PROXY_SSL_HEADER` | production settings |
 | `X-Request-ID` | every response; a well-formed id from the proxy is kept |
 
 ## Logging (`config/logging.py`)
 
-- One JSON handler on stdout. Every handler carries `RedactionFilter` (system check `gmat.E004`): token paths (the password-reset key, and any long random path segment) become `REDACTED`, query strings and fragments are dropped, `secret=value` pairs are masked, and the `request` attribute keeps only the method and the redacted path. `Referer` and `HX-Current-URL` are never logged.
+- One JSON handler on stdout. Every handler carries `RedactionFilter` (system check `gmat.E004`): token paths (the password-reset key, the segment after `/invite/` and `/account/email-change/`, and any long random path segment) become `REDACTED`, query strings and fragments are dropped, `secret=value` pairs are masked, and the `request` attribute keeps only the method and the redacted path. `Referer` and `HX-Current-URL` are never logged.
 - No `AdminEmailHandler` reaches Django's loggers. Error reports hide authentication POST bodies and URL-carrying headers (`RedactingExceptionReporterFilter`). `scrub_event` is the `before_send` hook for an optional error tracker (use it with `send_default_pii=False`).
 - The sentinel test plants a secret in a reset URL, an invitation URL, an email-change URL, a password field and the `Referer` and `HX-Current-URL` headers, on 404, 500 and normal responses, and checks every log line.
 
@@ -99,6 +99,18 @@ Code in `apps/notifications/`; plan §5 "Email: outbox and worker".
 - **Switches.** `flags/worker.paused`: the worker only writes its heartbeat (no query, claim, send or housekeeping). `OUTBOUND_EMAIL=off` (default in production until set): it never claims or opens an SMTP connection. Restore drills set it off.
 - **Housekeeping** (hourly, one transaction and one `housekeeping.<task>` authorization per task): idempotency records past retention, expired security-cache rows, expired sensitive bodies. M6.4 adds the attachment tasks.
 - **Containers.** The worker shares no network with `web` (`db_worker` and `egress` only); the SMTP password reaches the worker container only. Development, local and CI stacks deliver to Mailpit, so no mail leaves the host.
+
+## Accounts: invitations, email changes, offboarding (step M2.6)
+
+Code in `apps/accounts/` (`tokens`, `services`, `revocation`, `housekeeping`, `eligibility`, the token views) and the screens in `apps/organizations/views.py`; plan §3.6 (principals) and §5.
+
+- **Tokens.** 32 random bytes (`secrets.token_urlsafe`), shown only in an email or, for `bootstrap_admin`, on the operator's terminal. The database keeps the SHA-256; lookups compare it again with `hmac.compare_digest`. Invitations live 72 hours, email confirmations 24 hours. A link stores the hash in the session and redirects to a token-less page, so the token leaves the address bar, the history and any `Referer` on the first hit; the link views are exempt from the MFA step-up so the token never lands in a `next` parameter. Links and submissions share a rate limit (20 a minute per client IP). Every expired, used, revoked or unknown token shows one generic page and forgets the session's token.
+- **Redemption** runs as a persistent-token `TokenPrincipal`: `authorize_in_txn` locks `AccessState`, then the target and initiator `User` rows in id order, then the token row, and checks the token's state, the target rules and that the **initiator still holds `org.manage`** (a superuser for a staff target). Offboarding locks the same `User` rows first, so either order ends with the account inactive and no valid membership (race tests in `tests/integration/test_invitation_races.py`, with two concurrent redemptions of one token).
+- **Invitation kinds.** A new account is created signed out with a password (validators, minimum 12); the unique email stops a parallel creation. An active account accepts only while signed in as itself, and its credentials never change. An inactive account is re-hired only by an invitation created after its `offboarded_at` (the invitation's time is the database wall clock after its locks); the old authenticators are removed. Every granted branch, company and project must still be active. Privileged roles move `privilege_elevated_at`, so MFA is enrolled before they are used. A group administrator cannot invite a staff or superuser account.
+- **Email changes** are started by an administrator (`org.manage`; a superuser for staff). The new address confirms (single use, 24 h) and the old one receives a cancel link valid until the change applies. Confirmation starts a 24-hour cooling-off; the worker's hourly housekeeping (`email_changes`, as `system:worker`) applies it under the same locks only if the account is active, the initiator still holds the authority and the address is still free, otherwise revokes it. Applying replaces the address and its verified `EmailAddress`, and the user trigger ends every session.
+- **Offboarding** (one transaction): `is_active = false`, `offboarded_at`, the triggers bump `authz_generation` and `session_epoch`; every membership and assignment revoked; every pending invitation and email change for the account (by user and by address) and every one it issued revoked; unsent security emails expired and wiped. Revoking or moving away a `GROUP_ADMIN` membership that leaves the user without `org.manage` revokes their issued tokens too. Administrators cannot offboard themselves.
+- **Mail.** Invitation and email-change messages are sensitive `SECURITY` emails with their own rules (`invitation.pending`, `email_change.confirmable`, `email_change.cancellable`), checked again at the worker's claim. Inactive accounts receive no password-reset email.
+- **First administrator.** `manage bootstrap_admin` runs only while no active `GROUP_ADMIN` exists (and, with `--superuser`, no active superuser); it creates the company and head office if missing and a `NEW_ACCOUNT` invitation granting `GROUP_ADMIN`, audited `via=bootstrap`. Running it again replaces an unused link; acceptance checks again that no administrator appeared meanwhile.
 
 ## System checks (`apps/core/checks.py`)
 
@@ -154,6 +166,4 @@ Templates in `templates/`, styles in `static/src/app.css`, code in `static/js/ap
 
 ## Still to come
 
-- M2.5: outbox, worker, and the cache housekeeping (`SecurityDatabaseCache.purge_expired`).
-- M2.6: invitations, administrator email changes, offboarding, `bootstrap_admin`; their token pages join the no-referrer list and the log redaction prefixes.
 - M8.2: the same checks in a real browser (e2e).
