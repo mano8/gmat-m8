@@ -27,7 +27,7 @@
         {% endblock content %}
       </main>
     </div>
-    <nav class="fixed inset-x-0 bottom-0 z-30 flex gap-1 border-t border-line bg-raised p-1 md:hidden"
+    <nav class="fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t border-line bg-raised p-1 md:hidden"
          aria-label="{% translate 'Main navigation' %}">
       {% include "partials/nav_items.html" with variant="bottom" %}
     </nav>
