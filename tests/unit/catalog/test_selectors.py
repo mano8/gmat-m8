@@ -189,3 +189,12 @@ class TestList:
             "Protección",
         ]
         assert [u.code for u in selectors.units(ctx)][:2] == ["BOLSA", "BOTE"]
+
+
+def test_an_unknown_or_invisible_category_is_not_in_scope(
+    org: Org, people: Any, catalog: Any
+) -> None:
+    known = catalog["cable25"].category
+    assert selectors.category(ctx_for(people.tech_mad), known.pk) == known
+    with pytest.raises(NotInScope):
+        selectors.category(ctx_for(people.nobody), known.pk)
