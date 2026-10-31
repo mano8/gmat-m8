@@ -17,7 +17,16 @@ from uuid import UUID
 from apps.access.context import AccessContext
 from apps.access.principals import OperatorPrincipal
 from apps.access.roles import Capability
-from apps.core.imports import CREATED, UNCHANGED, UPDATED, ImportCommand, RowRefused, require
+from apps.core.imports import (
+    CREATED,
+    UNCHANGED,
+    UPDATED,
+    ImportCommand,
+    RowRefused,
+    copy_text,
+    limited,
+    require,
+)
 from apps.core.tabular import Column, Row, normalize_header
 from apps.organizations import selectors as org_selectors
 from apps.organizations.models import CODE_PATTERN, Branch
@@ -83,33 +92,38 @@ class Command(ImportCommand):
                 f"{code!r}: use upper-case letters, digits, '-' and '_' (30 characters at most)",
                 "code",
             )
-        name = require(row, "name")
-        if len(name) > 200:
-            raise RowRefused("is longer than 200 characters", "name")
-        status = ""
-        if row.get("status"):
-            status = STATUSES.get(normalize_header(row.get("status")), "")
-            if not status:
-                choices = ", ".join(sorted(set(STATUSES.values())))
-                raise RowRefused(f"{row.get('status')!r} is not a status ({choices})", "status")
-        values: dict[str, Any] = {}
-        for key in ("client_name", "address"):
-            if key in row.values:
-                values[key] = row.get(key)
-        for key in ("start_date", "end_date"):
-            if key in row.values:
-                values[key] = parse_date(row.get(key), key)
-        start, end = values.get("start_date"), values.get("end_date")
-        if start and end and end < start:
-            raise RowRefused("is before the start date", "end_date")
+        values: dict[str, Any] = copy_text(row, {"client_name": 200, "address": 10_000})
+        values.update(self._dates(row))
         return ProjectRow(
             code,
-            name,
+            limited(row, "name", 200) or require(row, "name"),
             require(row, "branch").upper(),
             row.get("procurement_branch").upper(),
-            status,
+            self._status(row.get("status")),
             values,
         )
+
+    @staticmethod
+    def _status(cell: str) -> str:
+        if not cell:
+            return ""
+        status = STATUSES.get(normalize_header(cell), "")
+        if not status:
+            choices = ", ".join(sorted(set(STATUSES.values())))
+            raise RowRefused(f"{cell!r} is not a status ({choices})", "status")
+        return status
+
+    @staticmethod
+    def _dates(row: Row) -> dict[str, date | None]:
+        dates: dict[str, date | None] = {
+            key: parse_date(row.get(key), key)
+            for key in ("start_date", "end_date")
+            if key in row.values
+        }
+        start, end = dates.get("start_date"), dates.get("end_date")
+        if start and end and end < start:
+            raise RowRefused("is before the start date", "end_date")
+        return dates
 
     def begin(self, principal: OperatorPrincipal, ctx: AccessContext) -> None:
         self.ctx = ctx
@@ -138,16 +152,7 @@ class Command(ImportCommand):
         existing = selectors.project_by_code(self.ctx, parsed.code)
         fields = dict(parsed.values, name=parsed.name)
         if existing is None:
-            project = services.create_project(
-                principal,
-                code=parsed.code,
-                branch_id=branch_id,
-                procurement_branch_id=procurement_id,
-                **fields,
-            )
-            if parsed.status and parsed.status != project.status:
-                services.update_project(principal, project.pk, status=parsed.status)
-            return CREATED
+            return self._create(principal, parsed, fields, branch_id, procurement_id)
         fields["branch_id"] = branch_id
         if procurement_id is not None:
             fields["procurement_branch_id"] = procurement_id
@@ -158,3 +163,22 @@ class Command(ImportCommand):
             return UNCHANGED
         services.update_project(principal, existing.pk, **changes)
         return UPDATED
+
+    @staticmethod
+    def _create(
+        principal: OperatorPrincipal,
+        parsed: ProjectRow,
+        fields: dict[str, Any],
+        branch_id: UUID,
+        procurement_id: UUID | None,
+    ) -> str:
+        project = services.create_project(
+            principal,
+            code=parsed.code,
+            branch_id=branch_id,
+            procurement_branch_id=procurement_id,
+            **fields,
+        )
+        if parsed.status and parsed.status != project.status:
+            services.update_project(principal, project.pk, status=parsed.status)
+        return CREATED

@@ -132,8 +132,7 @@ def _decimal(value: float) -> str:
     return f"{value:g}".replace(".", ",")
 
 
-def materials() -> Iterator[DemoMaterial]:
-    """About 200 materials, in a fixed order."""
+def _family_0() -> Iterator[DemoMaterial]:
     colors = (
         ("AZ", "azul"),
         ("MA", "marrón"),
@@ -150,6 +149,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Prysmian",
             True,
         )
+
+
+def _family_1() -> Iterator[DemoMaterial]:
     for cores, area in ((3, 1.5), (3, 2.5), (3, 4), (5, 1.5), (5, 2.5), (5, 4), (5, 6), (5, 10)):
         yield DemoMaterial(
             f"CAB-RVK-{cores}X{_decimal(area)}",
@@ -159,6 +161,9 @@ def materials() -> Iterator[DemoMaterial]:
             "General Cable",
             False,
         )
+
+
+def _family_2() -> Iterator[DemoMaterial]:
     for poles, amps in product(("1P", "1P+N", "2P", "3P", "4P"), (10, 16, 20, 25, 32, 40, 63)):
         yield DemoMaterial(
             f"MAG-{poles.replace('+', '')}-{amps}C",
@@ -168,6 +173,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Schneider Electric",
             amps <= 32,
         )
+
+
+def _family_3() -> Iterator[DemoMaterial]:
     for poles, amps, sensitivity in product(("2P", "4P"), (25, 40, 63), (30, 300)):
         yield DemoMaterial(
             f"DIF-{poles}-{amps}-{sensitivity}",
@@ -177,6 +185,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Schneider Electric",
             sensitivity == 30,
         )
+
+
+def _family_4() -> Iterator[DemoMaterial]:
     for diameter in (16, 20, 25, 32, 40, 50):
         yield DemoMaterial(
             f"TUB-COR-M{diameter}",
@@ -194,6 +205,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Aiscan",
             False,
         )
+
+
+def _family_5() -> Iterator[DemoMaterial]:
     for width, height in ((60, 100), (100, 100), (200, 100), (300, 100)):
         yield DemoMaterial(
             f"BAN-REJ-{width}X{height}",
@@ -203,6 +217,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Unex",
             False,
         )
+
+
+def _family_6() -> Iterator[DemoMaterial]:
     for side, protection in product((80, 100, 150, 200), (54, 65)):
         yield DemoMaterial(
             f"CAJ-REG-{side}-IP{protection}",
@@ -212,6 +229,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Gewiss",
             side <= 100,
         )
+
+
+def _family_7() -> Iterator[DemoMaterial]:
     for series, finish in product(
         ("Serie Plana", "Serie Clásica", "Serie Industrial"), ("blanco", "antracita")
     ):
@@ -232,6 +252,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Simon",
             True,
         )
+
+
+def _family_8() -> Iterator[DemoMaterial]:
     for kind, watts, kelvin in product(
         ("Downlight", "Panel 60x60", "Regleta estanca", "Proyector"), (18, 36, 50), (4000, 6500)
     ):
@@ -244,6 +267,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Philips",
             False,
         )
+
+
+def _family_9() -> Iterator[DemoMaterial]:
     for ways in (2, 3, 5, 12):
         yield DemoMaterial(
             f"CON-REG-{ways}",
@@ -261,6 +287,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Wago",
             True,
         )
+
+
+def _family_10() -> Iterator[DemoMaterial]:
     for length in (100, 150, 200, 300):
         yield DemoMaterial(
             f"FIJ-BRI-{length}",
@@ -270,6 +299,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Fischer",
             True,
         )
+
+
+def _family_11() -> Iterator[DemoMaterial]:
     for diameter in (6, 8, 10):
         yield DemoMaterial(
             f"FIJ-TAC-{diameter}",
@@ -279,6 +311,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Fischer",
             True,
         )
+
+
+def _family_12() -> Iterator[DemoMaterial]:
     for poles, amps, coil in product(("3P", "4P"), (9, 12, 18, 25, 32), ("24V", "230V")):
         yield DemoMaterial(
             f"CNT-{poles}-{amps}-{coil}",
@@ -288,6 +323,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Schneider Electric",
             False,
         )
+
+
+def _family_13() -> Iterator[DemoMaterial]:
     fuses = (
         ("10x38", (6, 10, 16, 20)),
         ("14x51", (16, 25, 32)),
@@ -302,6 +340,9 @@ def materials() -> Iterator[DemoMaterial]:
             "Ferraz",
             True,
         )
+
+
+def _family_14() -> Iterator[DemoMaterial]:
     for kind, lens in product(("Piloto", "Pulsador"), ("rojo", "verde", "amarillo", "azul")):
         yield DemoMaterial(
             f"CTL-{kind[:3].upper()}-{lens[:3].upper()}",
@@ -311,13 +352,51 @@ def materials() -> Iterator[DemoMaterial]:
             "Schneider Electric",
             False,
         )
+
+
+def _family_15() -> Iterator[DemoMaterial]:
     yield DemoMaterial(
         "CON-CINTA-AIS", "Cinta aislante PVC 19 mm negra", "ROLLO", "Consumibles", "3M", True
     )
+
+
+def _family_16() -> Iterator[DemoMaterial]:
     yield DemoMaterial(
         "CON-PEGA-PVC", "Adhesivo para PVC 250 ml", "BOTE", "Consumibles", "Fischer", True
     )
+
+
+def _family_17() -> Iterator[DemoMaterial]:
     yield DemoMaterial(
         "CON-GRASA", "Pasta lubricante para cables", "KG", "Consumibles", "Ega Master", True
     )
+
+
+def _family_18() -> Iterator[DemoMaterial]:
     yield DemoMaterial("CON-LIMPIA", "Limpiador de contactos", "L", "Consumibles", "3M", True)
+
+
+def materials() -> Iterator[DemoMaterial]:
+    """About 200 materials, in a fixed order."""
+    for family in (
+        _family_0,
+        _family_1,
+        _family_2,
+        _family_3,
+        _family_4,
+        _family_5,
+        _family_6,
+        _family_7,
+        _family_8,
+        _family_9,
+        _family_10,
+        _family_11,
+        _family_12,
+        _family_13,
+        _family_14,
+        _family_15,
+        _family_16,
+        _family_17,
+        _family_18,
+    ):
+        yield from family()

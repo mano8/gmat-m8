@@ -20,8 +20,9 @@ from apps.core.imports import (
     UPDATED,
     ImportCommand,
     RowRefused,
-    parse_bool,
-    require,
+    copy_text,
+    limited,
+    optional_bool,
 )
 from apps.core.tabular import Column, Row
 from apps.suppliers import selectors, services
@@ -36,8 +37,13 @@ COLUMNS = (
     Column("notes", ("notas", "observaciones", "comments")),
     Column("active", ("is_active", "activo", "actif")),
 )
-TEXT_LIMITS = {"name": 200, "tax_id": 32, "contact_name": 200, "phone": 40}
-TEXT_KEYS = ("contact_name", "email", "phone", "address", "notes")
+TEXT_LIMITS = {
+    "contact_name": 200,
+    "email": 254,
+    "phone": 40,
+    "address": 10_000,
+    "notes": 10_000,
+}
 
 
 @dataclass(frozen=True)
@@ -65,43 +71,48 @@ class Command(ImportCommand):
         return keys
 
     def parse(self, row: Row) -> SupplierRow:
-        name = require(row, "name")
-        values: dict[str, Any] = {}
-        for key, limit in TEXT_LIMITS.items():
-            if len(row.get(key)) > limit:
-                raise RowRefused(f"is longer than {limit} characters", key)
-        for key in TEXT_KEYS:
-            if key in row.values:
-                values[key] = row.get(key)
+        name = limited(row, "name", 200)
+        if not name:
+            raise RowRefused("is required", "name")
+        tax_id = limited(row, "tax_id", 32)
+        values: dict[str, Any] = copy_text(row, TEXT_LIMITS)
         if values.get("email") and "@" not in values["email"]:
             raise RowRefused(f"{values['email']!r} is not an email address", "email")
-        active = parse_bool(row.get("active"), "active") if row.get("active") else None
-        return SupplierRow(name, row.get("tax_id") or None, values, active)
+        return SupplierRow(name, tax_id or None, values, optional_bool(row, "active"))
 
     def begin(self, principal: OperatorPrincipal, ctx: AccessContext) -> None:
         self.ctx = ctx
 
     def apply(self, principal: OperatorPrincipal, parsed: SupplierRow) -> str:
         existing = self._find(parsed)
-        fields = dict(parsed.values, name=parsed.name)
-        if parsed.tax_id is not None:
-            fields["tax_id"] = parsed.tax_id
-        if "email" in fields:
-            fields["email"] = fields["email"].lower()
+        fields = self._fields(parsed)
         if existing is None:
             supplier = services.create_supplier(principal, **fields)
             if parsed.active is False:
                 services.deactivate_supplier(principal, supplier.pk)
             return CREATED
         changes = {key: value for key, value in fields.items() if getattr(existing, key) != value}
-        changed = bool(changes)
         if changes:
             services.update_supplier(principal, existing.pk, **changes)
-        if parsed.active is not None and parsed.active != existing.is_active:
-            action = services.reactivate_supplier if parsed.active else services.deactivate_supplier
-            action(principal, existing.pk)
-            changed = True
-        return UPDATED if changed else UNCHANGED
+        toggled = self._toggle_active(principal, existing, parsed.active)
+        return UPDATED if changes or toggled else UNCHANGED
+
+    @staticmethod
+    def _fields(parsed: SupplierRow) -> dict[str, Any]:
+        fields = dict(parsed.values, name=parsed.name)
+        if parsed.tax_id is not None:
+            fields["tax_id"] = parsed.tax_id
+        if "email" in fields:
+            fields["email"] = fields["email"].lower()
+        return fields
+
+    @staticmethod
+    def _toggle_active(principal: OperatorPrincipal, existing: Any, wanted: bool | None) -> bool:
+        if wanted is None or wanted == existing.is_active:
+            return False
+        action = services.reactivate_supplier if wanted else services.deactivate_supplier
+        action(principal, existing.pk)
+        return True
 
     def _find(self, parsed: SupplierRow) -> Any:
         if parsed.tax_id is not None:

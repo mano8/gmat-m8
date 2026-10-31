@@ -81,27 +81,31 @@ class Report:
         if table.encoding and table.encoding != "utf-8-sig":
             out.append(f"  read as {table.encoding}")
         out.append("Columns:")
-        for column in columns:
-            header = table.mapped.get(column.key)
-            note = (
-                f'"{header}"' if header else ("MISSING" if column.required else "not in the file")
-            )
-            out.append(f"  {column.key:<18} <- {note}")
+        out.extend(self._mapping(column) for column in columns)
         if table.ignored:
             out.append("Ignored columns: " + ", ".join(f'"{name}"' for name in table.ignored))
-        if self.errors:
-            out.append("Errors:")
-            for error in self.errors[:MAX_REPORTED_ERRORS]:
-                where = f"{error.column}: " if error.column else ""
-                out.append(f"  line {error.line}: {where}{error.message}")
-            if len(self.errors) > MAX_REPORTED_ERRORS:
-                out.append(f"  ... and {len(self.errors) - MAX_REPORTED_ERRORS} more")
-            out.append(f"{len(self.errors)} error(s): nothing was written.")
-        else:
-            counts = ", ".join(f"{self.counts[key]} {key}" for key in self.counts) or "no rows"
-            suffix = "dry run, nothing was written" if self.dry_run else "committed"
-            out.append(f"Result: {counts} ({suffix}).")
+        out.extend(self._errors() if self.errors else [self._result()])
         return "\n".join(out)
+
+    def _mapping(self, column: Column) -> str:
+        header = self.table.mapped.get(column.key)
+        note = f'"{header}"' if header else ("MISSING" if column.required else "not in the file")
+        return f"  {column.key:<18} <- {note}"
+
+    def _errors(self) -> list[str]:
+        lines = ["Errors:"]
+        for error in self.errors[:MAX_REPORTED_ERRORS]:
+            where = f"{error.column}: " if error.column else ""
+            lines.append(f"  line {error.line}: {where}{error.message}")
+        if len(self.errors) > MAX_REPORTED_ERRORS:
+            lines.append(f"  ... and {len(self.errors) - MAX_REPORTED_ERRORS} more")
+        lines.append(f"{len(self.errors)} error(s): nothing was written.")
+        return lines
+
+    def _result(self) -> str:
+        counts = ", ".join(f"{self.counts[key]} {key}" for key in self.counts) or "no rows"
+        suffix = "dry run, nothing was written" if self.dry_run else "committed"
+        return f"Result: {counts} ({suffix})."
 
 
 def parse_bool(value: str, column: str) -> bool:
@@ -111,6 +115,24 @@ def parse_bool(value: str, column: str) -> bool:
     if lowered in NO:
         return False
     raise RowRefused(f"expected yes or no, got {value!r}", column)
+
+
+def optional_bool(row: Row, key: str) -> bool | None:
+    """A yes/no cell; ``None`` when blank (the field is left alone)."""
+    return parse_bool(row.get(key), key) if row.get(key) else None
+
+
+def limited(row: Row, key: str, limit: int) -> str:
+    """The cell, refused when longer than ``limit`` characters."""
+    value = row.get(key)
+    if len(value) > limit:
+        raise RowRefused(f"is longer than {limit} characters", key)
+    return value
+
+
+def copy_text(row: Row, limits: dict[str, int]) -> dict[str, str]:
+    """The text columns that are in the file, each within its limit."""
+    return {key: limited(row, key, limit) for key, limit in limits.items() if key in row.values}
 
 
 def require(row: Row, key: str) -> str:
@@ -178,21 +200,7 @@ class ImportCommand(OperatorCommand):
         ctx = AccessContext.for_user(User.objects.get(pk=principal.user_id))
         dry_run = bool(options["dry_run"])
 
-        parsed_rows: list[tuple[Row, Any]] = []
-        pre = Report(self.command_name, table, dry_run=dry_run)
-        seen: dict[str, int] = {}
-        for row in table.rows:
-            try:
-                parsed = self.parse(row)
-                keys = self.natural_keys(parsed)
-                for key in keys:
-                    if key in seen:
-                        raise RowRefused(f"is the same as line {seen[key]}")
-                for key in keys:
-                    seen[key] = row.line
-                parsed_rows.append((row, parsed))
-            except RowRefused as exc:
-                pre.error(row.line, str(exc), exc.column)
+        parsed_rows, pre = self._parse_all(table, dry_run)
         # A file with errors is still tried against the database in a transaction that is
         # rolled back, so the report lists what the data refuses as well as what the rows say.
         rehearsal = dry_run or bool(pre.errors)
@@ -208,6 +216,25 @@ class ImportCommand(OperatorCommand):
         if report.errors:
             raise CommandError(f"{self.command_name}: the file has errors; nothing was written")
         return None
+
+    def _parse_all(self, table: Table, dry_run: bool) -> tuple[list[tuple[Row, Any]], Report]:
+        """Check every row without the database; collect the errors by line."""
+        parsed_rows: list[tuple[Row, Any]] = []
+        pre = Report(self.command_name, table, dry_run=dry_run)
+        seen: dict[str, int] = {}
+        for row in table.rows:
+            try:
+                parsed = self.parse(row)
+                keys = self.natural_keys(parsed)
+                for key in keys:
+                    if key in seen:
+                        raise RowRefused(f"is the same as line {seen[key]}")
+                for key in keys:
+                    seen[key] = row.line
+                parsed_rows.append((row, parsed))
+            except RowRefused as exc:
+                pre.error(row.line, str(exc), exc.column)
+        return parsed_rows, pre
 
     def _apply_all(
         self,

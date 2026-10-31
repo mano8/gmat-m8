@@ -75,22 +75,30 @@ def normalize_header(text: str) -> str:
     return re.sub(r"[\s_\-.]+", "_", folded.strip().casefold()).strip("_")
 
 
+def _number_text(value: int | float) -> str:
+    if isinstance(value, float):
+        return format(Decimal(repr(value)).normalize(), "f")
+    return str(value)
+
+
+def _date_text(value: date) -> str:
+    if isinstance(value, datetime):
+        return (
+            value.date().isoformat() if value.time() == datetime.min.time() else value.isoformat()
+        )
+    return value.isoformat()
+
+
 def cell_text(value: Any) -> str:
     """One cell as stripped text."""
     if value is None:
         return ""
     if isinstance(value, bool):
         return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, float):
-        return format(Decimal(repr(value)).normalize(), "f")
-    if isinstance(value, datetime):
-        return (
-            value.date().isoformat() if value.time() == datetime.min.time() else value.isoformat()
-        )
-    if isinstance(value, date):
-        return value.isoformat()
+    if isinstance(value, int | float):
+        return _number_text(value)
+    if isinstance(value, date):  # datetime is a date
+        return _date_text(value)
     return str(value).strip()
 
 
@@ -119,16 +127,17 @@ def _csv_rows(path: Path, delimiter: str | None) -> tuple[list[list[Any]], str]:
         raise TableError(f"Invalid CSV: {exc}") from exc
 
 
-def _xlsx_rows(path: Path, sheet: str | None) -> list[list[Any]]:
+def _open_workbook(path: Path) -> Any:
     from openpyxl import load_workbook
-    from openpyxl.utils.exceptions import InvalidFileException
 
     try:
-        workbook = load_workbook(path, read_only=True, data_only=True)
-    except (InvalidFileException, OSError, KeyError, ValueError) as exc:
-        raise TableError(f"Not a readable XLSX file: {exc}") from exc
-    except Exception as exc:  # a corrupt archive raises zipfile / XML errors
+        return load_workbook(path, read_only=True, data_only=True)
+    except Exception as exc:  # a corrupt archive raises zipfile / XML / openpyxl errors
         raise TableError(f"Not a readable XLSX file: {type(exc).__name__}") from exc
+
+
+def _xlsx_rows(path: Path, sheet: str | None) -> list[list[Any]]:
+    workbook = _open_workbook(path)
     try:
         if sheet is not None and sheet not in workbook.sheetnames:
             raise TableError(f"The workbook has no sheet {sheet!r} (it has {workbook.sheetnames}).")
@@ -143,39 +152,41 @@ def _xlsx_rows(path: Path, sheet: str | None) -> list[list[Any]]:
         workbook.close()
 
 
+def _by_name(columns: Sequence[Column]) -> dict[str, Column]:
+    return {name: column for column in columns for name in column.names()}
+
+
+def _check_required(
+    header: Sequence[Any], columns: Sequence[Column], mapped: dict[str, str]
+) -> None:
+    missing = [column.key for column in columns if column.required and column.key not in mapped]
+    if missing:
+        found = ", ".join(repr(cell_text(c)) for c in header if cell_text(c)) or "none"
+        raise TableError(f"Required column(s) missing: {', '.join(missing)}. Found: {found}")
+
+
 def _map_columns(
     header: Sequence[Any], columns: Sequence[Column]
 ) -> tuple[dict[int, str], dict[str, str], list[str]]:
     """``(index -> key, key -> header text, ignored headers)``; errors on a duplicate."""
-    by_name: dict[str, Column] = {}
-    for column in columns:
-        for name in column.names():
-            by_name[name] = column
+    by_name = _by_name(columns)
     positions: dict[int, str] = {}
     mapped: dict[str, str] = {}
     ignored: list[str] = []
     for index, cell in enumerate(header):
         title = cell_text(cell)
-        if not title:
-            continue
-        match = by_name.get(normalize_header(title))
+        match = by_name.get(normalize_header(title)) if title else None
         if match is None:
-            ignored.append(title)
-        elif match.key in mapped:
+            if title:
+                ignored.append(title)
+            continue
+        if match.key in mapped:
             raise TableError(
                 f"Column {match.key!r} appears twice: {mapped[match.key]!r}, {title!r}"
             )
-        else:
-            positions[index] = match.key
-            mapped[match.key] = title
-    missing = [column.key for column in columns if column.required and column.key not in mapped]
-    if missing:
-        raise TableError(
-            "Required column(s) missing: "
-            + ", ".join(missing)
-            + ". Found: "
-            + (", ".join(repr(cell_text(c)) for c in header if cell_text(c)) or "none")
-        )
+        positions[index] = match.key
+        mapped[match.key] = title
+    _check_required(header, columns, mapped)
     return positions, mapped, ignored
 
 
@@ -187,10 +198,7 @@ def read_table(
     delimiter: str | None = None,
 ) -> Table:
     """Read ``path`` (CSV or XLSX by its suffix) into a ``Table`` of mapped rows."""
-    if not path.is_file():
-        raise TableError(f"{path} is not a file.")
-    if path.stat().st_size > MAX_FILE_BYTES:
-        raise TableError(f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB.")
+    _check_file(path)
     suffix = path.suffix.lower()
     encoding = ""
     if suffix in XLSX_SUFFIXES:
@@ -207,6 +215,13 @@ def read_table(
     if len(rows) > MAX_ROWS:
         raise TableError(f"The file has more than {MAX_ROWS} rows.")
     return Table(path.name, kind, rows, mapped, ignored, encoding)
+
+
+def _check_file(path: Path) -> None:
+    if not path.is_file():
+        raise TableError(f"{path} is not a file.")
+    if path.stat().st_size > MAX_FILE_BYTES:
+        raise TableError(f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB.")
 
 
 def _data_rows(raw: list[list[Any]], positions: dict[int, str]) -> Iterator[Row]:

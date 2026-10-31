@@ -22,7 +22,9 @@ from apps.core.imports import (
     UPDATED,
     ImportCommand,
     RowRefused,
-    parse_bool,
+    copy_text,
+    limited,
+    optional_bool,
     require,
 )
 from apps.core.tabular import Column, Row
@@ -78,40 +80,41 @@ class Command(ImportCommand):
         return [parsed.reference.casefold()]
 
     def parse(self, row: Row) -> MaterialRow:
-        reference = require(row, "reference")
-        name = require(row, "name")
-        unit = require(row, "unit")
-        values: dict[str, Any] = {"name": name}
-        if len(reference) > 60:
-            raise RowRefused("is longer than 60 characters", "reference")
-        if len(name) > 200:
-            raise RowRefused("is longer than 200 characters", "name")
-        for key, limit in (("manufacturer", 100), ("manufacturer_ref", 100)):
-            if key in row.values:
-                if len(row.get(key)) > limit:
-                    raise RowRefused(f"is longer than {limit} characters", key)
-                values[key] = row.get(key)
-        if "description" in row.values:
-            values["description"] = row.get("description")
+        reference = limited(row, "reference", 60)
+        if not reference:
+            raise RowRefused("is required", "reference")
+        values: dict[str, Any] = {"name": limited(row, "name", 200) or require(row, "name")}
+        values.update(copy_text(row, {"manufacturer": 100, "manufacturer_ref": 100}))
+        values.update(copy_text(row, {"description": 10_000}))
         if "ean" in row.values:
-            ean = row.get("ean")
-            if ean and not re.fullmatch(EAN_PATTERN, ean):
-                raise RowRefused(f"{ean!r} is not 8 to 14 digits", "ean")
-            values["ean"] = ean or None
-        category_path = None
-        if "category" in row.values:
-            parts = tuple(p.strip() for p in row.get("category").split(CATEGORY_SEPARATOR))
-            category_path = () if parts == ("",) else parts
-            if any(not part for part in category_path):
-                raise RowRefused("has an empty level", "category")
-            if len(category_path) > MAX_CATEGORY_LEVELS:
-                raise RowRefused(f"has more than {MAX_CATEGORY_LEVELS} levels", "category")
-        stock = active = None
-        if row.get("is_stock_item"):
-            stock = parse_bool(row.get("is_stock_item"), "is_stock_item")
-        if row.get("active"):
-            active = parse_bool(row.get("active"), "active")
-        return MaterialRow(reference, values, unit, category_path, stock, active)
+            values["ean"] = self._ean(row.get("ean"))
+        category_path = (
+            self._category_path(row.get("category")) if "category" in row.values else None
+        )
+        return MaterialRow(
+            reference,
+            values,
+            require(row, "unit"),
+            category_path,
+            optional_bool(row, "is_stock_item"),
+            optional_bool(row, "active"),
+        )
+
+    @staticmethod
+    def _ean(ean: str) -> str | None:
+        if ean and not re.fullmatch(EAN_PATTERN, ean):
+            raise RowRefused(f"{ean!r} is not 8 to 14 digits", "ean")
+        return ean or None
+
+    @staticmethod
+    def _category_path(cell: str) -> tuple[str, ...]:
+        parts = tuple(p.strip() for p in cell.split(CATEGORY_SEPARATOR))
+        path = () if parts == ("",) else parts
+        if any(not part for part in path):
+            raise RowRefused("has an empty level", "category")
+        if len(path) > MAX_CATEGORY_LEVELS:
+            raise RowRefused(f"has more than {MAX_CATEGORY_LEVELS} levels", "category")
+        return path
 
     def begin(self, principal: OperatorPrincipal, ctx: AccessContext) -> None:
         self.ctx = ctx
@@ -154,14 +157,20 @@ class Command(ImportCommand):
         changes = {key: value for key, value in fields.items() if getattr(existing, key) != value}
         if parsed.stock is not None and parsed.stock != existing.is_stock_item:
             changes["is_stock_item"] = parsed.stock
-        changed = bool(changes)
         if changes:
             services.update_material(principal, existing.pk, **changes)
-        if parsed.active is not None and parsed.active != existing.is_active:
-            action = services.reactivate_material if parsed.active else services.deactivate_material
-            action(principal, existing.pk)
-            changed = True
-        return UPDATED if changed else UNCHANGED
+        toggled = self._toggle_active(principal, existing, parsed.active)
+        return UPDATED if changes or toggled else UNCHANGED
+
+    @staticmethod
+    def _toggle_active(
+        principal: OperatorPrincipal, existing: Material, wanted: bool | None
+    ) -> bool:
+        if wanted is None or wanted == existing.is_active:
+            return False
+        action = services.reactivate_material if wanted else services.deactivate_material
+        action(principal, existing.pk)
+        return True
 
     def _category(self, principal: OperatorPrincipal, path: tuple[str, ...]) -> Any:
         """The id of the category at ``path``, creating the missing levels."""
