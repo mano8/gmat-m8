@@ -20,6 +20,7 @@ from apps.core.imports import (
     UPDATED,
     ImportCommand,
     RowRefused,
+    changed_fields,
     copy_text,
     limited,
     optional_bool,
@@ -91,7 +92,7 @@ class Command(ImportCommand):
             if parsed.active is False:
                 services.deactivate_supplier(principal, supplier.pk)
             return CREATED
-        changes = {key: value for key, value in fields.items() if getattr(existing, key) != value}
+        changes = changed_fields(existing, fields)
         if changes:
             services.update_supplier(principal, existing.pk, **changes)
         toggled = self._toggle_active(principal, existing, parsed.active)

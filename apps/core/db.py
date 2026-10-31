@@ -91,12 +91,21 @@ def constraint_errors(
         with transaction.atomic(using=using):
             yield
     except IntegrityError as exc:
-        found = messages.get(constraint_name(exc) or "")
-        if found is None and referenced is not None and _is_foreign_key_violation(exc):
-            found = referenced
-        if found is None:
-            raise
-        field, message = found
+        field, message = _refusal(exc, messages, referenced)
         raise ValidationError(
             {field or NON_FIELD_ERRORS: ValidationError(message, code="constraint")}
         ) from exc
+
+
+def _refusal(
+    exc: IntegrityError,
+    messages: Mapping[str, tuple[str | None, Any]],
+    referenced: tuple[str | None, Any] | None,
+) -> tuple[str | None, Any]:
+    """The field and message for a violation we word; anything else is re-raised."""
+    found = messages.get(constraint_name(exc) or "")
+    if found is None and referenced is not None and _is_foreign_key_violation(exc):
+        found = referenced
+    if found is None:
+        raise exc
+    return found

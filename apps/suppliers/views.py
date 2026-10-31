@@ -37,20 +37,23 @@ def _manageable(request: HttpRequest, supplier_id: UUID) -> Supplier:
     return supplier
 
 
+def _kept(**params: str | None) -> dict[str, str]:
+    """The filters that are set, for the pager's links."""
+    return {key: value for key, value in params.items() if value}
+
+
 @require_safe
 @require_capability(VIEW)
 def supplier_list(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
     filters = SupplierFilterForm(request.GET or None)
-    q, state = "", selectors.STATE_ACTIVE
-    if filters.is_valid():
-        q = filters.cleaned_data["q"]
-        state = filters.cleaned_data["state"] or selectors.STATE_ACTIVE
+    data = filters.cleaned_data if filters.is_valid() else {}
+    q = data.get("q", "")
+    state = data.get("state") or selectors.STATE_ACTIVE
     page = Paginator(selectors.suppliers(ctx, q=q, state=state), selectors.PAGE_SIZE).get_page(
         request.GET.get("page")
     )
-    params = {"q": q, "state": request.GET.get("state", "")}
-    kept = {key: value for key, value in params.items() if value}
+    kept = _kept(q=q, state=request.GET.get("state"))
     template = "suppliers/list.html#results" if is_htmx(request) else "suppliers/list.html"
     context = {
         "filters": filters,

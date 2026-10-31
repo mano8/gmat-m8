@@ -22,6 +22,7 @@ from apps.core.imports import (
     UPDATED,
     ImportCommand,
     RowRefused,
+    changed_fields,
     copy_text,
     limited,
     optional_bool,
@@ -154,9 +155,8 @@ class Command(ImportCommand):
         fields: dict[str, Any],
         parsed: MaterialRow,
     ) -> str:
-        changes = {key: value for key, value in fields.items() if getattr(existing, key) != value}
-        if parsed.stock is not None and parsed.stock != existing.is_stock_item:
-            changes["is_stock_item"] = parsed.stock
+        stock = {} if parsed.stock is None else {"is_stock_item": parsed.stock}
+        changes = changed_fields(existing, fields | stock)
         if changes:
             services.update_material(principal, existing.pk, **changes)
         toggled = self._toggle_active(principal, existing, parsed.active)

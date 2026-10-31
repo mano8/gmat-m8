@@ -156,13 +156,18 @@ def _by_name(columns: Sequence[Column]) -> dict[str, Column]:
     return {name: column for column in columns for name in column.names()}
 
 
+def _required_missing(columns: Sequence[Column], mapped: dict[str, str]) -> list[str]:
+    return [column.key for column in columns if column.required and column.key not in mapped]
+
+
 def _check_required(
     header: Sequence[Any], columns: Sequence[Column], mapped: dict[str, str]
 ) -> None:
-    missing = [column.key for column in columns if column.required and column.key not in mapped]
-    if missing:
-        found = ", ".join(repr(cell_text(c)) for c in header if cell_text(c)) or "none"
-        raise TableError(f"Required column(s) missing: {', '.join(missing)}. Found: {found}")
+    missing = _required_missing(columns, mapped)
+    if not missing:
+        return
+    found = ", ".join(repr(title) for title in map(cell_text, header) if title) or "none"
+    raise TableError(f"Required column(s) missing: {', '.join(missing)}. Found: {found}")
 
 
 def _map_columns(

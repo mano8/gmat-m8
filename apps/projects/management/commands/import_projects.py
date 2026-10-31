@@ -23,6 +23,7 @@ from apps.core.imports import (
     UPDATED,
     ImportCommand,
     RowRefused,
+    changed_fields,
     copy_text,
     limited,
     require,
@@ -153,16 +154,18 @@ class Command(ImportCommand):
         fields = dict(parsed.values, name=parsed.name)
         if existing is None:
             return self._create(principal, parsed, fields, branch_id, procurement_id)
-        fields["branch_id"] = branch_id
-        if procurement_id is not None:
-            fields["procurement_branch_id"] = procurement_id
-        if parsed.status:
-            fields["status"] = parsed.status
-        changes = {key: value for key, value in fields.items() if getattr(existing, key) != value}
+        fields.update(self._moves(parsed, branch_id, procurement_id))
+        changes = changed_fields(existing, fields)
         if not changes:
             return UNCHANGED
         services.update_project(principal, existing.pk, **changes)
         return UPDATED
+
+    @staticmethod
+    def _moves(parsed: ProjectRow, branch_id: UUID, procurement_id: UUID | None) -> dict[str, Any]:
+        """The branch, and the procurement branch and status when the file gives them."""
+        optional = {"procurement_branch_id": procurement_id, "status": parsed.status or None}
+        return {"branch_id": branch_id} | {k: v for k, v in optional.items() if v is not None}
 
     @staticmethod
     def _create(

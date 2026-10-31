@@ -117,6 +117,11 @@ def parse_bool(value: str, column: str) -> bool:
     raise RowRefused(f"expected yes or no, got {value!r}", column)
 
 
+def changed_fields(existing: object, fields: dict[str, Any]) -> dict[str, Any]:
+    """The entries of ``fields`` that differ from what ``existing`` holds."""
+    return {key: value for key, value in fields.items() if getattr(existing, key) != value}
+
+
 def optional_bool(row: Row, key: str) -> bool | None:
     """A yes/no cell; ``None`` when blank (the field is left alone)."""
     return parse_bool(row.get(key), key) if row.get(key) else None
