@@ -297,6 +297,88 @@ PROJECT_POSITIONS = (
 FAKE_TOKEN = "A" * 43
 
 APP_ROUTES: dict[str, tuple[Route, ...]] = {
+    "projects:list": (Route(app_page(**_each(OK, PROJECT_VIEWERS))),),
+    "projects:detail": tuple(
+        Route(
+            project_page(PROJECT_VIEWERS, visible, visible),
+            position=position,
+            path=_project_url("projects:detail", project),
+        )
+        for position, project, visible in PROJECT_POSITIONS
+    ),
+    "projects:new": (Route(app_page(**_each(OK, PROJECT_MANAGERS))),),
+    "projects:create": (
+        Route(app_action(**_each(OK, PROJECT_MANAGERS)), note="an empty form: 200 with errors"),
+    ),
+    "projects:edit": (
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            position="own scope",
+            path=_project_url("projects:edit", "hospital"),
+        ),
+        Route(
+            project_page(PROJECT_MANAGERS, SEV_VIEWERS, SEV_VIEWERS),
+            position="foreign scope",
+            path=_project_url("projects:edit", "sev_works"),
+        ),
+    ),
+    "projects:update": (
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, OK),
+            path=_project_url("projects:update", "hospital"),
+            note="an empty form: 200 with errors",
+        ),
+    ),
+    "projects:assign": (
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, OK),
+            path=_project_url("projects:assign", "hospital"),
+            note="an empty form: the detail page with errors",
+        ),
+    ),
+    "projects:revoke_assignment": (
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, REDIRECT),
+            path=_object_url("projects:revoke_assignment", "projectassignment"),
+            note="the hospital's site manager; revoked once, then reported",
+        ),
+    ),
+    "projects:assignment_validity": (
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, REDIRECT),
+            path=_object_url("projects:assignment_validity", "projectassignment"),
+            note="an empty form: reported, then back to the project",
+        ),
+    ),
+    # Group administrators only (org.manage); the target is the A-MAD technician.
+    "org:people": (Route(org_page()),),
+    "org:person": (Route(org_page(), path=_person_url("org:person")),),
+    "org:grant_membership": (Route(org_action(), path=_person_url("org:grant_membership")),),
+    "org:set_employer": (Route(org_action(), path=_person_url("org:set_employer")),),
+    "org:offboard": (
+        Route(org_action(), path=_person_url("org:offboard"), note="unconfirmed: nothing happens"),
+    ),
+    "org:request_email_change": (
+        Route(org_action(), path=_person_url("org:request_email_change")),
+    ),
+    "org:revoke_membership": (
+        Route(org_action(), path=_object_url("org:revoke_membership", "membership")),
+    ),
+    "org:membership_validity": (
+        Route(org_action(), path=_object_url("org:membership_validity", "membership")),
+    ),
+    "org:revoke_email_change": (
+        Route(org_action(), path=_object_url("org:revoke_email_change", "emailchangerequest")),
+    ),
+    "org:invitations": (Route(org_page()),),
+    "org:new_invitation": (Route(org_page()),),
+    "org:create_invitation": (Route(org_action(OK), note="an empty form: 200 with errors"),),
+    "org:resend_invitation": (
+        Route(org_action(), path=_object_url("org:resend_invitation", "invitation")),
+    ),
+    "org:revoke_invitation": (
+        Route(org_action(), path=_object_url("org:revoke_invitation", "invitation")),
+    ),
     # Token pages: anonymous by design; no token in the session shows the generic page.
     "invitations:link": (
         Route(

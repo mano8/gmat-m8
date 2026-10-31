@@ -1,0 +1,47 @@
+{% extends "layouts/app.html" %}
+{% load i18n access %}
+{% block head_title %}
+  {% translate "Projects" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Projects" %}</h1>
+    {% can "project.manage" %}
+      {% url 'projects:new' as new_url %}
+      {% include "components/button.html" with href=new_url label=_("New project") variant="primary" %}
+    {% endcan %}
+  </div>
+  {% url 'projects:list' as list_url %}
+  {% include "components/filter_form.html" with form=filters target="#project-results" action=list_url %}
+  {% partialdef results inline %}
+    <div id="project-results">
+      {% if page_obj.object_list %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Code" %}</th>
+              <th scope="col">{% translate "Name" %}</th>
+              <th scope="col">{% translate "Branch" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for project in page_obj.object_list %}
+              <tr>
+                <td data-label="{% translate 'Code' %}">
+                  <a href="{% url 'projects:detail' project_id=project.pk %}">{{ project.code }}</a>
+                </td>
+                <td data-label="{% translate 'Name' %}">{{ project.name }}</td>
+                <td data-label="{% translate 'Branch' %}">{{ project.branch.company.code }}-{{ project.branch.code }}</td>
+                <td data-label="{% translate 'Status' %}">{% include "projects/status.html" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No projects") text=_("No project matches, or none is shared with you yet.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

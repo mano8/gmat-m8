@@ -40,6 +40,11 @@ e2e = [
 package = false
 default-groups = ["dev"]
 
+# --- djlint -------------------------------------------------------------
+[tool.djlint]
+# Block tags of Django's template partials and of ``{% can %}`` (apps.access).
+custom_blocks = "partialdef,can"
+
 # --- ruff ---------------------------------------------------------------
 [tool.ruff]
 line-length = 100

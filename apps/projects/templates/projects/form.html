@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% if project %}{{ project.code }}{% else %}{% translate "New project" %}{% endif %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-4">
+    {% if project %}
+      {% blocktranslate with code=project.code %}Edit project {{ code }}{% endblocktranslate %}
+    {% else %}
+      {% translate "New project" %}
+    {% endif %}
+  </h1>
+  <form method="post"
+        class="card max-w-2xl"
+        action="{% if project %}{% url 'projects:update' project_id=project.pk %}{% else %}{% url 'projects:create' %}{% endif %}">
+    {% csrf_token %}
+    {{ form }}
+    <div class="flex flex-wrap gap-3">
+      {% include "components/button.html" with type="submit" label=_("Save") variant="primary" %}
+      {% if project %}
+        {% url 'projects:detail' project_id=project.pk as back_url %}
+      {% else %}
+        {% url 'projects:list' as back_url %}
+      {% endif %}
+      {% include "components/button.html" with href=back_url label=_("Cancel") %}
+    </div>
+  </form>
+{% endblock content %}

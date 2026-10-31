@@ -1,0 +1,178 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {{ person.email }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1 class="break-all">{{ person.full_name|default:person.email }}</h1>
+    <p class="mt-1 flex flex-wrap items-center gap-2 text-soft">
+      <span class="break-all">{{ person.email }}</span>
+      {% include "organizations/account_status.html" %}
+    </p>
+    {% if not manageable and not is_self %}
+      <p class="mt-2 text-sm text-soft">{% translate "Only a platform operator can change this account." %}</p>
+    {% endif %}
+  </div>
+  <section class="card mb-4" aria-labelledby="roles-title">
+    <h2 id="roles-title" class="card-title">{% translate "Roles" %}</h2>
+    {% if memberships %}
+      <ul class="mb-4 divide-y divide-line">
+        {% for membership in memberships %}
+          <li class="py-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p class="font-medium">
+                  {{ membership.get_role_display }}
+                  {% if membership.branch %}· {{ membership.branch }}{% endif %}
+                  {% if membership.company %}· {{ membership.company }}{% endif %}
+                </p>
+                <p class="text-sm text-soft">
+                  {{ membership.valid_from|date:"SHORT_DATETIME_FORMAT" }} – {{ membership.valid_until|date:"SHORT_DATETIME_FORMAT"|default:"…" }}
+                </p>
+              </div>
+              {% if membership.revoked_at %}
+                {% include "components/status_chip.html" with label=_("Revoked") tone="danger" %}
+              {% elif manageable %}
+                <form method="post"
+                      action="{% url 'org:revoke_membership' membership_id=membership.pk %}">
+                  {% csrf_token %}
+                  {% include "components/button.html" with type="submit" label=_("Revoke") variant="danger" %}
+                </form>
+              {% endif %}
+            </div>
+            {% if manageable and not membership.revoked_at %}
+              <details class="mt-2">
+                <summary class="inline-flex min-h-11 cursor-pointer items-center text-brand">{% translate "Change validity" %}</summary>
+                <form method="post"
+                      class="mt-2 grid gap-x-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+                      action="{% url 'org:membership_validity' membership_id=membership.pk %}">
+                  {% csrf_token %}
+                  <div class="field">
+                    <label for="from-{{ membership.pk }}">{% translate "Valid from" %}</label>
+                    <input id="from-{{ membership.pk }}"
+                           type="datetime-local"
+                           name="valid_from"
+                           required
+                           value="{{ membership.valid_from|date:'Y-m-d\TH:i' }}">
+                  </div>
+                  <div class="field">
+                    <label for="until-{{ membership.pk }}">{% translate "Valid until" %}</label>
+                    <input id="until-{{ membership.pk }}"
+                           type="datetime-local"
+                           name="valid_until"
+                           value="{{ membership.valid_until|date:'Y-m-d\TH:i' }}">
+                  </div>
+                  <div class="field">{% include "components/button.html" with type="submit" label=_("Save") %}</div>
+                </form>
+              </details>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="mb-4 text-soft">{% translate "No roles yet." %}</p>
+    {% endif %}
+    {% if manageable and person.is_active %}
+      <details>
+        <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-brand">{% translate "Grant a role" %}</summary>
+        <form method="post"
+              class="mt-2 max-w-xl"
+              action="{% url 'org:grant_membership' user_id=person.pk %}">
+          {% csrf_token %}
+          {{ membership_form }}
+          {% include "components/button.html" with type="submit" label=_("Grant") variant="primary" %}
+        </form>
+      </details>
+    {% endif %}
+  </section>
+  {% if assignments %}
+    <section class="card mb-4" aria-labelledby="projects-title">
+      <h2 id="projects-title" class="card-title">{% translate "Projects shared" %}</h2>
+      <ul class="divide-y divide-line">
+        {% for assignment in assignments %}
+          <li class="flex flex-wrap items-center justify-between gap-2 py-3">
+            <span>
+              <a href="{% url 'projects:detail' project_id=assignment.project_id %}">{{ assignment.project.code }}</a>
+              · {{ assignment.get_kind_display }}
+            </span>
+            {% if assignment.revoked_at %}
+              {% include "components/status_chip.html" with label=_("Revoked") tone="danger" %}
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  {% if manageable and person.is_active %}
+    <section class="card mb-4" aria-labelledby="account-title">
+      <h2 id="account-title" class="card-title">{% translate "Account" %}</h2>
+      <form method="post"
+            class="mb-4 grid max-w-xl gap-x-3 sm:grid-cols-[1fr_auto] sm:items-end"
+            action="{% url 'org:set_employer' user_id=person.pk %}">
+        {% csrf_token %}
+        {{ employer_form }}
+        <div class="field">{% include "components/button.html" with type="submit" label=_("Save") %}</div>
+      </form>
+      <h3 class="mb-2 font-semibold">{% translate "Email address" %}</h3>
+      {% if open_change %}
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p class="text-soft">
+            {% if open_change.confirmed_at %}
+              {% blocktranslate with email=open_change.new_email date=open_change.apply_after|date:"SHORT_DATETIME_FORMAT" %}Changes to {{ email }} after {{ date }}.{% endblocktranslate %}
+            {% else %}
+              {% blocktranslate with email=open_change.new_email %}Waiting for {{ email }} to confirm.{% endblocktranslate %}
+            {% endif %}
+          </p>
+          <form method="post"
+                action="{% url 'org:revoke_email_change' change_id=open_change.pk %}">
+            {% csrf_token %}
+            {% include "components/button.html" with type="submit" label=_("Revoke") variant="danger" %}
+          </form>
+        </div>
+      {% endif %}
+      <form method="post"
+            class="mb-4 grid max-w-xl gap-x-3 sm:grid-cols-[1fr_auto] sm:items-end"
+            action="{% url 'org:request_email_change' user_id=person.pk %}">
+        {% csrf_token %}
+        {{ email_form }}
+        <div class="field">{% include "components/button.html" with type="submit" label=_("Change") %}</div>
+      </form>
+      <p class="mb-4 text-sm text-soft">
+        {% translate "The new address confirms the change; the current one can cancel it. It applies 24 hours after confirmation and ends every session of the account." %}
+      </p>
+      <details>
+        <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-danger">{% translate "Offboard" %}</summary>
+        <form method="post"
+              class="mt-2 max-w-xl"
+              action="{% url 'org:offboard' user_id=person.pk %}">
+          {% csrf_token %}
+          <p class="mb-2 text-soft">
+            {% translate "Deactivates the account, ends its sessions, revokes every role, project and pending invitation or email change, including those this person issued." %}
+          </p>
+          {{ confirm_form }}
+          {% include "components/button.html" with type="submit" label=_("Offboard") variant="danger" %}
+        </form>
+      </details>
+    </section>
+  {% endif %}
+  {% if invitations %}
+    <section class="card mb-4" aria-labelledby="invitations-title">
+      <h2 id="invitations-title" class="card-title">{% translate "Invitations" %}</h2>
+      <ul class="divide-y divide-line">
+        {% for invitation in invitations %}
+          <li class="py-3 text-soft">
+            {{ invitation.created_at|date:"SHORT_DATETIME_FORMAT" }} · {{ invitation.get_kind_display }} ·
+            {% if invitation.accepted_at %}
+              {% translate "accepted" %}
+            {% elif invitation.revoked_at %}
+              {% translate "revoked" %}
+            {% else %}
+              {% translate "pending" %}
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+{% endblock content %}

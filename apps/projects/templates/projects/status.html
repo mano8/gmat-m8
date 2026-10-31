@@ -1,0 +1,7 @@
+{% if project.status == "ACTIVE" %}
+  {% include "components/status_chip.html" with label=project.get_status_display tone="ok" %}
+{% elif project.status == "ON_HOLD" %}
+  {% include "components/status_chip.html" with label=project.get_status_display tone="warn" %}
+{% else %}
+  {% include "components/status_chip.html" with label=project.get_status_display %}
+{% endif %}

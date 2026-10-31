@@ -27,9 +27,11 @@ from typing import Any
 
 from allauth.account.internal.flows.login import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.models import Authenticator
+from django.conf import settings
 from django.contrib.auth import BACKEND_SESSION_KEY, HASH_SESSION_KEY, SESSION_KEY
 from django.contrib.sessions.backends.db import SessionStore
 from django.db.models import F
+from django.test import Client
 from django.utils import timezone
 
 from apps.access.roles import Role
@@ -304,3 +306,10 @@ def _thousands(whole: str) -> list[str]:
 
 
 NUMERIC_SENTINELS = frozenset({Sentinel.PRICE, Sentinel.OTHER_PROJECT_QUANTITY})
+
+
+def client_for(user: User, *, mfa: bool = True, **defaults: Any) -> Client:
+    """A test client signed in as ``user`` (with session MFA unless ``mfa=False``)."""
+    client = Client(**defaults)
+    client.cookies[settings.SESSION_COOKIE_NAME] = session_for(user, mfa=mfa)
+    return client

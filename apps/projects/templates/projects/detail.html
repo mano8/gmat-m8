@@ -1,0 +1,120 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {{ project.code }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1>{{ project.code }} · {{ project.name }}</h1>
+      <p class="mt-1">{% include "projects/status.html" %}</p>
+    </div>
+    {% if manageable %}
+      {% url 'projects:edit' project_id=project.pk as edit_url %}
+      {% include "components/button.html" with href=edit_url label=_("Edit") %}
+    {% endif %}
+  </div>
+  <section class="card mb-4">
+    <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      <div>
+        <dt class="text-sm text-soft">{% translate "Client" %}</dt>
+        <dd>
+          {{ project.client_name|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Address" %}</dt>
+        <dd>
+          {{ project.address|default:"—"|linebreaksbr }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Branch" %}</dt>
+        <dd>
+          {{ project.branch }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Procurement branch" %}</dt>
+        <dd>
+          {{ project.procurement_branch }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Dates" %}</dt>
+        <dd>
+          {{ project.start_date|date:"SHORT_DATE_FORMAT"|default:"—" }} – {{ project.end_date|date:"SHORT_DATE_FORMAT"|default:"—" }}
+        </dd>
+      </div>
+    </dl>
+  </section>
+  {% if manageable %}
+    <section class="card mb-4" aria-labelledby="assignments-title">
+      <h2 id="assignments-title" class="card-title">{% translate "Shared with" %}</h2>
+      {% if assignments %}
+        <ul class="mb-4 divide-y divide-line">
+          {% for assignment in assignments %}
+            <li class="py-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p class="font-medium">{{ assignment.user.full_name|default:assignment.user.email }}</p>
+                  <p class="text-sm text-soft">
+                    {{ assignment.get_kind_display }} ·
+                    {{ assignment.valid_from|date:"SHORT_DATETIME_FORMAT" }} – {{ assignment.valid_until|date:"SHORT_DATETIME_FORMAT"|default:"…" }}
+                  </p>
+                </div>
+                {% if assignment.revoked_at %}
+                  {% include "components/status_chip.html" with label=_("Revoked") tone="danger" %}
+                {% else %}
+                  <form method="post"
+                        action="{% url 'projects:revoke_assignment' assignment_id=assignment.pk %}">
+                    {% csrf_token %}
+                    {% include "components/button.html" with type="submit" label=_("Revoke") variant="danger" %}
+                  </form>
+                {% endif %}
+              </div>
+              {% if not assignment.revoked_at %}
+                <details class="mt-2">
+                  <summary class="inline-flex min-h-11 cursor-pointer items-center text-brand">{% translate "Change validity" %}</summary>
+                  <form method="post"
+                        class="mt-2 grid gap-x-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+                        action="{% url 'projects:assignment_validity' assignment_id=assignment.pk %}">
+                    {% csrf_token %}
+                    <div class="field">
+                      <label for="from-{{ assignment.pk }}">{% translate "Valid from" %}</label>
+                      <input id="from-{{ assignment.pk }}"
+                             type="datetime-local"
+                             name="valid_from"
+                             required
+                             value="{{ assignment.valid_from|date:'Y-m-d\TH:i' }}">
+                    </div>
+                    <div class="field">
+                      <label for="until-{{ assignment.pk }}">{% translate "Valid until" %}</label>
+                      <input id="until-{{ assignment.pk }}"
+                             type="datetime-local"
+                             name="valid_until"
+                             value="{{ assignment.valid_until|date:'Y-m-d\TH:i' }}">
+                    </div>
+                    <div class="field">{% include "components/button.html" with type="submit" label=_("Save") %}</div>
+                  </form>
+                </details>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="mb-4 text-soft">{% translate "Nobody outside the branches sees this project yet." %}</p>
+      {% endif %}
+      {% if assignment_form %}
+        <h3 class="mb-2 font-semibold">{% translate "Share the project" %}</h3>
+        <form method="post"
+              class="max-w-xl"
+              action="{% url 'projects:assign' project_id=project.pk %}">
+          {% csrf_token %}
+          {{ assignment_form }}
+          {% include "components/button.html" with type="submit" label=_("Share") variant="primary" %}
+        </form>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock content %}
