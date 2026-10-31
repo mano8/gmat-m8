@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 14:32+0000\n"
+"POT-Creation-Date: 2026-10-31 14:53+0000\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -120,7 +120,7 @@ msgstr "invitaciones"
 msgid "new email"
 msgstr "correo nuevo"
 
-#: apps/accounts/models.py:209 apps/material_requests/models.py:116
+#: apps/accounts/models.py:209 apps/material_requests/models.py:114
 msgid "requested by"
 msgstr "solicitado por"
 
@@ -589,7 +589,7 @@ msgstr "unidades de medida"
 msgid "reference"
 msgstr "referencia"
 
-#: apps/catalog/models.py:143 apps/material_requests/models.py:208
+#: apps/catalog/models.py:143 apps/material_requests/models.py:206
 msgid "description"
 msgstr "descripción"
 
@@ -615,7 +615,7 @@ msgstr "artículo de almacén"
 msgid "active"
 msgstr "activo"
 
-#: apps/catalog/models.py:174 apps/material_requests/models.py:206
+#: apps/catalog/models.py:174 apps/material_requests/models.py:204
 msgid "material"
 msgstr "material"
 
@@ -836,8 +836,8 @@ msgstr "Obra"
 msgid "branch"
 msgstr "delegación"
 
-#: apps/locations/models.py:44 apps/material_requests/models.py:104
-#: apps/material_requests/models.py:197 apps/projects/models.py:52
+#: apps/locations/models.py:44 apps/material_requests/models.py:102
+#: apps/material_requests/models.py:195 apps/projects/models.py:52
 #: apps/projects/models.py:87
 msgid "project"
 msgstr "obra"
@@ -864,248 +864,323 @@ msgstr "La delegación está inactiva."
 msgid "This is the branch's default warehouse; choose another first."
 msgstr "Es el almacén por defecto de la delegación; elige otro primero."
 
-#: apps/material_requests/models.py:82
+#: apps/material_requests/models.py:80
 msgid "Draft"
 msgstr "Borrador"
 
-#: apps/material_requests/models.py:83
+#: apps/material_requests/models.py:81
 msgid "Submitted"
 msgstr "Enviada"
 
-#: apps/material_requests/models.py:84 apps/material_requests/models.py:181
+#: apps/material_requests/models.py:82 apps/material_requests/models.py:179
 msgid "Approved"
 msgstr "Aprobada"
 
-#: apps/material_requests/models.py:85 apps/material_requests/models.py:182
+#: apps/material_requests/models.py:83 apps/material_requests/models.py:180
 msgid "Rejected"
 msgstr "Rechazada"
 
-#: apps/material_requests/models.py:86 apps/notifications/models.py:39
+#: apps/material_requests/models.py:84 apps/notifications/models.py:39
 msgid "Cancelled"
 msgstr "Cancelado"
 
-#: apps/material_requests/models.py:87 apps/projects/models.py:30
+#: apps/material_requests/models.py:85 apps/projects/models.py:30
 msgid "Closed"
 msgstr "Cerrada"
 
-#: apps/material_requests/models.py:90
+#: apps/material_requests/models.py:88
 msgid "Low"
 msgstr "Baja"
 
-#: apps/material_requests/models.py:91
+#: apps/material_requests/models.py:89
 msgid "Normal"
 msgstr "Normal"
 
-#: apps/material_requests/models.py:92
+#: apps/material_requests/models.py:90
 msgid "High"
 msgstr "Alta"
 
-#: apps/material_requests/models.py:93
+#: apps/material_requests/models.py:91
 msgid "Urgent"
 msgstr "Urgente"
 
-#: apps/material_requests/models.py:96
+#: apps/material_requests/models.py:94
 msgid "Automatic"
 msgstr "Automático"
 
-#: apps/material_requests/models.py:97
+#: apps/material_requests/models.py:95
 msgid "Manual"
 msgstr "Manual"
 
-#: apps/material_requests/models.py:101
+#: apps/material_requests/models.py:99
 msgid "number"
 msgstr "número"
 
-#: apps/material_requests/models.py:110 apps/projects/models.py:43
+#: apps/material_requests/models.py:108 apps/projects/models.py:43
 msgid "procurement branch"
 msgstr "delegación de compras"
 
-#: apps/material_requests/models.py:119
+#: apps/material_requests/models.py:117
 msgid "priority"
 msgstr "prioridad"
 
-#: apps/material_requests/models.py:121
+#: apps/material_requests/models.py:119
 msgid "needed by"
 msgstr "necesario para"
 
-#: apps/material_requests/models.py:122 apps/projects/models.py:45
+#: apps/material_requests/models.py:120 apps/projects/models.py:45
 msgid "status"
 msgstr "estado"
 
-#: apps/material_requests/models.py:123
+#: apps/material_requests/models.py:121
 msgid "close mode"
 msgstr "modo de cierre"
 
-#: apps/material_requests/models.py:124 apps/suppliers/models.py:31
+#: apps/material_requests/models.py:122 apps/suppliers/models.py:31
 msgid "notes"
 msgstr "notas"
 
-#: apps/material_requests/models.py:125
+#: apps/material_requests/models.py:123
 msgid "submitted at"
 msgstr "enviada el"
 
-#: apps/material_requests/models.py:126 apps/material_requests/models.py:225
+#: apps/material_requests/models.py:124 apps/material_requests/models.py:223
 msgid "decided at"
 msgstr "decidido el"
 
-#: apps/material_requests/models.py:127
+#: apps/material_requests/models.py:125
 msgid "closed at"
 msgstr "cerrada el"
 
-#: apps/material_requests/models.py:128 apps/material_requests/models.py:242
+#: apps/material_requests/models.py:126 apps/material_requests/models.py:240
 msgid "close reason"
 msgstr "motivo del cierre"
 
-#: apps/material_requests/models.py:133
+#: apps/material_requests/models.py:131
 msgid "material request"
 msgstr "solicitud de material"
 
-#: apps/material_requests/models.py:134
+#: apps/material_requests/models.py:132
 msgid "material requests"
 msgstr "solicitudes de material"
 
-#: apps/material_requests/models.py:180
+#: apps/material_requests/models.py:178
 msgid "Pending"
 msgstr "Pendiente"
 
-#: apps/material_requests/models.py:185
+#: apps/material_requests/models.py:183
 msgid "Undecided"
 msgstr "Sin decidir"
 
-#: apps/material_requests/models.py:186
+#: apps/material_requests/models.py:184
 msgid "From stock"
 msgstr "Desde almacén"
 
-#: apps/material_requests/models.py:187
+#: apps/material_requests/models.py:185
 msgid "Purchase"
 msgstr "Compra"
 
-#: apps/material_requests/models.py:190
+#: apps/material_requests/models.py:188
 msgid "Line closed"
 msgstr "Línea cerrada"
 
-#: apps/material_requests/models.py:191
+#: apps/material_requests/models.py:189
 msgid "Request closed"
 msgstr "Solicitud cerrada"
 
-#: apps/material_requests/models.py:194
+#: apps/material_requests/models.py:192
 msgid "request"
 msgstr "solicitud"
 
-#: apps/material_requests/models.py:199
+#: apps/material_requests/models.py:197
 msgid "line"
 msgstr "línea"
 
-#: apps/material_requests/models.py:210
+#: apps/material_requests/models.py:208
 msgid "unit"
 msgstr "unidad"
 
-#: apps/material_requests/models.py:212
+#: apps/material_requests/models.py:210
 msgid "requested quantity"
 msgstr "cantidad solicitada"
 
-#: apps/material_requests/models.py:213
+#: apps/material_requests/models.py:211
 msgid "approved quantity"
 msgstr "cantidad aprobada"
 
-#: apps/material_requests/models.py:215
+#: apps/material_requests/models.py:213
 msgid "decision"
 msgstr "decisión"
 
-#: apps/material_requests/models.py:223
+#: apps/material_requests/models.py:221
 msgid "decided by"
 msgstr "decidido por"
 
-#: apps/material_requests/models.py:226
+#: apps/material_requests/models.py:224
 msgid "decision note"
 msgstr "nota de la decisión"
 
-#: apps/material_requests/models.py:228
+#: apps/material_requests/models.py:226
 msgid "sourcing"
 msgstr "aprovisionamiento"
 
-#: apps/material_requests/models.py:230
+#: apps/material_requests/models.py:228
 msgid "closed short at"
 msgstr "cerrada incompleta el"
 
-#: apps/material_requests/models.py:237
+#: apps/material_requests/models.py:235
 msgid "closed short by"
 msgstr "cerrada incompleta por"
 
-#: apps/material_requests/models.py:240
+#: apps/material_requests/models.py:238
 msgid "closed by"
 msgstr "cerrada por"
 
-#: apps/material_requests/models.py:247
+#: apps/material_requests/models.py:245
 msgid "material request line"
 msgstr "línea de solicitud de material"
 
-#: apps/material_requests/models.py:248
+#: apps/material_requests/models.py:246
 msgid "material request lines"
 msgstr "líneas de solicitud de material"
 
-#: apps/material_requests/services.py:71
+#: apps/material_requests/services.py:94
 msgid "This material's unit has just changed; choose the material again."
-msgstr "La unidad de este material acaba de cambiar; vuelve a elegir el material."
+msgstr ""
+"La unidad de este material acaba de cambiar; vuelve a elegir el material."
 
-#: apps/material_requests/services.py:135
+#: apps/material_requests/services.py:158
 msgid "This project accepts no new requests."
 msgstr "Esta obra no admite nuevas solicitudes."
 
-#: apps/material_requests/services.py:144
+#: apps/material_requests/services.py:167
 msgid "The project's branch is inactive."
 msgstr "La delegación de la obra está inactiva."
 
-#: apps/material_requests/services.py:153
+#: apps/material_requests/services.py:176
 msgid "Lines change only while the request is a draft."
 msgstr "Las líneas solo se cambian mientras la solicitud es un borrador."
 
-#: apps/material_requests/services.py:165
+#: apps/material_requests/services.py:190
 msgid "Enter a quantity."
 msgstr "Indica una cantidad."
 
-#: apps/material_requests/services.py:169
+#: apps/material_requests/services.py:193
 msgid "The quantity must be positive."
 msgstr "La cantidad debe ser positiva."
 
-#: apps/material_requests/services.py:176
+#: apps/material_requests/services.py:200
 #, python-format
 msgid "%(unit)s quantities have at most %(decimals)s decimals."
 msgstr "Las cantidades en %(unit)s tienen como máximo %(decimals)s decimales."
 
-#: apps/material_requests/services.py:202
+#: apps/material_requests/services.py:226
+#: apps/material_requests/services.py:1052
 msgid "Choose an active material."
 msgstr "Elige un material activo."
 
-#: apps/material_requests/services.py:208
+#: apps/material_requests/services.py:232
 msgid "A catalog material is requested in its own unit."
 msgstr "Un material del catálogo se pide en su propia unidad."
 
-#: apps/material_requests/services.py:218
+#: apps/material_requests/services.py:242
 msgid "Describe the material, or choose one from the catalog."
 msgstr "Describe el material o elige uno del catálogo."
 
-#: apps/material_requests/services.py:225
+#: apps/material_requests/services.py:249
 msgid "Choose a unit."
 msgstr "Elige una unidad."
 
-#: apps/material_requests/services.py:370
+#: apps/material_requests/services.py:316
+msgid "Material has already been ordered or delivered for this request."
+msgstr "Ya se ha pedido o entregado material para esta solicitud."
+
+#: apps/material_requests/services.py:404
 #, python-format
 msgid "These details cannot be changed while the request is %(status)s."
-msgstr "Estos datos no se pueden cambiar mientras la solicitud está en estado %(status)s."
+msgstr ""
+"Estos datos no se pueden cambiar mientras la solicitud está en estado "
+"%(status)s."
 
-#: apps/material_requests/services.py:526
+#: apps/material_requests/services.py:560
 msgid "Add at least one line before submitting."
 msgstr "Añade al menos una línea antes de enviar."
 
-#: apps/material_requests/services.py:562
+#: apps/material_requests/services.py:596
 msgid "A reviewer has already decided a line; it can no longer be withdrawn."
 msgstr "Un revisor ya ha decidido una línea; ya no se puede retirar."
 
+#: apps/material_requests/services.py:649
 #: apps/material_requests/transitions.py:52
 #, python-format
 msgid "This request is %(status)s; it cannot be changed this way."
 msgstr "Esta solicitud está en estado %(status)s; no se puede cambiar así."
+
+#: apps/material_requests/services.py:659
+msgid "Give a reason."
+msgstr "Indica un motivo."
+
+#: apps/material_requests/services.py:666
+msgid "This line is closed short."
+msgstr "Esta línea está cerrada incompleta."
+
+#: apps/material_requests/services.py:668
+msgid "This line has no approved quantity."
+msgstr "Esta línea no tiene cantidad aprobada."
+
+#: apps/material_requests/services.py:780
+msgid "At most the requested quantity can be approved."
+msgstr "Como máximo se puede aprobar la cantidad solicitada."
+
+#: apps/material_requests/services.py:797
+msgid "Approve or reject the line."
+msgstr "Aprueba o rechaza la línea."
+
+#: apps/material_requests/services.py:822
+#, python-format
+msgid "Line %(line)s was decided by another reviewer."
+msgstr "La línea %(line)s la decidió otro revisor."
+
+#: apps/material_requests/services.py:872
+msgid "Decide at least one line."
+msgstr "Decide al menos una línea."
+
+#: apps/material_requests/services.py:877
+msgid "A line does not belong to this request."
+msgstr "Una línea no pertenece a esta solicitud."
+
+#: apps/material_requests/services.py:951
+msgid "An approved quantity can only be reduced."
+msgstr "Una cantidad aprobada solo se puede reducir."
+
+#: apps/material_requests/services.py:962
+#, python-format
+msgid "%(floor)s are already delivered, received or on order."
+msgstr "Ya hay %(floor)s entregados, recibidos o pedidos."
+
+#: apps/material_requests/services.py:995
+msgid "Choose stock or purchase."
+msgstr "Elige almacén o compra."
+
+#: apps/material_requests/services.py:1010
+msgid "Link the line to a catalog material before purchasing it."
+msgstr "Vincula la línea a un material del catálogo antes de comprarla."
+
+#: apps/material_requests/services.py:1016
+msgid "Goods are on order for this line; it cannot move to stock."
+msgstr "Hay material pedido para esta línea; no puede pasar a almacén."
+
+#: apps/material_requests/services.py:1048
+msgid "This line is already a catalog material."
+msgstr "Esta línea ya es un material del catálogo."
+
+#: apps/material_requests/services.py:1058
+msgid "This material is measured in another unit."
+msgstr "Este material se mide en otra unidad."
+
+#: apps/material_requests/services.py:1142
+msgid "This line is not closed short."
+msgstr "Esta línea no está cerrada incompleta."
 
 #: apps/notifications/models.py:22
 msgid "Notification"

@@ -1,14 +1,17 @@
-"""Fixtures for the material request tests: catalog rows and requests in any state."""
+"""Fixtures for the material request tests: catalog rows, requests in any state, and the
+flows (D, R, P, Q, allocated) that purchasing and handovers will contribute."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 import pytest
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Material, UnitOfMeasure
+from apps.material_requests import ledger
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.projects.models import Project
 from tests.org import Org, People
@@ -89,3 +92,17 @@ def make_request(org: Org, people: People, cable: Material) -> MakeRequest:
         return request
 
     return make
+
+
+@pytest.fixture
+def flows_of() -> Iterator[dict[UUID, ledger.Flows]]:
+    """A flow source the test fills: ``flows_of[line.pk] = Flows(delivered=…)``.
+
+    Stands in for purchasing (R, P, Q, allocated) and handovers (D) until they exist.
+    """
+    table: dict[UUID, ledger.Flows] = {}
+    unregister = ledger.register_flow_source(
+        lambda ids: {line_id: table[line_id] for line_id in ids if line_id in table}
+    )
+    yield table
+    unregister()
