@@ -25,6 +25,7 @@ ENTRYPOINT_COMMANDS = {
     "web",
     "runserver",
     "worker",
+    "worker-healthcheck",
     "migrate",
     "check",
     "migrate-plan",

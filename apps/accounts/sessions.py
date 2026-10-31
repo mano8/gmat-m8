@@ -3,7 +3,8 @@
 A session remembers the user's ``session_epoch`` from when it logged in. A password,
 email or MFA reset, a deactivation or "sign out everywhere" bumps the epoch, and every
 older session ends on its next request (``SessionGuardMiddleware``). Sessions also have an
-absolute lifetime that depends on the account: privileged ones are short (Q12).
+absolute lifetime that depends on the account: privileged ones (platform operators and
+holders of a privileged role, ``apps.access.policy.is_privileged``) are short (Q12).
 """
 
 import time
@@ -14,17 +15,10 @@ from django.contrib.auth import get_user_model
 from django.db.models import F
 from django.http import HttpRequest
 
+from apps.access.policy import is_privileged
+
 SESSION_EPOCH_KEY = "_gmat_session_epoch"
 SESSION_LOGIN_AT_KEY = "_gmat_login_at"
-
-
-def is_privileged(user: Any) -> bool:
-    """Accounts with short sessions and mandatory MFA.
-
-    Today these are the platform operators (staff and superusers). M2.3 adds the
-    privileged roles (``GROUP_ADMIN``, ``MATERIAL_MANAGER``).
-    """
-    return bool(user.is_staff or user.is_superuser)
 
 
 def session_lifetime(user: Any) -> int:

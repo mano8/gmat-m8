@@ -1,0 +1,22 @@
+{% extends "layouts/entrance.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Accept the invitation" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-2">{% translate "Accept the invitation" %}</h1>
+  <p class="mb-4 text-soft break-all">{{ invitation.email }}</p>
+  <form method="post" action="{% url 'invitations:submit' %}">
+    {% csrf_token %}
+    {% if form %}
+      <p class="mb-4 text-soft">
+        {% translate "Choose a password of at least 12 characters. Administrators and material managers then set up a second factor when they first sign in." %}
+      </p>
+      {{ form }}
+      {% include "components/button.html" with type="submit" label=_("Set password and accept") variant="primary" block=True %}
+    {% else %}
+      <p class="mb-4 text-soft">{% translate "Your account receives the access in this invitation. Your password and second factor do not change." %}</p>
+      {% include "components/button.html" with type="submit" label=_("Accept") variant="primary" block=True %}
+    {% endif %}
+  </form>
+{% endblock content %}

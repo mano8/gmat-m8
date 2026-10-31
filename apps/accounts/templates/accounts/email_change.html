@@ -1,0 +1,29 @@
+{% extends "layouts/entrance.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Email change" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  {% if action == "confirm" %}
+    <h1 class="mb-2">{% translate "Confirm your new address" %}</h1>
+    <p class="mb-4 text-soft break-all">
+      {% blocktranslate with email=change.new_email %}Use {{ email }} for your gmat-m8 account.{% endblocktranslate %}
+    </p>
+    <p class="mb-4 text-sm text-soft">
+      {% blocktranslate %}The change applies {{ cooling_off_hours }} hours after you confirm, unless it is cancelled from the current address. Every session of the account then ends.{% endblocktranslate %}
+    </p>
+    <form method="post" action="{% url 'email_change:confirm_submit' %}">
+      {% csrf_token %}
+      {% include "components/button.html" with type="submit" label=_("Confirm") variant="primary" block=True %}
+    </form>
+  {% else %}
+    <h1 class="mb-2">{% translate "Cancel the email change" %}</h1>
+    <p class="mb-4 text-soft">
+      {% translate "An administrator asked to change the address of your account. Cancel it if you did not expect this." %}
+    </p>
+    <form method="post" action="{% url 'email_change:cancel_submit' %}">
+      {% csrf_token %}
+      {% include "components/button.html" with type="submit" label=_("Cancel the change") variant="danger" block=True %}
+    </form>
+  {% endif %}
+{% endblock content %}

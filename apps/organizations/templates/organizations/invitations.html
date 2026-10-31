@@ -1,0 +1,50 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Invitations" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Pending invitations" %}</h1>
+    {% url 'org:new_invitation' as invite_url %}
+    {% include "components/button.html" with href=invite_url label=_("Invite someone") variant="primary" %}
+  </div>
+  {% url 'org:invitations' as list_url %}
+  {% include "components/filter_form.html" with form=filters target="#invitation-results" action=list_url %}
+  {% partialdef results inline %}
+    <div id="invitation-results">
+      {% if page_obj.object_list %}
+        <ul class="divide-y divide-line">
+          {% for invitation in page_obj.object_list %}
+            <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div>
+                <p class="font-medium">{{ invitation.email }}</p>
+                <p class="text-sm text-soft">
+                  {{ invitation.get_kind_display }} ·
+                  {% blocktranslate with date=invitation.expires_at|date:"SHORT_DATETIME_FORMAT" %}expires {{ date }}{% endblocktranslate %}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                {% if not invitation.bootstrap %}
+                  <form method="post"
+                        action="{% url 'org:resend_invitation' invitation_id=invitation.pk %}">
+                    {% csrf_token %}
+                    {% include "components/button.html" with type="submit" label=_("Resend") %}
+                  </form>
+                {% endif %}
+                <form method="post"
+                      action="{% url 'org:revoke_invitation' invitation_id=invitation.pk %}">
+                  {% csrf_token %}
+                  {% include "components/button.html" with type="submit" label=_("Revoke") variant="danger" %}
+                </form>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No pending invitations") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

@@ -1,0 +1,26 @@
+# Local mail sink for a local or CI stack: the worker delivers to Mailpit (app.env.example:
+# EMAIL_HOST=mailpit), so no mail leaves the host. `.env` adds this file through COMPOSE_FILE
+# when compose runs without -f; production and the restore drill always pass -f and never
+# load it. Not part of the production image set (the nightly scan reads docker-compose.yml).
+#
+#   docker compose up -d --build --wait     # with COMPOSE_FILE from .env.example
+#   docker compose exec worker python -c "import urllib.request; print(urllib.request.urlopen('http://mailpit:8025/api/v1/messages').read().decode())"
+
+services:
+  mailpit:
+    image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    user: "1000:1000"
+    tmpfs: [/tmp]
+    # Only the worker (and the backup) share `egress`; nothing is published.
+    networks: [egress]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 128m
+    pids_limit: 64

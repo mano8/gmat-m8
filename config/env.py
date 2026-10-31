@@ -37,6 +37,12 @@ def derived_fernet_key(label: str) -> str:
     return base64.urlsafe_b64encode(digest).decode("ascii")
 
 
+def non_production_fernet_keys() -> frozenset[str]:
+    """The derived development and test keys (MFA and outbox); production refuses them."""
+    labels = ("development", "test", "outbox-development", "outbox-test")
+    return frozenset(derived_fernet_key(label) for label in labels)
+
+
 def _raw(name: str, environ: Mapping[str, str] | None) -> str | None:
     value = (os.environ if environ is None else environ).get(name)
     if value is None:

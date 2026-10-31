@@ -15,9 +15,11 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db import connection
 from django.test import Client, RequestFactory, override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 from django.utils import timezone
 
+from apps.access.principals import SessionPrincipal
+from apps.access.roles import Role
 from apps.accounts import signals
 from apps.accounts.adapters import MFAAdapter
 from apps.accounts.mfa import (
@@ -29,8 +31,11 @@ from apps.accounts.mfa import (
     step_up_response,
 )
 from apps.accounts.models import User
+from apps.organizations.models import Branch
+from apps.organizations.services import grant_membership
 from tests.support import (
     enroll_totp,
+    grant,
     mfa_login,
     password_login,
     totp_authenticator,
@@ -391,7 +396,63 @@ class TestStepUp:
         response = step_up_response(request)
         assert response["Location"].startswith(reverse("mfa_index") + "?next=")
 
-    def test_only_admin_urls_need_mfa_today(self, client: Client) -> None:
+    def test_an_unresolved_request_needs_no_mfa(self, client: Client) -> None:
         request = RequestFactory().get("/")
         request.resolver_match = None
         assert mfa_required_for(request) is False
+
+
+class TestRoleBasedMfa:
+    """Privileged roles need a session that passed MFA after their last elevation (§3.6, §5)."""
+
+    @pytest.fixture
+    def manager(self, make_user: Callable[..., User], branch: Branch) -> User:
+        user = make_user("mm@example.org")
+        grant(user, Role.MATERIAL_MANAGER, branch=branch)
+        return user
+
+    def needs_mfa(self, user: User, url_name: str) -> bool:
+        request = RequestFactory().get("/")
+        request.user = user
+        request.resolver_match = resolve(reverse(url_name))
+        return mfa_required_for(request)
+
+    def test_privileged_users_need_it_on_every_business_url(
+        self, manager: User, make_user: Callable[..., User]
+    ) -> None:
+        assert self.needs_mfa(manager, "core:home") is True
+        assert self.needs_mfa(make_user("ops@example.org", is_staff=True), "core:home") is True
+        assert self.needs_mfa(make_user(), "core:home") is False
+
+    @pytest.mark.parametrize(
+        "url_name", ["account_logout", "mfa_index", "mfa_reauthenticate", "set_language"]
+    )
+    def test_except_where_mfa_is_completed_or_the_session_ends(
+        self, manager: User, url_name: str
+    ) -> None:
+        assert self.needs_mfa(manager, url_name) is False
+
+    def test_a_password_only_session_is_stepped_up(self, client: Client, manager: User) -> None:
+        client.force_login(manager)
+        response = client.get(reverse("core:home"))
+        assert response.status_code == 302
+        assert response["Location"].startswith(reverse("mfa_index"))  # not enrolled: enroll
+        assert client.post(reverse("core:home")).status_code == 403
+
+    def test_mfa_before_a_privilege_elevation_steps_up_again(
+        self,
+        client: Client,
+        admin_principal: SessionPrincipal,
+        make_user: Callable[..., User],
+        branch: Branch,
+        frozen_totp: int,
+    ) -> None:
+        user = make_user("tech@example.org")
+        grant(user, Role.TECHNICIAN, branch=branch)
+        mfa_login(client, user.email, enroll_totp(user))
+        assert client.get(reverse("core:home")).status_code == 200
+        grant_membership(
+            admin_principal, user_id=user.pk, role=Role.MATERIAL_MANAGER, branch_id=branch.pk
+        )
+        response = client.get(reverse("core:home"))
+        assert response["Location"].startswith(reverse("mfa_reauthenticate"))

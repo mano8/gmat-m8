@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n access %}
 {% comment %}
   The navigation entries, rendered twice by layouts/app.html (`variant` "side" and "bottom"
   only changes the container). Later phases add their entries here, guarded by capability.
@@ -9,6 +9,22 @@
   {% include "components/icon.html" with name="home" %}
   <span>{% translate "Home" %}</span>
 </a>
+{% can "project.view" %}
+  <a href="{% url 'projects:list' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'projects' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="folder" %}
+    <span>{% translate "Projects" %}</span>
+  </a>
+{% endcan %}
+{% can "org.manage" %}
+  <a href="{% url 'org:people' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'org' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="people" %}
+    <span>{% translate "People" %}</span>
+  </a>
+{% endcan %}
 <a href="{% url 'mfa_index' %}"
    class="nav-link"
    {% if request.resolver_match.app_name == 'mfa' or request.resolver_match.url_name|slice:':4' == 'mfa_' %}aria-current="page"{% endif %}>

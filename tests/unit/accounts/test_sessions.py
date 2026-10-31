@@ -11,16 +11,17 @@ from django.core.exceptions import PermissionDenied
 from django.test import Client, RequestFactory
 from django.urls import reverse
 
+from apps.access.roles import Role
 from apps.accounts.adapters import AccountAdapter
 from apps.accounts.models import User
 from apps.accounts.sessions import (
     SESSION_EPOCH_KEY,
     SESSION_LOGIN_AT_KEY,
     bump_session_epoch,
-    is_privileged,
     session_lifetime,
 )
-from tests.support import PASSWORD, password_login
+from apps.organizations.models import Branch
+from tests.support import PASSWORD, grant, password_login
 
 pytestmark = pytest.mark.django_db
 
@@ -133,17 +134,23 @@ class TestSessionGuard:
         assert session_lifetime(user) == lifetime
         client.force_login(user)
         login_at = client.session[SESSION_LOGIN_AT_KEY]
+        # A privileged session without MFA is sent to the step-up, but stays logged in.
         with mock.patch("apps.accounts.sessions.time.time", return_value=login_at + lifetime - 5):
-            assert client.get(reverse("core:home")).status_code == 200
+            client.get(reverse("core:home"))
+            assert "_auth_user_id" in client.session
         with mock.patch("apps.accounts.sessions.time.time", return_value=login_at + lifetime + 1):
             assert client.get(reverse("core:home")).status_code == 302
+            assert "_auth_user_id" not in client.session
 
-    def test_privileged_means_staff_or_superuser_for_now(
-        self, make_user: Callable[..., User]
+    def test_privileged_roles_have_short_sessions(
+        self, make_user: Callable[..., User], branch: Branch
     ) -> None:
-        assert not is_privileged(make_user())
-        assert is_privileged(make_user("ops@example.org", is_staff=True))
-        assert is_privileged(make_user("root@example.org", is_superuser=True))
+        manager = make_user("mm@example.org")
+        technician = make_user()
+        grant(manager, Role.MATERIAL_MANAGER, branch=branch)
+        grant(technician, Role.TECHNICIAN, branch=branch)
+        assert session_lifetime(manager) == 12 * 3600
+        assert session_lifetime(technician) == 14 * 24 * 3600
 
     def test_a_login_without_a_request_is_ignored(self, make_user: Callable[..., User]) -> None:
         from apps.accounts.signals import on_user_logged_in

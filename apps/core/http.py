@@ -40,3 +40,8 @@ def client_ip(request: HttpRequest) -> str | None:
         return _parse_ip(hops[-trusted])
     remote = request.META.get("REMOTE_ADDR")
     return _parse_ip(remote) if remote else None
+
+
+def is_htmx(request: HttpRequest) -> bool:
+    """The request came from htmx (``django_htmx``'s ``request.htmx``): answer with a partial."""
+    return bool(getattr(request, "htmx", False))

@@ -2,7 +2,8 @@
 # Prepares the gmat-m8 compose stack (plan §7.3).
 #
 #   bash init.sh                    create .env and app.env from the *.example templates,
-#                                   generate every secret, set mode 0600, create backups/ and flags/
+#                                   generate every secret, set mode 0600, create backups/ and flags/;
+#                                   existing env files get only the keys a later release added
 #   bash init.sh --ci               the same, for a CI runner: backups/ is world-writable so the
 #                                   container user (uid 1000) can write whatever uid the runner has
 #   bash init.sh --reset-db [--yes] stop the stack and DELETE the database volume (asks first)
@@ -22,7 +23,7 @@ for arg in "$@"; do
         --reset-db) reset_db=1 ;;
         --yes) assume_yes=1 ;;
         -h | --help)
-            sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -79,6 +80,28 @@ fill_generated() {
     mv "$tmp" "$file"
 }
 
+# Appends to an existing env file each key of its template that it lacks (introduced by a
+# later release): __GENERATE_*__ values are generated, others copied. Prints key names only.
+add_missing_keys() { # add_missing_keys FILE TEMPLATE
+    local file="$1" template="$2" line key value added=()
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+        key="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[2]}"
+        if grep -q "^${key}=" "$file" || [[ "$value" == __FROM_ENV_* ]]; then
+            continue
+        fi
+        if [[ "$value" =~ ^__GENERATE_[A-Z]+__$ ]]; then
+            value=$(generate "$value")
+        fi
+        printf '%s=%s\n' "$key" "$value" >>"$file"
+        added+=("$key")
+    done <"$template"
+    if [ "${#added[@]}" -gt 0 ]; then
+        echo "init.sh: added to $file: ${added[*]}"
+    fi
+}
+
 env_value() { # env_value FILE KEY
     sed -n "s/^$2=//p" "$1" | head -n 1
 }
@@ -107,6 +130,8 @@ if [ ! -f .env ]; then
     cp .env.example .env
     fill_generated .env
     created+=(.env)
+else
+    add_missing_keys .env .env.example
 fi
 
 if [ ! -f app.env ]; then
@@ -121,6 +146,8 @@ if [ ! -f app.env ]; then
     sed -i "s|^DJANGO_ALLOWED_HOSTS=__FROM_ENV_HOSTS__$|DJANGO_ALLOWED_HOSTS=${domain:-localhost}|" app.env
     sed -i "s|^DJANGO_CSRF_TRUSTED_ORIGINS=__FROM_ENV_ORIGINS__$|DJANGO_CSRF_TRUSTED_ORIGINS=${origin}|" app.env
     created+=(app.env)
+else
+    add_missing_keys app.env app.env.example
 fi
 
 if cat .env app.env | grep -vE '^[[:space:]]*#' | grep -qE '__(GENERATE|FROM_ENV)_'; then

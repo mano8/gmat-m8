@@ -186,7 +186,9 @@ def test_failed_logins_spread_over_all_workers_hit_the_limit(
     with ThreadPoolExecutor(max_workers=12) as pool:
         responses = list(pool.map(attempt, range(24)))
 
-    assert all(response.status in {200, 429} for response in responses)
+    statuses = sorted(response.status for response in responses)
+    # A 503 is Caddy's fallback page: a Gunicorn worker died (see the M2.6 PR on sizing).
+    assert set(statuses) <= {200, 429}, statuses
     checked = 1 + sum(_checked(response, reference) for response in responses)
     assert checked <= 10, f"{checked} passwords were checked from one address"
     assert checked < 25, "no attempt was limited"
@@ -233,6 +235,10 @@ def test_the_sentinel_never_reaches_a_log(stack: Stack) -> None:
         "HX-Current-URL": f"{stack.base_url}{token_path}",
     }
     stack.get(f"{token_path}?token={sentinel}", headers=hostile)
+    # Invitation and email-change links: a token of the real shape (43 characters).
+    link_token = f"{sentinel}{'x' * (43 - len(sentinel))}"
+    stack.get(f"/invite/{link_token}/", headers=hostile)
+    stack.get(f"/account/email-change/{link_token}/?token={sentinel}", headers=hostile)
     stack.get(f"/accounts/login/?next=/x/{sentinel}/", headers=hostile)
     stack.get("/no-such-page/", headers=hostile)
     stack.get(f"/healthz/?probe={sentinel}", headers=hostile)
@@ -256,6 +262,7 @@ def test_the_sentinel_never_reaches_a_log(stack: Stack) -> None:
     caddy = stack.logs("caddy")
     # The access log exists and shows the redaction at work...
     assert "/accounts/password/reset/key/REDACTED" in caddy.replace("\\/", "/")
+    assert "/invite/REDACTED" in caddy.replace("\\/", "/")
     # ...and no stream carries the secret: not the proxy, not Gunicorn, not Django.
     for service in ("caddy", "web"):
         assert sentinel not in stack.logs(service), f"{service} logged the sentinel"
@@ -380,6 +387,21 @@ def test_web_has_no_route_to_the_internet(stack: Stack) -> None:
     assert probe.returncode != 0
 
 
+def test_the_worker_cannot_reach_web(stack: Stack) -> None:
+    probe = stack.compose(
+        "exec",
+        "-T",
+        "worker",
+        "python",
+        "-c",
+        "import socket; socket.create_connection(('web', 8000), timeout=3)",
+        check=False,
+    )
+    assert probe.returncode != 0
+    resolve = stack.compose("exec", "-T", "worker", "getent", "hosts", "web", check=False)
+    assert resolve.returncode != 0
+
+
 def _as_role(stack: Stack, role: str, statement: str) -> tuple[int, str]:
     result = stack.compose(
         "exec",
@@ -447,3 +469,111 @@ def test_backup_now_then_restore_verify_against_the_manifest(stack: Stack) -> No
         assert "restore verify OK" in verified.stdout + verified.stderr
     finally:
         stack.sql(f"DELETE FROM django_session WHERE session_key = '{marker}'")  # noqa: S608
+
+
+# --- outbox and worker (plan §5) -------------------------------------------------------------
+
+
+def _new_account(stack: Stack) -> str:
+    email = f"live-{uuid.uuid4().hex[:12]}@example.org"
+    stack.compose(
+        "exec", "-T", "web", "python", "manage.py", "shell", "-c",
+        "from apps.accounts.models import User; "
+        f"User.objects.create_user({email!r}, 'live-test-password-{uuid.uuid4().hex}')",
+    )  # fmt: skip
+    return email
+
+
+def _request_reset(stack: Stack, email: str) -> None:
+    page = stack.get("/accounts/password/reset/")
+    assert page.status == 200
+    match = CSRF_FIELD.search(page.text)
+    assert match
+    cookie = next(
+        value.split(";", 1)[0]
+        for value in page.headers_named("set-cookie")
+        if value.startswith(f"{CSRF_COOKIE}=")
+    )
+    response = stack.request(
+        "POST",
+        "/accounts/password/reset/",
+        body=urlencode({"csrfmiddlewaretoken": match.group(1), "email": email}).encode(),
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Cookie": cookie,
+            "Origin": stack.base_url,
+            "Referer": f"{stack.base_url}/accounts/password/reset/",
+        },
+    )
+    assert response.status == 302, response.text[:500]
+
+
+def _outbox_status(stack: Stack, email: str) -> str:
+    return stack.sql(
+        "SELECT status || ':' || (body = '')::text FROM notifications_emailoutbox "  # noqa: S608
+        f"WHERE recipient_address = '{email}'"
+    )
+
+
+def _mailpit(stack: Stack, path: str) -> dict[str, object]:
+    """Ask Mailpit's API from the worker container (both are on `egress`)."""
+    result = stack.compose(
+        "exec", "-T", "worker", "python", "-c",
+        "import sys, urllib.request; "
+        "print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())",
+        f"http://mailpit:8025{path}",
+    )  # fmt: skip
+    loaded: dict[str, object] = json.loads(result.stdout)
+    return loaded
+
+
+def _wait_for(check: object, timeout: float = 60) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if check():  # type: ignore[operator]
+            return
+        time.sleep(1)
+    raise AssertionError("timed out")
+
+
+def test_a_password_reset_reaches_mailpit_through_the_worker(stack: Stack) -> None:
+    stack.reset_rate_limits()
+    email = _new_account(stack)
+    _request_reset(stack, email)
+    _wait_for(lambda: _outbox_status(stack, email) == "SENT:true")  # sent, body wiped
+    found = _mailpit(stack, f"/api/v1/search?query=to:{email}")
+    assert found["messages_count"] == 1, found
+    message_id = found["messages"][0]["ID"]  # type: ignore[index]
+    text = str(_mailpit(stack, f"/api/v1/message/{message_id}")["Text"])
+    link = re.search(r"/accounts/password/reset/key/(\S+)/", text)
+    assert link, text
+    worker_log = stack.logs("worker")
+    assert link.group(1) not in worker_log
+    assert email not in worker_log
+    stack.reset_rate_limits()
+
+
+def test_a_paused_worker_sends_nothing_until_resumed(stack: Stack) -> None:
+    flag = stack.compose_dir / "flags" / "worker.paused"
+    flag.parent.mkdir(exist_ok=True)
+    stack.reset_rate_limits()
+    email = _new_account(stack)
+    try:
+        flag.write_text("", encoding="utf-8")
+        heartbeat = "/tmp/gmat-worker.heartbeat"  # noqa: S108 (inside the container)
+        _wait_for(
+            lambda: '"paused"' in stack.compose("exec", "-T", "worker", "cat", heartbeat).stdout,
+            timeout=15,
+        )
+        healthy = stack.compose(
+            "exec", "-T", "worker", "/app/docker/app/entrypoint.sh", "worker-healthcheck",
+            check=False,
+        )  # fmt: skip
+        assert healthy.returncode == 0  # paused is still alive (deploys check it, M8.4)
+        _request_reset(stack, email)
+        time.sleep(6)  # three loop iterations
+        assert _outbox_status(stack, email) == "QUEUED:false"
+    finally:
+        flag.unlink(missing_ok=True)
+    _wait_for(lambda: _outbox_status(stack, email) == "SENT:true")
+    stack.reset_rate_limits()

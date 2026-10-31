@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}You have been invited to gmat-m8, the materials app of your company.{% endblocktranslate %}
+
+{% blocktranslate %}Open this link to accept the invitation. It works once, for {{ hours }} hours:{% endblocktranslate %}
+
+{{ link }}
+
+{% blocktranslate %}If you did not expect this invitation, ignore this message.{% endblocktranslate %}
+{% endautoescape %}

@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}An administrator asked to change the email address of your gmat-m8 account.{% endblocktranslate %}
+
+{% blocktranslate %}If the new address confirms, the change takes effect {{ cooling_off_hours }} hours later and every session of your account ends.{% endblocktranslate %}
+
+{% blocktranslate %}If you did not expect this, cancel the change with this link before it takes effect:{% endblocktranslate %}
+
+{{ link }}
+{% endautoescape %}

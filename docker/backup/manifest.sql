@@ -32,11 +32,13 @@ SELECT json_build_object(
                               ORDER BY app, id DESC) m
                     $q$, false, true, '')))[1]::text::json
     END,
-    -- Identifier of the newest audit event (UUIDv7 sorts by time), once the audit table exists.
+    -- Identifier of the newest audit event (UUIDv7 sorts by time), once the audit table exists;
+    -- null while it is empty. The scalar subquery always yields one row: a query with no row
+    -- gives query_to_xml an empty document, which xpath refuses.
     'audit_last_event_id', CASE
         WHEN to_regclass(format('public.%I', :'audit_table')) IS NULL THEN NULL
         ELSE (xpath('/row/j/text()',
-                    query_to_xml(format('SELECT id::text AS j FROM public.%I ORDER BY id DESC LIMIT 1',
+                    query_to_xml(format('SELECT (SELECT id FROM public.%I ORDER BY id DESC LIMIT 1)::text AS j',
                                         :'audit_table'), false, true, '')))[1]::text
     END
 );

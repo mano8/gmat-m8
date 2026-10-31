@@ -3,8 +3,9 @@
 The always-on checks guard settings that must hold in every environment: the allauth
 floor and hardening, the security cache, log redaction and the admin base class. The
 deployment checks run with ``manage.py check --deploy`` (image entrypoint, compose smoke
-test) and refuse a production configuration that is unsafe. M2.5 adds
-``OUTBOX_ENCRYPTION_KEYS`` and makes the outbox the only production mail backend.
+test) and refuse a production configuration that is unsafe, the mail setup included: the
+outbox is the only default mailer, the worker's mailer is SMTP with bounded timeouts, and
+``OUTBOX_ENCRYPTION_KEYS`` are real keys of their own.
 """
 
 import logging
@@ -14,15 +15,15 @@ from typing import Any
 from django.conf import settings
 from django.core.checks import CheckMessage, Error, register
 
-from config.env import derived_fernet_key, fernet_key_problems, is_placeholder
+from config.env import fernet_key_problems, is_placeholder, non_production_fernet_keys
 
 ALLAUTH_FLOOR = "65.20.1"  # same floor as scripts/check_security_floors.py (plan §8.3)
 SECURITY_CACHE = "apps.core.cache.SecurityDatabaseCache"
 REDACTION_FILTER = "config.logging.RedactionFilter"
 ARGON2 = "django.contrib.auth.hashers.Argon2PasswordHasher"
 CHECKED_LOGGERS = ("django", "django.request", "django.server", "django.security")
-# M2.5 replaces the interim backend with the outbox backend here.
-PRODUCTION_MAIL_BACKENDS = frozenset({"apps.core.mail.DisabledEmailBackend"})
+OUTBOX_BACKEND = "apps.notifications.backends.OutboxEmailBackend"
+SMTP_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # allauth settings whose value is part of the security baseline: name -> required value.
 ALLAUTH_BASELINE: dict[str, Any] = {
@@ -134,6 +135,40 @@ def check_admin_base_class(app_configs: Any, **kwargs: Any) -> list[CheckMessage
     ]
 
 
+@register()
+def check_idempotency_windows(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+    """A record must outlive its key, or a purge could turn a replay into a new command."""
+    max_age = int(getattr(settings, "IDEMPOTENCY_KEY_MAX_AGE", 0))
+    retention = int(getattr(settings, "IDEMPOTENCY_RECORD_RETENTION", 0))
+    if max_age <= 0 or retention <= max_age:
+        return [
+            Error(
+                "IDEMPOTENCY_RECORD_RETENTION must be longer than IDEMPOTENCY_KEY_MAX_AGE (> 0)",
+                id="gmat.E006",
+            )
+        ]
+    return []
+
+
+def _mailer_backend(alias: str) -> str | None:
+    backend = getattr(settings, "MAILERS", {}).get(alias, {}).get("BACKEND")
+    return backend if isinstance(backend, str) else None
+
+
+@register()
+def check_no_smtp_in_requests(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+    """Requests send through the default mailer: it must never be SMTP (plan §5)."""
+    backend = _mailer_backend("default")
+    if backend is None or backend == SMTP_BACKEND:
+        return [
+            Error(
+                "MAILERS['default'] must queue to the outbox, never send SMTP from a request",
+                id="gmat.E007",
+            )
+        ]
+    return []
+
+
 def _secret_errors() -> list[CheckMessage]:
     errors: list[CheckMessage] = []
     if settings.DEBUG:
@@ -141,13 +176,19 @@ def _secret_errors() -> list[CheckMessage]:
     secret_key = str(getattr(settings, "SECRET_KEY", ""))
     if len(secret_key) < 50 or is_placeholder(secret_key):
         errors.append(Error("SECRET_KEY is missing, weak or a placeholder", id="gmat.E011"))
-    refused = frozenset({derived_fernet_key("development"), derived_fernet_key("test")})
+    refused = non_production_fernet_keys()
+    mfa_keys = list(getattr(settings, "MFA_ENCRYPTION_KEYS", []))
     errors.extend(
         Error(f"MFA_ENCRYPTION_KEYS: {problem}", id="gmat.E012")
-        for problem in fernet_key_problems(
-            list(getattr(settings, "MFA_ENCRYPTION_KEYS", [])), refused=refused
-        )
+        for problem in fernet_key_problems(mfa_keys, refused=refused)
     )
+    outbox_keys = list(getattr(settings, "OUTBOX_ENCRYPTION_KEYS", []))
+    errors.extend(
+        Error(f"OUTBOX_ENCRYPTION_KEYS: {problem}", id="gmat.E018")
+        for problem in fernet_key_problems(outbox_keys, refused=refused)
+    )
+    if set(outbox_keys) & set(mfa_keys):
+        errors.append(Error("OUTBOX_ENCRYPTION_KEYS must not reuse an MFA key", id="gmat.E018"))
     return errors
 
 
@@ -178,18 +219,41 @@ def _hasher_and_mail_errors() -> list[CheckMessage]:
     errors: list[CheckMessage] = []
     if not settings.PASSWORD_HASHERS or settings.PASSWORD_HASHERS[0] != ARGON2:
         errors.append(Error("Argon2 must be the first password hasher", id="gmat.E016"))
-    mailer = getattr(settings, "MAILERS", {}).get("default", {}).get("BACKEND")
-    if mailer not in PRODUCTION_MAIL_BACKENDS:
+    if _mailer_backend("default") != OUTBOX_BACKEND:
         errors.append(
             Error(
-                "Production mail must not be sent from a request (no SMTP); use "
-                f"{' or '.join(sorted(PRODUCTION_MAIL_BACKENDS))}",
+                f"Production mail goes through the outbox: MAILERS['default'] = {OUTBOX_BACKEND}",
                 id="gmat.E017",
             )
         )
     return errors
 
 
+def _outbound_errors() -> list[CheckMessage]:
+    """The worker's mailer: SMTP, every socket operation bounded, inside the deadline."""
+    outbound = getattr(settings, "MAILERS", {}).get("outbound", {})
+    timeout = outbound.get("OPTIONS", {}).get("timeout")
+    deadline = int(getattr(settings, "OUTBOX_SEND_DEADLINE", 0))
+    problems = []
+    if outbound.get("BACKEND") != SMTP_BACKEND:
+        problems.append(f"MAILERS['outbound'] must be {SMTP_BACKEND}")
+    if not isinstance(timeout, int | float) or not 0 < timeout <= settings.OUTBOX_SMTP_TIMEOUT:
+        problems.append(
+            f"MAILERS['outbound'] needs a timeout of at most {settings.OUTBOX_SMTP_TIMEOUT} s"
+        )
+    elif deadline <= timeout:
+        problems.append("OUTBOX_SEND_DEADLINE must be longer than one operation's timeout")
+    if int(getattr(settings, "OUTBOX_ABANDON_GRACE", 0)) < 30:
+        problems.append("OUTBOX_ABANDON_GRACE must be at least 30 s")
+    return [Error(problem, id="gmat.E019") for problem in problems]
+
+
 @register(deploy=True)
 def check_deployment(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
-    return [*_secret_errors(), *_host_errors(), *_cookie_errors(), *_hasher_and_mail_errors()]
+    return [
+        *_secret_errors(),
+        *_host_errors(),
+        *_cookie_errors(),
+        *_hasher_and_mail_errors(),
+        *_outbound_errors(),
+    ]

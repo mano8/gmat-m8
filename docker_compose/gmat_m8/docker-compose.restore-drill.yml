@@ -6,13 +6,17 @@
 # - its own project name, therefore its own volumes: never touches a production stack;
 # - EVERY network is internal, `edge` and `ingress` included, so no restored container has a
 #   route out; nothing is published, checks run through `docker compose exec`;
-# - OUTBOUND_EMAIL=off: the worker (M2.5) never claims or sends a message.
+# - OUTBOUND_EMAIL=off: the worker never claims or sends a message (post-restore-reconcile
+#   then quarantines the restored outbox, M8.4).
 name: gmat-m8-restore-drill
 
 services:
   caddy:
     ports: !reset []
   web:
+    environment:
+      OUTBOUND_EMAIL: "off"
+  worker:
     environment:
       OUTBOUND_EMAIL: "off"
   db:

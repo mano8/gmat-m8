@@ -1,0 +1,45 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "People" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "People" %}</h1>
+    {% url 'org:new_invitation' as invite_url %}
+    {% include "components/button.html" with href=invite_url label=_("Invite someone") variant="primary" %}
+  </div>
+  {% url 'org:people' as list_url %}
+  {% include "components/filter_form.html" with form=filters target="#people-results" action=list_url %}
+  {% partialdef results inline %}
+    <div id="people-results">
+      {% if page_obj.object_list %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Email" %}</th>
+              <th scope="col">{% translate "Name" %}</th>
+              <th scope="col">{% translate "Employer" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for person in page_obj.object_list %}
+              <tr>
+                <td data-label="{% translate 'Email' %}">
+                  <a href="{% url 'org:person' user_id=person.pk %}">{{ person.email }}</a>
+                </td>
+                <td data-label="{% translate 'Name' %}">{{ person.full_name|default:"—" }}</td>
+                <td data-label="{% translate 'Employer' %}">{{ person.employer_company.code|default:"—" }}</td>
+                <td data-label="{% translate 'Status' %}">{% include "organizations/account_status.html" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("Nobody found") text=_("Try another search.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

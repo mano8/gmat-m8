@@ -17,14 +17,22 @@ from apps.core import checks
 from config.env import derived_fernet_key
 from config.logging import RedactionFilter
 
-GOOD_DEPLOY = {
+MFA_KEY = Fernet.generate_key().decode()
+SMTP: dict[str, Any] = {"BACKEND": "django.core.mail.backends.smtp.EmailBackend"}
+GOOD_MAILERS: dict[str, dict[str, Any]] = {
+    "default": {"BACKEND": checks.OUTBOX_BACKEND},
+    "outbound": {"BACKEND": checks.SMTP_BACKEND, "OPTIONS": {"host": "smtp", "timeout": 10}},
+}
+
+GOOD_DEPLOY: dict[str, Any] = {
     "DEBUG": False,
     "SECRET_KEY": "Zq8vN2xLp4Rt7WmB9cYd3GhJ6KsFa1UeVo5XnTi0PbQrCwEyAz",
-    "MFA_ENCRYPTION_KEYS": [Fernet.generate_key().decode()],
+    "MFA_ENCRYPTION_KEYS": [MFA_KEY],
+    "OUTBOX_ENCRYPTION_KEYS": [Fernet.generate_key().decode()],
     "ALLOWED_HOSTS": ["app.example.org"],
     "CSRF_TRUSTED_ORIGINS": ["https://app.example.org"],
     "PASSWORD_HASHERS": ["django.contrib.auth.hashers.Argon2PasswordHasher"],
-    "MAILERS": {"default": {"BACKEND": "apps.core.mail.DisabledEmailBackend"}},
+    "MAILERS": GOOD_MAILERS,
 }
 
 
@@ -38,6 +46,24 @@ class TestAlwaysOnChecks:
         assert checks.check_security_cache(None) == []
         assert checks.check_logging(None) == []
         assert checks.check_admin_base_class(None) == []
+        assert checks.check_idempotency_windows(None) == []
+        assert checks.check_no_smtp_in_requests(None) == []
+
+    @pytest.mark.parametrize("mailers", [{}, {"default": SMTP}])
+    def test_requests_never_send_smtp(self, mailers: dict[str, Any]) -> None:
+        with override_settings(MAILERS=mailers):
+            assert ids(checks.check_no_smtp_in_requests(None)) == {"gmat.E007"}
+
+    @pytest.mark.parametrize(
+        ("max_age", "retention"), [(86_400, 86_400), (86_400, 3_600), (0, 3_600)]
+    )
+    def test_idempotency_records_must_outlive_their_keys(
+        self, max_age: int, retention: int
+    ) -> None:
+        with override_settings(
+            IDEMPOTENCY_KEY_MAX_AGE=max_age, IDEMPOTENCY_RECORD_RETENTION=retention
+        ):
+            assert ids(checks.check_idempotency_windows(None)) == {"gmat.E006"}
 
     def test_floor_matches_the_lock_check(self, load_script: Any) -> None:
         floors = load_script("check_security_floors")
@@ -147,14 +173,30 @@ class TestDeploymentChecks:
             ({"CSRF_COOKIE_SECURE": False}, "gmat.E015"),
             ({"PASSWORD_HASHERS": ["django.contrib.auth.hashers.MD5PasswordHasher"]}, "gmat.E016"),
             ({"PASSWORD_HASHERS": []}, "gmat.E016"),
+            ({"MAILERS": {**GOOD_MAILERS, "default": SMTP}}, "gmat.E017"),
+            (
+                {"MAILERS": {**GOOD_MAILERS, "default": {"BACKEND": "x.Console"}}},
+                "gmat.E017",
+            ),
+            ({"OUTBOX_ENCRYPTION_KEYS": []}, "gmat.E018"),
+            ({"OUTBOX_ENCRYPTION_KEYS": [derived_fernet_key("outbox-test")]}, "gmat.E018"),
+            ({"OUTBOX_ENCRYPTION_KEYS": [MFA_KEY]}, "gmat.E018"),
+            ({"MAILERS": {"default": GOOD_MAILERS["default"]}}, "gmat.E019"),
+            (
+                {"MAILERS": {**GOOD_MAILERS, "outbound": {**SMTP, "OPTIONS": {}}}},
+                "gmat.E019",
+            ),
             (
                 {
                     "MAILERS": {
-                        "default": {"BACKEND": "django.core.mail.backends.smtp.EmailBackend"}
+                        **GOOD_MAILERS,
+                        "outbound": {**SMTP, "OPTIONS": {"timeout": 30}},
                     }
                 },
-                "gmat.E017",
+                "gmat.E019",
             ),
+            ({"OUTBOX_SEND_DEADLINE": 10}, "gmat.E019"),
+            ({"OUTBOX_ABANDON_GRACE": 5}, "gmat.E019"),
         ],
     )
     def test_unsafe_production_values_are_refused(

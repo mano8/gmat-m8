@@ -4,11 +4,14 @@
 #   docker compose up -d --build --wait           # https://localhost:8443
 #
 # Overlays: docker-compose.dev.yml (development), docker-compose.production.yml (VPS, images
-# by digest), docker-compose.restore-drill.yml (offline restore drill). See README.md.
+# by digest), docker-compose.restore-drill.yml (offline restore drill), and
+# docker-compose.local-mail.yml (Mailpit, which .env's COMPOSE_FILE adds to a local or CI
+# stack started without -f). See README.md.
 #
 # Networks (plan §7.2, F64, F74): one internal network per database client, so web, worker,
 # backup and migrate never share a network and cannot reach each other; `edge` holds only
-# Caddy and web; only Caddy publishes ports, through `ingress`.
+# Caddy and web; only Caddy publishes ports, through `ingress`. The worker and the backup
+# reach the outside through `egress` (SMTP, offsite storage); web has no way out.
 name: gmat-m8
 
 x-logging: &logging
@@ -126,6 +129,39 @@ services:
       retries: 5
       start_period: 40s
     mem_limit: 512m
+
+  # The only process that sends email (plan §5): claims outbox rows, delivers them through
+  # SMTP and runs the hourly housekeeping. Idle while flags/worker.paused exists.
+  worker:
+    <<: *app
+    command: ["worker"]
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-gmat}
+      DB_USER: ${GMAT_DB_RUNTIME_USER:?run init.sh}
+      DB_PASSWORD: ${GMAT_DB_RUNTIME_PASSWORD:?run init.sh}
+      # The SMTP password reaches this container only, never web.
+      EMAIL_HOST_PASSWORD: ${SMTP_PASSWORD:-}
+      WORKER_FLAGS_DIR: /srv/flags
+      WORKER_HEARTBEAT_FILE: /tmp/gmat-worker.heartbeat
+    volumes:
+      - ./flags:/srv/flags:ro
+    networks: [db_worker, egress]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/docker/app/entrypoint.sh", "worker-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # A message being sent may take its whole deadline (60 s) before the worker stops.
+    stop_grace_period: 75s
+    mem_limit: 256m
 
   db:
     <<: *hardened

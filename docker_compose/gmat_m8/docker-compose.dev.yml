@@ -1,5 +1,6 @@
 # Development overlay: the `dev` image target with the source bind-mounted read-only,
-# `runserver`, Tailwind in watch mode, Mailpit, and the database on 127.0.0.1:5432.
+# `runserver`, the worker, Tailwind in watch mode, Mailpit (UI on 127.0.0.1:8025), and the
+# database on 127.0.0.1:5432.
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo
@@ -47,6 +48,23 @@ services:
       - ../..:/app:ro
     mem_limit: 768m
 
+  worker:
+    <<: *dev-app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-gmat}
+      DB_USER: ${GMAT_DB_RUNTIME_USER:?run init.sh}
+      DB_PASSWORD: ${GMAT_DB_RUNTIME_PASSWORD:?run init.sh}
+      EMAIL_HOST: mailpit
+      EMAIL_PORT: "1025"
+      WORKER_FLAGS_DIR: /srv/flags
+      WORKER_HEARTBEAT_FILE: /tmp/gmat-worker.heartbeat
+    volumes:
+      - ../..:/app:ro
+      - ./flags:/srv/flags:ro
+
   db:
     # A container that is only on internal networks cannot publish a port: join one more, and
     # make it the preferred (default-route) network, which is the one Docker publishes through.
@@ -60,9 +78,15 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
 
+  # The worker delivers here; the UI is published on the loopback interface only.
   mailpit:
     image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
+    user: "1000:1000"
+    tmpfs: [/tmp]
     ports:
       - "127.0.0.1:8025:8025"
     networks: [egress]

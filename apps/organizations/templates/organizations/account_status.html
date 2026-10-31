@@ -1,0 +1,11 @@
+{% load i18n %}
+{% if person.offboarded_at %}
+  {% include "components/status_chip.html" with label=_("Offboarded") tone="danger" %}
+{% elif not person.is_active %}
+  {% include "components/status_chip.html" with label=_("Inactive") tone="warn" %}
+{% else %}
+  {% include "components/status_chip.html" with label=_("Active") tone="ok" %}
+{% endif %}
+{% if person.is_staff %}
+  {% include "components/status_chip.html" with label=_("Platform operator") tone="brand" %}
+{% endif %}

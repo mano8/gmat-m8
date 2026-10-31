@@ -3,137 +3,1368 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-31 09:22+0000\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: apps/access/roles.py:23
+msgid "Group administrator"
+msgstr "Administrador del grupo"
+
+#: apps/access/roles.py:24
+msgid "Material manager"
+msgstr "Encargado de material"
+
+#: apps/access/roles.py:25
+msgid "Warehouse operator"
+msgstr "Operario de almacén"
+
+#: apps/access/roles.py:26
+msgid "Technician"
+msgstr "Técnico"
+
+#: apps/access/roles.py:27 apps/projects/models.py:83
+msgid "Site manager"
+msgstr "Responsable de obra"
+
+#: apps/access/roles.py:28
+msgid "Partner requester"
+msgstr "Solicitante asociado"
+
+#: apps/accounts/forms.py:29
+msgid "Password"
+msgstr "Contraseña"
+
+#: apps/accounts/forms.py:34
+msgid "Password (again)"
+msgstr "Contraseña (otra vez)"
+
+#: apps/accounts/forms.py:47
+msgid "The two passwords differ."
+msgstr "Las dos contraseñas no coinciden."
+
+#: apps/accounts/models.py:104
+msgid "New account"
+msgstr "Cuenta nueva"
+
+#: apps/accounts/models.py:105
+msgid "Existing account"
+msgstr "Cuenta existente"
+
+#: apps/accounts/models.py:107
+msgid "email"
+msgstr "correo electrónico"
+
+#: apps/accounts/models.py:108 apps/locations/models.py:34
+#: apps/organizations/models.py:32 apps/projects/models.py:95
+msgid "kind"
+msgstr "tipo"
+
+#: apps/accounts/models.py:116 apps/accounts/models.py:205
+msgid "account"
+msgstr "cuenta"
+
+#: apps/accounts/models.py:124
+msgid "invited by"
+msgstr "invitado por"
+
+#: apps/accounts/models.py:126
+msgid "first administrator"
+msgstr "primer administrador"
+
+#: apps/accounts/models.py:127
+msgid "platform operator"
+msgstr "operador de la plataforma"
+
+#: apps/accounts/models.py:128
+msgid "full name"
+msgstr "nombre completo"
+
+#: apps/accounts/models.py:135
+msgid "employer"
+msgstr "empresa empleadora"
+
+#: apps/accounts/models.py:137
+msgid "grants"
+msgstr "permisos concedidos"
+
+#: apps/accounts/models.py:139
+msgid "expires at"
+msgstr "caduca el"
+
+#: apps/accounts/models.py:140
+msgid "accepted at"
+msgstr "aceptada el"
+
+#: apps/accounts/models.py:141 apps/accounts/models.py:218
+#: apps/organizations/models.py:239 apps/projects/models.py:98
+msgid "revoked at"
+msgstr "revocado el"
+
+#: apps/accounts/models.py:142 apps/accounts/models.py:219
+msgid "reason"
+msgstr "motivo"
+
+#: apps/accounts/models.py:145
+msgid "invitation"
+msgstr "invitación"
+
+#: apps/accounts/models.py:146
+msgid "invitations"
+msgstr "invitaciones"
+
+#: apps/accounts/models.py:207
+msgid "new email"
+msgstr "correo nuevo"
+
+#: apps/accounts/models.py:209
+msgid "requested by"
+msgstr "solicitado por"
+
+#: apps/accounts/models.py:213
+msgid "confirm before"
+msgstr "confirmar antes de"
+
+#: apps/accounts/models.py:214
+msgid "confirmed at"
+msgstr "confirmado el"
+
+#: apps/accounts/models.py:215
+msgid "applies after"
+msgstr "se aplica después de"
+
+#: apps/accounts/models.py:216
+msgid "applied at"
+msgstr "aplicado el"
+
+#: apps/accounts/models.py:217
+msgid "cancelled at"
+msgstr "cancelado el"
+
+#: apps/accounts/models.py:222
+msgid "email change request"
+msgstr "solicitud de cambio de correo"
+
+#: apps/accounts/models.py:223
+msgid "email change requests"
+msgstr "solicitudes de cambio de correo"
+
+#: apps/accounts/services.py:154
+msgid "The project is not active."
+msgstr "La obra no está activa."
+
+#: apps/accounts/services.py:166
+msgid "An invitation grants at least one role."
+msgstr "Una invitación concede al menos un rol."
+
+#: apps/accounts/services.py:174
+msgid "Unknown kind."
+msgstr "Tipo desconocido."
+
+#: apps/accounts/services.py:195
+msgid "You are invited to gmat-m8"
+msgstr "Te han invitado a gmat-m8"
+
+#: apps/accounts/services.py:220
+msgid "Confirm your new email address"
+msgstr "Confirma tu nueva dirección de correo"
+
+#: apps/accounts/services.py:231
+msgid "Your email address is about to change"
+msgstr "Tu dirección de correo va a cambiar"
+
+#: apps/accounts/services.py:338
+msgid "This address already has a pending invitation: resend or revoke it."
+msgstr "Esta dirección ya tiene una invitación pendiente: reenvíala o revócala."
+
+#: apps/accounts/services.py:349
+msgid "An active account keeps its employer."
+msgstr "Una cuenta activa conserva su empresa empleadora."
+
+#: apps/accounts/services.py:387
+msgid "This invitation is no longer pending."
+msgstr "Esta invitación ya no está pendiente."
+
+#: apps/accounts/services.py:406
+msgid "Run bootstrap_admin again to replace a first-administrator link."
+msgstr "Ejecuta bootstrap_admin de nuevo para sustituir un enlace de primer administrador."
+
+#: apps/accounts/services.py:584
+msgid "You cannot offboard your own account."
+msgstr "No puedes dar de baja tu propia cuenta."
+
+#: apps/accounts/services.py:587
+msgid "This account is already offboarded."
+msgstr "Esta cuenta ya está dada de baja."
+
+#: apps/accounts/services.py:633
+msgid "This account is inactive."
+msgstr "Esta cuenta está inactiva."
+
+#: apps/accounts/services.py:636
+msgid "This is the current address."
+msgstr "Es la dirección actual."
+
+#: apps/accounts/services.py:640
+msgid "Another account uses this address."
+msgstr "Otra cuenta usa esta dirección."
+
+#: apps/accounts/services.py:688
+msgid "This email change is no longer open."
+msgstr "Este cambio de correo ya no está abierto."
+
+#: apps/accounts/services.py:765
+msgid "An account with this email exists."
+msgstr "Ya existe una cuenta con este correo."
+
+#: apps/accounts/services.py:787 apps/organizations/grants.py:30
+#: apps/organizations/services.py:296 apps/organizations/services.py:509
+msgid "The company is inactive."
+msgstr "La empresa está inactiva."
+
+#: apps/accounts/templates/accounts/email/email_change_confirm.txt:1
+msgid "An administrator asked to use this address for your gmat-m8 account."
+msgstr "Un administrador ha pedido usar esta dirección para tu cuenta de gmat-m8."
+
+#: apps/accounts/templates/accounts/email/email_change_confirm.txt:3
+#, python-format
+msgid "Open this link to confirm it. It works once, for %(hours)s hours:"
+msgstr "Abre este enlace para confirmarla. Funciona una sola vez, durante %(hours)s horas:"
+
+#: apps/accounts/templates/accounts/email/email_change_confirm.txt:7
+#, python-format
+msgid ""
+"The change takes effect %(cooling_off_hours)s hours after you confirm, "
+"unless it is cancelled from the current address."
+msgstr "El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, salvo que se cancele desde la dirección actual."
+
+#: apps/accounts/templates/accounts/email/email_change_notice.txt:1
+msgid ""
+"An administrator asked to change the email address of your gmat-m8 account."
+msgstr "Un administrador ha pedido cambiar la dirección de correo de tu cuenta de gmat-m8."
+
+#: apps/accounts/templates/accounts/email/email_change_notice.txt:3
+#, python-format
+msgid ""
+"If the new address confirms, the change takes effect %(cooling_off_hours)s "
+"hours later and every session of your account ends."
+msgstr "Si la nueva dirección lo confirma, el cambio se aplica %(cooling_off_hours)s horas después y se cierran todas las sesiones de tu cuenta."
+
+#: apps/accounts/templates/accounts/email/email_change_notice.txt:5
+msgid ""
+"If you did not expect this, cancel the change with this link before it takes "
+"effect:"
+msgstr "Si no lo esperabas, cancela el cambio con este enlace antes de que se aplique:"
+
+#: apps/accounts/templates/accounts/email/invitation.txt:1
+msgid "You have been invited to gmat-m8, the materials app of your company."
+msgstr "Te han invitado a gmat-m8, la aplicación de material de tu empresa."
+
+#: apps/accounts/templates/accounts/email/invitation.txt:3
+#, python-format
+msgid ""
+"Open this link to accept the invitation. It works once, for %(hours)s hours:"
+msgstr "Abre este enlace para aceptar la invitación. Funciona una sola vez, durante %(hours)s horas:"
+
+#: apps/accounts/templates/accounts/email/invitation.txt:7
+msgid "If you did not expect this invitation, ignore this message."
+msgstr "Si no esperabas esta invitación, ignora este mensaje."
+
+#: apps/accounts/templates/accounts/email_change.html:4
+msgid "Email change"
+msgstr "Cambio de correo"
+
+#: apps/accounts/templates/accounts/email_change.html:8
+msgid "Confirm your new address"
+msgstr "Confirma tu nueva dirección"
+
+#: apps/accounts/templates/accounts/email_change.html:10
+#, python-format
+msgid "Use %(email)s for your gmat-m8 account."
+msgstr "Usar %(email)s para tu cuenta de gmat-m8."
+
+#: apps/accounts/templates/accounts/email_change.html:13
+#, python-format
+msgid ""
+"The change applies %(cooling_off_hours)s hours after you confirm, unless it "
+"is cancelled from the current address. Every session of the account then "
+"ends."
+msgstr "El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, salvo que se cancele desde la dirección actual. Entonces se cierran todas las sesiones de la cuenta."
+
+#: apps/accounts/templates/accounts/email_change.html:17
+msgid "Confirm"
+msgstr "Confirmar"
+
+#: apps/accounts/templates/accounts/email_change.html:20
+msgid "Cancel the email change"
+msgstr "Cancelar el cambio de correo"
+
+#: apps/accounts/templates/accounts/email_change.html:22
+msgid ""
+"An administrator asked to change the address of your account. Cancel it if "
+"you did not expect this."
+msgstr "Un administrador ha pedido cambiar la dirección de tu cuenta. Cancélalo si no lo esperabas."
+
+#: apps/accounts/templates/accounts/email_change.html:26
+msgid "Cancel the change"
+msgstr "Cancelar el cambio"
+
+#: apps/accounts/templates/accounts/invitation_accept.html:4
+#: apps/accounts/templates/accounts/invitation_accept.html:7
+msgid "Accept the invitation"
+msgstr "Aceptar la invitación"
+
+#: apps/accounts/templates/accounts/invitation_accept.html:13
+msgid ""
+"Choose a password of at least 12 characters. Administrators and material "
+"managers then set up a second factor when they first sign in."
+msgstr "Elige una contraseña de al menos 12 caracteres. Los administradores y encargados de material configuran después un segundo factor al iniciar sesión por primera vez."
+
+#: apps/accounts/templates/accounts/invitation_accept.html:16
+msgid "Set password and accept"
+msgstr "Guardar contraseña y aceptar"
+
+#: apps/accounts/templates/accounts/invitation_accept.html:18
+msgid ""
+"Your account receives the access in this invitation. Your password and "
+"second factor do not change."
+msgstr "Tu cuenta recibe el acceso de esta invitación. Tu contraseña y tu segundo factor no cambian."
+
+#: apps/accounts/templates/accounts/invitation_accept.html:19
+msgid "Accept"
+msgstr "Aceptar"
+
+#: apps/accounts/templates/accounts/invitation_account.html:4
+#: apps/accounts/templates/accounts/invitation_account.html:7
+msgid "Invitation"
+msgstr "Invitación"
+
+#: apps/accounts/templates/accounts/invitation_account.html:10
+#, python-format
+msgid ""
+"This invitation is for the existing account %(email)s. Sign in with it, then "
+"open the link again."
+msgstr "Esta invitación es para la cuenta existente %(email)s. Inicia sesión con ella y abre el enlace otra vez."
+
+#: apps/accounts/templates/accounts/invitation_account.html:13
+msgid "Sign in"
+msgstr "Iniciar sesión"
+
+#: apps/accounts/templates/accounts/invitation_account.html:16
+msgid ""
+"You are signed in with another account. Sign out, then open the link again."
+msgstr "Has iniciado sesión con otra cuenta. Cierra la sesión y abre el enlace otra vez."
+
+#: apps/accounts/templates/accounts/invitation_account.html:20
+#: templates/partials/nav_items.html:40
+msgid "Sign out"
+msgstr "Cerrar sesión"
+
+#: apps/accounts/templates/accounts/token_invalid.html:4
+msgid "Link not valid"
+msgstr "Enlace no válido"
+
+#: apps/accounts/templates/accounts/token_invalid.html:7
+msgid "This link is not valid"
+msgstr "Este enlace no es válido"
+
+#: apps/accounts/templates/accounts/token_invalid.html:9
+msgid ""
+"It may have expired, been used already, or been replaced by a newer one. Ask "
+"your administrator for a new link."
+msgstr "Puede haber caducado, haberse usado ya o haber sido sustituido por uno más reciente. Pide un enlace nuevo a tu administrador."
+
+#: apps/accounts/templates/accounts/token_invalid.html:12
+msgid "Go to sign in"
+msgstr "Ir a iniciar sesión"
+
+#: apps/accounts/views.py:155
+msgid "Invitation accepted. Your new access is ready."
+msgstr "Invitación aceptada. Tu nuevo acceso está listo."
+
+#: apps/accounts/views.py:156
+msgid "Your account is ready. Sign in to continue."
+msgstr "Tu cuenta está lista. Inicia sesión para continuar."
+
+#: apps/accounts/views.py:215
+msgid "Address confirmed. The change applies after the waiting period."
+msgstr "Dirección confirmada. El cambio se aplica tras el periodo de espera."
+
+#: apps/accounts/views.py:216
+msgid "The email change is cancelled."
+msgstr "El cambio de correo está cancelado."
+
+#: apps/core/forms.py:49 apps/organizations/forms.py:70
+#: apps/organizations/templates/organizations/person.html:52
+#: apps/projects/templates/projects/detail.html:84
+msgid "Valid from"
+msgstr "Válido desde"
+
+#: apps/core/forms.py:50 apps/organizations/forms.py:44
+#: apps/organizations/templates/organizations/person.html:60
+#: apps/projects/forms.py:138 apps/projects/templates/projects/detail.html:92
+msgid "Valid until"
+msgstr "Válido hasta"
+
+#: apps/core/forms.py:50 apps/organizations/forms.py:44
+#: apps/projects/forms.py:138
+msgid "Leave empty for no end."
+msgstr "Déjalo vacío para que no termine."
+
+#: apps/core/forms.py:56 apps/organizations/forms.py:84
+msgid "The end must be after the start."
+msgstr "El final debe ser posterior al inicio."
+
+#: apps/core/templates/core/home.html:4 apps/core/templates/core/home.html:7
+#: templates/partials/nav_items.html:10
 msgid "Home"
 msgstr "Inicio"
 
+#: apps/core/templates/core/home.html:8
+#, python-format
 msgid "Signed in as %(email)s."
 msgstr "Sesión iniciada como %(email)s."
 
+#: apps/core/templates/core/home.html:9
 msgid "Nothing here yet"
 msgstr "Todavía no hay nada aquí"
 
-msgid "Your requests and tasks will appear here once the first features are switched on."
-msgstr "Tus solicitudes y tareas aparecerán aquí cuando se activen las primeras funciones."
+#: apps/core/templates/core/home.html:9
+msgid ""
+"Your requests and tasks will appear here once the first features are "
+"switched on."
+msgstr ""
+"Tus solicitudes y tareas aparecerán aquí cuando se activen las primeras "
+"funciones."
 
-msgid "Bad request"
-msgstr "Solicitud incorrecta"
+#: apps/locations/models.py:31
+msgid "Warehouse"
+msgstr "Almacén"
 
-msgid "We could not understand that request"
-msgstr "No hemos podido entender esa solicitud"
+#: apps/locations/models.py:32
+msgid "Worksite"
+msgstr "Obra"
 
-msgid "Go back and try again. If it keeps happening, contact your administrator."
-msgstr "Vuelve atrás e inténtalo de nuevo. Si sigue ocurriendo, contacta con tu administrador."
+#: apps/locations/models.py:36 apps/organizations/models.py:146
+#: apps/organizations/models.py:227 apps/projects/models.py:37
+msgid "branch"
+msgstr "delegación"
 
-msgid "Not allowed"
-msgstr "No permitido"
+#: apps/locations/models.py:44 apps/projects/models.py:52
+#: apps/projects/models.py:87
+msgid "project"
+msgstr "obra"
 
-msgid "You are not allowed to do that"
-msgstr "No tienes permiso para hacer eso"
+#: apps/locations/models.py:46 apps/organizations/models.py:121
+#: apps/projects/models.py:33
+msgid "name"
+msgstr "nombre"
 
-msgid "Your account does not have access to this action. If you think it should, ask your administrator."
-msgstr "Tu cuenta no tiene acceso a esta acción. Si crees que debería tenerlo, pregunta a tu administrador."
+#: apps/locations/models.py:47 apps/organizations/models.py:123
+#: apps/projects/models.py:35
+msgid "address"
+msgstr "dirección"
 
-msgid "Form expired"
-msgstr "Formulario caducado"
+#: apps/locations/models.py:48 apps/organizations/models.py:33
+#: apps/organizations/models.py:141
+msgid "active"
+msgstr "activo"
 
-msgid "That form has expired"
-msgstr "Ese formulario ha caducado"
+#: apps/locations/models.py:53
+msgid "location"
+msgstr "ubicación"
 
-msgid "Reload the page and send it again."
-msgstr "Recarga la página y envíalo de nuevo."
+#: apps/locations/models.py:54
+msgid "locations"
+msgstr "ubicaciones"
 
-msgid "Page not found"
-msgstr "Página no encontrada"
+#: apps/locations/services.py:51 apps/organizations/grants.py:25
+#: apps/projects/services.py:76
+msgid "The branch is inactive."
+msgstr "La delegación está inactiva."
 
-msgid "We could not find that page"
-msgstr "No hemos encontrado esa página"
+#: apps/locations/services.py:95
+msgid "This is the branch's default warehouse; choose another first."
+msgstr "Es el almacén por defecto de la delegación; elige otro primero."
 
-msgid "The address may be wrong, or the page may no longer exist."
-msgstr "Puede que la dirección sea incorrecta o que la página ya no exista."
+#: apps/notifications/models.py:22
+msgid "Notification"
+msgstr "Notificación"
 
-msgid "Not available"
-msgstr "No disponible"
+#: apps/notifications/models.py:23
+msgid "Security email"
+msgstr "Correo de seguridad"
 
-msgid "That action is not available here"
-msgstr "Esa acción no está disponible aquí"
+#: apps/notifications/models.py:24
+msgid "Purchase order"
+msgstr "Pedido de compra"
 
-msgid "Use the buttons and links of the page instead of typing the address."
-msgstr "Usa los botones y enlaces de la página en lugar de escribir la dirección."
+#: apps/notifications/models.py:25
+msgid "Purchase-order cancellation"
+msgstr "Anulación de pedido de compra"
 
-msgid "Conflict"
-msgstr "Conflicto"
+#: apps/notifications/models.py:33
+msgid "Queued"
+msgstr "En cola"
 
-msgid "That conflicts with a recent change"
-msgstr "Eso entra en conflicto con un cambio reciente"
+#: apps/notifications/models.py:34
+msgid "Sending"
+msgstr "Enviando"
 
-msgid "Reload the page to see the latest data, then try again."
-msgstr "Recarga la página para ver los datos más recientes y vuelve a intentarlo."
+#: apps/notifications/models.py:35 apps/notifications/models.py:48
+msgid "Sent"
+msgstr "Enviado"
 
-msgid "Too many requests"
-msgstr "Demasiadas solicitudes"
+#: apps/notifications/models.py:36 apps/notifications/models.py:50
+msgid "Failed"
+msgstr "Fallido"
 
-msgid "Too many attempts"
-msgstr "Demasiados intentos"
+#: apps/notifications/models.py:37 apps/notifications/models.py:52
+msgid "Ambiguous"
+msgstr "Ambiguo"
 
-msgid "Wait a few minutes and try again."
-msgstr "Espera unos minutos e inténtalo de nuevo."
+#: apps/notifications/models.py:38
+msgid "Superseded"
+msgstr "Sustituido"
 
-msgid "Something went wrong"
-msgstr "Algo ha salido mal"
+#: apps/notifications/models.py:39
+msgid "Cancelled"
+msgstr "Cancelado"
 
-msgid "Something went wrong on our side"
-msgstr "Algo ha salido mal por nuestra parte"
+#: apps/notifications/models.py:40
+msgid "Suppressed"
+msgstr "Descartado"
 
-msgid "The problem has been recorded. Try again in a moment."
-msgstr "El problema se ha registrado. Inténtalo de nuevo en un momento."
+#: apps/notifications/models.py:41
+msgid "Expired"
+msgstr "Caducado"
 
-msgid "Sign In"
-msgstr "Iniciar sesión"
+#: apps/notifications/models.py:42
+msgid "Quarantined"
+msgstr "En cuarentena"
 
-msgid "Accounts are created by invitation. Ask your administrator if you do not have one."
-msgstr "Las cuentas se crean por invitación. Pregunta a tu administrador si no tienes una."
+#: apps/organizations/deactivation.py:57
+#, python-format
+msgid "Cannot deactivate while these documents are open: %(documents)s"
+msgstr ""
+"No se puede desactivar mientras estos documentos estén abiertos: "
+"%(documents)s"
 
-msgid "Skip to content"
-msgstr "Saltar al contenido"
+#: apps/organizations/forms.py:16
+msgid "Everyone"
+msgstr "Todos"
 
-msgid "Notifications"
-msgstr "Notificaciones"
+#: apps/organizations/forms.py:16
+#: apps/organizations/templates/organizations/account_status.html:7
+#: apps/projects/models.py:28
+msgid "Active"
+msgstr "Activa"
 
-msgid "Dismiss"
-msgstr "Cerrar"
+#: apps/organizations/forms.py:16
+#: apps/organizations/templates/organizations/account_status.html:5
+msgid "Inactive"
+msgstr "Inactiva"
 
-msgid "Pagination"
-msgstr "Paginación"
+#: apps/organizations/forms.py:20 apps/organizations/forms.py:25
+#: apps/projects/forms.py:21
+msgid "Search"
+msgstr "Buscar"
 
-msgid "Previous"
-msgstr "Anterior"
+#: apps/organizations/forms.py:21
+#: apps/organizations/templates/organizations/people.html:23
+#: apps/organizations/templates/organizations/people.html:34
+#: apps/projects/forms.py:22 apps/projects/forms.py:53
+#: apps/projects/templates/projects/list.html:25
+#: apps/projects/templates/projects/list.html:36
+msgid "Status"
+msgstr "Estado"
 
-msgid "Page %(number)s of %(total)s"
-msgstr "Página %(number)s de %(total)s"
+#: apps/organizations/forms.py:40
+msgid "Role"
+msgstr "Rol"
 
-msgid "Next"
-msgstr "Siguiente"
+#: apps/organizations/forms.py:42 apps/projects/forms.py:45
+#: apps/projects/templates/projects/detail.html:32
+#: apps/projects/templates/projects/list.html:24
+#: apps/projects/templates/projects/list.html:35
+msgid "Branch"
+msgstr "Delegación"
 
-msgid "Back to the start"
-msgstr "Volver al inicio"
+#: apps/organizations/forms.py:42
+msgid "For branch roles."
+msgstr "Para los roles de una delegación."
 
-msgid "Main navigation"
-msgstr "Navegación principal"
+#: apps/organizations/forms.py:52
+msgid "Choose the branch of this role."
+msgstr "Elige la delegación de este rol."
 
-msgid "Language"
-msgstr "Idioma"
+#: apps/organizations/forms.py:54
+msgid "This role is not on a branch."
+msgstr "Este rol no es de una delegación."
 
+#: apps/organizations/forms.py:56
+msgid "A partner needs an employer company."
+msgstr "Un asociado necesita una empresa empleadora."
+
+#: apps/organizations/forms.py:65
+msgid "Company"
+msgstr "Empresa"
+
+#: apps/organizations/forms.py:68
+msgid "For partners: the company that employs them."
+msgstr "Para asociados: la empresa que los emplea."
+
+#: apps/organizations/forms.py:70
+msgid "Leave empty to start now."
+msgstr "Déjalo vacío para empezar ahora."
+
+#: apps/organizations/forms.py:81
+msgid "Only a partner's role is on a company."
+msgstr "Solo el rol de asociado es de una empresa."
+
+#: apps/organizations/forms.py:100 apps/organizations/forms.py:129
+#: apps/organizations/templates/organizations/people.html:22
+#: apps/organizations/templates/organizations/people.html:33
+msgid "Employer"
+msgstr "Empresa empleadora"
+
+#: apps/organizations/forms.py:108
+msgid "New email"
+msgstr "Correo nuevo"
+
+#: apps/organizations/forms.py:114
+msgid "I understand this cannot be undone."
+msgstr "Entiendo que no se puede deshacer."
+
+#: apps/organizations/forms.py:118
+msgid "Reason"
+msgstr "Motivo"
+
+#: apps/organizations/forms.py:126
+#: apps/organizations/templates/organizations/people.html:20
+#: apps/organizations/templates/organizations/people.html:29
+msgid "Email"
+msgstr "Correo electrónico"
+
+#: apps/organizations/forms.py:127
+msgid "Full name"
+msgstr "Nombre completo"
+
+#: apps/organizations/forms.py:132
+msgid "Required for partners; their role is on this company."
+msgstr "Obligatoria para asociados; su rol es de esta empresa."
+
+#: apps/organizations/forms.py:135
+msgid "Project"
+msgstr "Obra"
+
+#: apps/organizations/forms.py:138
+msgid "Site managers and partners: the project shared with them."
+msgstr "Responsables de obra y asociados: la obra que se comparte con ellos."
+
+#: apps/organizations/forms.py:154
+msgid "Only site managers and partners are assigned to projects."
+msgstr "Solo los responsables de obra y los asociados se asignan a obras."
+
+#: apps/organizations/grants.py:36
+msgid "A partner's membership is on the company that employs them."
+msgstr "La pertenencia de un asociado es en la empresa que lo emplea."
+
+#: apps/organizations/models.py:20
+msgid ""
+"Use upper-case letters, digits, '-' and '_', starting with a letter or digit."
+msgstr ""
+"Usa mayúsculas, dígitos, '-' y '_', empezando por una letra o un dígito."
+
+#: apps/organizations/models.py:26
+msgid "Standard"
+msgstr "Estándar"
+
+#: apps/organizations/models.py:27
+msgid "Joint venture"
+msgstr "UTE"
+
+#: apps/organizations/models.py:29 apps/organizations/models.py:120
+#: apps/projects/models.py:32
+msgid "code"
+msgstr "código"
+
+#: apps/organizations/models.py:30
+msgid "legal name"
+msgstr "razón social"
+
+#: apps/organizations/models.py:31
+msgid "tax id"
+msgstr "NIF"
+
+#: apps/organizations/models.py:36 apps/organizations/models.py:118
+#: apps/organizations/models.py:235
+msgid "company"
+msgstr "empresa"
+
+#: apps/organizations/models.py:37
+msgid "companies"
+msgstr "empresas"
+
+#: apps/organizations/models.py:70
+msgid "venture"
+msgstr "UTE"
+
+#: apps/organizations/models.py:76
+msgid "member"
+msgstr "miembro"
+
+#: apps/organizations/models.py:79
+msgid "share (%)"
+msgstr "participación (%)"
+
+#: apps/organizations/models.py:83
+msgid "joint-venture member"
+msgstr "miembro de la UTE"
+
+#: apps/organizations/models.py:84
+msgid "joint-venture members"
+msgstr "miembros de la UTE"
+
+#: apps/organizations/models.py:122
+msgid "city"
+msgstr "ciudad"
+
+#: apps/organizations/models.py:130
+msgid "managed by"
+msgstr "gestionada por"
+
+#: apps/organizations/models.py:132
+msgid "allow self-approval"
+msgstr "permitir autoaprobación"
+
+#: apps/organizations/models.py:139
+msgid "default warehouse"
+msgstr "almacén por defecto"
+
+#: apps/organizations/models.py:147
+msgid "branches"
+msgstr "delegaciones"
+
+#: apps/organizations/models.py:170
+msgid "A branch cannot manage itself."
+msgstr "Una delegación no puede gestionarse a sí misma."
+
+#: apps/organizations/models.py:178
+msgid "A managed branch cannot manage other branches."
+msgstr "Una delegación gestionada no puede gestionar otras delegaciones."
+
+#: apps/organizations/models.py:187
+msgid "A branch that manages others cannot be managed."
+msgstr "Una delegación que gestiona otras no puede estar gestionada."
+
+#: apps/organizations/models.py:218 apps/projects/models.py:93
+msgid "user"
+msgstr "usuario"
+
+#: apps/organizations/models.py:220
+msgid "role"
+msgstr "rol"
+
+#: apps/organizations/models.py:237 apps/projects/models.py:96
+msgid "valid from"
+msgstr "válido desde"
+
+#: apps/organizations/models.py:238 apps/projects/models.py:97
+msgid "valid until"
+msgstr "válido hasta"
+
+#: apps/organizations/models.py:246 apps/projects/models.py:105
+msgid "revoked by"
+msgstr "revocado por"
+
+#: apps/organizations/models.py:250
+msgid "membership"
+msgstr "pertenencia"
+
+#: apps/organizations/models.py:251
+msgid "memberships"
+msgstr "pertenencias"
+
+#: apps/organizations/services.py:166
+msgid "A joint venture with members must stay a joint venture."
+msgstr "Una UTE con miembros debe seguir siendo una UTE."
+
+#: apps/organizations/services.py:204
+msgid "Only a joint venture has members."
+msgstr "Solo una UTE tiene miembros."
+
+#: apps/organizations/services.py:260
+msgid "Choose an active warehouse of this branch."
+msgstr "Elige un almacén activo de esta delegación."
+
+#: apps/organizations/services.py:431
+msgid "This membership is already revoked."
+msgstr "Esta pertenencia ya está revocada."
+
+#: apps/organizations/services.py:520
+msgid "Revoke the partner memberships on the previous company first."
+msgstr "Revoca primero las pertenencias de asociado en la empresa anterior."
+
+#: apps/organizations/templates/organizations/account_status.html:3
+msgid "Offboarded"
+msgstr "Dado de baja"
+
+#: apps/organizations/templates/organizations/account_status.html:10
+msgid "Platform operator"
+msgstr "Operador de la plataforma"
+
+#: apps/organizations/templates/organizations/invitation_form.html:4
+#: apps/organizations/templates/organizations/invitation_form.html:7
+#: apps/organizations/templates/organizations/invitations.html:10
+#: apps/organizations/templates/organizations/people.html:10
+msgid "Invite someone"
+msgstr "Invitar a alguien"
+
+#: apps/organizations/templates/organizations/invitation_form.html:9
+msgid ""
+"The address receives a link valid for 72 hours. A new person sets a "
+"password; an existing account accepts while signed in."
+msgstr "La dirección recibe un enlace válido durante 72 horas. Una persona nueva elige una contraseña; una cuenta existente acepta con la sesión iniciada."
+
+#: apps/organizations/templates/organizations/invitation_form.html:17
+msgid "Send invitation"
+msgstr "Enviar invitación"
+
+#: apps/organizations/templates/organizations/invitation_form.html:19
+#: apps/projects/templates/projects/form.html:26
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: apps/organizations/templates/organizations/invitations.html:4
+#: apps/organizations/templates/organizations/person.html:161
+msgid "Invitations"
+msgstr "Invitaciones"
+
+#: apps/organizations/templates/organizations/invitations.html:8
+msgid "Pending invitations"
+msgstr "Invitaciones pendientes"
+
+#: apps/organizations/templates/organizations/invitations.html:24
+#, python-format
+msgid "expires %(date)s"
+msgstr "caduca el %(date)s"
+
+#: apps/organizations/templates/organizations/invitations.html:32
+msgid "Resend"
+msgstr "Reenviar"
+
+#: apps/organizations/templates/organizations/invitations.html:38
+#: apps/organizations/templates/organizations/person.html:40
+#: apps/organizations/templates/organizations/person.html:130
+#: apps/projects/templates/projects/detail.html:72
+msgid "Revoke"
+msgstr "Revocar"
+
+#: apps/organizations/templates/organizations/invitations.html:46
+msgid "No pending invitations"
+msgstr "No hay invitaciones pendientes"
+
+#: apps/organizations/templates/organizations/people.html:4
+#: apps/organizations/templates/organizations/people.html:8
+#: templates/partials/nav_items.html:25
+msgid "People"
+msgstr "Personas"
+
+#: apps/organizations/templates/organizations/people.html:21
+#: apps/organizations/templates/organizations/people.html:32
+#: apps/projects/forms.py:39 apps/projects/templates/projects/list.html:23
+#: apps/projects/templates/projects/list.html:34
+msgid "Name"
+msgstr "Nombre"
+
+#: apps/organizations/templates/organizations/people.html:41
+msgid "Nobody found"
+msgstr "No se ha encontrado a nadie"
+
+#: apps/organizations/templates/organizations/people.html:41
+msgid "Try another search."
+msgstr "Prueba otra búsqueda."
+
+#: apps/organizations/templates/organizations/person.html:14
+msgid "Only a platform operator can change this account."
+msgstr "Solo un operador de la plataforma puede modificar esta cuenta."
+
+#: apps/organizations/templates/organizations/person.html:18
+msgid "Roles"
+msgstr "Roles"
+
+#: apps/organizations/templates/organizations/person.html:35
+#: apps/organizations/templates/organizations/person.html:100
+#: apps/projects/templates/projects/detail.html:67
+msgid "Revoked"
+msgstr "Revocado"
+
+#: apps/organizations/templates/organizations/person.html:46
+#: apps/projects/templates/projects/detail.html:78
+msgid "Change validity"
+msgstr "Cambiar validez"
+
+#: apps/organizations/templates/organizations/person.html:66
+#: apps/organizations/templates/organizations/person.html:115
+#: apps/projects/templates/projects/detail.html:98
+#: apps/projects/templates/projects/form.html:20
+msgid "Save"
+msgstr "Guardar"
+
+#: apps/organizations/templates/organizations/person.html:74
+msgid "No roles yet."
+msgstr "Todavía no tiene roles."
+
+#: apps/organizations/templates/organizations/person.html:78
+msgid "Grant a role"
+msgstr "Conceder un rol"
+
+#: apps/organizations/templates/organizations/person.html:84
+msgid "Grant"
+msgstr "Conceder"
+
+#: apps/organizations/templates/organizations/person.html:91
+msgid "Projects shared"
+msgstr "Obras compartidas"
+
+#: apps/organizations/templates/organizations/person.html:109
+msgid "Account"
+msgstr "Cuenta"
+
+#: apps/organizations/templates/organizations/person.html:117
+msgid "Email address"
+msgstr "Dirección de correo"
+
+#: apps/organizations/templates/organizations/person.html:122
+#, python-format
+msgid "Changes to %(email)s after %(date)s."
+msgstr "Cambia a %(email)s después del %(date)s."
+
+#: apps/organizations/templates/organizations/person.html:124
+#, python-format
+msgid "Waiting for %(email)s to confirm."
+msgstr "Esperando la confirmación de %(email)s."
+
+#: apps/organizations/templates/organizations/person.html:139
+#: templates/partials/language_switcher.html:20
 msgid "Change"
 msgstr "Cambiar"
 
+#: apps/organizations/templates/organizations/person.html:142
+msgid ""
+"The new address confirms the change; the current one can cancel it. It "
+"applies 24 hours after confirmation and ends every session of the account."
+msgstr "La nueva dirección confirma el cambio; la actual puede cancelarlo. Se aplica 24 horas después de la confirmación y cierra todas las sesiones de la cuenta."
+
+#: apps/organizations/templates/organizations/person.html:145
+#: apps/organizations/templates/organizations/person.html:154
+msgid "Offboard"
+msgstr "Dar de baja"
+
+#: apps/organizations/templates/organizations/person.html:151
+msgid ""
+"Deactivates the account, ends its sessions, revokes every role, project and "
+"pending invitation or email change, including those this person issued."
+msgstr "Desactiva la cuenta, cierra sus sesiones y revoca todos sus roles, obras e invitaciones o cambios de correo pendientes, incluidos los que esta persona emitió."
+
+#: apps/organizations/templates/organizations/person.html:167
+msgid "accepted"
+msgstr "aceptada"
+
+#: apps/organizations/templates/organizations/person.html:169
+msgid "revoked"
+msgstr "revocada"
+
+#: apps/organizations/templates/organizations/person.html:171
+msgid "pending"
+msgstr "pendiente"
+
+#: apps/organizations/views.py:121
+msgid "Role granted."
+msgstr "Rol concedido."
+
+#: apps/organizations/views.py:136
+msgid "Role revoked."
+msgstr "Rol revocado."
+
+#: apps/organizations/views.py:160 apps/projects/views.py:211
+msgid "Validity saved."
+msgstr "Validez guardada."
+
+#: apps/organizations/views.py:180
+msgid "Employer saved."
+msgstr "Empresa empleadora guardada."
+
+#: apps/organizations/views.py:190
+msgid "Tick the confirmation to offboard this account."
+msgstr "Marca la confirmación para dar de baja esta cuenta."
+
+#: apps/organizations/views.py:199
+msgid "Account offboarded."
+msgstr "Cuenta dada de baja."
+
+#: apps/organizations/views.py:221
+msgid "Confirmation sent to the new address; the current one can cancel."
+msgstr "Confirmación enviada a la nueva dirección; la actual puede cancelar."
+
+#: apps/organizations/views.py:239
+msgid "Email change revoked."
+msgstr "Cambio de correo revocado."
+
+#: apps/organizations/views.py:290
+#, python-format
+msgid "Invitation sent to %(email)s."
+msgstr "Invitación enviada a %(email)s."
+
+#: apps/organizations/views.py:307
+msgid "Invitation sent again; the previous link no longer works."
+msgstr "Invitación reenviada; el enlace anterior ya no funciona."
+
+#: apps/organizations/views.py:324
+msgid "Invitation revoked."
+msgstr "Invitación revocada."
+
+#: apps/projects/forms.py:17
+msgid "All statuses"
+msgstr "Todos los estados"
+
+#: apps/projects/forms.py:40 apps/projects/templates/projects/detail.html:20
+msgid "Client"
+msgstr "Cliente"
+
+#: apps/projects/forms.py:42 apps/projects/templates/projects/detail.html:26
+msgid "Address"
+msgstr "Dirección"
+
+#: apps/projects/forms.py:45
+msgid "Executes and bills the project."
+msgstr "Ejecuta y factura la obra."
+
+#: apps/projects/forms.py:48 apps/projects/templates/projects/detail.html:38
+msgid "Procurement branch"
+msgstr "Delegación de compras"
+
+#: apps/projects/forms.py:51
+msgid "Buys for the project. Empty: the branch that manages it, or itself."
+msgstr "Compra para la obra. Vacío: la delegación que la gestiona, o ella misma."
+
+#: apps/projects/forms.py:54
+msgid "Start date"
+msgstr "Fecha de inicio"
+
+#: apps/projects/forms.py:55
+msgid "End date"
+msgstr "Fecha de fin"
+
+#: apps/projects/forms.py:67
+msgid "The end date cannot be before the start date."
+msgstr "La fecha de fin no puede ser anterior a la de inicio."
+
+#: apps/projects/forms.py:99 apps/projects/templates/projects/list.html:22
+#: apps/projects/templates/projects/list.html:31
+msgid "Code"
+msgstr "Código"
+
+#: apps/projects/forms.py:102
+msgid "Upper-case letters, digits, '-' and '_'. It cannot change later."
+msgstr "Mayúsculas, dígitos, '-' y '_'. No se puede cambiar después."
+
+#: apps/projects/forms.py:136
+msgid "As"
+msgstr "Como"
+
+#: apps/projects/forms.py:137
+msgid "Person"
+msgstr "Persona"
+
+#: apps/projects/forms.py:153
+msgid "This person does not hold the matching role."
+msgstr "Esta persona no tiene el rol correspondiente."
+
+#: apps/projects/models.py:29
+msgid "On hold"
+msgstr "En pausa"
+
+#: apps/projects/models.py:30
+msgid "Closed"
+msgstr "Cerrada"
+
+#: apps/projects/models.py:34
+msgid "client"
+msgstr "cliente"
+
+#: apps/projects/models.py:43
+msgid "procurement branch"
+msgstr "delegación de compras"
+
+#: apps/projects/models.py:45
+msgid "status"
+msgstr "estado"
+
+#: apps/projects/models.py:46
+msgid "start date"
+msgstr "fecha de inicio"
+
+#: apps/projects/models.py:47
+msgid "end date"
+msgstr "fecha de fin"
+
+#: apps/projects/models.py:53
+msgid "projects"
+msgstr "obras"
+
+#: apps/projects/models.py:84
+msgid "Partner"
+msgstr "Asociado"
+
+#: apps/projects/models.py:109
+msgid "project assignment"
+msgstr "asignación a obra"
+
+#: apps/projects/models.py:110
+msgid "project assignments"
+msgstr "asignaciones a obra"
+
+#: apps/projects/services.py:271
+msgid "This assignment is already revoked."
+msgstr "Esta asignación ya está revocada."
+
+#: apps/projects/templates/projects/detail.html:14
+msgid "Edit"
+msgstr "Editar"
+
+#: apps/projects/templates/projects/detail.html:44
+msgid "Dates"
+msgstr "Fechas"
+
+#: apps/projects/templates/projects/detail.html:53
+msgid "Shared with"
+msgstr "Compartida con"
+
+#: apps/projects/templates/projects/detail.html:106
+msgid "Nobody outside the branches sees this project yet."
+msgstr "Nadie fuera de las delegaciones ve todavía esta obra."
+
+#: apps/projects/templates/projects/detail.html:109
+msgid "Share the project"
+msgstr "Compartir la obra"
+
+#: apps/projects/templates/projects/detail.html:115
+msgid "Share"
+msgstr "Compartir"
+
+#: apps/projects/templates/projects/form.html:4
+#: apps/projects/templates/projects/form.html:11
+#: apps/projects/templates/projects/list.html:11
+msgid "New project"
+msgstr "Nueva obra"
+
+#: apps/projects/templates/projects/form.html:9
+#, python-format
+msgid "Edit project %(code)s"
+msgstr "Editar la obra %(code)s"
+
+#: apps/projects/templates/projects/list.html:4
+#: apps/projects/templates/projects/list.html:8
+#: templates/partials/nav_items.html:17
+msgid "Projects"
+msgstr "Obras"
+
+#: apps/projects/templates/projects/list.html:43
+msgid "No projects"
+msgstr "No hay obras"
+
+#: apps/projects/templates/projects/list.html:43
+msgid "No project matches, or none is shared with you yet."
+msgstr "Ninguna obra coincide, o todavía no se ha compartido ninguna contigo."
+
+#: apps/projects/views.py:114
+#, python-format
+msgid "Project %(code)s created."
+msgstr "Obra %(code)s creada."
+
+#: apps/projects/views.py:141
+#, python-format
+msgid "Project %(code)s saved."
+msgstr "Obra %(code)s guardada."
+
+#: apps/projects/views.py:169
+msgid "Project shared."
+msgstr "Obra compartida."
+
+#: apps/projects/views.py:186
+msgid "Access to the project revoked."
+msgstr "Acceso a la obra revocado."
+
+#: templates/400.html:4
+msgid "Bad request"
+msgstr "Solicitud incorrecta"
+
+#: templates/400.html:8
+msgid "We could not understand that request"
+msgstr "No hemos podido entender esa solicitud"
+
+#: templates/400.html:11
+msgid ""
+"Go back and try again. If it keeps happening, contact your administrator."
+msgstr ""
+"Vuelve atrás e inténtalo de nuevo. Si sigue ocurriendo, contacta con tu "
+"administrador."
+
+#: templates/403.html:4
+msgid "Not allowed"
+msgstr "No permitido"
+
+#: templates/403.html:8
+msgid "You are not allowed to do that"
+msgstr "No tienes permiso para hacer eso"
+
+#: templates/403.html:11
+msgid ""
+"Your account does not have access to this action. If you think it should, "
+"ask your administrator."
+msgstr ""
+"Tu cuenta no tiene acceso a esta acción. Si crees que debería tenerlo, "
+"pregunta a tu administrador."
+
+#: templates/403_csrf.html:6
+msgid "Form expired"
+msgstr "Formulario caducado"
+
+#: templates/403_csrf.html:10
+msgid "That form has expired"
+msgstr "Ese formulario ha caducado"
+
+#: templates/403_csrf.html:13
+msgid "Reload the page and send it again."
+msgstr "Recarga la página y envíalo de nuevo."
+
+#: templates/404.html:4
+msgid "Page not found"
+msgstr "Página no encontrada"
+
+#: templates/404.html:8
+msgid "We could not find that page"
+msgstr "No hemos encontrado esa página"
+
+#: templates/404.html:11
+msgid "The address may be wrong, or the page may no longer exist."
+msgstr "Puede que la dirección sea incorrecta o que la página ya no exista."
+
+#: templates/405.html:4
+msgid "Not available"
+msgstr "No disponible"
+
+#: templates/405.html:8
+msgid "That action is not available here"
+msgstr "Esa acción no está disponible aquí"
+
+#: templates/405.html:11
+msgid "Use the buttons and links of the page instead of typing the address."
+msgstr ""
+"Usa los botones y enlaces de la página en lugar de escribir la dirección."
+
+#: templates/409.html:4
+msgid "Conflict"
+msgstr "Conflicto"
+
+#: templates/409.html:8
+msgid "That conflicts with a recent change"
+msgstr "Eso entra en conflicto con un cambio reciente"
+
+#: templates/409.html:11
+msgid "Reload the page to see the latest data, then try again."
+msgstr ""
+"Recarga la página para ver los datos más recientes y vuelve a intentarlo."
+
+#: templates/429.html:4
+msgid "Too many requests"
+msgstr "Demasiadas solicitudes"
+
+#: templates/429.html:8
+msgid "Too many attempts"
+msgstr "Demasiados intentos"
+
+#: templates/429.html:11
+msgid "Wait a few minutes and try again."
+msgstr "Espera unos minutos e inténtalo de nuevo."
+
+#: templates/500.html:4
+msgid "Something went wrong"
+msgstr "Algo ha salido mal"
+
+#: templates/500.html:8
+msgid "Something went wrong on our side"
+msgstr "Algo ha salido mal por nuestra parte"
+
+#: templates/500.html:11
+msgid "The problem has been recorded. Try again in a moment."
+msgstr "El problema se ha registrado. Inténtalo de nuevo en un momento."
+
+#: templates/account/login.html:8 templates/account/login.html:12
+#: templates/account/login.html:24
+msgid "Sign In"
+msgstr "Iniciar sesión"
+
+#: templates/account/login.html:29
+msgid ""
+"Accounts are created by invitation. Ask your administrator if you do not "
+"have one."
+msgstr ""
+"Las cuentas se crean por invitación. Pregunta a tu administrador si no "
+"tienes una."
+
+#: templates/base.html:32
+msgid "Skip to content"
+msgstr "Saltar al contenido"
+
+#: templates/components/filter_form.html:17
+msgid "Filter"
+msgstr "Filtrar"
+
+#: templates/components/messages.html:7
+msgid "Notifications"
+msgstr "Notificaciones"
+
+#: templates/components/messages.html:16
+msgid "Dismiss"
+msgstr "Cerrar"
+
+#: templates/components/pagination.html:8
+msgid "Pagination"
+msgstr "Paginación"
+
+#: templates/components/pagination.html:12
+#: templates/components/pagination.html:14
+msgid "Previous"
+msgstr "Anterior"
+
+#: templates/components/pagination.html:17
+#, python-format
+msgid "Page %(number)s of %(total)s"
+msgstr "Página %(number)s de %(total)s"
+
+#: templates/components/pagination.html:22
+#: templates/components/pagination.html:24
+msgid "Next"
+msgstr "Siguiente"
+
+#: templates/errors/base_error.html:24
+msgid "Back to the start"
+msgstr "Volver al inicio"
+
+#: templates/layouts/app.html:10 templates/layouts/app.html:31
+msgid "Main navigation"
+msgstr "Navegación principal"
+
+#: templates/partials/language_switcher.html:8
+msgid "Language"
+msgstr "Idioma"
+
+#: templates/partials/nav_items.html:32
 msgid "Security"
 msgstr "Seguridad"
-
-msgid "Sign out"
-msgstr "Cerrar sesión"
