@@ -52,3 +52,12 @@ def manageable(ctx: AccessContext, of: Supplier | None = None) -> bool:
     if of is None:
         return ctx.has(MANAGE)
     return ctx.can(MANAGE, of)
+
+
+def supplier_by_tax_id(ctx: AccessContext, tax_id: str) -> Supplier | None:
+    return Supplier.objects.visible_to(ctx, VIEW).filter(tax_id=tax_id).first()
+
+
+def supplier_by_name(ctx: AccessContext, name: str) -> Supplier | None:
+    """The supplier with this name, ignoring case, if viewable (the name is unique)."""
+    return Supplier.objects.visible_to(ctx, VIEW).filter(name__iexact=name).first()

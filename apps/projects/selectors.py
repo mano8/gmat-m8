@@ -91,3 +91,8 @@ def assignment_candidates(ctx: AccessContext, kind: str | None = None) -> QueryS
 
 def manageable(ctx: AccessContext, of: Project) -> bool:
     return ctx.can(Capability.PROJECT_MANAGE, of)
+
+
+def project_by_code(ctx: AccessContext, code: str) -> Project | None:
+    """The project with this code (its natural key), if ``ctx`` may view it."""
+    return Project.objects.visible_to(ctx, Capability.PROJECT_VIEW).filter(code=code).first()

@@ -1,0 +1,3 @@
+reference,name,unit,category,description,manufacturer,manufacturer_ref,ean,is_stock_item,active
+CAB-H07VK-25-AZ,Cable H07V-K 1x2.5 mm² azul,M,Cables > Unipolares,Flexible libre de halógenos,Prysmian,H07VK25AZ,8412345678905,yes,yes
+DIF-2P-40-30,Interruptor diferencial 2P 40A 30mA,UD,Protección > Diferenciales,,Schneider,A9R11240,,yes,yes

@@ -1,0 +1,3 @@
+name,tax_id,contact_name,email,phone,address,notes,active
+Suministros Eléctricos Ejemplo SL,B00000001,Marta Pérez,pedidos@ejemplo.example,+34 600 000 001,"Polígono Industrial, nave 4, Madrid",Pago a 30 días,yes
+Cables del Sur SA,A00000002,,,,,,yes

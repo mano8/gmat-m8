@@ -169,3 +169,20 @@ def manageable(ctx: AccessContext, of: Material | None = None) -> bool:
     if of is None:
         return ctx.has(Capability.CATALOG_MANAGE)
     return ctx.can(Capability.CATALOG_MANAGE, of)
+
+
+def units_by_code(ctx: AccessContext) -> dict[str, UnitOfMeasure]:
+    """The units, keyed by upper-case code (for imports)."""
+    return {unit.code.upper(): unit for unit in units(ctx)}
+
+
+def material_by_reference(ctx: AccessContext, reference: str) -> Material | None:
+    """The material with this reference, ignoring case (its natural key), if viewable."""
+    return Material.objects.visible_to(ctx, VIEW).filter(reference__iexact=reference).first()
+
+
+def category_named(
+    ctx: AccessContext, name: str, parent_id: UUID | None = None
+) -> MaterialCategory | None:
+    """The category with this name under ``parent_id`` (a root when ``None``), ignoring case."""
+    return categories(ctx).filter(name__iexact=name, parent_id=parent_id).first()
