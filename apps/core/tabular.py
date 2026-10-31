@@ -106,7 +106,7 @@ def _decode(data: bytes) -> tuple[str, str]:
 def _delimiter(text: str, forced: str | None) -> str:
     if forced:
         return forced
-    header = text.split("\n", 1)[0]
+    header = next(iter(text.splitlines()), "")
     return max(DELIMITERS, key=header.count)
 
 
@@ -133,7 +133,12 @@ def _xlsx_rows(path: Path, sheet: str | None) -> list[list[Any]]:
         if sheet is not None and sheet not in workbook.sheetnames:
             raise TableError(f"The workbook has no sheet {sheet!r} (it has {workbook.sheetnames}).")
         worksheet = workbook[sheet] if sheet is not None else workbook.worksheets[0]
-        return [list(row) for row in worksheet.iter_rows(values_only=True)]
+        rows: list[list[Any]] = []
+        for row in worksheet.iter_rows(values_only=True):
+            rows.append(list(row))
+            if len(rows) > MAX_ROWS + 1:  # header + MAX_ROWS; stop before memory does
+                raise TableError(f"The file has more than {MAX_ROWS} rows.")
+        return rows
     finally:
         workbook.close()
 

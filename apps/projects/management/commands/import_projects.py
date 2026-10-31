@@ -73,8 +73,8 @@ class Command(ImportCommand):
         self.ctx: AccessContext
         self.branches: dict[str, Branch] = {}
 
-    def natural_key(self, parsed: ProjectRow) -> str:
-        return parsed.code
+    def natural_keys(self, parsed: ProjectRow) -> list[str]:
+        return [parsed.code]
 
     def parse(self, row: Row) -> ProjectRow:
         code = require(row, "code").upper()

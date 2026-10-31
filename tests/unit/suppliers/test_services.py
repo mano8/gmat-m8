@@ -67,7 +67,7 @@ class TestSuppliers:
         )
         assert (updated.phone, updated.notes) == ("600 000 000", "Pays in 30 days")
         event = AuditEvent.objects.get(action="supplier.updated", object_id=acme.pk)
-        assert set(event.data) == {"phone", "notes"}
+        assert event.data == {"fields": ["notes", "phone"]}
         events = AuditEvent.objects.count()
         services.update_supplier(admin_principal, acme.pk, phone="600 000 000", tax_id="B12345678")
         assert AuditEvent.objects.count() == events

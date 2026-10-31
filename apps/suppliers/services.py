@@ -105,7 +105,7 @@ def create_supplier(
 @transactional
 def update_supplier(principal: Principal, supplier_id: UUID, **changes: Any) -> Supplier:
     """Change a supplier's data (not whether it is active)."""
-    supplier = Supplier.objects.get(pk=supplier_id)
+    supplier = Supplier.objects.select_for_update().get(pk=supplier_id)
     _authorize(principal, supplier)
     diff = apply_changes(supplier, _clean(changes), SUPPLIER_FIELDS)
     if not diff:
@@ -114,13 +114,16 @@ def update_supplier(principal: Principal, supplier_id: UUID, **changes: Any) -> 
     with constraint_errors(SUPPLIER_CONSTRAINTS):
         supplier.save()
     # The audit trail keeps what changed; contact details are business data, not secrets.
-    record(principal.audit_identity, "supplier.updated", obj=supplier, data=diff)
+    # Field names only: contact details stay out of the append-only trail.
+    record(
+        principal.audit_identity, "supplier.updated", obj=supplier, data={"fields": sorted(diff)}
+    )
     events.publish("supplier.updated", supplier_id=supplier.pk, fields=sorted(diff))
     return supplier
 
 
 def _set_active(principal: Principal, supplier_id: UUID, active: bool) -> Supplier:
-    supplier = Supplier.objects.get(pk=supplier_id)
+    supplier = Supplier.objects.select_for_update().get(pk=supplier_id)
     _authorize(principal, supplier)
     if supplier.is_active == active:
         return supplier

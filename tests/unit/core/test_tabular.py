@@ -154,3 +154,17 @@ class TestRefusals:
         with pytest.raises(TableError, match="larger than"):
             read_table(path, COLUMNS)
         assert MAX_FILE_BYTES == 20 * 1024 * 1024
+
+
+def test_a_cr_only_csv_and_too_many_xlsx_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old = tmp_path / "mac.csv"
+    old.write_bytes(b"reference;name\rR1;Uno\rR2;Dos\r")
+    assert [r.get("reference") for r in read_table(old, COLUMNS).rows] == ["R1", "R2"]
+    monkeypatch.setattr("apps.core.tabular.MAX_ROWS", 2)
+    big = write_xlsx(
+        tmp_path / "big.xlsx", [["reference", "name"], *[[f"R{i}", "x"] for i in range(5)]]
+    )
+    with pytest.raises(TableError, match="more than 2 rows"):
+        read_table(big, COLUMNS)

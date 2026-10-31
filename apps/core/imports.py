@@ -149,9 +149,9 @@ class ImportCommand(OperatorCommand):
     def begin(self, principal: OperatorPrincipal, ctx: AccessContext) -> None:
         """Called once per transaction attempt, before the first row (load lookups here)."""
 
-    def natural_key(self, parsed: Any) -> str | None:
-        """The key rows are matched by; two rows of a file with the same key are an error."""
-        return None
+    def natural_keys(self, parsed: Any) -> list[str]:
+        """The keys rows are matched by; two rows of a file sharing one are an error."""
+        return []
 
     def apply(self, principal: OperatorPrincipal, parsed: Any) -> str:
         """Write one parsed row through the services; return ``created``, ``updated`` or
@@ -184,10 +184,11 @@ class ImportCommand(OperatorCommand):
         for row in table.rows:
             try:
                 parsed = self.parse(row)
-                key = self.natural_key(parsed)
-                if key is not None and key in seen:
-                    raise RowRefused(f"is the same as line {seen[key]}")
-                if key is not None:
+                keys = self.natural_keys(parsed)
+                for key in keys:
+                    if key in seen:
+                        raise RowRefused(f"is the same as line {seen[key]}")
+                for key in keys:
                     seen[key] = row.line
                 parsed_rows.append((row, parsed))
             except RowRefused as exc:

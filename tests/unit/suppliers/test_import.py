@@ -106,7 +106,7 @@ class TestErrors:
             "Bad Mail,B3,,not-an-email,,,,",  # line 4
             "Twice,B1,,,,,,",  # line 5: the tax id of line 2
             "Fine Again,,,,,,,maybe",  # line 6
-            "Fine,,,,,,,",  # line 7: the name of line 2 and no tax id: a different key
+            "fine,,,,,,,",  # line 7: the name of line 2: the same supplier
         ]
         with pytest.raises(CommandError, match="nothing was written") as caught:
             run_import("import_suppliers", write_csv(tmp_path / "e.csv", lines), operator)
@@ -116,6 +116,7 @@ class TestErrors:
             "line 4: email: 'not-an-email' is not an email address",
             "line 5: is the same as line 2",
             "line 6: active: expected yes or no",
+            "line 7: is the same as line 2",
         ):
             assert expected in report, report
         assert Supplier.objects.count() == 1  # only the fixture's

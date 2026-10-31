@@ -150,7 +150,7 @@ def create_category(
 
 @transactional
 def update_category(principal: Principal, category_id: UUID, **changes: Any) -> MaterialCategory:
-    category = MaterialCategory.objects.get(pk=category_id)
+    category = MaterialCategory.objects.select_for_update().get(pk=category_id)
     _authorize(principal, category)
     diff = apply_changes(category, _clean_text(changes), CATEGORY_FIELDS)
     if not diff:
@@ -236,7 +236,7 @@ def update_material(principal: Principal, material_id: UUID, **changes: Any) -> 
     A material that documents reference keeps its unit: the composite foreign key refuses
     the change (C9), which is reported on the ``unit`` field.
     """
-    material = Material.objects.get(pk=material_id)
+    material = Material.objects.select_for_update().get(pk=material_id)
     _authorize(principal, material)
     diff = apply_changes(material, _clean_text(changes), MATERIAL_FIELDS)
     if not diff:
@@ -253,7 +253,7 @@ def update_material(principal: Principal, material_id: UUID, **changes: Any) -> 
 
 
 def _set_active(principal: Principal, material_id: UUID, active: bool) -> Material:
-    material = Material.objects.get(pk=material_id)
+    material = Material.objects.select_for_update().get(pk=material_id)
     _authorize(principal, material)
     if material.is_active == active:
         return material

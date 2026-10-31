@@ -58,8 +58,11 @@ class Command(ImportCommand):
         super().__init__(*args, **kwargs)
         self.ctx: AccessContext
 
-    def natural_key(self, parsed: SupplierRow) -> str:
-        return parsed.tax_id or f"name:{parsed.name.casefold()}"
+    def natural_keys(self, parsed: SupplierRow) -> list[str]:
+        keys = [f"name:{parsed.name.casefold()}"]
+        if parsed.tax_id:
+            keys.append(f"tax:{parsed.tax_id.casefold()}")
+        return keys
 
     def parse(self, row: Row) -> SupplierRow:
         name = require(row, "name")

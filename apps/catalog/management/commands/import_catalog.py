@@ -74,8 +74,8 @@ class Command(ImportCommand):
         self.units: dict[str, UnitOfMeasure] = {}
         self.categories_created = 0
 
-    def natural_key(self, parsed: MaterialRow) -> str:
-        return parsed.reference.casefold()
+    def natural_keys(self, parsed: MaterialRow) -> list[str]:
+        return [parsed.reference.casefold()]
 
     def parse(self, row: Row) -> MaterialRow:
         reference = require(row, "reference")
