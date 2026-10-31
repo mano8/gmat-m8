@@ -140,6 +140,16 @@ Code in `apps/material_requests/services.py` and `ledger.py`; plan §3.4, §4.3�
 - **Editing by state** (§4.4): decisions only while `SUBMITTED`, and a reviewer changes only their own; sourcing, schedule and closures only while `APPROVED`; reopen only from `CLOSED`. Approved quantities only go down, never on a closed-short line and never below what is delivered, received or on order, so R ≤ A and D ≤ A hold whatever the sequence (property test). Every change is audited with its reason or note; return to draft keeps the earlier decisions in the audit only.
 - **Locks.** The header (L2) before its lines (L3); operations that change ledger inputs lock every line of the request. Concurrent decisions finalise a request exactly once, and a withdrawal racing a decision ends with one of them refused (threaded tests).
 
+## Material requests: the requester's screens (step M4.3)
+
+Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templates/material_requests/`; plan §3.4–3.6, §5 (Web), §11 M4.3.
+
+- **Same checks as every screen.** Reads go through `selectors` (`visible_to`), writes through the M4.1 services from POST-only views (`@mutating`) on their own URLs; the order is S7: the capability somewhere (403), the request or line in scope (404), the capability on it (403 for a reviewer who sees a draft that is not theirs). Every URL and method has rows in the acceptance matrix, including the partner's and the technician's own request, an unknown id and the revoked and expired actors. `{% can %}` only hides buttons.
+- **Choices are never trusted.** The project of a new request, the material and the unit are hidden or select fields checked against selector querysets (`creatable_projects`: active projects in the user's `request.create` scope; active catalog materials; units): a forged id is a form error, not an object.
+- **Double taps.** Starting a request (one signed key per project button), submitting and adding a material outside the catalog carry the server-issued idempotency key; the review step's details are saved inside the submit transaction, and a replay with other details is a 409. The fragment returned after each change of a draft carries a fresh key.
+- **No leaks.** Requests hold no prices and the screens show no supplier; a partner's pages are checked for every sentinel. "My requests" lists only the user's own requests.
+- **Browser.** No inline script or style; htmx attributes only (`hx-post`, `hx-get`, `hx-trigger`), the CSRF token in the body's `hx-headers` and in each form; responses are `no-store, private`; the pages still work without JavaScript (forms post and redirect).
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

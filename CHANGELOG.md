@@ -95,6 +95,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - sourcing services `set_sourcing` (`PURCHASE` needs a catalog material; `PURCHASE → STOCK` only with nothing pending or reserved), `resolve_non_catalog_line` (an active material in the line's unit, C9), `change_schedule` / `change_priority` / `change_needed_by`, `close_line_short` / `reopen_line` (source `LINE`), `manual_close` / `reopen` (source `REQUEST`; a reopen restores only the lines the close closed), and the automatic close when no live line is short of delivery (§4.9);
   - `apps/material_requests/ledger.py`: the derived quantities of plan §4.5 from flow sources that purchasing (M5.1) and handovers (M6.2) register, the live/open predicates, *to purchase* (a closed-short line is never purchasable), close/reopen eligibility; cancellation and return to draft now check that nothing is allocated or delivered;
   - deactivation precondition: a branch or company with an approved request still awaiting deliveries (by procurement branch or project branch) cannot be deactivated.
+- Technician mobile UI (M4.3, `apps/material_requests`, screens under `/requests/`):
+  - the requester's flow: home → new request → project (the latest used first, search) → materials (search as you type, recent materials, one tap adds one, the same material again adds up, quantity stepper with the unit shown, a material outside the catalog) → review (priority, needed-by date, notes) → submit → status page; the draft lives on the server, a discarded draft is cancelled;
+  - "My requests" (`/requests/`): the user's own requests with status chips, filters and, per line, requested, approved, delivered and outstanding quantities; withdraw is offered while no line is decided; partners get the same screens with their restricted project list (requests carry no prices);
+  - `submit` takes the review step's `priority`, `needed_by` and `notes` in the same transaction, so a double tap (same signed key) yields one request; one key per project button for the draft;
+  - selectors `creatable_projects`, `my_requests`, `request`, `line`, `lines`, `recent_materials`, `can_edit`, `can_withdraw`; the `quantity` template filter (no trailing zeros, localized); a `clipboard` icon and the "Requests" entry in the navigation; the acceptance matrix covers every new URL and method.
 
 ### Changed
 
