@@ -72,7 +72,14 @@ None of the env files is committed; only the `*.example` templates are.
 | `docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --wait` | Production on the VPS: ports 80/443 (tcp+udp), ACME for `APP_DOMAIN`, both images **by digest** from GHCR (`APP_DIGEST`, `BACKUP_DIGEST`; the worker runs the app image), no build, no Mailpit (mail goes to `EMAIL_HOST`). `deploy.sh` (M8.4) is the supported way to run it. |
 | `docker compose -f docker-compose.yml -f docker-compose.restore-drill.yml ...` | The quarterly restore drill on an isolated machine: own project name and volumes, **every network internal**, nothing published, `OUTBOUND_EMAIL=off`. |
 
-Seed data for development: `docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo` (command arrives with M3).
+Seed data for development (the dev overlay only; the command refuses any settings but `config.settings.dev` and `config.settings.test`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage bootstrap_admin --email you@example.com --company-code A   # once: prints the setup link
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo --operator you@example.com [--password …]
+```
+
+`seed_demo` runs as that group administrator and, through the same services as the app, creates the A/B/C organization of plan §3.2 (companies A, B (joint venture of A and C) and C; branches A-MAD, A-SEV and B-MAD, managed by A-MAD; warehouses), one user per role plus a user with mixed memberships (`mm-mad@demo.example`, `mm-sev`, `wo-mad`, `tech-mad`, `site-manager`, `partner`, `mixed`), four projects (one on hold; the site manager and the partner are shared on `HOSP-X`), about 200 materials and 5 suppliers. The password of the new users is `--password` or a random one, printed once. Privileged roles enroll MFA at their first sign-in; with Mailpit (`http://127.0.0.1:8025`) password resets work. It is idempotent: a second run reports everything as existing. To load your own data instead, see `docs/import-templates/` (`manage import_catalog | import_suppliers | import_projects <file> --operator <email> [--dry-run]`).
 
 ## Day to day
 

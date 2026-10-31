@@ -1,0 +1,3 @@
+code,name,branch,procurement_branch,client_name,address,status,start_date,end_date
+HOSP-1,Hospital X,B-MAD,A-MAD,Servicio de Salud,"Av. de la Sanidad 1, Madrid",ACTIVE,2026-11-01,2027-06-30
+NAVE-2,Nave industrial 2,A-SEV,,Logística Ejemplo SA,"Polígono Norte, Sevilla",ACTIVE,2026-12-01,

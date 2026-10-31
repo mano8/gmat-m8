@@ -1,0 +1,72 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {{ supplier.name }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1>{{ supplier.name }}</h1>
+      <p class="mt-1">{% include "suppliers/status.html" %}</p>
+    </div>
+    {% if manageable %}
+      <div class="flex flex-wrap gap-3">
+        {% url 'suppliers:edit' supplier_id=supplier.pk as edit_url %}
+        {% include "components/button.html" with href=edit_url label=_("Edit") %}
+        {% if supplier.is_active %}
+          <form method="post"
+                action="{% url 'suppliers:deactivate' supplier_id=supplier.pk %}">
+            {% csrf_token %}
+            {% include "components/button.html" with type="submit" label=_("Deactivate") variant="danger" %}
+          </form>
+        {% else %}
+          <form method="post"
+                action="{% url 'suppliers:reactivate' supplier_id=supplier.pk %}">
+            {% csrf_token %}
+            {% include "components/button.html" with type="submit" label=_("Reactivate") %}
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+  <section class="card">
+    <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      <div>
+        <dt class="text-sm text-soft">{% translate "Tax id" %}</dt>
+        <dd>
+          {{ supplier.tax_id|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Contact person" %}</dt>
+        <dd>
+          {{ supplier.contact_name|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Email" %}</dt>
+        <dd>
+          {{ supplier.email|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Phone" %}</dt>
+        <dd>
+          {{ supplier.phone|default:"—" }}
+        </dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-sm text-soft">{% translate "Address" %}</dt>
+        <dd>
+          {{ supplier.address|default:"—"|linebreaksbr }}
+        </dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
+        <dd>
+          {{ supplier.notes|default:"—"|linebreaksbr }}
+        </dd>
+      </div>
+    </dl>
+  </section>
+{% endblock content %}

@@ -13,8 +13,9 @@ sentinel is checked absent from every response. A URL with an object adds one ro
 object position (``Route.position``).
 
 The account pages (allauth), the admin, the health checks, the token pages (invitations,
-email changes) and the screens of M2.6 (projects, people, invitations) have rows; later
-business screens add theirs with the steps that build them.
+email changes), the screens of M2.6 (projects, people, invitations) and the master-data
+screens of M3 (catalog, suppliers) have rows; later business screens add theirs with the
+steps that build them.
 """
 
 import re
@@ -31,12 +32,12 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.access.admin import CapabilityModelAdmin
 from apps.access.models import AccessState
 from apps.accounts.models import User
 from apps.accounts.sessions import bump_session_epoch
 from apps.audit.models import AuditEvent
 from apps.core.admin import ReadOnlyModelAdmin, ServiceBackedModelAdmin
-from apps.organizations.admin import MasterDataAdmin
 from apps.organizations.models import Company, Membership
 from tests.access.matrix import (
     ACTOR_NAMES,
@@ -63,6 +64,7 @@ from tests.access.matrix import (
     send,
     url_patterns,
 )
+from tests.org import Sentinel
 
 pytestmark = pytest.mark.django_db
 
@@ -120,6 +122,7 @@ def admin_object(world: World, model: str) -> Any:
         "branch": lambda: org.a_mad,
         "project": lambda: org.hospital,
         "location": lambda: org.warehouses["A Madrid"],
+        "supplier": lambda: org.supplier,
     }
     return rows.get(model, lambda: world.objects[model])()
 
@@ -140,6 +143,10 @@ def admin_redirect_path(app: str, model: str) -> Callable[[World], str]:
     return path
 
 
+SUPPLIER_SENTINELS = frozenset(
+    {Sentinel.SUPPLIER_NAME, Sentinel.SUPPLIER_EMAIL, Sentinel.SUPPLIER_PHONE}
+)
+
 # Access and document models are read-only; master data is editable by GROUP_ADMIN only
 # (the platform operator only views it). Nothing is ever deleted (plan §5, §8.2).
 READ_ONLY_MODELS = {
@@ -150,11 +157,16 @@ READ_ONLY_MODELS = {
     "access": ("accessstate",),
     "organizations": ("membership",),
     "projects": ("project", "projectassignment"),
+    "catalog": ("unitofmeasure",),
 }
 MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),
     "locations": ("location",),
+    "catalog": ("materialcategory", "material"),
+    "suppliers": ("supplier",),
 }
+# The admin pages of a model that shows its own sentinels (the supplier's contact details).
+ADMIN_SENTINELS = {"supplier": SUPPLIER_SENTINELS}
 
 
 def _admin_model_routes() -> dict[str, Route]:
@@ -180,11 +192,14 @@ def _admin_model_routes() -> dict[str, Route]:
                     "delete": admin_page(DENIED, DENIED),
                     "change": change,
                 }
+                shown = ADMIN_SENTINELS.get(model, frozenset())
                 for view, methods in views.items():
                     key = f"{base}_{view}"
-                    routes[key] = Route(methods, path=admin_model_path(key))
+                    routes[key] = Route(methods, path=admin_model_path(key), allowed=shown)
                 routes[f"admin:{app}/{model}/<path:object_id>/"] = Route(
-                    admin_page(REDIRECT, REDIRECT), path=admin_redirect_path(app, model)
+                    admin_page(REDIRECT, REDIRECT),
+                    path=admin_redirect_path(app, model),
+                    allowed=shown,
                 )
     return routes
 
@@ -289,6 +304,26 @@ def _person_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.people.tech_mad.pk])
 
 
+UNKNOWN_ID = "00000000-0000-7000-8000-000000000000"
+# Every account with a valid membership reads the catalog; managers change it (M3.1).
+CATALOG_VIEWERS = (*PROJECT_VIEWERS, "revoked_assignment")
+CATALOG_MANAGERS = PROJECT_MANAGERS
+
+
+# Suppliers are read by who holds supplier.view and changed by who holds supplier.manage; the
+# mixed user manages through A-SEV (S6). Not site managers, technicians or partners.
+SUPPLIER_VIEWERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "mixed")
+SUPPLIER_MANAGERS = PROJECT_MANAGERS
+
+
+def _supplier_url(name: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[world.org.supplier.pk])
+
+
+def _unknown_url(name: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[UNKNOWN_ID])
+
+
 PROJECT_POSITIONS = (
     ("own scope", "hospital", HOSPITAL_VIEWERS),
     ("foreign scope", "sev_works", SEV_VIEWERS),
@@ -348,6 +383,139 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, REDIRECT),
             path=_object_url("projects:assignment_validity", "projectassignment"),
             note="an empty form: reported, then back to the project",
+        ),
+    ),
+    # Catalog (M3.1): installation-wide master data. Every valid membership views it (also a
+    # site manager whose assignments are all revoked); managers change it.
+    "catalog:list": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "catalog:search": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "catalog:detail": (
+        Route(
+            app_page(**_each(OK, CATALOG_VIEWERS)),
+            position="a material",
+            path=_object_url("catalog:detail", "material"),
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, CATALOG_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("catalog:detail"),
+        ),
+    ),
+    "catalog:new": (Route(app_page(**_each(OK, CATALOG_MANAGERS))),),
+    "catalog:create": (
+        Route(app_action(**_each(OK, CATALOG_MANAGERS)), note="an empty form: 200 with errors"),
+    ),
+    "catalog:edit": (
+        Route(
+            app_page(**_each(OK, CATALOG_MANAGERS)),
+            position="a material",
+            path=_object_url("catalog:edit", "material"),
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, CATALOG_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("catalog:edit"),
+        ),
+    ),
+    "catalog:update": (
+        Route(
+            app_action(**_each(OK, CATALOG_MANAGERS)),
+            path=_object_url("catalog:update", "material"),
+            note="an empty form: 200 with errors",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, CATALOG_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("catalog:update"),
+        ),
+    ),
+    "catalog:deactivate": (
+        Route(
+            app_action(**_each(REDIRECT, CATALOG_MANAGERS)),
+            path=_object_url("catalog:deactivate", "material"),
+        ),
+    ),
+    "catalog:reactivate": (
+        Route(
+            app_action(**_each(REDIRECT, CATALOG_MANAGERS)),
+            path=_object_url("catalog:reactivate", "material"),
+        ),
+    ),
+    "catalog:categories": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "catalog:category_new": (Route(app_page(**_each(OK, CATALOG_MANAGERS))),),
+    "catalog:category_create": (
+        Route(app_action(**_each(OK, CATALOG_MANAGERS)), note="an empty form: 200 with errors"),
+    ),
+    "catalog:category_edit": (
+        Route(
+            app_page(**_each(OK, CATALOG_MANAGERS)),
+            path=_object_url("catalog:category_edit", "materialcategory"),
+        ),
+    ),
+    "catalog:category_update": (
+        Route(
+            app_action(**_each(OK, CATALOG_MANAGERS)),
+            path=_object_url("catalog:category_update", "materialcategory"),
+            note="an empty form: 200 with errors",
+        ),
+    ),
+    # Suppliers (M3.2): supplier.view (group administrators, material managers, warehouse
+    # operators) reads every supplier; supplier.manage (not warehouse operators) changes them.
+    # Site managers, technicians and partners get nothing: no supplier name, email or phone.
+    "suppliers:list": (Route(app_page(**_each(OK, SUPPLIER_VIEWERS)), allowed=SUPPLIER_SENTINELS),),
+    "suppliers:detail": (
+        Route(
+            app_page(**_each(OK, SUPPLIER_VIEWERS)),
+            position="a supplier",
+            path=_supplier_url("suppliers:detail"),
+            allowed=SUPPLIER_SENTINELS,
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, SUPPLIER_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("suppliers:detail"),
+        ),
+    ),
+    "suppliers:new": (Route(app_page(**_each(OK, SUPPLIER_MANAGERS))),),
+    "suppliers:create": (
+        Route(app_action(**_each(OK, SUPPLIER_MANAGERS)), note="an empty form: 200 with errors"),
+    ),
+    "suppliers:edit": (
+        Route(
+            app_page(**_each(OK, SUPPLIER_MANAGERS)),
+            position="a supplier",
+            path=_supplier_url("suppliers:edit"),
+            allowed=SUPPLIER_SENTINELS,
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, SUPPLIER_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("suppliers:edit"),
+        ),
+    ),
+    "suppliers:update": (
+        Route(
+            app_action(**_each(OK, SUPPLIER_MANAGERS)),
+            path=_supplier_url("suppliers:update"),
+            allowed=SUPPLIER_SENTINELS,
+            note="an empty form: 200 with errors",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, SUPPLIER_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("suppliers:update"),
+        ),
+    ),
+    "suppliers:deactivate": (
+        Route(
+            app_action(**_each(REDIRECT, SUPPLIER_MANAGERS)),
+            path=_supplier_url("suppliers:deactivate"),
+        ),
+    ),
+    "suppliers:reactivate": (
+        Route(
+            app_action(**_each(REDIRECT, SUPPLIER_MANAGERS)),
+            path=_supplier_url("suppliers:reactivate"),
         ),
     ),
     # Group administrators only (org.manage); the target is the A-MAD technician.
@@ -555,7 +723,7 @@ class TestAdmin:
         for key in read_only:
             assert isinstance(registered[key], ReadOnlyModelAdmin), key
         for key in master:
-            assert isinstance(registered[key], MasterDataAdmin), key
+            assert isinstance(registered[key], CapabilityModelAdmin), key
 
     def test_no_admin_offers_the_bulk_delete(self, world: World) -> None:
         client = world.client("group_admin")

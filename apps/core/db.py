@@ -1,13 +1,16 @@
 """Transaction helpers. Every locking write bounds its lock waits (CLAUDE.md, "Writes")."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime
+from typing import Any
 
-from django.db import DEFAULT_DB_ALIAS, OperationalError, connections, transaction
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
+from django.db import DEFAULT_DB_ALIAS, IntegrityError, OperationalError, connections, transaction
 
 DEFAULT_LOCK_TIMEOUT_MS = 5_000
 _LOCK_NOT_AVAILABLE = "55P03"
+_FOREIGN_KEY_VIOLATION = "23503"
 
 
 class LockTimeout(Exception):
@@ -55,3 +58,54 @@ def db_clock(*, using: str = DEFAULT_DB_ALIAS) -> datetime:
         cursor.execute("SELECT clock_timestamp()")
         (now,) = cursor.fetchone()
     return now  # type: ignore[no-any-return]
+
+
+def _is_foreign_key_violation(exc: IntegrityError) -> bool:
+    return getattr(exc.__cause__, "sqlstate", None) == _FOREIGN_KEY_VIOLATION
+
+
+def constraint_name(exc: IntegrityError) -> str | None:
+    """The name of the constraint or trigger-raised constraint behind an ``IntegrityError``."""
+    diag = getattr(exc.__cause__, "diag", None)
+    name = getattr(diag, "constraint_name", None)
+    return name if isinstance(name, str) else None
+
+
+@contextmanager
+def constraint_errors(
+    messages: Mapping[str, tuple[str | None, Any]],
+    *,
+    referenced: tuple[str | None, Any] | None = None,
+    using: str = DEFAULT_DB_ALIAS,
+) -> Iterator[None]:
+    """Turn a violation of the named constraints into a field ``ValidationError``.
+
+    ``messages`` maps a constraint name to ``(field or None, message)``. ``referenced`` is
+    the answer to any foreign-key violation, which on a parent row means a child still
+    points at the key being changed (the unit of a referenced material, C9). The write
+    runs in a savepoint, so the service's transaction stays usable. This covers what only
+    the database can settle: a concurrent insert of the same key, or a trigger's rule
+    (``full_clean`` checks the same rules first, for the common case).
+    """
+    try:
+        with transaction.atomic(using=using):
+            yield
+    except IntegrityError as exc:
+        field, message = _refusal(exc, messages, referenced)
+        raise ValidationError(
+            {field or NON_FIELD_ERRORS: ValidationError(message, code="constraint")}
+        ) from exc
+
+
+def _refusal(
+    exc: IntegrityError,
+    messages: Mapping[str, tuple[str | None, Any]],
+    referenced: tuple[str | None, Any] | None,
+) -> tuple[str | None, Any]:
+    """The field and message for a violation we word; anything else is re-raised."""
+    found = messages.get(constraint_name(exc) or "")
+    if found is None and referenced is not None and _is_foreign_key_violation(exc):
+        found = referenced
+    if found is None:
+        raise exc
+    return found

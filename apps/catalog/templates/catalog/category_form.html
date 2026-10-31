@@ -1,0 +1,25 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% if category %}{{ category.name }}{% else %}{% translate "New category" %}{% endif %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-4">
+    {% if category %}
+      {% blocktranslate with name=category.name %}Edit category {{ name }}{% endblocktranslate %}
+    {% else %}
+      {% translate "New category" %}
+    {% endif %}
+  </h1>
+  <form method="post"
+        class="card max-w-2xl"
+        action="{% if category %}{% url 'catalog:category_update' category_id=category.pk %}{% else %}{% url 'catalog:category_create' %}{% endif %}">
+    {% csrf_token %}
+    {{ form }}
+    <div class="flex flex-wrap gap-3">
+      {% include "components/button.html" with type="submit" label=_("Save") variant="primary" %}
+      {% url 'catalog:categories' as back_url %}
+      {% include "components/button.html" with href=back_url label=_("Cancel") %}
+    </div>
+  </form>
+{% endblock content %}

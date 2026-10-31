@@ -185,6 +185,18 @@ class ScopedQuerySet[M: Model](QuerySet[M]):
         return self.in_scope(ctx.scope_for(capability))
 
 
+class InstallationQuerySet[M: Model](ScopedQuerySet[M]):
+    """Master data shared by the whole installation (catalog, suppliers; plan §4.2).
+
+    A grant reaches all of it or none: no branch, project or ownership narrows it
+    (``INSTALLATION_CAPABILITIES``). What a role may see of a row is decided by the
+    selector's projection (suppliers: ``supplier.view``), never by the scope.
+    """
+
+    def scope_q(self, scope: Scope) -> Q:
+        return ALWAYS if scope.installation else NEVER
+
+
 def object_in_scope(obj: Model, scope: Scope) -> bool:
     """Whether ``obj`` (as stored) is in ``scope``; its model needs a ``ScopedQuerySet``."""
     queryset = type(obj)._default_manager.all()

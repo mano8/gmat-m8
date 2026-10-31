@@ -1,0 +1,82 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {{ material.reference }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1>{{ material.reference }} · {{ material.name }}</h1>
+      <p class="mt-1">{% include "catalog/status.html" %}</p>
+    </div>
+    {% if manageable %}
+      <div class="flex flex-wrap gap-3">
+        {% url 'catalog:edit' material_id=material.pk as edit_url %}
+        {% include "components/button.html" with href=edit_url label=_("Edit") %}
+        {% if material.is_active %}
+          <form method="post"
+                action="{% url 'catalog:deactivate' material_id=material.pk %}">
+            {% csrf_token %}
+            {% include "components/button.html" with type="submit" label=_("Deactivate") variant="danger" %}
+          </form>
+        {% else %}
+          <form method="post"
+                action="{% url 'catalog:reactivate' material_id=material.pk %}">
+            {% csrf_token %}
+            {% include "components/button.html" with type="submit" label=_("Reactivate") %}
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+  <section class="card">
+    <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      <div>
+        <dt class="text-sm text-soft">{% translate "Category" %}</dt>
+        <dd>
+          {{ material.category|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Unit of measure" %}</dt>
+        <dd>
+          {{ material.unit.label }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Manufacturer" %}</dt>
+        <dd>
+          {{ material.manufacturer|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Manufacturer reference" %}</dt>
+        <dd>
+          {{ material.manufacturer_ref|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "EAN / barcode" %}</dt>
+        <dd>
+          {{ material.ean|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Stock item" %}</dt>
+        <dd>
+          {% if material.is_stock_item %}
+            {% translate "Yes" %}
+          {% else %}
+            {% translate "No" %}
+          {% endif %}
+        </dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-sm text-soft">{% translate "Description" %}</dt>
+        <dd>
+          {{ material.description|default:"—"|linebreaksbr }}
+        </dd>
+      </div>
+    </dl>
+  </section>
+{% endblock content %}

@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% if supplier %}{{ supplier.name }}{% else %}{% translate "New supplier" %}{% endif %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-4">
+    {% if supplier %}
+      {% blocktranslate with name=supplier.name %}Edit supplier {{ name }}{% endblocktranslate %}
+    {% else %}
+      {% translate "New supplier" %}
+    {% endif %}
+  </h1>
+  <form method="post"
+        class="card max-w-2xl"
+        action="{% if supplier %}{% url 'suppliers:update' supplier_id=supplier.pk %}{% else %}{% url 'suppliers:create' %}{% endif %}">
+    {% csrf_token %}
+    {{ form }}
+    <div class="flex flex-wrap gap-3">
+      {% include "components/button.html" with type="submit" label=_("Save") variant="primary" %}
+      {% if supplier %}
+        {% url 'suppliers:detail' supplier_id=supplier.pk as back_url %}
+      {% else %}
+        {% url 'suppliers:list' as back_url %}
+      {% endif %}
+      {% include "components/button.html" with href=back_url label=_("Cancel") %}
+    </div>
+  </form>
+{% endblock content %}

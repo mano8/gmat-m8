@@ -98,3 +98,46 @@ def test_handle_operator_is_abstract(manager: User) -> None:
 
     with pytest.raises(NotImplementedError):
         call_command(Bare(), operator="ops@example.org")
+
+
+class TouchesTwoDomains(OperatorCommand):
+    required_capability = "catalog.manage"
+    also_capabilities = ("supplier.manage",)
+    seen: dict[str, OperatorPrincipal]
+
+    def handle_operator(self, principal: OperatorPrincipal, *args: Any, **options: Any) -> None:
+        self.seen = {
+            "main": principal,
+            "also": self.principal_for("supplier.manage"),
+        }
+
+
+def test_a_command_can_act_under_several_capabilities_one_principal_each(manager: User) -> None:
+    command = TouchesTwoDomains()
+    call_command(command, operator=manager.email)
+    assert command.seen["main"].capability == "catalog.manage"
+    assert command.seen["also"].capability == "supplier.manage"
+    assert command.seen["also"].user_id == manager.pk
+
+
+def test_a_command_with_extra_capabilities_still_needs_the_main_one(
+    make_user: Callable[..., User], branch: Branch
+) -> None:
+    technician = make_user("tech@example.org")
+    grant(technician, Role.TECHNICIAN, branch=branch)
+    with pytest.raises(CommandError, match=r"does not hold catalog\.manage"):
+        call_command(TouchesTwoDomains(), operator=technician.email)
+
+
+def test_a_shared_base_may_declare_itself_abstract() -> None:
+    class SharedBase(OperatorCommand):
+        abstract = True
+
+    class Concrete(SharedBase):
+        required_capability = "catalog.manage"
+
+    assert Concrete.required_capability == "catalog.manage"
+    with pytest.raises(TypeError, match="must declare required_capability"):
+
+        class Missing(SharedBase):
+            pass

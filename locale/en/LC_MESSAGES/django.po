@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 09:22+0000\n"
+"POT-Creation-Date: 2026-10-31 12:17+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -54,7 +54,7 @@ msgstr ""
 msgid "Existing account"
 msgstr ""
 
-#: apps/accounts/models.py:107
+#: apps/accounts/models.py:107 apps/suppliers/models.py:28
 msgid "email"
 msgstr ""
 
@@ -359,7 +359,7 @@ msgid ""
 msgstr ""
 
 #: apps/accounts/templates/accounts/invitation_account.html:20
-#: templates/partials/nav_items.html:40
+#: templates/partials/nav_items.html:56
 msgid "Sign out"
 msgstr ""
 
@@ -395,6 +395,356 @@ msgstr ""
 
 #: apps/accounts/views.py:216
 msgid "The email change is cancelled."
+msgstr ""
+
+#: apps/catalog/forms.py:26 apps/organizations/forms.py:20
+#: apps/organizations/forms.py:25 apps/projects/forms.py:21
+#: apps/suppliers/forms.py:14
+msgid "Search"
+msgstr ""
+
+#: apps/catalog/forms.py:28 apps/catalog/forms.py:50
+#: apps/catalog/templates/catalog/detail.html:35
+#: apps/catalog/templates/catalog/list.html:28
+#: apps/catalog/templates/catalog/list.html:40
+msgid "Category"
+msgstr ""
+
+#: apps/catalog/forms.py:28
+msgid "All categories"
+msgstr ""
+
+#: apps/catalog/forms.py:31 apps/catalog/templates/catalog/list.html:30
+#: apps/catalog/templates/catalog/list.html:42 apps/organizations/forms.py:21
+#: apps/organizations/templates/organizations/people.html:23
+#: apps/organizations/templates/organizations/people.html:34
+#: apps/projects/forms.py:22 apps/projects/forms.py:53
+#: apps/projects/templates/projects/list.html:25
+#: apps/projects/templates/projects/list.html:36 apps/suppliers/forms.py:16
+#: apps/suppliers/templates/suppliers/list.html:26
+#: apps/suppliers/templates/suppliers/list.html:38
+msgid "Status"
+msgstr ""
+
+#: apps/catalog/forms.py:34 apps/catalog/templates/catalog/status.html:3
+#: apps/organizations/forms.py:16
+#: apps/organizations/templates/organizations/account_status.html:7
+#: apps/projects/models.py:28 apps/suppliers/forms.py:19
+#: apps/suppliers/templates/suppliers/status.html:3
+msgid "Active"
+msgstr ""
+
+#: apps/catalog/forms.py:35 apps/catalog/templates/catalog/status.html:5
+#: apps/organizations/forms.py:16
+#: apps/organizations/templates/organizations/account_status.html:5
+#: apps/suppliers/forms.py:20 apps/suppliers/templates/suppliers/status.html:5
+msgid "Inactive"
+msgstr ""
+
+#: apps/catalog/forms.py:36 apps/suppliers/forms.py:21
+msgid "All"
+msgstr ""
+
+#: apps/catalog/forms.py:48 apps/catalog/forms.py:123
+#: apps/catalog/templates/catalog/list.html:27
+#: apps/catalog/templates/catalog/list.html:39
+#: apps/organizations/templates/organizations/people.html:21
+#: apps/organizations/templates/organizations/people.html:32
+#: apps/projects/forms.py:39 apps/projects/templates/projects/list.html:23
+#: apps/projects/templates/projects/list.html:34 apps/suppliers/forms.py:27
+#: apps/suppliers/templates/suppliers/list.html:22
+#: apps/suppliers/templates/suppliers/list.html:32
+msgid "Name"
+msgstr ""
+
+#: apps/catalog/forms.py:49 apps/catalog/templates/catalog/detail.html:41
+msgid "Unit of measure"
+msgstr ""
+
+#: apps/catalog/forms.py:52 apps/catalog/templates/catalog/detail.html:75
+msgid "Description"
+msgstr ""
+
+#: apps/catalog/forms.py:54 apps/catalog/templates/catalog/detail.html:47
+msgid "Manufacturer"
+msgstr ""
+
+#: apps/catalog/forms.py:56 apps/catalog/templates/catalog/detail.html:53
+msgid "Manufacturer reference"
+msgstr ""
+
+#: apps/catalog/forms.py:59 apps/catalog/models.py:162
+#: apps/catalog/templates/catalog/detail.html:59
+msgid "EAN / barcode"
+msgstr ""
+
+#: apps/catalog/forms.py:63 apps/catalog/models.py:25
+msgid "Use 8 to 14 digits."
+msgstr ""
+
+#: apps/catalog/forms.py:66 apps/catalog/templates/catalog/detail.html:65
+msgid "Stock item"
+msgstr ""
+
+#: apps/catalog/forms.py:68 apps/catalog/models.py:167
+msgid "Kept in the warehouse, so it can be handed over from stock."
+msgstr ""
+
+#: apps/catalog/forms.py:108 apps/catalog/templates/catalog/list.html:26
+#: apps/catalog/templates/catalog/list.html:36
+msgid "Reference"
+msgstr ""
+
+#: apps/catalog/forms.py:110
+msgid "Your own code for the material. It cannot change later."
+msgstr ""
+
+#: apps/catalog/forms.py:125
+msgid "Parent category"
+msgstr ""
+
+#: apps/catalog/forms.py:128 apps/catalog/services.py:64
+#: apps/catalog/services.py:98
+msgid "Categories have two levels at most."
+msgstr ""
+
+#: apps/catalog/models.py:23
+msgid "A reference is one line of text without control characters."
+msgstr ""
+
+#: apps/catalog/models.py:58 apps/catalog/models.py:104
+#: apps/catalog/models.py:142 apps/locations/models.py:46
+#: apps/organizations/models.py:121 apps/projects/models.py:33
+#: apps/suppliers/models.py:24
+msgid "name"
+msgstr ""
+
+#: apps/catalog/models.py:65
+msgid "parent category"
+msgstr ""
+
+#: apps/catalog/models.py:71
+msgid "material category"
+msgstr ""
+
+#: apps/catalog/models.py:72
+msgid "material categories"
+msgstr ""
+
+#: apps/catalog/models.py:103 apps/organizations/models.py:29
+#: apps/organizations/models.py:120 apps/projects/models.py:32
+msgid "code"
+msgstr ""
+
+#: apps/catalog/models.py:106
+msgid "decimals"
+msgstr ""
+
+#: apps/catalog/models.py:109
+msgid "How many decimal places a quantity in this unit may have."
+msgstr ""
+
+#: apps/catalog/models.py:115 apps/catalog/models.py:156
+msgid "unit of measure"
+msgstr ""
+
+#: apps/catalog/models.py:116
+msgid "units of measure"
+msgstr ""
+
+#: apps/catalog/models.py:141
+msgid "reference"
+msgstr ""
+
+#: apps/catalog/models.py:143
+msgid "description"
+msgstr ""
+
+#: apps/catalog/models.py:150
+msgid "category"
+msgstr ""
+
+#: apps/catalog/models.py:158
+msgid "manufacturer"
+msgstr ""
+
+#: apps/catalog/models.py:159
+msgid "manufacturer reference"
+msgstr ""
+
+#: apps/catalog/models.py:165
+msgid "stock item"
+msgstr ""
+
+#: apps/catalog/models.py:169 apps/locations/models.py:48
+#: apps/organizations/models.py:33 apps/organizations/models.py:141
+#: apps/suppliers/models.py:32
+msgid "active"
+msgstr ""
+
+#: apps/catalog/models.py:174
+msgid "material"
+msgstr ""
+
+#: apps/catalog/models.py:175
+msgid "materials"
+msgstr ""
+
+#: apps/catalog/services.py:53
+msgid "A category with this name already exists."
+msgstr ""
+
+#: apps/catalog/services.py:56
+msgid "This category already has a subcategory with this name."
+msgstr ""
+
+#: apps/catalog/services.py:60
+msgid "A category cannot be its own parent."
+msgstr ""
+
+#: apps/catalog/services.py:68
+msgid "A material with this reference exists."
+msgstr ""
+
+#: apps/catalog/services.py:107
+msgid "A category with subcategories cannot be placed under another."
+msgstr ""
+
+#: apps/catalog/services.py:247
+msgid "A material that documents use keeps its unit."
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_form.html:4
+#: apps/catalog/templates/catalog/category_form.html:11
+#: apps/catalog/templates/catalog/category_list.html:14
+msgid "New category"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_form.html:9
+#, python-format
+msgid "Edit category %(name)s"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_form.html:20
+#: apps/catalog/templates/catalog/form.html:20
+#: apps/organizations/templates/organizations/person.html:66
+#: apps/organizations/templates/organizations/person.html:115
+#: apps/projects/templates/projects/detail.html:98
+#: apps/projects/templates/projects/form.html:20
+#: apps/suppliers/templates/suppliers/form.html:20
+msgid "Save"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_form.html:22
+#: apps/catalog/templates/catalog/form.html:26
+#: apps/organizations/templates/organizations/invitation_form.html:19
+#: apps/projects/templates/projects/form.html:26
+#: apps/suppliers/templates/suppliers/form.html:26
+msgid "Cancel"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_list.html:4
+#: apps/catalog/templates/catalog/category_list.html:8
+#: apps/catalog/templates/catalog/list.html:11
+msgid "Categories"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_list.html:11
+#: apps/catalog/templates/catalog/list.html:4
+#: apps/catalog/templates/catalog/list.html:8
+#: templates/partials/nav_items.html:25
+msgid "Catalog"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_list.html:25
+#: apps/catalog/templates/catalog/detail.html:15
+#: apps/projects/templates/projects/detail.html:14
+#: apps/suppliers/templates/suppliers/detail.html:15
+msgid "Edit"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_list.html:31
+msgid "No categories"
+msgstr ""
+
+#: apps/catalog/templates/catalog/category_list.html:31
+msgid "The catalog has no categories yet."
+msgstr ""
+
+#: apps/catalog/templates/catalog/detail.html:20
+#: apps/suppliers/templates/suppliers/detail.html:20
+msgid "Deactivate"
+msgstr ""
+
+#: apps/catalog/templates/catalog/detail.html:26
+#: apps/suppliers/templates/suppliers/detail.html:26
+msgid "Reactivate"
+msgstr ""
+
+#: apps/catalog/templates/catalog/detail.html:68
+msgid "Yes"
+msgstr ""
+
+#: apps/catalog/templates/catalog/detail.html:70
+msgid "No"
+msgstr ""
+
+#: apps/catalog/templates/catalog/form.html:4
+#: apps/catalog/templates/catalog/form.html:11
+#: apps/catalog/templates/catalog/list.html:14
+msgid "New material"
+msgstr ""
+
+#: apps/catalog/templates/catalog/form.html:9
+#, python-format
+msgid "Edit material %(reference)s"
+msgstr ""
+
+#: apps/catalog/templates/catalog/list.html:29
+#: apps/catalog/templates/catalog/list.html:41
+msgid "Unit"
+msgstr ""
+
+#: apps/catalog/templates/catalog/list.html:49
+msgid "No materials"
+msgstr ""
+
+#: apps/catalog/templates/catalog/list.html:49
+msgid "No material matches the filters."
+msgstr ""
+
+#: apps/catalog/templates/catalog/search_results.html:19
+msgid "No material matches."
+msgstr ""
+
+#: apps/catalog/views.py:129
+#, python-format
+msgid "Material %(reference)s added."
+msgstr ""
+
+#: apps/catalog/views.py:158
+#, python-format
+msgid "Material %(reference)s saved."
+msgstr ""
+
+#: apps/catalog/views.py:177
+#, python-format
+msgid "Material %(reference)s reactivated."
+msgstr ""
+
+#: apps/catalog/views.py:179
+#, python-format
+msgid "Material %(reference)s deactivated."
+msgstr ""
+
+#: apps/catalog/views.py:227
+#, python-format
+msgid "Category %(name)s added."
+msgstr ""
+
+#: apps/catalog/views.py:260
+#, python-format
+msgid "Category %(name)s saved."
 msgstr ""
 
 #: apps/core/forms.py:49 apps/organizations/forms.py:70
@@ -456,19 +806,9 @@ msgstr ""
 msgid "project"
 msgstr ""
 
-#: apps/locations/models.py:46 apps/organizations/models.py:121
-#: apps/projects/models.py:33
-msgid "name"
-msgstr ""
-
 #: apps/locations/models.py:47 apps/organizations/models.py:123
-#: apps/projects/models.py:35
+#: apps/projects/models.py:35 apps/suppliers/models.py:30
 msgid "address"
-msgstr ""
-
-#: apps/locations/models.py:48 apps/organizations/models.py:33
-#: apps/organizations/models.py:141
-msgid "active"
 msgstr ""
 
 #: apps/locations/models.py:53
@@ -553,31 +893,6 @@ msgstr ""
 msgid "Everyone"
 msgstr ""
 
-#: apps/organizations/forms.py:16
-#: apps/organizations/templates/organizations/account_status.html:7
-#: apps/projects/models.py:28
-msgid "Active"
-msgstr ""
-
-#: apps/organizations/forms.py:16
-#: apps/organizations/templates/organizations/account_status.html:5
-msgid "Inactive"
-msgstr ""
-
-#: apps/organizations/forms.py:20 apps/organizations/forms.py:25
-#: apps/projects/forms.py:21
-msgid "Search"
-msgstr ""
-
-#: apps/organizations/forms.py:21
-#: apps/organizations/templates/organizations/people.html:23
-#: apps/organizations/templates/organizations/people.html:34
-#: apps/projects/forms.py:22 apps/projects/forms.py:53
-#: apps/projects/templates/projects/list.html:25
-#: apps/projects/templates/projects/list.html:36
-msgid "Status"
-msgstr ""
-
 #: apps/organizations/forms.py:40
 msgid "Role"
 msgstr ""
@@ -642,6 +957,7 @@ msgstr ""
 #: apps/organizations/forms.py:126
 #: apps/organizations/templates/organizations/people.html:20
 #: apps/organizations/templates/organizations/people.html:29
+#: apps/suppliers/forms.py:30 apps/suppliers/templates/suppliers/detail.html:47
 msgid "Email"
 msgstr ""
 
@@ -682,16 +998,11 @@ msgstr ""
 msgid "Joint venture"
 msgstr ""
 
-#: apps/organizations/models.py:29 apps/organizations/models.py:120
-#: apps/projects/models.py:32
-msgid "code"
-msgstr ""
-
 #: apps/organizations/models.py:30
 msgid "legal name"
 msgstr ""
 
-#: apps/organizations/models.py:31
+#: apps/organizations/models.py:31 apps/suppliers/models.py:26
 msgid "tax id"
 msgstr ""
 
@@ -829,11 +1140,6 @@ msgstr ""
 msgid "Send invitation"
 msgstr ""
 
-#: apps/organizations/templates/organizations/invitation_form.html:19
-#: apps/projects/templates/projects/form.html:26
-msgid "Cancel"
-msgstr ""
-
 #: apps/organizations/templates/organizations/invitations.html:4
 #: apps/organizations/templates/organizations/person.html:161
 msgid "Invitations"
@@ -865,15 +1171,8 @@ msgstr ""
 
 #: apps/organizations/templates/organizations/people.html:4
 #: apps/organizations/templates/organizations/people.html:8
-#: templates/partials/nav_items.html:25
+#: templates/partials/nav_items.html:41
 msgid "People"
-msgstr ""
-
-#: apps/organizations/templates/organizations/people.html:21
-#: apps/organizations/templates/organizations/people.html:32
-#: apps/projects/forms.py:39 apps/projects/templates/projects/list.html:23
-#: apps/projects/templates/projects/list.html:34
-msgid "Name"
 msgstr ""
 
 #: apps/organizations/templates/organizations/people.html:41
@@ -901,13 +1200,6 @@ msgstr ""
 #: apps/organizations/templates/organizations/person.html:46
 #: apps/projects/templates/projects/detail.html:78
 msgid "Change validity"
-msgstr ""
-
-#: apps/organizations/templates/organizations/person.html:66
-#: apps/organizations/templates/organizations/person.html:115
-#: apps/projects/templates/projects/detail.html:98
-#: apps/projects/templates/projects/form.html:20
-msgid "Save"
 msgstr ""
 
 #: apps/organizations/templates/organizations/person.html:74
@@ -1032,6 +1324,7 @@ msgid "Client"
 msgstr ""
 
 #: apps/projects/forms.py:42 apps/projects/templates/projects/detail.html:26
+#: apps/suppliers/forms.py:33 apps/suppliers/templates/suppliers/detail.html:59
 msgid "Address"
 msgstr ""
 
@@ -1128,10 +1421,6 @@ msgstr ""
 msgid "This assignment is already revoked."
 msgstr ""
 
-#: apps/projects/templates/projects/detail.html:14
-msgid "Edit"
-msgstr ""
-
 #: apps/projects/templates/projects/detail.html:44
 msgid "Dates"
 msgstr ""
@@ -1193,6 +1482,101 @@ msgstr ""
 
 #: apps/projects/views.py:186
 msgid "Access to the project revoked."
+msgstr ""
+
+#: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
+#: apps/suppliers/templates/suppliers/list.html:23
+#: apps/suppliers/templates/suppliers/list.html:35
+msgid "Tax id"
+msgstr ""
+
+#: apps/suppliers/forms.py:29 apps/suppliers/templates/suppliers/detail.html:41
+#: apps/suppliers/templates/suppliers/list.html:24
+#: apps/suppliers/templates/suppliers/list.html:36
+msgid "Contact person"
+msgstr ""
+
+#: apps/suppliers/forms.py:31 apps/suppliers/templates/suppliers/detail.html:53
+#: apps/suppliers/templates/suppliers/list.html:25
+#: apps/suppliers/templates/suppliers/list.html:37
+msgid "Phone"
+msgstr ""
+
+#: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
+msgid "Notes"
+msgstr ""
+
+#: apps/suppliers/models.py:27
+msgid "contact person"
+msgstr ""
+
+#: apps/suppliers/models.py:29
+msgid "phone"
+msgstr ""
+
+#: apps/suppliers/models.py:31
+msgid "notes"
+msgstr ""
+
+#: apps/suppliers/models.py:37
+msgid "supplier"
+msgstr ""
+
+#: apps/suppliers/models.py:38
+msgid "suppliers"
+msgstr ""
+
+#: apps/suppliers/services.py:36
+msgid "A supplier with this name exists."
+msgstr ""
+
+#: apps/suppliers/services.py:37
+msgid "A supplier with this tax id exists."
+msgstr ""
+
+#: apps/suppliers/templates/suppliers/form.html:4
+#: apps/suppliers/templates/suppliers/form.html:11
+#: apps/suppliers/templates/suppliers/list.html:11
+msgid "New supplier"
+msgstr ""
+
+#: apps/suppliers/templates/suppliers/form.html:9
+#, python-format
+msgid "Edit supplier %(name)s"
+msgstr ""
+
+#: apps/suppliers/templates/suppliers/list.html:4
+#: apps/suppliers/templates/suppliers/list.html:8
+#: templates/partials/nav_items.html:33
+msgid "Suppliers"
+msgstr ""
+
+#: apps/suppliers/templates/suppliers/list.html:45
+msgid "No suppliers"
+msgstr ""
+
+#: apps/suppliers/templates/suppliers/list.html:45
+msgid "No supplier matches the filters."
+msgstr ""
+
+#: apps/suppliers/views.py:94
+#, python-format
+msgid "Supplier %(name)s added."
+msgstr ""
+
+#: apps/suppliers/views.py:120
+#, python-format
+msgid "Supplier %(name)s saved."
+msgstr ""
+
+#: apps/suppliers/views.py:138
+#, python-format
+msgid "Supplier %(name)s reactivated."
+msgstr ""
+
+#: apps/suppliers/views.py:140
+#, python-format
+msgid "Supplier %(name)s deactivated."
 msgstr ""
 
 #: templates/400.html:4
@@ -1309,7 +1693,7 @@ msgstr ""
 msgid "Skip to content"
 msgstr ""
 
-#: templates/components/filter_form.html:17
+#: templates/components/filter_form.html:19
 msgid "Filter"
 msgstr ""
 
@@ -1352,6 +1736,6 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
-#: templates/partials/nav_items.html:32
+#: templates/partials/nav_items.html:48
 msgid "Security"
 msgstr ""

@@ -13,7 +13,8 @@ test; ``tests/access`` builds the same world once per module.
     sev_for_mad  branch A-SEV, procurement A-MAD, ACTIVE   (A-MAD buys for A-SEV)
     mad_hold     branch A-MAD, procurement A-MAD, ON_HOLD
 
-Each project has its worksite; A-MAD, A-SEV and B-MAD have a warehouse. ``build_people``
+Each project has its worksite; A-MAD, A-SEV and B-MAD have a warehouse. The supplier
+carries the supplier sentinels (name, email, phone). ``build_people``
 adds what only the people need: an inactive company D (with its head office) and an
 inactive branch A-OLD.
 """
@@ -40,6 +41,7 @@ from apps.accounts.sessions import SESSION_EPOCH_KEY, SESSION_LOGIN_AT_KEY, sess
 from apps.locations.models import Location
 from apps.organizations.models import Branch, Company, Membership
 from apps.projects.models import Project, ProjectAssignment
+from apps.suppliers.models import Supplier
 from tests.support import PASSWORD, enroll_totp, grant
 
 HOUR = timedelta(hours=1)
@@ -63,6 +65,7 @@ class Org:
     sev_for_mad: Project
     mad_hold: Project
     warehouses: dict[str, Location]
+    supplier: Supplier
 
     def worksite(self, project: Project) -> Location:
         return Location.objects.get(project=project)
@@ -108,6 +111,13 @@ def build_org() -> Org:
         sev_for_mad=_project("SEV-2", a_sev, a_mad, active),
         mad_hold=_project("MAD-1", a_mad, a_mad, on_hold),
         warehouses=warehouses,
+        supplier=Supplier.objects.create(
+            name=Sentinel.SUPPLIER_NAME,
+            tax_id="B00000000",
+            contact_name="Contact Sentinel",
+            email=Sentinel.SUPPLIER_EMAIL,
+            phone=Sentinel.SUPPLIER_PHONE,
+        ),
     )
 
 
@@ -271,9 +281,9 @@ def change_password_later(user: User) -> None:
 class Sentinel(StrEnum):
     """Recognisable values whose presence in a response is a leak (plan §8.1, §8.2).
 
-    Each step that adds the model behind a value seeds it into the fixture: supplier name,
-    email and phone with the suppliers (M3.2); the price and another project's quantity
-    with purchase orders (M5.1). Until then nothing renders them, and the acceptance
+    Each step that adds the model behind a value seeds it into the fixture: the supplier
+    name, email and phone are on ``Org.supplier`` (M3.2); the price and another project's
+    quantity come with purchase orders (M5.1). Until then nothing renders them, and the acceptance
     matrix already checks every response against all of them.
     """
 

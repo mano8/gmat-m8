@@ -1,0 +1,22 @@
+{% load i18n %}
+{% comment %}
+  The fragment of `catalog:search`: the best matches for a query, to be placed inside a picker.
+  Parameters: materials, query. Shows no prices (the catalog has none).
+{% endcomment %}
+<ul id="material-search-results"
+    class="divide-y divide-line"
+    role="listbox">
+  {% for material in materials %}
+    <li role="option" class="py-2">
+      <a class="block min-h-11 no-underline hover:no-underline"
+         href="{% url 'catalog:detail' material_id=material.pk %}">
+        <span class="font-medium">{{ material.reference }}</span> · {{ material.name }}
+        <span class="block text-sm text-soft">{{ material.category|default:"—" }} · {{ material.unit.code }}</span>
+      </a>
+    </li>
+  {% empty %}
+    {% if query %}
+      <li class="py-2 text-soft">{% translate "No material matches." %}</li>
+    {% endif %}
+  {% endfor %}
+</ul>
