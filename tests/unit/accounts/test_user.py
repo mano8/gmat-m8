@@ -1,9 +1,11 @@
 import uuid
+from io import StringIO
 
 import pytest
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 
-from apps.accounts.models import User
+from apps.accounts.models import SuperuserCreationDisabled, User
 from apps.core.ids import new_id
 
 
@@ -29,9 +31,18 @@ class TestUser:
         first, second = new_id(), new_id()
         assert first < second
 
-    def test_create_superuser_is_staff_and_superuser(self) -> None:
-        user = User.objects.create_superuser("root@example.org", "a-long-test-password")
-        assert user.is_staff and user.is_superuser
+    def test_create_superuser_is_disabled(self) -> None:
+        with pytest.raises(SuperuserCreationDisabled, match="bootstrap_admin"):
+            User.objects.create_superuser("root@example.org", "a-long-test-password")
+        assert not User.objects.exists()
+
+    def test_the_createsuperuser_command_is_disabled(self) -> None:
+        """F76: no account skips the invitation path, not even from a shell."""
+        with pytest.raises(SuperuserCreationDisabled):
+            call_command(
+                "createsuperuser", "--noinput", "--email", "root@example.org", stdout=StringIO()
+            )
+        assert not User.objects.exists()
 
     def test_create_user_ignores_privilege_flags_by_default(self) -> None:
         user = User.objects.create_user("b@example.org")

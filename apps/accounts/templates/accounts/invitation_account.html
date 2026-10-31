@@ -1,0 +1,23 @@
+{% extends "layouts/entrance.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Invitation" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-2">{% translate "Invitation" %}</h1>
+  {% if sign_in %}
+    <p class="mb-4 text-soft">
+      {% blocktranslate with email=invitation.email %}This invitation is for the existing account {{ email }}. Sign in with it, then open the link again.{% endblocktranslate %}
+    </p>
+    {% url 'account_login' as login_url %}
+    {% include "components/button.html" with href=login_url label=_("Sign in") variant="primary" %}
+  {% else %}
+    <p class="mb-4 text-soft">
+      {% translate "You are signed in with another account. Sign out, then open the link again." %}
+    </p>
+    <form method="post" action="{% url 'account_logout' %}">
+      {% csrf_token %}
+      {% include "components/button.html" with type="submit" label=_("Sign out") variant="primary" %}
+    </form>
+  {% endif %}
+{% endblock content %}

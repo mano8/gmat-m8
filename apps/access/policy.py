@@ -14,6 +14,7 @@ from django.db.models.functions import Now
 
 from apps.access.exceptions import AccessDenied
 from apps.access.roles import PRIVILEGED_ROLES
+from apps.accounts.models import User
 from apps.organizations.models import Branch, Membership
 
 
@@ -57,14 +58,30 @@ def mfa_satisfied(mfa_at: float | None, privilege_elevated_at: datetime | None) 
     return privilege_elevated_at is None or mfa_at >= privilege_elevated_at.timestamp()
 
 
+def platform_operator_flags(enabled: bool) -> dict[str, bool]:
+    """The account flags of a platform operator, for the first administrator (F76)."""
+    return {"is_staff": enabled, "is_superuser": enabled}
+
+
+def active_platform_operator_exists() -> bool:
+    """An active, not offboarded superuser account (``bootstrap_admin --superuser``)."""
+    return User.objects.filter(
+        is_active=True, is_superuser=True, offboarded_at__isnull=True
+    ).exists()
+
+
 def is_platform_operator(user: Any) -> bool:
     """An active superuser: reaches the admin (read-only without ``org.manage``)."""
     return bool(getattr(user, "is_authenticated", False) and user.is_active and user.is_superuser)
 
 
-def require_may_manage_account(actor: Any, target: Any) -> None:
+def may_manage_account(actor: Any, target: Any) -> bool:
     """Only a superuser acts on a staff or superuser account (plan §3.4)."""
-    if (target.is_staff or target.is_superuser) and not actor.is_superuser:
+    return not (target.is_staff or target.is_superuser) or bool(actor.is_superuser)
+
+
+def require_may_manage_account(actor: Any, target: Any) -> None:
+    if not may_manage_account(actor, target):
         raise AccessDenied("Only a platform operator can manage a staff account")
 
 

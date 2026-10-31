@@ -44,6 +44,8 @@ class TestRules:
                 f"/accounts/password/reset/key/{REDACTED}/",
             ),
             (f"/invitations/{SENTINEL}/accept/", f"/invitations/{REDACTED}/accept/"),
+            (f"/invite/{SENTINEL}/", f"/invite/{REDACTED}/"),
+            (f"/account/email-change/{SENTINEL}/", f"/account/email-change/{REDACTED}/"),
             (
                 f"https://app.example.org/email-change/{SENTINEL}/?x=1",
                 f"https://app.example.org/email-change/{REDACTED}/?{REDACTED}",
@@ -216,16 +218,21 @@ class TestSentinel:
         make_user()
         url_headers = {
             "Referer": f"https://app.example.org/accounts/password/reset/key/1-{SENTINEL}/",
-            "HX-Current-URL": f"https://app.example.org/invitations/{SENTINEL}/",
+            "HX-Current-URL": f"https://app.example.org/invite/{SENTINEL}/",
         }
         client = Client(raise_request_exception=False)
         # Password-reset URL (valid shape, unknown token) and a query string.
         client.get(
             f"/accounts/password/reset/key/1-{SENTINEL}/?next={SENTINEL}", headers=url_headers
         )
-        # Invitation and email-change URLs (their routes arrive in M2.6: 404s are logged).
-        client.get(f"/invitations/{SENTINEL}/accept/", headers=url_headers)
-        client.get(f"/accounts/email-change/{SENTINEL}/confirm/", headers=url_headers)
+        # Invitation and email-change links (real routes: the token goes into the session),
+        # their token-less pages, and a 404 under the same prefixes.
+        client.get(f"/invite/{SENTINEL}/", headers=url_headers)
+        client.get("/invite/accept/", headers=url_headers)
+        client.post("/invite/accept/submit/", {"password1": SENTINEL, "password2": SENTINEL})
+        client.get(f"/account/email-change/{SENTINEL}/", headers=url_headers)
+        client.get(f"/invite/{SENTINEL}/accept/?token={SENTINEL}", headers=url_headers)
+        client.get(f"/account/email-change/x/{SENTINEL}/", headers=url_headers)
         # A password field, on a failed login.
         client.post(
             reverse("account_login"),

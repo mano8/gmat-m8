@@ -10,22 +10,26 @@ authorize nothing themselves: the service that calls them has already run
 - ``queue_security_email``: one address, a named rule on its target, the bodies sealed;
   expires after ``OUTBOX_SENSITIVE_TTL``. allauth's mail arrives here through
   ``apps.notifications.backends.OutboxEmailBackend``;
-- ``queue_dispatch``: a supplier dispatch of a purchase order (M5.3).
+- ``queue_dispatch``: a supplier dispatch of a purchase order (M5.3);
+- ``expire_security_email``: offboarding expires the unsent security emails of an account
+  and of the tokens it revokes (plan §5).
 """
 
+from collections import defaultdict
 from collections.abc import Iterable
 from datetime import timedelta
 from uuid import UUID
 
 from django.conf import settings
 from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models import Model
+from django.db.models import Model, Q
+from django.db.models.functions import Now
 
 from apps.access.roles import Capability
 from apps.core.db import db_now
 from apps.notifications import eligibility
 from apps.notifications.crypto import seal
-from apps.notifications.models import DISPATCH_KINDS, MAX_RECIPIENTS, EmailOutbox, Kind
+from apps.notifications.models import DISPATCH_KINDS, MAX_RECIPIENTS, EmailOutbox, Kind, Status
 
 
 class OutboxOutsideTransaction(RuntimeError):
@@ -146,4 +150,34 @@ def queue_dispatch(
         subject=subject,
         body=body,
         html_body=html_body,
+    )
+
+
+def expire_security_email(
+    *,
+    addresses: Iterable[str] = (),
+    targets: Iterable[Model] = (),
+    using: str = DEFAULT_DB_ALIAS,
+) -> int:
+    """Expire and wipe the queued security emails to ``addresses`` or about ``targets``.
+
+    A message the worker is sending right now is left to its outcome; the token or account
+    it is about no longer passes its rule, so a retry is suppressed at the next claim.
+    """
+    _require_transaction(using)
+    condition = Q(pk__in=[])
+    for address in {address.lower() for address in addresses if address}:
+        condition |= Q(recipient_address__iexact=address)
+    by_type: defaultdict[str, set[object]] = defaultdict(set)
+    for target in targets:
+        label, pk = eligibility.object_reference(target)
+        by_type[label].add(pk)
+    for label, ids in by_type.items():
+        condition |= Q(
+            eligibility_object_type=label, eligibility_object_id__in=sorted(ids, key=str)
+        )
+    return (
+        EmailOutbox.objects.using(using)
+        .filter(condition, kind=Kind.SECURITY, status=Status.QUEUED)
+        .update(status=Status.EXPIRED, body="", html_body="", wiped_at=Now())
     )

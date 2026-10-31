@@ -164,6 +164,8 @@ class To(Enum):
     LOGOUT = "account_logout"
     ADMIN = "admin:index"
     HOME = "core:home"
+    INVITATION = "invitations:accept"
+    EMAIL_CHANGE = "email_change:confirm"
     ANYWHERE = ""
 
     def matches(self, location: str) -> bool:

@@ -6,12 +6,16 @@ an outer transaction that lives for the module; each test runs in a savepoint in
 """
 
 from collections.abc import Iterator
+from datetime import timedelta
 
 import pytest
 from allauth.account.models import EmailAddress
 from django.db import transaction
+from django.utils import timezone
 from pytest_django import DjangoDbBlocker
 
+from apps.accounts.models import EmailChangeRequest, Invitation
+from apps.accounts.tokens import new_token
 from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.organizations.models import JointVentureMember, Membership
@@ -34,6 +38,23 @@ def _admin_rows(world: World) -> None:
     )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
+    later = timezone.now() + timedelta(hours=24)
+    world.objects["invitation"] = Invitation.objects.create(
+        email="invitee@example.org",
+        kind=Invitation.Kind.NEW_ACCOUNT,
+        invited_by=people.group_admin,
+        token_hash=new_token()[1],
+        expires_at=later,
+        grants={"memberships": [{"role": "TECHNICIAN", "branch_id": str(org.a_mad.pk)}]},
+    )
+    world.objects["emailchangerequest"] = EmailChangeRequest.objects.create(
+        user=people.tech_mad,
+        new_email="tech-new@example.org",
+        requested_by=people.group_admin,
+        token_hash=new_token()[1],
+        cancel_token_hash=new_token()[1],
+        expires_at=later,
+    )
     assert AuditEvent.objects.exists()
 
 

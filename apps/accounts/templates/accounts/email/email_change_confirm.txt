@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}An administrator asked to use this address for your gmat-m8 account.{% endblocktranslate %}
+
+{% blocktranslate %}Open this link to confirm it. It works once, for {{ hours }} hours:{% endblocktranslate %}
+
+{{ link }}
+
+{% blocktranslate %}The change takes effect {{ cooling_off_hours }} hours after you confirm, unless it is cancelled from the current address.{% endblocktranslate %}
+{% endautoescape %}

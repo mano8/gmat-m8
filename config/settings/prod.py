@@ -27,6 +27,8 @@ if "*" in ALLOWED_HOSTS:
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 if not all(origin.startswith("https://") for origin in CSRF_TRUSTED_ORIGINS):
     raise ImproperlyConfigured("DJANGO_CSRF_TRUSTED_ORIGINS must all be https:// origins")
+# Links in email and the bootstrap link point at the first trusted origin.
+PUBLIC_BASE_URL = CSRF_TRUSTED_ORIGINS[0]
 
 # Separate from SECRET_KEY; newest first. The development and test keys are refused.
 MFA_ENCRYPTION_KEYS = env_fernet_keys("MFA_ENCRYPTION_KEYS", refused=non_production_fernet_keys())

@@ -12,8 +12,9 @@ Each row also lists the sentinels (plan §8.1) its responses may contain; every 
 sentinel is checked absent from every response. A URL with an object adds one row per
 object position (``Route.position``).
 
-Today's URLs are the account pages (allauth), the admin and the health checks; the
-business screens add their rows with the steps that build them (M2.6 onwards).
+The account pages (allauth), the admin, the health checks, the token pages (invitations,
+email changes) and the screens of M2.6 (projects, people, invitations) have rows; later
+business screens add theirs with the steps that build them.
 """
 
 import re
@@ -142,7 +143,7 @@ def admin_redirect_path(app: str, model: str) -> Callable[[World], str]:
 # Access and document models are read-only; master data is editable by GROUP_ADMIN only
 # (the platform operator only views it). Nothing is ever deleted (plan §5, §8.2).
 READ_ONLY_MODELS = {
-    "accounts": ("user",),
+    "accounts": ("user", "invitation", "emailchangerequest"),
     "account": ("emailaddress",),
     "mfa": ("authenticator",),
     "audit": ("auditevent",),
@@ -189,6 +190,133 @@ def _admin_model_routes() -> dict[str, Route]:
 
 
 ADMIN_INDEX = Outcome(302, To.ADMIN)
+
+# --- app screens (M2.6) -------------------------------------------------------------------
+
+PROJECT_VIEWERS = (
+    "group_admin",
+    "mm_mad",
+    "mm_sev",
+    "wo_mad",
+    "tech_mad",
+    "site_manager",
+    "partner",
+    "mixed",
+)
+PROJECT_MANAGERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
+# Who sees each object position of a project URL (S1, S3, S4; technicians and partners only
+# ACTIVE projects).
+HOSPITAL_VIEWERS = (
+    "group_admin",
+    "mm_mad",
+    "wo_mad",
+    "tech_mad",
+    "site_manager",
+    "partner",
+    "mixed",
+)
+SEV_VIEWERS = ("group_admin", "mm_sev", "mixed")
+ON_HOLD_VIEWERS = ("group_admin", "mm_mad", "wo_mad")
+HOSPITAL_MANAGERS = ("group_admin", "mm_mad")
+
+
+def _each(outcome: Outcome, names: tuple[str, ...]) -> dict[str, Outcome]:
+    return dict.fromkeys(names, outcome)
+
+
+def app_page(**outcomes: Outcome) -> dict[str, Expect]:
+    """A GET screen: login, session MFA for privileged users, then the view (403 default)."""
+    row = expect(DENIED, signed_out=LOGIN, no_mfa=STEP_UP, **outcomes)
+    return {"GET": row, "HEAD": row, "POST": expect(NOT_ALLOWED, no_mfa=DENIED)}
+
+
+def app_action(**outcomes: Outcome) -> dict[str, Expect]:
+    """A POST-only view that calls a service (F66): 405 to GET, login, then the view."""
+    get = expect(NOT_ALLOWED, no_mfa=STEP_UP)
+    return {"GET": get, "HEAD": get, "POST": expect(DENIED, signed_out=LOGIN, **outcomes)}
+
+
+def project_page(
+    capable: tuple[str, ...], visible: tuple[str, ...], allowed: tuple[str, ...]
+) -> dict[str, Expect]:
+    """``capable`` hold the capability somewhere (others 403), ``visible`` see the object
+    (others of ``capable`` 404), ``allowed`` may act on it (others of ``visible`` 403)."""
+    outcomes = _each(NOT_FOUND, capable) | _each(DENIED, visible) | _each(OK, allowed)
+    return app_page(**{name: outcomes[name] for name in capable})
+
+
+def project_action(
+    capable: tuple[str, ...], visible: tuple[str, ...], allowed: tuple[str, ...], ok: Outcome
+) -> dict[str, Expect]:
+    outcomes = _each(NOT_FOUND, capable) | _each(DENIED, visible) | _each(ok, allowed)
+    return app_action(**{name: outcomes[name] for name in capable})
+
+
+def org_page() -> dict[str, Expect]:
+    return app_page(group_admin=OK)
+
+
+def org_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
+    return app_action(group_admin=ok)
+
+
+def token_link(to: To) -> dict[str, Expect]:
+    """A token link: everybody is redirected to its token-less page (exempt from MFA)."""
+    row = expect(Outcome(302, to))
+    return {"GET": row, "HEAD": row, "POST": expect(NOT_ALLOWED)}
+
+
+def token_page() -> dict[str, Expect]:
+    """A token-less page without a token in the session: the generic error page."""
+    row = expect(OK, no_mfa=STEP_UP)
+    return {"GET": row, "HEAD": row, "POST": expect(NOT_ALLOWED, no_mfa=DENIED)}
+
+
+def token_action() -> dict[str, Expect]:
+    get = expect(NOT_ALLOWED, no_mfa=STEP_UP)
+    return {"GET": get, "HEAD": get, "POST": expect(OK, no_mfa=DENIED)}
+
+
+def _project_url(name: str, project: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[getattr(world.org, project).pk])
+
+
+def _object_url(name: str, key: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[world.objects[key].pk])
+
+
+def _person_url(name: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[world.people.tech_mad.pk])
+
+
+PROJECT_POSITIONS = (
+    ("own scope", "hospital", HOSPITAL_VIEWERS),
+    ("foreign scope", "sev_works", SEV_VIEWERS),
+    ("on hold", "mad_hold", ON_HOLD_VIEWERS),
+)
+FAKE_TOKEN = "A" * 43
+
+APP_ROUTES: dict[str, tuple[Route, ...]] = {
+    # Token pages: anonymous by design; no token in the session shows the generic page.
+    "invitations:link": (
+        Route(
+            token_link(To.INVITATION),
+            path=lambda world: reverse("invitations:link", args=[FAKE_TOKEN]),
+        ),
+    ),
+    "invitations:accept": (Route(token_page()),),
+    "invitations:submit": (Route(token_action()),),
+    "email_change:link": (
+        Route(
+            token_link(To.EMAIL_CHANGE),
+            path=lambda world: reverse("email_change:link", args=[FAKE_TOKEN]),
+        ),
+    ),
+    "email_change:confirm": (Route(token_page()),),
+    "email_change:confirm_submit": (Route(token_action()),),
+    "email_change:cancel": (Route(token_page()),),
+    "email_change:cancel_submit": (Route(token_action()),),
+}
 
 # --- the table ---------------------------------------------------------------------------
 
@@ -289,7 +417,7 @@ ROUTES: dict[str, tuple[Route, ...]] = {
         ),
         **_admin_model_routes(),
     }.items()
-}
+} | APP_ROUTES
 
 
 # --- the matrix --------------------------------------------------------------------------

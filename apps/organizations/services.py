@@ -22,16 +22,17 @@ from typing import Any
 from uuid import UUID
 
 from django.core.exceptions import ValidationError
-from django.db.models import F, Model
-from django.db.models.functions import Coalesce, Greatest, Now
+from django.db.models import Model
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
+from apps.access.context import AccessContext
 from apps.access.generations import lock_access_state, lock_users
 from apps.access.policy import require_may_manage_account
 from apps.access.principals import Principal
-from apps.access.roles import COMPANY_ROLES, PRIVILEGED_ROLES, Capability, Role
+from apps.access.roles import PRIVILEGED_ROLES, Capability, Role
 from apps.accounts.models import User
+from apps.accounts.revocation import revoke_pending_tokens
 from apps.audit.recorder import record
 from apps.core import events
 from apps.core.changes import apply_changes
@@ -40,6 +41,7 @@ from apps.core.idempotency import execute_once
 from apps.core.locking import LockMode, LockOrder, transactional
 from apps.locations.models import Location
 from apps.organizations.deactivation import DeactivationRefused, open_documents
+from apps.organizations.grants import check_membership_target, elevate_privilege
 from apps.organizations.models import Branch, Company, JointVentureMember, Membership
 
 HEAD_OFFICE_CODE = "HQ"
@@ -83,19 +85,6 @@ def lock_for_user_change(
     actor = authorize_in_txn(principal, capability, *objects, locks=locks, read=read)
     require_may_manage_account(actor, User.objects.get(pk=user_id))
     return actor
-
-
-def _elevate_privilege(user_id: UUID) -> None:
-    """Granting a privileged role moves ``privilege_elevated_at`` to now (plan §3.6).
-
-    The database clock of the grant; never moved back. Sessions must complete MFA after it
-    before they use any privileged grant, including one that starts later: an elevation in
-    the future would refuse every MFA done before then, even a step-up, and lock an
-    already privileged user out until that time.
-    """
-    User.objects.filter(pk=user_id).update(
-        privilege_elevated_at=Greatest(Coalesce(F("privilege_elevated_at"), Now()), Now())
-    )
 
 
 def _snapshot(obj: Any, fields: tuple[str, ...]) -> dict[str, Any]:
@@ -359,30 +348,6 @@ def update_branch(principal: Principal, branch_id: UUID, **changes: Any) -> Bran
 # --- memberships and employer -------------------------------------------------------
 
 
-def _check_membership_target(membership: Membership, user: User) -> None:
-    """The granted branch or company is active; a partner's company is their employer."""
-    if membership.branch_id is not None:
-        branch = Branch.objects.select_related("company").get(pk=membership.branch_id)
-        if not (branch.is_active and branch.company.is_active):
-            raise ValidationError(
-                {"branch": ValidationError(_("The branch is inactive."), code="inactive")}
-            )
-    if membership.company_id is not None:
-        if not Company.objects.filter(pk=membership.company_id, is_active=True).exists():
-            raise ValidationError(
-                {"company": ValidationError(_("The company is inactive."), code="inactive")}
-            )
-        if membership.role in COMPANY_ROLES and membership.company_id != user.employer_company_id:
-            raise ValidationError(
-                {
-                    "company": ValidationError(
-                        _("A partner's membership is on the company that employs them."),
-                        code="not_employer",
-                    )
-                }
-            )
-
-
 @transactional
 def grant_membership(
     principal: Principal,
@@ -417,10 +382,10 @@ def grant_membership(
             valid_until=valid_until,
         )
         membership.full_clean()
-        _check_membership_target(membership, user)
+        check_membership_target(membership, user.employer_company_id)
         membership.save()
         if membership.role in PRIVILEGED_ROLES:
-            _elevate_privilege(user.pk)
+            elevate_privilege(user.pk)
         record(
             principal.audit_identity,
             "membership.granted",
@@ -447,6 +412,19 @@ def grant_membership(
     )
 
 
+def _after_authority_change(membership: Membership) -> None:
+    """A group administrator who lost ``org.manage`` loses the tokens they issued (F71).
+
+    Their pending invitations and email changes are revoked in the same transaction (which
+    holds their ``User`` row); one that only expires is refused when used instead.
+    """
+    if membership.role != Role.GROUP_ADMIN:
+        return
+    user = User.objects.get(pk=membership.user_id)
+    if not AccessContext.for_user(user).has(Capability.ORG_MANAGE):
+        revoke_pending_tokens(reason="initiator lost org.manage", initiated_by=user.pk)
+
+
 def _open_membership(membership_id: UUID) -> Membership:
     membership = Membership.objects.get(pk=membership_id)
     if membership.revoked_at is not None:
@@ -464,6 +442,7 @@ def revoke_membership(principal: Principal, membership_id: UUID) -> Membership:
     membership.revoked_at = db_now()
     membership.revoked_by = actor
     membership.save(update_fields=["revoked_at", "revoked_by", "updated_at"])
+    _after_authority_change(membership)
     record(
         principal.audit_identity,
         "membership.revoked",
@@ -496,8 +475,9 @@ def change_membership_validity(
         return membership
     membership.full_clean()
     membership.save(update_fields=["valid_from", "valid_until", "updated_at"])
+    _after_authority_change(membership)
     if membership.role in PRIVILEGED_ROLES:
-        _elevate_privilege(user_id)
+        elevate_privilege(user_id)
     record(
         principal.audit_identity,
         "membership.validity_changed",

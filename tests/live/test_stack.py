@@ -186,7 +186,7 @@ def test_failed_logins_spread_over_all_workers_hit_the_limit(
     with ThreadPoolExecutor(max_workers=12) as pool:
         responses = list(pool.map(attempt, range(24)))
 
-    assert all(response.status in {200, 429} for response in responses)
+    assert all(response.status in {200, 429} for response in responses), str(sorted(r.status for r in responses))
     checked = 1 + sum(_checked(response, reference) for response in responses)
     assert checked <= 10, f"{checked} passwords were checked from one address"
     assert checked < 25, "no attempt was limited"
@@ -233,6 +233,10 @@ def test_the_sentinel_never_reaches_a_log(stack: Stack) -> None:
         "HX-Current-URL": f"{stack.base_url}{token_path}",
     }
     stack.get(f"{token_path}?token={sentinel}", headers=hostile)
+    # Invitation and email-change links: a token of the real shape (43 characters).
+    link_token = f"{sentinel}{'x' * (43 - len(sentinel))}"
+    stack.get(f"/invite/{link_token}/", headers=hostile)
+    stack.get(f"/account/email-change/{link_token}/?token={sentinel}", headers=hostile)
     stack.get(f"/accounts/login/?next=/x/{sentinel}/", headers=hostile)
     stack.get("/no-such-page/", headers=hostile)
     stack.get(f"/healthz/?probe={sentinel}", headers=hostile)
@@ -256,6 +260,7 @@ def test_the_sentinel_never_reaches_a_log(stack: Stack) -> None:
     caddy = stack.logs("caddy")
     # The access log exists and shows the redaction at work...
     assert "/accounts/password/reset/key/REDACTED" in caddy.replace("\\/", "/")
+    assert "/invite/REDACTED" in caddy.replace("\\/", "/")
     # ...and no stream carries the secret: not the proxy, not Gunicorn, not Django.
     for service in ("caddy", "web"):
         assert sentinel not in stack.logs(service), f"{service} logged the sentinel"

@@ -42,3 +42,16 @@ def db_now(*, using: str = DEFAULT_DB_ALIAS) -> datetime:
         cursor.execute("SELECT now()")
         (now,) = cursor.fetchone()
     return now  # type: ignore[no-any-return]
+
+
+def db_clock(*, using: str = DEFAULT_DB_ALIAS) -> datetime:
+    """The database's wall clock right now (``clock_timestamp()``), not the transaction start.
+
+    For a time that must order after the row locks the transaction waited for: an
+    invitation created after an offboarding that committed while it waited is newer than
+    that offboarding's ``offboarded_at``.
+    """
+    with connections[using].cursor() as cursor:
+        cursor.execute("SELECT clock_timestamp()")
+        (now,) = cursor.fetchone()
+    return now  # type: ignore[no-any-return]

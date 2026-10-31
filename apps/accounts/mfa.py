@@ -28,6 +28,9 @@ from apps.core.db import atomic_with_lock_timeout
 # change the language: allauth's account and MFA pages, the language switch, health checks.
 MFA_EXEMPT_URL_NAMES = frozenset({"set_language", "healthz", "readyz"})
 MFA_EXEMPT_URL_PREFIXES = ("account_", "mfa_")
+# The token links only store the token's hash and redirect to a token-less page: a step-up
+# from here would carry the token into the ``next`` parameter.
+MFA_EXEMPT_VIEW_NAMES = frozenset({"invitations:link", "email_change:link"})
 
 
 def _mfa_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -99,6 +102,8 @@ def mfa_required_for(request: HttpRequest) -> bool:
     if "admin" in match.app_names:
         return match.url_name not in {"login", "logout"}
     name = match.url_name or ""
+    if match.view_name in MFA_EXEMPT_VIEW_NAMES:
+        return False
     if name in MFA_EXEMPT_URL_NAMES or name.startswith(MFA_EXEMPT_URL_PREFIXES):
         return False
     return is_privileged(request.user)

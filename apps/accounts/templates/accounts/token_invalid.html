@@ -1,0 +1,13 @@
+{% extends "layouts/entrance.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Link not valid" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-2">{% translate "This link is not valid" %}</h1>
+  <p class="mb-4 text-soft">
+    {% translate "It may have expired, been used already, or been replaced by a newer one. Ask your administrator for a new link." %}
+  </p>
+  {% url 'account_login' as login_url %}
+  {% include "components/button.html" with href=login_url label=_("Go to sign in") %}
+{% endblock content %}

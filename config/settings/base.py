@@ -207,6 +207,9 @@ OUTBOX_BACKEND = "apps.notifications.backends.OutboxEmailBackend"
 SMTP_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 MAILERS: dict[str, dict[str, object]] = {"default": {"BACKEND": OUTBOX_BACKEND}}
 DEFAULT_FROM_EMAIL = env_str("DJANGO_DEFAULT_FROM_EMAIL", "gmat-m8 <no-reply@localhost>")
+# Origin of the absolute links in email (invitations, email changes) and of the first
+# administrator's setup link. Production uses its first trusted origin.
+PUBLIC_BASE_URL = "http://localhost:8000"
 # Off unless switched on: with it off the worker never claims or opens an SMTP connection.
 OUTBOUND_EMAIL = env_bool("OUTBOUND_EMAIL", False)
 # Seconds per SMTP socket operation (the plan's EMAIL_TIMEOUT; Django reserves that name).

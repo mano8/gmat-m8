@@ -20,11 +20,18 @@ GetResponse = Callable[[HttpRequest], HttpResponseBase]
 REQUEST_ID_HEADER = "X-Request-ID"
 _REQUEST_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
 
-# Token-bearing and pre-authentication pages (plan §5, Web): no Referer leaves them and no
-# copy is cached, even for anonymous visitors. M2.6 adds invitation acceptance and
-# email-change confirmation.
+# Token-bearing and pre-authentication pages (plan §5, Web), by view name: no Referer leaves
+# them and no copy is cached, even for anonymous visitors.
 TOKEN_PAGE_URL_NAMES = frozenset(
     {
+        "invitations:link",
+        "invitations:accept",
+        "invitations:submit",
+        "email_change:link",
+        "email_change:confirm",
+        "email_change:confirm_submit",
+        "email_change:cancel",
+        "email_change:cancel_submit",
         "account_login",
         "account_logout",
         "account_inactive",
@@ -39,9 +46,10 @@ TOKEN_PAGE_URL_NAMES = frozenset(
     }
 )
 
-# allauth's key-less steps of a password reset: the key already sits in the session.
+# The key-less steps after a token link: the token's hash already sits in the session
+# (allauth's password reset; invitation acceptance; email-change confirmation and cancel).
 KEYLESS_SEGMENT_SUFFIX = "-set-password"
-KEYLESS_SEGMENTS = frozenset({"done"})
+KEYLESS_SEGMENTS = frozenset({"done", "accept", "confirm", "cancel"})
 
 
 def path_carries_secret(path: str) -> bool:
@@ -104,11 +112,12 @@ class SecurityHeadersMiddleware:
         response = self.get_response(request)
         match = getattr(request, "resolver_match", None)
         url_name = match.url_name if match is not None else None
+        view_name = match.view_name if match is not None else None
         user = getattr(request, "user", None)
         if user is not None and user.is_authenticated:
             patch_cache_control(response, no_store=True, private=True)
             patch_vary_headers(response, ["Cookie"])
-        if url_name in TOKEN_PAGE_URL_NAMES:
+        if view_name in TOKEN_PAGE_URL_NAMES:
             patch_cache_control(response, no_store=True, private=True)
             if path_carries_secret(request.path):
                 response["Referrer-Policy"] = "no-referrer"

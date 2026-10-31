@@ -103,3 +103,11 @@ def queued_security_mail() -> list[tuple[str, str, str]]:
     """``(address, subject, body)`` of each queued security email, oldest first, unsealed."""
     rows = EmailOutbox.objects.filter(kind=Kind.SECURITY).order_by("created_at", "id")
     return [(row.recipient_address, row.subject, unseal(row.body)) for row in rows]
+
+
+def error_codes(exc: Any) -> set[str]:
+    """The codes of a ``ValidationError`` (messages are translated; codes are not)."""
+    error = exc.value if hasattr(exc, "value") else exc
+    if hasattr(error, "error_dict"):
+        return {item.code for items in error.error_dict.values() for item in items if item.code}
+    return {item.code for item in error.error_list if item.code}

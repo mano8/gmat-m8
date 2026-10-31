@@ -1,6 +1,6 @@
 """Structured logging with secret redaction (plan §5, "Logging and secret redaction").
 
-Tokens travel in URLs (password-reset keys, later invitation and email-change links) and
+Tokens travel in URLs (password-reset keys, invitation and email-change links) and
 from there in ``Referer`` and ``HX-Current-URL`` headers. Every handler carries
 ``RedactionFilter``, which rewrites token paths and query strings in messages, tracebacks
 and the ``request`` attribute before anything is formatted. A system check refuses a
@@ -26,12 +26,16 @@ request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "request_id", default=None
 )
 
-# The path segment after each prefix is a secret. M2.6 adds the invitation and
-# email-change routes here when it creates them.
-TOKEN_PATH_PREFIXES: tuple[str, ...] = ("/accounts/password/reset/key/",)
+# The path segment after each prefix is a secret (the same prefixes as the Caddyfile's
+# access-log filter).
+TOKEN_PATH_PREFIXES: tuple[str, ...] = (
+    "/accounts/password/reset/key/",
+    "/invite/",
+    "/account/email-change/",
+)
 
-# Paths whose POST bodies never appear in error reports.
-SENSITIVE_PATH_PREFIXES: tuple[str, ...] = ("/accounts/",)
+# Paths whose POST bodies never appear in error reports (passwords, tokens).
+SENSITIVE_PATH_PREFIXES: tuple[str, ...] = ("/accounts/", "/invite/", "/account/")
 
 # Request headers that carry full URLs (and so tokens) or credentials.
 URL_HEADERS = frozenset({"referer", "hx-current-url"})

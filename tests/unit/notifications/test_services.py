@@ -524,7 +524,12 @@ class TestHousekeeping:
 
         monkeypatch.setattr("apps.notifications.services.authorize_in_txn", spy)
         done = run_housekeeping(system)
-        assert done == {"idempotency": 1, "security_cache": 1, "sensitive_bodies": 2}
+        assert done == {
+            "idempotency": 1,
+            "security_cache": 1,
+            "sensitive_bodies": 2,
+            "email_changes": 0,  # apps.accounts (M2.6)
+        }
         assert authorized == [f"housekeeping.{name}" for name in done]
         assert (reload(queued).status, reload(queued).body) == (Status.EXPIRED, "")
         assert (reload(ambiguous).status, reload(ambiguous).body) == (Status.AMBIGUOUS, "")
