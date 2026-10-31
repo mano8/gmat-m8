@@ -276,6 +276,7 @@ jobs:
           "${run[@]}" \
             -e DJANGO_SECRET_KEY="$(openssl rand -base64 60 | tr -d '\n=+/')" \
             -e MFA_ENCRYPTION_KEYS="$(openssl rand -base64 32 | tr '+/' '-_')" \
+            -e OUTBOX_ENCRYPTION_KEYS="$(openssl rand -base64 32 | tr '+/' '-_')" \
             -e DJANGO_ALLOWED_HOSTS=localhost \
             -e DJANGO_CSRF_TRUSTED_ORIGINS=https://localhost:8443 \
             -e DB_NAME=gmat -e DB_USER=gmat -e DB_PASSWORD=unused-in-check -e DB_HOST=db \
