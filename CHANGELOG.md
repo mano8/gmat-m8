@@ -115,6 +115,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - selectors: orders, order lines (prices only with `price.view`), allocations, and the purchase worklist (*to purchase*, *reserved in drafts*, *unallocated on order*, drafts older than 14 days, Q24);
   - deactivation precondition: a branch with an issued order, or the branch of the location an issued order ships to, cannot be deactivated;
   - the shared test fixture has the sentinel purchase order (price and another project's quantity), checked by the acceptance matrix; es/fr strings.
+- Purchasing screens (M5.2, `apps/purchasing/views/`, `/purchasing/`):
+  - the worklist (`po.manage`): the lines to purchase by material with project and priority filters, a tick on each line to start an order, *reserved in drafts* and *ordered for nobody* flags, the draft orders (older than 14 days flagged, Q24) and a supplier filter for those;
+  - the builder: supplier, buying branch and destination, the quantities of the ticked request lines, then the draft page with the allocation breakdown (raise, lower or remove an allocation), line quantity and price, lines added from the worklist, issue (confirmed, with an idempotency key) and discard;
+  - the orders list (`po.view`, pending orders by default, any status or supplier by filter, receipt progress derived from the lines) and the order page for every state: lines with ordered, received, pending and ordered-for-nobody quantities, who each allocation is for, close a line short, cancel, and the history (revisions with their reason, closures and reconciliation trims from the audit trail);
+  - the amendment form of an issued order (reason, expected date, reference, notes, line quantities and prices, allocation ceilings, request lines to add; only what changed is sent) and the printable purchase-order page from the snapshots (print CSS, a `data-print` button);
+  - warehouse operators read orders and the printable page without prices; the acceptance matrix has the 17 URLs and now allows the price sentinel per actor (`Route.allowed_for`);
+  - "To purchase" and "Orders" navigation entries, a cart icon, selectors `by_material`, `drafts`, `ship_to_choices`, `candidates`, `progress`, `history`, es/fr strings.
 
 ### Changed
 
