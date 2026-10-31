@@ -150,6 +150,16 @@ Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templ
 - **No leaks.** Requests hold no prices and the screens show no supplier; a partner's pages are checked for every sentinel. "My requests" lists only the user's own requests.
 - **Browser.** No inline script or style; htmx attributes only (`hx-post`, `hx-get`, `hx-trigger`), the CSRF token in the body's `hx-headers` and in each form; responses are `no-store, private`; the pages still work without JavaScript (forms post and redirect).
 
+## Material requests: the reviewer's screens (step M4.4)
+
+Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templates/material_requests/`; plan §3.4, §4.3, §4.4, §4.9, §11 M4.4.
+
+- **Capabilities per screen.** The inbox and the review page need `request.review` (group administrators, material managers, and site managers on their assigned projects); the sourcing, schedule, closing, resolution and link actions `request.source` (not site managers); cancelling another user's request `request.cancel_any`. Each action is its own POST-only URL (`@mutating`), checked in S7 order (capability somewhere 403, request in scope 404, capability on it 403) and then again by the service in its transaction; the buttons shown (`can_decide`, `can_source`, `can_cancel_any`) only hide.
+- **Self-approval.** A reviewer's own request shows no decision controls where the procurement branch does not allow it; the service refuses it (403) all the same.
+- **Scope.** The inbox lists through `visible_to(ctx, REQUEST_REVIEW)`; a request of another branch is not listed and its page is 404. The project filter offers only projects in the user's `project.view` scope, and a forged project or material id is a form error. The link dialog searches the catalog (no prices) and offers only materials in the line's unit.
+- **History.** The timeline reads the request's `AuditEvent` rows only for who reviews, sources or holds `audit.view` on the request, and shows the action, actor, time, line and the reason or note: never the raw payload. Requesters see no audit trail.
+- **Errors.** Service validation errors are flashed (text from the service), a busy database answers 409, and nothing is written by a GET. Same browser rules as before: no inline script or style, CSRF in each form, `no-store, private`; the pages work without JavaScript.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

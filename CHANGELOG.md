@@ -100,6 +100,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - "My requests" (`/requests/`): the user's own requests with status chips, filters and, per line, requested, approved, delivered and outstanding quantities; withdraw is offered while no line is decided; partners get the same screens with their restricted project list (requests carry no prices);
   - `submit` takes the review step's `priority`, `needed_by` and `notes` in the same transaction, so a double tap (same signed key) yields one request; one key per project button for the draft;
   - selectors `creatable_projects`, `my_requests`, `request`, `line`, `lines`, `recent_materials`, `can_edit`, `can_withdraw`; the `quantity` template filter (no trailing zeros, localized); a `clipboard` icon and the "Requests" entry in the navigation; the acceptance matrix covers every new URL and method.
+- Reviewer UI (M4.4, `apps/material_requests`, screens under `/requests/`):
+  - the approval inbox (`/requests/inbox/`): submitted requests in the reviewer's scope (or the approved ones to follow up), most pressing first, filtered by priority, project and needed-by deadline; an "Inbox" entry in the navigation and a shortcut on the home page for who holds `request.review`;
+  - the review page (`/requests/<id>/examine/`): per line approve (with an adjusted quantity) or reject (with a reason), approve all pending lines, return for changes (a note; every decision is cleared), and for an own request a notice instead of the controls where the branch does not allow self-approval;
+  - the material manager's tools on approved requests: sourcing, reducing an approved quantity (the floor max(D, R) + P + Q is shown), priority and needed-by editing, a link-to-catalog dialog for non-catalog lines (materials in the line's unit only), close short / reopen line, close / reopen the request with the closure's author, source, reason and time shown, and cancelling someone else's request;
+  - a history timeline from the request's audit events (who, when, what, why) for who reviews, sources or audits it;
+  - one POST-only URL per action calling the M4.2 services, with the outcome flashed and a redirect back; `data-testid` selectors on the inbox, lines, forms and buttons for the e2e layer; selectors `inbox`, `inbox_projects`, `link_candidates`, `history`, `can_review`, `can_decide`, `can_source`, `can_cancel_any`; es/fr strings; the acceptance matrix covers every new URL and method.
 
 ### Changed
 
