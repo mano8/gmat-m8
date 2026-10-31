@@ -1,12 +1,12 @@
 """Derived quantities of request lines and the predicates built on them (plan §4.5, §4.9).
 
 Nothing here is stored. A line's approved quantity A is its own; the other inputs come from
-the documents that refer to it: received R, pending P (the waterfall) and draft
-reservations Q from purchase orders and receipts (M5.1, M6.1), delivered D from handovers
-(M6.2), and the allocated ceiling (Σ allocation ``qty`` on draft or issued orders) that a
-cancellation must find at zero. Those apps refer to request lines, so this one cannot
-import them: each registers a ``FlowSource`` from its ``AppConfig.ready``. Until they
-exist every flow is zero.
+the documents that refer to it: received R, pending P (the waterfall), draft reservations
+Q and the allocated ceiling (Σ allocation ``qty`` on draft or issued orders, which a
+cancellation must find at zero) from purchasing (M5.1, with receipts from M6.1), and
+delivered D from handovers (M6.2). Those apps refer to request lines, so this one cannot
+import them: each registers a ``FlowSource`` from its ``AppConfig.ready``. A flow nobody
+contributes is zero.
 
 Predicates (§4.5): a line is **live** when approved with ``approved_qty > 0`` and not
 closed short, whatever the request's state; it is **open** when it is live and its request

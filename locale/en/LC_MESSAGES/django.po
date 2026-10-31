@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 16:54+0100\n"
+"POT-Creation-Date: 2026-10-31 20:17+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -591,11 +591,25 @@ msgid "active"
 msgstr ""
 
 #: apps/catalog/models.py:174 apps/material_requests/models.py:204
+#: apps/purchasing/models.py:165
 msgid "material"
 msgstr ""
 
 #: apps/catalog/models.py:175
 msgid "materials"
+msgstr ""
+
+#: apps/catalog/quantities.py:20
+msgid "Enter a quantity."
+msgstr ""
+
+#: apps/catalog/quantities.py:23
+msgid "The quantity must be positive."
+msgstr ""
+
+#: apps/catalog/quantities.py:30
+#, python-format
+msgid "%(unit)s quantities have at most %(decimals)s decimals."
 msgstr ""
 
 #: apps/catalog/services.py:53
@@ -830,6 +844,7 @@ msgstr ""
 
 #: apps/locations/models.py:36 apps/organizations/models.py:146
 #: apps/organizations/models.py:227 apps/projects/models.py:37
+#: apps/purchasing/models.py:76
 msgid "branch"
 msgstr ""
 
@@ -862,7 +877,7 @@ msgid "This is the branch's default warehouse; choose another first."
 msgstr ""
 
 #: apps/material_requests/forms.py:34
-#: apps/material_requests/templates/material_requests/draft_lines.html:45
+#: apps/material_requests/templates/material_requests/draft_lines.html:46
 msgid "Quantity"
 msgstr ""
 
@@ -947,7 +962,8 @@ msgid "Approved quantity"
 msgstr ""
 
 #: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
-#: apps/material_requests/services.py:678
+#: apps/material_requests/services/common.py:290
+#: apps/purchasing/services/common.py:126
 msgid "Give a reason."
 msgstr ""
 
@@ -972,7 +988,7 @@ msgstr ""
 msgid "Purchase"
 msgstr ""
 
-#: apps/material_requests/models.py:80
+#: apps/material_requests/models.py:80 apps/purchasing/models.py:65
 msgid "Draft"
 msgstr ""
 
@@ -988,13 +1004,13 @@ msgid "Rejected"
 msgstr ""
 
 #: apps/material_requests/models.py:84 apps/material_requests/selectors.py:282
-#: apps/notifications/models.py:39
+#: apps/notifications/models.py:39 apps/purchasing/models.py:68
 msgid "Cancelled"
 msgstr ""
 
 #: apps/material_requests/models.py:85 apps/material_requests/selectors.py:287
 #: apps/material_requests/templates/material_requests/examine.html:47
-#: apps/projects/models.py:30
+#: apps/projects/models.py:30 apps/purchasing/models.py:67
 msgid "Closed"
 msgstr ""
 
@@ -1022,7 +1038,7 @@ msgstr ""
 msgid "Manual"
 msgstr ""
 
-#: apps/material_requests/models.py:99
+#: apps/material_requests/models.py:99 apps/purchasing/models.py:72
 msgid "number"
 msgstr ""
 
@@ -1039,6 +1055,7 @@ msgid "needed by"
 msgstr ""
 
 #: apps/material_requests/models.py:120 apps/projects/models.py:45
+#: apps/purchasing/models.py:96
 msgid "status"
 msgstr ""
 
@@ -1046,7 +1063,8 @@ msgstr ""
 msgid "close mode"
 msgstr ""
 
-#: apps/material_requests/models.py:122 apps/suppliers/models.py:31
+#: apps/material_requests/models.py:122 apps/purchasing/models.py:99
+#: apps/suppliers/models.py:31
 msgid "notes"
 msgstr ""
 
@@ -1063,6 +1081,7 @@ msgid "closed at"
 msgstr ""
 
 #: apps/material_requests/models.py:126 apps/material_requests/models.py:240
+#: apps/purchasing/models.py:179
 msgid "close reason"
 msgstr ""
 
@@ -1096,11 +1115,11 @@ msgstr ""
 msgid "request"
 msgstr ""
 
-#: apps/material_requests/models.py:197
+#: apps/material_requests/models.py:197 apps/purchasing/models.py:160
 msgid "line"
 msgstr ""
 
-#: apps/material_requests/models.py:208
+#: apps/material_requests/models.py:208 apps/purchasing/models.py:168
 msgid "unit"
 msgstr ""
 
@@ -1128,7 +1147,7 @@ msgstr ""
 msgid "sourcing"
 msgstr ""
 
-#: apps/material_requests/models.py:228
+#: apps/material_requests/models.py:228 apps/purchasing/models.py:178
 msgid "closed short at"
 msgstr ""
 
@@ -1220,134 +1239,127 @@ msgstr ""
 msgid "Line reopened"
 msgstr ""
 
-#: apps/material_requests/services.py:98
+#: apps/material_requests/services/common.py:59
+#: apps/purchasing/services/common.py:43
 msgid "This material's unit has just changed; choose the material again."
 msgstr ""
 
-#: apps/material_requests/services.py:162
+#: apps/material_requests/services/common.py:123
 msgid "This project accepts no new requests."
 msgstr ""
 
-#: apps/material_requests/services.py:171
+#: apps/material_requests/services/common.py:132
 msgid "The project's branch is inactive."
 msgstr ""
 
-#: apps/material_requests/services.py:180
+#: apps/material_requests/services/common.py:141
 msgid "Lines change only while the request is a draft."
 msgstr ""
 
-#: apps/material_requests/services.py:194
-msgid "Enter a quantity."
-msgstr ""
-
-#: apps/material_requests/services.py:197
-msgid "The quantity must be positive."
-msgstr ""
-
-#: apps/material_requests/services.py:204
-#, python-format
-msgid "%(unit)s quantities have at most %(decimals)s decimals."
-msgstr ""
-
-#: apps/material_requests/services.py:230
-#: apps/material_requests/services.py:1072
+#: apps/material_requests/services/common.py:167
+#: apps/material_requests/services/review.py:346
 msgid "Choose an active material."
 msgstr ""
 
-#: apps/material_requests/services.py:236
+#: apps/material_requests/services/common.py:173
 msgid "A catalog material is requested in its own unit."
 msgstr ""
 
-#: apps/material_requests/services.py:246
+#: apps/material_requests/services/common.py:183
 msgid "Describe the material, or choose one from the catalog."
 msgstr ""
 
-#: apps/material_requests/services.py:253
+#: apps/material_requests/services/common.py:190
 msgid "Choose a unit."
 msgstr ""
 
-#: apps/material_requests/services.py:320
+#: apps/material_requests/services/common.py:257
 msgid "Material has already been ordered or delivered for this request."
 msgstr ""
 
-#: apps/material_requests/services.py:408
-#, python-format
-msgid "These details cannot be changed while the request is %(status)s."
-msgstr ""
-
-#: apps/material_requests/services.py:574
-msgid "Add at least one line before submitting."
-msgstr ""
-
-#: apps/material_requests/services.py:615
-msgid "A reviewer has already decided a line; it can no longer be withdrawn."
-msgstr ""
-
-#: apps/material_requests/services.py:668
+#: apps/material_requests/services/common.py:280
 #: apps/material_requests/transitions.py:52
 #, python-format
 msgid "This request is %(status)s; it cannot be changed this way."
 msgstr ""
 
-#: apps/material_requests/services.py:685
+#: apps/material_requests/services/common.py:297
 msgid "This line is closed short."
 msgstr ""
 
-#: apps/material_requests/services.py:687
+#: apps/material_requests/services/common.py:299
 msgid "This line has no approved quantity."
 msgstr ""
 
-#: apps/material_requests/services.py:801
+#: apps/material_requests/services/requester.py:120
+#, python-format
+msgid "These details cannot be changed while the request is %(status)s."
+msgstr ""
+
+#: apps/material_requests/services/requester.py:286
+msgid "Add at least one line before submitting."
+msgstr ""
+
+#: apps/material_requests/services/requester.py:327
+msgid "A reviewer has already decided a line; it can no longer be withdrawn."
+msgstr ""
+
+#: apps/material_requests/services/review.py:75
 msgid "At most the requested quantity can be approved."
 msgstr ""
 
-#: apps/material_requests/services.py:818
+#: apps/material_requests/services/review.py:92
 msgid "Approve or reject the line."
 msgstr ""
 
-#: apps/material_requests/services.py:843
+#: apps/material_requests/services/review.py:117
 #, python-format
 msgid "Line %(line)s was decided by another reviewer."
 msgstr ""
 
-#: apps/material_requests/services.py:893
+#: apps/material_requests/services/review.py:167
 msgid "Decide at least one line."
 msgstr ""
 
-#: apps/material_requests/services.py:897
+#: apps/material_requests/services/review.py:171
 msgid "A line does not belong to this request."
 msgstr ""
 
-#: apps/material_requests/services.py:972
+#: apps/material_requests/services/review.py:246
 msgid "An approved quantity can only be reduced."
 msgstr ""
 
-#: apps/material_requests/services.py:983
+#: apps/material_requests/services/review.py:257
 #, python-format
 msgid "%(floor)s are already delivered, received or on order."
 msgstr ""
 
-#: apps/material_requests/services.py:1016
+#: apps/material_requests/services/review.py:290
 msgid "Choose stock or purchase."
 msgstr ""
 
-#: apps/material_requests/services.py:1030
+#: apps/material_requests/services/review.py:304
 msgid "Link the line to a catalog material before purchasing it."
 msgstr ""
 
-#: apps/material_requests/services.py:1036
+#: apps/material_requests/services/review.py:310
 msgid "Goods are on order for this line; it cannot move to stock."
 msgstr ""
 
-#: apps/material_requests/services.py:1068 apps/material_requests/views.py:689
+#: apps/material_requests/services/review.py:342
+#: apps/material_requests/views/reviewer.py:307
 msgid "This line is already a catalog material."
 msgstr ""
 
-#: apps/material_requests/services.py:1078
+#: apps/material_requests/services/review.py:352
 msgid "This material is measured in another unit."
 msgstr ""
 
-#: apps/material_requests/services.py:1162
+#: apps/material_requests/services/review.py:423
+msgid "This line is fully delivered: nothing is short."
+msgstr ""
+
+#: apps/material_requests/services/review.py:443
 msgid "This line is not closed short."
 msgstr ""
 
@@ -1407,35 +1419,35 @@ msgid_plural "Your request: %(counter)s lines"
 msgstr[0] ""
 msgstr[1] ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:34
+#: apps/material_requests/templates/material_requests/draft_lines.html:35
 msgid "Set quantity"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:39
+#: apps/material_requests/templates/material_requests/draft_lines.html:40
 msgid "One less"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:51
+#: apps/material_requests/templates/material_requests/draft_lines.html:52
 msgid "One more"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:59
+#: apps/material_requests/templates/material_requests/draft_lines.html:60
 msgid "Remove"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:65
+#: apps/material_requests/templates/material_requests/draft_lines.html:66
 msgid "No material yet. Pick one above."
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:68
+#: apps/material_requests/templates/material_requests/draft_lines.html:69
 msgid "Not in the catalog?"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:77
+#: apps/material_requests/templates/material_requests/draft_lines.html:78
 msgid "Add to the request"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/draft_lines.html:83
+#: apps/material_requests/templates/material_requests/draft_lines.html:84
 #, python-format
 msgid "Review and submit: %(counter)s line"
 msgid_plural "Review and submit: %(counter)s lines"
@@ -1694,77 +1706,77 @@ msgstr ""
 msgid "Submit request"
 msgstr ""
 
-#: apps/material_requests/views.py:154
+#: apps/material_requests/views/common.py:104
+msgid "Check the form."
+msgstr ""
+
+#: apps/material_requests/views/requester.py:119
 msgid "Choose a project."
 msgstr ""
 
-#: apps/material_requests/views.py:333
+#: apps/material_requests/views/requester.py:298
 msgid "The quantity must be positive; remove the line instead."
 msgstr ""
 
-#: apps/material_requests/views.py:382
+#: apps/material_requests/views/requester.py:347
 #, python-format
 msgid "Request %(number)s submitted."
 msgstr ""
 
-#: apps/material_requests/views.py:401
+#: apps/material_requests/views/requester.py:366
 msgid "Request withdrawn; it is a draft again."
 msgstr ""
 
-#: apps/material_requests/views.py:419
+#: apps/material_requests/views/requester.py:384
 msgid "Request discarded."
 msgstr ""
 
-#: apps/material_requests/views.py:470
-msgid "Check the form."
-msgstr ""
-
-#: apps/material_requests/views.py:610
+#: apps/material_requests/views/reviewer.py:228
 #, python-format
 msgid "Line %(line)s decided."
 msgstr ""
 
-#: apps/material_requests/views.py:622
+#: apps/material_requests/views/reviewer.py:240
 msgid "Every pending line is approved."
 msgstr ""
 
-#: apps/material_requests/views.py:639
+#: apps/material_requests/views/reviewer.py:257
 msgid "Request returned to its requester."
 msgstr ""
 
-#: apps/material_requests/views.py:659
+#: apps/material_requests/views/reviewer.py:277
 msgid "Approved quantity reduced."
 msgstr ""
 
-#: apps/material_requests/views.py:677
+#: apps/material_requests/views/reviewer.py:295
 msgid "Sourcing saved."
 msgstr ""
 
-#: apps/material_requests/views.py:716
+#: apps/material_requests/views/reviewer.py:334
 msgid "Line linked to the catalog."
 msgstr ""
 
-#: apps/material_requests/views.py:743
+#: apps/material_requests/views/reviewer.py:367
 msgid "Line closed short."
 msgstr ""
 
-#: apps/material_requests/views.py:748
+#: apps/material_requests/views/reviewer.py:373
 msgid "Line reopened."
 msgstr ""
 
-#: apps/material_requests/views.py:766
+#: apps/material_requests/views/reviewer.py:391
 msgid "Schedule saved."
 msgstr ""
 
-#: apps/material_requests/views.py:793
+#: apps/material_requests/views/reviewer.py:399
 msgid "Request closed."
 msgstr ""
 
-#: apps/material_requests/views.py:798
+#: apps/material_requests/views/reviewer.py:406
 msgid "Request reopened."
 msgstr ""
 
-#: apps/material_requests/views.py:811
+#: apps/material_requests/views/reviewer.py:420
 msgid "Request cancelled."
 msgstr ""
 
@@ -2396,6 +2408,284 @@ msgstr ""
 msgid "Access to the project revoked."
 msgstr ""
 
+#: apps/purchasing/components.py:79
+#, python-format
+msgid ""
+"This change reaches more than %(limit)s linked order and request lines. "
+"Split the work across separate orders, or ask an administrator."
+msgstr ""
+
+#: apps/purchasing/components.py:184
+msgid ""
+"The quantities of a request line are inconsistent (more delivered or "
+"received than approved); ask an administrator to check it."
+msgstr ""
+
+#: apps/purchasing/components.py:311
+#, python-format
+msgid "%(attributed)s have already been received for this allocation."
+msgstr ""
+
+#: apps/purchasing/models.py:66
+msgid "Issued"
+msgstr ""
+
+#: apps/purchasing/models.py:74
+msgid "revision"
+msgstr ""
+
+#: apps/purchasing/models.py:82
+msgid "buyer"
+msgstr ""
+
+#: apps/purchasing/models.py:88 apps/suppliers/models.py:37
+msgid "supplier"
+msgstr ""
+
+#: apps/purchasing/models.py:94
+msgid "ship to"
+msgstr ""
+
+#: apps/purchasing/models.py:97
+msgid "expected date"
+msgstr ""
+
+#: apps/purchasing/models.py:98
+msgid "supplier reference"
+msgstr ""
+
+#: apps/purchasing/models.py:100
+msgid "currency"
+msgstr ""
+
+#: apps/purchasing/models.py:101
+msgid "issued at"
+msgstr ""
+
+#: apps/purchasing/models.py:108
+msgid "issued by"
+msgstr ""
+
+#: apps/purchasing/models.py:113
+msgid "cancellation notice required"
+msgstr ""
+
+#: apps/purchasing/models.py:116
+msgid "buyer (as issued)"
+msgstr ""
+
+#: apps/purchasing/models.py:119
+msgid "supplier (as issued)"
+msgstr ""
+
+#: apps/purchasing/models.py:122
+msgid "ship to (as issued)"
+msgstr ""
+
+#: apps/purchasing/models.py:128
+msgid "purchase order"
+msgstr ""
+
+#: apps/purchasing/models.py:129
+msgid "purchase orders"
+msgstr ""
+
+#: apps/purchasing/models.py:151 tests/unit/purchasing/test_models.py:31
+msgid "Draft order"
+msgstr ""
+
+#: apps/purchasing/models.py:158
+msgid "order"
+msgstr ""
+
+#: apps/purchasing/models.py:170
+msgid "ordered quantity"
+msgstr ""
+
+#: apps/purchasing/models.py:171
+msgid "unit price"
+msgstr ""
+
+#: apps/purchasing/models.py:173
+msgid "discount (%)"
+msgstr ""
+
+#: apps/purchasing/models.py:176
+msgid "material (as issued)"
+msgstr ""
+
+#: apps/purchasing/models.py:184
+msgid "purchase order line"
+msgstr ""
+
+#: apps/purchasing/models.py:185
+msgid "purchase order lines"
+msgstr ""
+
+#: apps/purchasing/models.py:230
+msgid "order line"
+msgstr ""
+
+#: apps/purchasing/models.py:236
+msgid "request line"
+msgstr ""
+
+#: apps/purchasing/models.py:238
+msgid "allocated quantity"
+msgstr ""
+
+#: apps/purchasing/models.py:243
+msgid "purchase allocation"
+msgstr ""
+
+#: apps/purchasing/models.py:244
+msgid "purchase allocations"
+msgstr ""
+
+#: apps/purchasing/services/common.py:45
+msgid "This order already has a line for this material."
+msgstr ""
+
+#: apps/purchasing/services/common.py:104 apps/purchasing/transitions.py:48
+#, python-format
+msgid "This purchase order is %(status)s; it cannot be changed this way."
+msgstr ""
+
+#: apps/purchasing/services/common.py:113
+msgid "An issued order changes only through an amendment."
+msgstr ""
+
+#: apps/purchasing/services/common.py:133
+msgid "This branch is inactive."
+msgstr ""
+
+#: apps/purchasing/services/common.py:140
+msgid "Choose an active supplier."
+msgstr ""
+
+#: apps/purchasing/services/common.py:163
+msgid "Choose a valid destination."
+msgstr ""
+
+#: apps/purchasing/services/common.py:178
+msgid "This order serves other projects; it cannot ship to this worksite."
+msgstr ""
+
+#: apps/purchasing/services/common.py:189
+msgid "The request's project accepts no new allocations."
+msgstr ""
+
+#: apps/purchasing/services/common.py:217
+#, python-format
+msgid "Line %(line)s of %(request)s is not open for purchasing."
+msgstr ""
+
+#: apps/purchasing/services/common.py:223
+#, python-format
+msgid "Line %(line)s of %(request)s is not to be purchased."
+msgstr ""
+
+#: apps/purchasing/services/common.py:229
+#, python-format
+msgid "%(request)s is bought by another branch."
+msgstr ""
+
+#: apps/purchasing/services/common.py:236
+msgid "This order ships to another project's worksite."
+msgstr ""
+
+#: apps/purchasing/services/common.py:249
+#, python-format
+msgid "Only %(available)s are left to purchase for this line."
+msgstr ""
+
+#: apps/purchasing/services/common.py:274
+#: apps/purchasing/services/orders.py:239
+msgid "This order line is closed short."
+msgstr ""
+
+#: apps/purchasing/services/common.py:277
+msgid "This order line has nothing left to receive."
+msgstr ""
+
+#: apps/purchasing/services/common.py:282
+msgid "The allocations would exceed the ordered quantity."
+msgstr ""
+
+#: apps/purchasing/services/common.py:292
+msgid "The order line and the request line are different materials."
+msgstr ""
+
+#: apps/purchasing/services/common.py:310
+msgid "This material is inactive."
+msgstr ""
+
+#: apps/purchasing/services/common.py:407
+#, python-format
+msgid "Nothing is left to purchase for line %(line)s of %(request)s."
+msgstr ""
+
+#: apps/purchasing/services/common.py:525
+#, python-format
+msgid "%(received)s have already been received on this line."
+msgstr ""
+
+#: apps/purchasing/services/common.py:548
+msgid "Enter a price of zero or more."
+msgstr ""
+
+#: apps/purchasing/services/common.py:556
+msgid "Enter a discount between 0 and 100 %."
+msgstr ""
+
+#: apps/purchasing/services/drafts.py:173
+msgid "Choose at least one request line."
+msgstr ""
+
+#: apps/purchasing/services/drafts.py:222
+msgid "This request line is already allocated here; change that allocation."
+msgstr ""
+
+#: apps/purchasing/services/drafts.py:269
+msgid "Use unallocate to lower an allocation."
+msgstr ""
+
+#: apps/purchasing/services/drafts.py:288
+msgid "An allocation can only be lowered here."
+msgstr ""
+
+#: apps/purchasing/services/orders.py:72
+#, python-format
+msgid "Line %(line)s allocates more than it orders."
+msgstr ""
+
+#: apps/purchasing/services/orders.py:88
+#, python-format
+msgid ""
+"%(request)s line %(line)s would be committed %(committed)s of %(approved)s."
+msgstr ""
+
+#: apps/purchasing/services/orders.py:122
+msgid "Add at least one line before issuing."
+msgstr ""
+
+#: apps/purchasing/services/orders.py:245
+#, python-format
+msgid "Line %(line)s has goods received: its price no longer changes."
+msgstr ""
+
+#: apps/purchasing/services/orders.py:318
+msgid "A line or allocation is not on this order."
+msgstr ""
+
+#: apps/purchasing/services/orders.py:385
+msgid "Goods have been received on this order; it can no longer be cancelled."
+msgstr ""
+
+#: apps/purchasing/services/orders.py:424
+msgid "This order line is already closed short."
+msgstr ""
+
 #: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
 #: apps/suppliers/templates/suppliers/list.html:23
 #: apps/suppliers/templates/suppliers/list.html:35
@@ -2420,10 +2710,6 @@ msgstr ""
 
 #: apps/suppliers/models.py:29
 msgid "phone"
-msgstr ""
-
-#: apps/suppliers/models.py:37
-msgid "supplier"
 msgstr ""
 
 #: apps/suppliers/models.py:38

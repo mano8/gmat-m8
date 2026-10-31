@@ -220,7 +220,7 @@ def _claim(
         return None
     if candidate["kind"] in DISPATCH_KINDS:
         # Discover → lock → verify (plan §4.7): the order at L4, then its row at L4b.
-        cast(DispatchSource, source).lock_order(locks, cast(UUID, candidate["source_po"]))
+        cast(DispatchSource, source).lock_order(locks, candidate["source_po"])
         locks.enter(LockLevel.PO_OUTBOX)
         message = _due().filter(pk=candidate["pk"]).select_for_update(skip_locked=True).first()
     else:
@@ -262,7 +262,7 @@ def _lock_message(locks: LockOrder, message_id: UUID) -> EmailOutbox | None:
         source = dispatch_source()
         if source is None:
             raise RuntimeError("A dispatch outcome needs the purchasing app's dispatch source")
-        source.lock_order(locks, cast(UUID, found["source_po"]))
+        source.lock_order(locks, found["source_po"])
         locks.enter(LockLevel.PO_OUTBOX)
     return EmailOutbox.objects.select_for_update().filter(pk=message_id).first()
 

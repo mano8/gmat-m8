@@ -27,6 +27,7 @@ from apps.core.models import DocumentSequence
 from apps.material_requests import services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services import requester as requester_services
+from apps.material_requests.services.common import _lock_component
 from apps.organizations.models import Branch
 from apps.projects.models import Project
 from tests.org import Org, People
@@ -814,6 +815,16 @@ def test_a_header_changed_since_authorization_is_retried(
     MaterialRequest.objects.filter(pk=stale.pk).update(status=Status.CANCELLED)
     with pytest.raises(LockSetChanged), transaction.atomic():
         services._lock_header(LockOrder(), stale)
+
+
+def test_a_header_changed_since_authorization_is_retried_with_its_component(
+    make_request: MakeRequest, people: People
+) -> None:
+    """The ledger-input services lock the whole allocation component first (M5.1)."""
+    stale = make_request(Status.APPROVED, decided=True)
+    MaterialRequest.objects.filter(pk=stale.pk).update(requested_by=people.partner)
+    with pytest.raises(LockSetChanged), transaction.atomic():
+        _lock_component(LockOrder(), stale)
 
 
 # --- the state rules, service by service ----------------------------------------------

@@ -16,13 +16,15 @@ test; ``tests/access`` builds the same world once per module.
 Each project has its worksite; A-MAD, A-SEV and B-MAD have a warehouse. The supplier
 carries the supplier sentinels (name, email, phone). ``build_people``
 adds what only the people need: an inactive company D (with its head office) and an
-inactive branch A-OLD.
+inactive branch A-OLD. ``build_sentinel_order`` adds the issued purchase order with the
+price and other-project quantity sentinels (the acceptance matrix's world has it).
 """
 
 import re
 import time
 from dataclasses import dataclass, fields
 from datetime import datetime, timedelta
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
@@ -38,9 +40,12 @@ from django.utils import timezone
 from apps.access.roles import Role
 from apps.accounts.models import User
 from apps.accounts.sessions import SESSION_EPOCH_KEY, SESSION_LOGIN_AT_KEY, session_lifetime
+from apps.catalog.models import Material, UnitOfMeasure
 from apps.locations.models import Location
+from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.organizations.models import Branch, Company, Membership
 from apps.projects.models import Project, ProjectAssignment
+from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from apps.suppliers.models import Supplier
 from tests.support import PASSWORD, enroll_totp, grant
 
@@ -283,8 +288,8 @@ class Sentinel(StrEnum):
 
     Each step that adds the model behind a value seeds it into the fixture: the supplier
     name, email and phone are on ``Org.supplier`` (M3.2); the price and another project's
-    quantity come with purchase orders (M5.1). Until then nothing renders them, and the acceptance
-    matrix already checks every response against all of them.
+    quantity are on the issued order of ``build_sentinel_order`` (M5.1). The acceptance
+    matrix checks every response against all of them.
     """
 
     PRICE = "98765.4321"
@@ -323,3 +328,93 @@ def client_for(user: User, *, mfa: bool = True, **defaults: Any) -> Client:
     client = Client(**defaults)
     client.cookies[settings.SESSION_COOKIE_NAME] = session_for(user, mfa=mfa)
     return client
+
+
+# --- the sentinel purchase order (M5.1) -------------------------------------------------
+
+
+@dataclass
+class SentinelOrder:
+    """An issued order of A-MAD to the sentinel supplier, priced at ``Sentinel.PRICE``.
+
+    Its one line serves two projects: the hospital (10) and SEV-2, whose allocation is
+    ``Sentinel.OTHER_PROJECT_QUANTITY``; a hospital view must never show the latter. The
+    requests belong to an account no actor uses.
+    """
+
+    order: PurchaseOrder
+    line: PurchaseOrderLine
+    hospital: PurchaseAllocation
+    other_project: PurchaseAllocation
+
+
+def build_sentinel_order(org: Org, people: People) -> SentinelOrder:
+    material = Material.objects.create(
+        reference="SENT-01",
+        name="Sentinel material",
+        unit=UnitOfMeasure.objects.get(code="M"),
+    )
+    requester = make_user("sentinel-requester@example.org")
+    now = timezone.now()
+
+    def approved_line(project: Project, quantity: str) -> MaterialRequestLine:
+        request = MaterialRequest.objects.create(
+            project=project,
+            procurement_branch_id=project.procurement_branch_id,
+            requested_by=requester,
+            status=MaterialRequest.Status.APPROVED,
+            number=f"SOL-SENT-{project.code}",
+            submitted_at=now,
+            decided_at=now,
+        )
+        return MaterialRequestLine.objects.create(
+            request=request,
+            project=project,
+            line_no=1,
+            material=material,
+            unit=material.unit,
+            requested_qty=Decimal(quantity),
+            approved_qty=Decimal(quantity),
+            decision=MaterialRequestLine.Decision.APPROVED,
+            decided_by=people.mm_mad,
+            decided_at=now,
+            sourcing=MaterialRequestLine.Sourcing.PURCHASE,
+        )
+
+    hospital_line = approved_line(org.hospital, "10")
+    other_line = approved_line(org.sev_for_mad, "5000")
+    order = PurchaseOrder.objects.create(
+        number="PED-A-SENT-00001",
+        branch=org.a_mad,
+        buyer_company=org.a,
+        supplier=org.supplier,
+        ship_to=org.warehouses["A Madrid"],
+        status=PurchaseOrder.Status.ISSUED,
+        issued_at=now,
+        issued_by=people.mm_mad,
+        supplier_snapshot={
+            "name": org.supplier.name,
+            "email": org.supplier.email,
+            "phone": org.supplier.phone,
+        },
+    )
+    other = Decimal(Sentinel.OTHER_PROJECT_QUANTITY.value)
+    line = PurchaseOrderLine.objects.create(
+        po=order,
+        line_no=1,
+        material=material,
+        unit=material.unit,
+        ordered_qty=Decimal(10) + other,
+        unit_price=Decimal(Sentinel.PRICE.value),
+        material_snapshot={"reference": material.reference, "name": material.name},
+    )
+    return SentinelOrder(
+        order=order,
+        line=line,
+        hospital=PurchaseAllocation.objects.create(
+            po_line=line, request_line=hospital_line, qty=Decimal(10)
+        ),
+        other_project=PurchaseAllocation.objects.create(
+            po_line=line, request_line=other_line, qty=other
+        ),
+    )

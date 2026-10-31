@@ -13,6 +13,8 @@ from apps.accounts.models import User
 from apps.notifications.eligibility import ACCOUNT_ACTIVE
 from apps.notifications.models import MAX_RECIPIENTS, EmailAttempt, EmailOutbox, Kind, Status
 from apps.notifications.outbox import queue_security_email
+from tests import orders as purchase_orders
+from tests.org import Org
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -76,10 +78,10 @@ class TestShapePerKind:
                 "expires_at": timezone.now(),
             },
             {"kind": Kind.PO_ORDER, "recipient_address": "x@example.org"},  # no order
-            {"kind": Kind.PO_ORDER, "source_po": uuid.uuid4()},  # no address
+            {"kind": Kind.PO_ORDER, "source_po_id": uuid.uuid4()},  # no address
             {
                 "kind": Kind.PO_ORDER,
-                "source_po": uuid.uuid4(),
+                "source_po_id": uuid.uuid4(),
                 "recipient_address": "x@example.org",
                 "eligibility_object_type": "projects.project",  # half a reference
             },
@@ -89,8 +91,8 @@ class TestShapePerKind:
         with pytest.raises(IntegrityError), transaction.atomic():
             EmailOutbox.objects.create(**row(**values))
 
-    def test_one_cancellation_notice_per_order(self) -> None:
-        order = uuid.uuid4()
+    def test_one_cancellation_notice_per_order(self, org: Org) -> None:
+        order = purchase_orders.order(org)
         values = row(kind=Kind.PO_CANCELLATION, source_po=order, recipient_address="s@e.org")
         EmailOutbox.objects.create(**values)
         EmailOutbox.objects.create(

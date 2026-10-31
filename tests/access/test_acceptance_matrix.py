@@ -12,10 +12,10 @@ Each row also lists the sentinels (plan §8.1) its responses may contain; every 
 sentinel is checked absent from every response. A URL with an object adds one row per
 object position (``Route.position``).
 
-The account pages (allauth), the admin, the health checks, the token pages (invitations,
-email changes), the screens of M2.6 (projects, people, invitations), the master-data
-screens of M3 (catalog, suppliers) and the requester's screens of M4.3 have rows; later
-business screens add theirs with the steps that build them.
+The account pages (allauth), the admin (purchase orders included, M5.1), the health checks,
+the token pages (invitations, email changes), the screens of M2.6 (projects, people,
+invitations), the master-data screens of M3 (catalog, suppliers) and the request screens
+of M4 have rows; later business screens add theirs with the steps that build them.
 """
 
 import re
@@ -159,6 +159,7 @@ READ_ONLY_MODELS = {
     "projects": ("project", "projectassignment"),
     "catalog": ("unitofmeasure",),
     "material_requests": ("materialrequest", "materialrequestline"),
+    "purchasing": ("purchaseorder", "purchaseorderline", "purchaseallocation"),
 }
 MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),
@@ -166,8 +167,14 @@ MASTER_DATA_MODELS = {
     "catalog": ("materialcategory", "material"),
     "suppliers": ("supplier",),
 }
-# The admin pages of a model that shows its own sentinels (the supplier's contact details).
-ADMIN_SENTINELS = {"supplier": SUPPLIER_SENTINELS}
+# The admin pages of a model that shows its own sentinels: the supplier's contact details
+# (also in an order's supplier snapshot) and the allocations' quantities. Prices never
+# reach the admin (``apps.purchasing.admin``).
+ADMIN_SENTINELS = {
+    "supplier": SUPPLIER_SENTINELS,
+    "purchaseorder": SUPPLIER_SENTINELS,
+    "purchaseallocation": frozenset({Sentinel.OTHER_PROJECT_QUANTITY}),
+}
 
 
 def _admin_model_routes() -> dict[str, Route]:

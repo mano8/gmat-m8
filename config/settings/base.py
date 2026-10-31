@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.catalog",
     "apps.suppliers",
     "apps.material_requests",
+    "apps.purchasing",
     "apps.notifications",
 ]
 
@@ -122,8 +123,10 @@ PASSWORD_RESET_TIMEOUT = 3600  # one hour (plan §5)
 IDEMPOTENCY_KEY_MAX_AGE = 24 * 3600
 IDEMPOTENCY_RECORD_RETENTION = 7 * 24 * 3600
 
-# Document number prefixes (plan §4.2): SOL-{company}-{branch}-{yyyy}-{00001}.
+# Document number prefixes (plan §4.2): SOL-{company}-{branch}-{yyyy}-{00001} for requests,
+# PED-{company}-{yyyy}-{00001} for purchase orders (per buyer company).
 REQUEST_NUMBER_PREFIX = "SOL"
+PURCHASE_ORDER_NUMBER_PREFIX = "PED"
 
 # --- allauth (plan §5, "Identity, sessions and MFA"; floor 65.20.1) ---------------------
 ACCOUNT_ADAPTER = "apps.accounts.adapters.AccountAdapter"

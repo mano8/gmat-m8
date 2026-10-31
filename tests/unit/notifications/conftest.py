@@ -14,6 +14,8 @@ from apps.notifications.eligibility import ACCOUNT_ACTIVE
 from apps.notifications.models import EmailOutbox, Kind
 from apps.notifications.outbox import queue_dispatch, queue_notification, queue_security_email
 from apps.projects.models import Project
+from apps.purchasing.models import PurchaseOrder
+from tests import orders as purchase_orders
 from tests.org import Org
 from tests.outbox import SECRET_BODY, FakeOrders
 
@@ -82,12 +84,18 @@ def orders() -> Iterator[FakeOrders]:
 
 
 @pytest.fixture
-def dispatch(org: Org) -> Callable[..., EmailOutbox]:
-    def make(kind: Kind = Kind.PO_ORDER, po: Project | None = None) -> EmailOutbox:
+def purchase_order(org: Org) -> PurchaseOrder:
+    """The order the dispatches are about: a draft of A-MAD."""
+    return purchase_orders.order(org)
+
+
+@pytest.fixture
+def dispatch(purchase_order: PurchaseOrder) -> Callable[..., EmailOutbox]:
+    def make(kind: Kind = Kind.PO_ORDER, po: PurchaseOrder | None = None) -> EmailOutbox:
         with transaction.atomic():
             return queue_dispatch(
                 kind=kind,
-                po_id=(po or org.hospital).pk,
+                po_id=(po or purchase_order).pk,
                 address="orders@supplier.example",
                 subject="Purchase order PED-A-2026-00001",
                 body="Please deliver.",

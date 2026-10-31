@@ -24,9 +24,12 @@ needed-by, closing and reopening). Material, unit and quantity change only in ``
 
 Ledger inputs (§4.5): closing or reopening a line or a request, reducing an approved
 quantity and changing the priority or needed-by date change the attribution order or the
-open lines, so they lock every line of the request (L3) and end in ``_reconcile``, where
-M5.1 adds the allocation trims and the component reconciliation. The quantities they
-check (D, R, P, Q) come from ``ledger``; automatic close and reopen follow §4.9.
+open lines, so they lock the request's whole allocation component before any line
+(``commitments``: every request header at L2, every request line at L3, then the purchase
+orders at L4/L5), trim the allocations of the lines they close, and end with the
+component's reconciliation (purchasing, M5.1), after the automatic close or reopen. The
+quantities they check (D, R, P, Q) come from ``ledger``; automatic close and reopen follow
+§4.9.
 
 C9: a catalog line carries its material's unit through the composite foreign key. A
 material whose unit changed between reading it and inserting the line fails that key: the

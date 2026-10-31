@@ -251,12 +251,12 @@ class TestDispatchClaim:
         system: SystemPrincipal,
         dispatch: Callable[..., EmailOutbox],
         orders: FakeOrders,
-        org: Any,
+        purchase_order: Any,
     ) -> None:
         message = dispatch()
         claimed = claim(system)
         assert claimed.to == ("orders@supplier.example",)
-        assert orders.locked == [org.hospital.pk]
+        assert orders.locked == [purchase_order.pk]
         assert reload(message).status == Status.SENDING
 
     @pytest.mark.parametrize("refusal", [Status.CANCELLED, Status.SUPERSEDED])
@@ -265,11 +265,11 @@ class TestDispatchClaim:
         system: SystemPrincipal,
         dispatch: Callable[..., EmailOutbox],
         orders: FakeOrders,
-        org: Any,
+        purchase_order: Any,
         refusal: Status,
     ) -> None:
         message = dispatch()
-        orders.refusals[org.hospital.pk] = refusal
+        orders.refusals[purchase_order.pk] = refusal
         assert claim_next(system) == Settled(message.pk, refusal)
 
     def test_one_source_at_a_time(self, orders: FakeOrders) -> None:

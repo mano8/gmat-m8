@@ -31,9 +31,10 @@ from apps.notifications.models import EmailAttempt, EmailOutbox, Kind, Outcome, 
 from apps.notifications.outbox import queue_dispatch, queue_security_email
 from apps.notifications.services import Claim, claim_next, record_outcome
 from apps.notifications.worker import Worker
-from apps.projects.models import Project
+from apps.purchasing.models import PurchaseOrder
+from tests import orders as purchase_orders
 from tests.integration.conftest import run_concurrently
-from tests.org import Org, build_org
+from tests.org import build_org
 from tests.outbox import SECRET_BODY, FakeOrders
 from tests.smtp import Behaviour, fake_smtp
 
@@ -92,24 +93,24 @@ def orders() -> Any:
 
 
 @pytest.fixture
-def order_and_dispatch(db: None) -> tuple[Org, EmailOutbox]:
-    org = build_org()
+def order_and_dispatch(db: None) -> tuple[PurchaseOrder, EmailOutbox]:
+    order = purchase_orders.order(build_org())
     with transaction.atomic():
         message = queue_dispatch(
             kind=Kind.PO_ORDER,
-            po_id=org.hospital.pk,
+            po_id=order.pk,
             address="orders@supplier.example",
             subject="Order",
             body="Please deliver.",
         )
-    return org, message
+    return order, message
 
 
 def _cancel(order_id: Any, message_id: Any, locked: threading.Event, hold: float) -> str:
     """What M5's cancel does: the order FOR UPDATE (L4), then its dispatch rows (L4b)."""
     with transaction.atomic():
         locks = LockOrder()
-        locks.lock(LockLevel.PO_HEADERS, Project, [order_id], mode=LockMode.UPDATE)
+        locks.lock(LockLevel.PO_HEADERS, PurchaseOrder, [order_id], mode=LockMode.UPDATE)
         locks.lock(LockLevel.PO_OUTBOX, EmailOutbox, [message_id], mode=LockMode.UPDATE)
         locked.set()
         time.sleep(hold)
@@ -120,14 +121,14 @@ def _cancel(order_id: Any, message_id: Any, locked: threading.Event, hold: float
 
 
 def test_a_dispatch_claim_waits_for_a_cancellation_holding_the_order(
-    orders: SlowOrders, order_and_dispatch: tuple[Org, EmailOutbox]
+    orders: SlowOrders, order_and_dispatch: tuple[PurchaseOrder, EmailOutbox]
 ) -> None:
-    org, message = order_and_dispatch
+    order, message = order_and_dispatch
     locked = threading.Event()
 
     def run(index: int) -> Any:
         if index == 0:
-            return _cancel(org.hospital.pk, message.pk, locked, hold=0.5)
+            return _cancel(order.pk, message.pk, locked, hold=0.5)
         locked.wait(10)
         started = time.monotonic()
         result = claim_next(SystemPrincipal())
@@ -142,9 +143,9 @@ def test_a_dispatch_claim_waits_for_a_cancellation_holding_the_order(
 
 
 def test_a_cancellation_waits_for_a_claim_in_progress(
-    orders: SlowOrders, order_and_dispatch: tuple[Org, EmailOutbox]
+    orders: SlowOrders, order_and_dispatch: tuple[PurchaseOrder, EmailOutbox]
 ) -> None:
-    org, message = order_and_dispatch
+    order, message = order_and_dispatch
     orders.hold = 0.5
     locked = threading.Event()
 
@@ -152,7 +153,7 @@ def test_a_cancellation_waits_for_a_claim_in_progress(
         if index == 0:
             return claim_next(SystemPrincipal())
         time.sleep(0.2)  # the claim holds the order FOR SHARE by now
-        return _cancel(org.hospital.pk, message.pk, locked, hold=0)
+        return _cancel(order.pk, message.pk, locked, hold=0)
 
     claimed, seen_by_cancel = run_concurrently(2, run)
     assert isinstance(claimed, Claim)

@@ -144,7 +144,7 @@ def queue_dispatch(
     return EmailOutbox.objects.using(using).create(
         kind=kind,
         recipient_address=address,
-        source_po=po_id,
+        source_po_id=po_id,
         source_ref=source_ref,
         from_email=_from(from_email),
         subject=subject,

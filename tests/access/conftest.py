@@ -24,6 +24,7 @@ from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
 from tests.access.matrix import World, build_world
+from tests.org import build_sentinel_order
 
 
 def _admin_rows(world: World) -> None:
@@ -129,6 +130,11 @@ def _admin_rows(world: World) -> None:
         decided_by=people.mm_mad,
         decided_at=decided,
     )
+    # The issued order carrying the price and other-project quantity sentinels (M5.1).
+    sentinel = build_sentinel_order(org, people)
+    world.objects["purchaseorder"] = sentinel.order
+    world.objects["purchaseorderline"] = sentinel.line
+    world.objects["purchaseallocation"] = sentinel.hospital
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)
