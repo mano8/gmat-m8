@@ -17,7 +17,7 @@ from apps.catalog import selectors as catalog_selectors
 from apps.catalog.forms import UnitChoiceField
 from apps.core.forms import IdempotentForm
 from apps.material_requests import selectors
-from apps.material_requests.models import MaterialRequest
+from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 
 STATUS_CHOICES = [
     ("", _("All")),
@@ -62,6 +62,10 @@ class MaterialSearchForm(forms.Form):
             attrs={"type": "search", "autocomplete": "off", "enterkeyhint": "search"}
         ),
     )
+
+
+class ProjectFilterField(forms.ModelChoiceField):  # type: ignore[type-arg]
+    """The inbox's project filter: an optional choice among the projects the user reviews."""
 
 
 class StartForm(IdempotentForm):
@@ -170,3 +174,113 @@ class ReasonForm(forms.Form):
     """Discarding or cancelling: the reason is optional and kept in the audit trail."""
 
     reason = forms.CharField(label=_("Reason"), required=False, max_length=500)
+
+
+# --- the reviewer's screens (M4.4) ----------------------------------------------------
+
+
+class InboxFilterForm(forms.Form):
+    """The approval inbox: status, priority, project and a needed-by deadline."""
+
+    status = forms.ChoiceField(
+        label=_("Status"),
+        required=False,
+        choices=[
+            (MaterialRequest.Status.SUBMITTED, _("To review")),
+            (MaterialRequest.Status.APPROVED, _("Approved")),
+        ],
+    )
+    priority = forms.ChoiceField(
+        label=_("Priority"),
+        required=False,
+        choices=[("", _("All")), *MaterialRequest.Priority.choices],
+    )
+    project = ProjectFilterField(label=_("Project"), required=False, queryset=None)
+    needed_before = forms.DateField(
+        label=_("Needed by"),
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        help_text=_("On or before"),
+    )
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        project = self.fields["project"]
+        project.queryset = selectors.inbox_projects(ctx)  # type: ignore[attr-defined]
+        project.empty_label = _("All")  # type: ignore[attr-defined]
+
+
+class DecisionForm(forms.Form):
+    """One line of the review page: approve (a quantity up to the requested) or reject."""
+
+    decision = forms.ChoiceField(
+        choices=[
+            (MaterialRequestLine.Decision.APPROVED, _("Approve")),
+            (MaterialRequestLine.Decision.REJECTED, _("Reject")),
+        ]
+    )
+    approved_qty = quantity_field(_("Approved quantity"), required=False)
+    note = forms.CharField(label=_("Reason"), required=False, max_length=500)
+
+    def clean(self) -> dict[str, Any]:
+        data: dict[str, Any] = super().clean() or {}
+        if data.get("decision") == MaterialRequestLine.Decision.REJECTED and not data.get("note"):
+            self.add_error("note", forms.ValidationError(_("Give a reason."), code="required"))
+        return data
+
+
+class ReturnForm(forms.Form):
+    """Return for changes: the requester reads the note."""
+
+    note = forms.CharField(
+        label=_("What should change"),
+        max_length=500,
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
+
+
+class ReduceForm(forms.Form):
+    approved_qty = quantity_field(_("New approved quantity"))
+    reason = forms.CharField(label=_("Reason"), required=False, max_length=500)
+
+
+class SourcingForm(forms.Form):
+    sourcing = forms.ChoiceField(
+        label=_("Sourcing"),
+        choices=[
+            (MaterialRequestLine.Sourcing.STOCK, _("From stock")),
+            (MaterialRequestLine.Sourcing.PURCHASE, _("Purchase")),
+        ],
+    )
+
+
+class ResolveForm(forms.Form):
+    """The material a non-catalog line is linked to (checked against the catalog selector)."""
+
+    material = IdChoiceField(queryset=None)
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["material"].queryset = catalog_selectors.materials(ctx)  # type: ignore[attr-defined]
+
+
+class ScheduleForm(forms.Form):
+    """Priority and needed-by date of an approved request; both decide the attribution
+    order of receipts (an empty date clears it)."""
+
+    priority = forms.ChoiceField(label=_("Priority"), choices=MaterialRequest.Priority.choices)
+    needed_by = forms.DateField(
+        label=_("Needed by"), required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+    @classmethod
+    def initial_for(cls, request: MaterialRequest) -> dict[str, Any]:
+        return {"priority": request.priority, "needed_by": request.needed_by}
+
+
+class RequiredReasonForm(forms.Form):
+    """Closing and reopening, of a line or of the request, always give a reason."""
+
+    reason = forms.CharField(
+        label=_("Reason"), max_length=500, error_messages={"required": _("Give a reason.")}
+    )

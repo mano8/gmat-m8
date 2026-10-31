@@ -78,6 +78,57 @@ def _admin_rows(world: World) -> None:
         unit=unit,
         requested_qty=Decimal("3.000"),
     )
+    # The reviewer's screens (M4.4): one request per row that may change state, so the
+    # order of the rows and actors never matters. All are the technician's, on the hospital.
+    material, decided = world.objects["material"], timezone.now()
+
+    def reviewable(key: str, status: str, number: int, *, approved: bool = False) -> None:
+        item = MaterialRequest.objects.create(
+            project=org.hospital,
+            procurement_branch=org.a_mad,
+            requested_by=people.tech_mad,
+            status=status,
+            number=f"SOL-A-MAD-2026-{number:05d}",
+            submitted_at=decided,
+        )
+        decision = (
+            {
+                "decision": MaterialRequestLine.Decision.APPROVED,
+                "approved_qty": Decimal("3.000"),
+                "decided_by": people.mm_mad,
+                "decided_at": decided,
+            }
+            if approved
+            else {}
+        )
+        world.objects[key] = item
+        world.objects[f"{key}_line"] = MaterialRequestLine.objects.create(
+            request=item,
+            project=org.hospital,
+            line_no=1,
+            material=material,
+            unit=unit,
+            requested_qty=Decimal("3.000"),
+            **decision,
+        )
+
+    Status = MaterialRequest.Status
+    reviewable("review_request", Status.SUBMITTED, 2)
+    reviewable("approve_request", Status.SUBMITTED, 3)
+    reviewable("cancel_request", Status.SUBMITTED, 4)
+    reviewable("approved_request", Status.APPROVED, 5, approved=True)
+    world.objects["free_line"] = MaterialRequestLine.objects.create(
+        request=world.objects["approved_request"],
+        project=org.hospital,
+        line_no=2,
+        free_text="Cable de obra",
+        unit=unit,
+        requested_qty=Decimal("2.000"),
+        decision=MaterialRequestLine.Decision.APPROVED,
+        approved_qty=Decimal("2.000"),
+        decided_by=people.mm_mad,
+        decided_at=decided,
+    )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)

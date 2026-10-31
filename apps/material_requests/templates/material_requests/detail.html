@@ -79,6 +79,13 @@
         {% include "components/button.html" with label=_("Withdraw") type="submit" block=True %}
       </form>
     {% endif %}
+    {% if reviewable %}
+      <p class="mb-4">
+        <a class="btn btn-primary btn-block"
+           href="{% url 'requests:examine' request_id=request_obj.pk %}"
+           data-testid="open-review">{% translate "Review and follow up" %}</a>
+      </p>
+    {% endif %}
     {% url 'requests:list' as list_url %}
     <p class="mt-4">{% include "components/button.html" with href=list_url label=_("My requests") variant="link" %}</p>
   {% endif %}

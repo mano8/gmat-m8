@@ -1,0 +1,47 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Approval inbox" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Approval inbox" %}</h1>
+  </div>
+  {% url 'requests:inbox' as inbox_url %}
+  {% include "components/filter_form.html" with form=filters target="#inbox-results" action=inbox_url grid="sm:grid-cols-[1fr_1fr_1fr_1fr_auto]" %}
+  {% partialdef results inline %}
+    <div id="inbox-results" data-testid="inbox">
+      {% if page_obj.object_list %}
+        {% for item in page_obj.object_list %}
+          <article class="card mb-3"
+                   data-request="{{ item.pk }}"
+                   data-testid="inbox-row">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <a class="font-semibold"
+                 href="{% url 'requests:examine' request_id=item.pk %}">{{ item.number }}</a>
+              <span class="flex flex-wrap gap-2">
+                {% if item.priority == "URGENT" %}
+                  {% include "components/status_chip.html" with label=item.get_priority_display tone="danger" %}
+                {% elif item.priority == "HIGH" %}
+                  {% include "components/status_chip.html" with label=item.get_priority_display tone="warn" %}
+                {% else %}
+                  {% include "components/status_chip.html" with label=item.get_priority_display %}
+                {% endif %}
+                {% include "material_requests/status.html" with obj=item %}
+              </span>
+            </div>
+            <p class="text-sm text-soft">{{ item.project.code }} · {{ item.project.name }}</p>
+            <p class="text-sm text-soft">
+              {{ item.requested_by.full_name|default:item.requested_by.email }}
+              · {% blocktranslate count counter=item.line_count %}{{ counter }} line{% plural %}{{ counter }} lines{% endblocktranslate %}
+              {% if item.needed_by %}· {% translate "Needed by" %} {{ item.needed_by|date:"SHORT_DATE_FORMAT" }}{% endif %}
+            </p>
+          </article>
+        {% endfor %}
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("Nothing to review") text=_("No request matches the filters.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

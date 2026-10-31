@@ -9,13 +9,19 @@ their transaction): ownership, the state and, for a withdrawal, that no line is 
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
-from django.db.models import F, Max, Q, QuerySet
+from django.db.models import Case, Count, F, IntegerField, Max, Q, QuerySet, Value, When
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
+from apps.audit.models import AuditEvent
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
 from apps.material_requests import ledger
@@ -32,6 +38,11 @@ VIEW, CREATE, WITHDRAW = (
     Capability.REQUEST_VIEW,
     Capability.REQUEST_CREATE,
     Capability.REQUEST_WITHDRAW,
+)
+REVIEW, SOURCE, CANCEL_ANY = (
+    Capability.REQUEST_REVIEW,
+    Capability.REQUEST_SOURCE,
+    Capability.REQUEST_CANCEL_ANY,
 )
 Status = MaterialRequest.Status
 Decision = MaterialRequestLine.Decision
@@ -114,7 +125,7 @@ def lines(ctx: AccessContext, of: Sequence[MaterialRequest]) -> dict[UUID, list[
     rows = (
         MaterialRequestLine.objects.visible_to(ctx, VIEW)
         .filter(request__in=of)
-        .select_related("request", "material", "unit")
+        .select_related("request", "material", "unit", "decided_by", "closed_short_by")
         .order_by("request_id", "line_no")
     )
     grouped: dict[UUID, list[ledger.LineLedger]] = {item.pk: [] for item in of}
@@ -178,3 +189,170 @@ def can_withdraw(ctx: AccessContext, of: MaterialRequest) -> bool:
         .exclude(decision=Decision.PENDING)
         .exists()
     )
+
+
+# --- the reviewer's inbox and page (M4.4) ----------------------------------------------
+
+# What the inbox lists: requests waiting for a decision, and approved ones to follow up.
+INBOX_STATUSES = (Status.SUBMITTED, Status.APPROVED)
+# Most urgent first, then the earliest needed-by date (none last), then the oldest submit.
+PRIORITY_RANK = Case(
+    When(priority="URGENT", then=Value(0)),
+    When(priority="HIGH", then=Value(1)),
+    When(priority="NORMAL", then=Value(2)),
+    default=Value(3),
+    output_field=IntegerField(),
+)
+
+
+def inbox(
+    ctx: AccessContext,
+    *,
+    status: str = Status.SUBMITTED,
+    priority: str = "",
+    project_id: UUID | None = None,
+    needed_before: date | None = None,
+) -> QuerySet[MaterialRequest]:
+    """Requests in the user's review scope in one status, the most pressing first."""
+    rows = (
+        MaterialRequest.objects.visible_to(ctx, REVIEW)
+        .filter(status=status if status in INBOX_STATUSES else Status.SUBMITTED)
+        .select_related("project", "requested_by")
+        .annotate(line_count=Count("lines"))
+    )
+    if priority:
+        rows = rows.filter(priority=priority)
+    if project_id is not None:
+        rows = rows.filter(project_id=project_id)
+    if needed_before is not None:
+        rows = rows.filter(needed_by__lte=needed_before)
+    return rows.order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+
+
+def inbox_projects(ctx: AccessContext) -> QuerySet[Project]:
+    """The projects of the inbox filter: the ones whose requests the user reviews."""
+    return Project.objects.visible_to(ctx, Capability.PROJECT_VIEW).order_by("code")
+
+
+def link_candidates(ctx: AccessContext, of: MaterialRequestLine, query: str) -> list[Material]:
+    """Active catalog materials matching ``query`` in the unit of a non-catalog line.
+
+    Only a material in the line's own unit can be linked (no conversions, Q15).
+    """
+    return [m for m in catalog_selectors.search(ctx, query) if m.unit_id == of.unit_id]
+
+
+def can_review(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """Decisions, return for changes and reductions (the services check again)."""
+    return ctx.can(REVIEW, of)
+
+
+def can_decide(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """Review that is not an approval of one's own request (unless the branch allows it)."""
+    return can_review(ctx, of) and (
+        of.requested_by_id != ctx.user_id or of.procurement_branch.allow_self_approval
+    )
+
+
+def can_source(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """Sourcing, schedule, resolution and closing (the services check again)."""
+    return ctx.can(SOURCE, of)
+
+
+def can_cancel_any(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """Cancelling somebody else's request: only before anything is allocated or delivered."""
+    return (
+        ctx.can(CANCEL_ANY, of)
+        and of.requested_by_id != ctx.user_id
+        and of.status in {Status.SUBMITTED, Status.APPROVED}
+    )
+
+
+def can_see_history(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """The timeline shows who did what and why: for who reviews, sources or audits it."""
+    return can_review(ctx, of) or can_source(ctx, of) or ctx.can(Capability.AUDIT_VIEW, of)
+
+
+ACTION_LABELS = {
+    "request.created": _("Draft created"),
+    "request.updated": _("Request edited"),
+    "request.submitted": _("Submitted"),
+    "request.withdrawn": _("Withdrawn"),
+    "request.discarded": _("Draft discarded"),
+    "request.cancelled": _("Cancelled"),
+    "request.returned": _("Returned for changes"),
+    "request.approved": _("Approved"),
+    "request.rejected": _("Rejected"),
+    "request.rescheduled": _("Schedule changed"),
+    "request.closed": _("Closed"),
+    "request.reopened": _("Reopened"),
+    "request.auto_closed": _("Closed automatically"),
+    "request.auto_reopened": _("Reopened automatically"),
+    "request_line.added": _("Line added"),
+    "request_line.updated": _("Line edited"),
+    "request_line.removed": _("Line removed"),
+    "request_line.decided": _("Line decided"),
+    "request_line.reduced": _("Approved quantity reduced"),
+    "request_line.sourcing_set": _("Sourcing set"),
+    "request_line.resolved": _("Linked to the catalog"),
+    "request_line.closed_short": _("Line closed short"),
+    "request_line.reopened": _("Line reopened"),
+}
+
+
+@dataclass(frozen=True)
+class HistoryEntry:
+    occurred_at: datetime
+    actor: str
+    action: str
+    label: Any
+    line_no: int | None
+    detail: str
+
+
+def _quantity(value: Any) -> str:
+    return f"{Decimal(str(value)).normalize():f}"
+
+
+def _detail(action: str, data: dict[str, Any]) -> str:
+    """The reason or note of an event, or what it changed; never the raw payload."""
+    changes = data.get("changes") or {}
+    if action == "request_line.decided":
+        decision = (changes.get("decision") or {}).get("to", "")
+        quantity = (changes.get("approved_qty") or {}).get("to")
+        note = (changes.get("decision_note") or {}).get("to", "")
+        parts = [
+            str(MaterialRequestLine.Decision(decision).label) if decision else "",
+            _quantity(quantity) if quantity is not None else "",
+            note,
+        ]
+        return " · ".join(part for part in parts if part)
+    if action == "request_line.reduced":
+        change = changes.get("approved_qty") or {}
+        arrow = f"{_quantity(change['from'])} → {_quantity(change['to'])}" if change else ""
+        return " · ".join(part for part in (arrow, data.get("reason", "")) if part)
+    if action == "request_line.sourcing_set":
+        return str((changes.get("sourcing") or {}).get("to", ""))
+    if action == "request.rescheduled":
+        return " · ".join(f"{name}: {change.get('to') or '—'}" for name, change in changes.items())
+    return str(data.get("reason") or data.get("note") or "")
+
+
+def history(ctx: AccessContext, of: MaterialRequest) -> list[HistoryEntry]:
+    """The request's audit events, oldest first, for who may see them (else nothing)."""
+    if not can_see_history(ctx, of):
+        return []
+    events = AuditEvent.objects.filter(
+        object_type=MaterialRequest._meta.label_lower, object_id=of.pk
+    ).order_by("occurred_at", "id")
+    return [
+        HistoryEntry(
+            occurred_at=event.occurred_at,
+            actor=event.actor_label,
+            action=event.action,
+            label=ACTION_LABELS.get(event.action, event.action),
+            line_no=event.data.get("line_no"),
+            detail=_detail(event.action, event.data),
+        )
+        for event in events
+    ]

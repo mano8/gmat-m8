@@ -6,6 +6,12 @@
 {% block content %}
   <h1 class="mb-1">{% translate "Home" %}</h1>
   <p class="mb-4 text-soft">{% blocktranslate with email=request.user.email %}Signed in as {{ email }}.{% endblocktranslate %}</p>
+  {% can "request.review" %}
+    {% url 'requests:inbox' as inbox_url %}
+    <div class="mb-3">
+      {% include "components/button.html" with href=inbox_url label=_("Approval inbox") variant="primary" block=True %}
+    </div>
+  {% endcan %}
   {% can "request.create" %}
     {% url 'requests:new' as new_url %}
     {% include "components/button.html" with href=new_url label=_("New request") variant="primary" block=True %}

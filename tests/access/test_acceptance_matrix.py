@@ -361,6 +361,37 @@ def request_url(name: str, key: str) -> Callable[[World], str]:
     return _object_url(name, key)
 
 
+# The reviewer's screens (M4.4). request.review is held somewhere by group administrators,
+# material managers and site managers; request.source (and cancel_any) not by site managers.
+# On the technician's request at the hospital (bought for by A-MAD) the readers are those
+# whose scope or assignment reaches it; the material manager of A-SEV holds the capability
+# elsewhere and gets 404, a warehouse operator or the technician none (403).
+REVIEWERS = ("group_admin", "mm_mad", "mm_sev", "site_manager", "mixed")
+SOURCERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
+REVIEW_READERS = ("group_admin", "mm_mad", "site_manager")
+SOURCE_READERS = ("group_admin", "mm_mad")
+
+
+def review_page() -> dict[str, Expect]:
+    return project_page(REVIEWERS, REVIEW_READERS, REVIEW_READERS)
+
+
+def review_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
+    return project_action(REVIEWERS, REVIEW_READERS, REVIEW_READERS, ok)
+
+
+def source_page() -> dict[str, Expect]:
+    return project_page(SOURCERS, SOURCE_READERS, SOURCE_READERS)
+
+
+def source_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
+    return project_action(SOURCERS, SOURCE_READERS, SOURCE_READERS, ok)
+
+
+def line_of(name: str, key: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[world.objects[key].pk])
+
+
 PROJECT_POSITIONS = (
     ("own scope", "hospital", HOSPITAL_VIEWERS),
     ("foreign scope", "sev_works", SEV_VIEWERS),
@@ -584,6 +615,130 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             request_own_action(PARTNER_REQUEST_VIEWERS, "partner", REDIRECT),
             position="the partner's draft",
             path=request_url("requests:cancel", "partner_request"),
+        ),
+    ),
+    # The reviewer (M4.4): inbox and review page, then one POST per action. An empty form is
+    # invalid and changes nothing (back to the page), except approve-all and cancel, which
+    # take no input and have a request of their own.
+    "requests:inbox": (Route(app_page(**_each(OK, REVIEWERS))),),
+    "requests:examine": (
+        Route(
+            review_page(),
+            position="the technician's submitted request",
+            path=request_url("requests:examine", "review_request"),
+        ),
+        Route(
+            review_page(),
+            position="an approved request",
+            path=request_url("requests:examine", "approved_request"),
+        ),
+        Route(
+            project_page(REVIEWERS, (), ()),
+            position="unknown",
+            path=_unknown_url("requests:examine"),
+        ),
+    ),
+    "requests:approve_all": (
+        Route(
+            review_action(),
+            position="a submitted request",
+            path=request_url("requests:approve_all", "approve_request"),
+            note="the first reviewer approves it, the others find it decided",
+        ),
+    ),
+    "requests:return_to_draft": (
+        Route(
+            review_action(),
+            position="a submitted request",
+            path=request_url("requests:return_to_draft", "review_request"),
+            note="an empty note: back to the page",
+        ),
+    ),
+    "requests:decide_line": (
+        Route(
+            review_action(),
+            position="a line of a submitted request",
+            path=line_of("requests:decide_line", "review_request_line"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:reduce_line": (
+        Route(
+            review_action(),
+            position="a line of an approved request",
+            path=line_of("requests:reduce_line", "approved_request_line"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:set_sourcing": (
+        Route(
+            source_action(),
+            position="a line of an approved request",
+            path=line_of("requests:set_sourcing", "approved_request_line"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:link": (
+        Route(
+            source_page(),
+            position="a non-catalog line",
+            path=line_of("requests:link", "free_line"),
+        ),
+    ),
+    "requests:resolve_line": (
+        Route(
+            source_action(),
+            position="a non-catalog line",
+            path=line_of("requests:resolve_line", "free_line"),
+            note="an empty form: back to the dialog",
+        ),
+    ),
+    "requests:close_line": (
+        Route(
+            source_action(),
+            position="a line of an approved request",
+            path=line_of("requests:close_line", "approved_request_line"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:reopen_line": (
+        Route(
+            source_action(),
+            position="a line of an approved request",
+            path=line_of("requests:reopen_line", "approved_request_line"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:schedule": (
+        Route(
+            source_action(),
+            position="an approved request",
+            path=request_url("requests:schedule", "approved_request"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:close": (
+        Route(
+            source_action(),
+            position="an approved request",
+            path=request_url("requests:close", "approved_request"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:reopen": (
+        Route(
+            source_action(),
+            position="an approved request",
+            path=request_url("requests:reopen", "approved_request"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:cancel_any": (
+        Route(
+            source_action(),
+            position="a submitted request",
+            path=request_url("requests:cancel_any", "cancel_request"),
+            note="the first reviewer cancels it, the others find it cancelled",
         ),
     ),
     "requests:withdraw": (
