@@ -186,7 +186,9 @@ def test_failed_logins_spread_over_all_workers_hit_the_limit(
     with ThreadPoolExecutor(max_workers=12) as pool:
         responses = list(pool.map(attempt, range(24)))
 
-    assert all(response.status in {200, 429} for response in responses), str(sorted(r.status for r in responses))
+    statuses = sorted(response.status for response in responses)
+    # A 503 is Caddy's fallback page: a Gunicorn worker died (see the M2.6 PR on sizing).
+    assert set(statuses) <= {200, 429}, statuses
     checked = 1 + sum(_checked(response, reference) for response in responses)
     assert checked <= 10, f"{checked} passwords were checked from one address"
     assert checked < 25, "no attempt was limited"
