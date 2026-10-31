@@ -160,6 +160,17 @@ Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templ
 - **History.** The timeline reads the request's `AuditEvent` rows only for who reviews, sources or holds `audit.view` on the request, and shows the action, actor, time, line and the reason or note: never the raw payload. Requesters see no audit trail.
 - **Errors.** Service validation errors are flashed (text from the service), a busy database answers 409, and nothing is written by a GET. Same browser rules as before: no inline script or style, CSRF in each form, `no-store, private`; the pages work without JavaScript.
 
+## Purchasing: orders, allocations and reconciliation (step M5.1)
+
+Code in `apps/purchasing/`; plan §3.4, §3.5 (S5, S9), §4.2-4.9.
+
+- **Capabilities.** Every write needs `po.manage` (group administrators and material managers in scope) on the order, or on the branch and destination of a new one, and on the requests it allocates to; `po.view` is the read capability (404 outside it, 403 inside it without `po.manage`: warehouse operators). Setting a price also needs `price.view`. Each service authorizes in full inside its transaction, with session MFA for privileged grants; a capability held through another membership is refused (S6). A service-level matrix calls every operation as every actor of the shared fixture.
+- **Prices.** Optional (Q10). Selectors return a line's price, discount and total only to who holds `price.view` on the order; the admin never shows them (platform operators hold no `price.view`). The shared fixture's sentinel order carries the price and another project's quantity, and the acceptance matrix checks every response for them.
+- **Scope.** Orders are documents of their branch (S5); an order ships to a warehouse of its branch or of a branch it manages, or to the worksite of an active project it buys for, and a worksite order serves only that project (C6). An allocation needs an open `PURCHASE` line of the order's procurement branch, the same material, an active project and branches (C5, S9).
+- **Integrity in the database.** CHECK constraints on quantities, prices, discounts, closures and issue fields; the C9 key binds an order line to its material's unit; the outbox's `source_po` is a foreign key.
+- **Commitments.** Allocations grow only through an authorized allocation within *to purchase* and the ordered quantity (C5, I3) and shrink only through audited trims, never below what is attributed (I6). Every operation that changes a reconciliation input locks its allocation component (L2-L5, verified, retried when it changes, refused above 200 lines) and cuts any excess commitment (I2); issue refuses an over-committed draft instead. Threaded tests race drafts, allocations and closures over the same quantities.
+- **Snapshots.** Issued orders keep the buyer, supplier, destination and material as they were at issue; documents use the snapshots, not the live master data.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |
