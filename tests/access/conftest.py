@@ -7,6 +7,7 @@ an outer transaction that lives for the module; each test runs in a savepoint in
 
 from collections.abc import Iterator
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from allauth.account.models import EmailAddress
@@ -19,6 +20,7 @@ from apps.accounts.tokens import new_token
 from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
+from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
 from tests.access.matrix import World, build_world
@@ -45,6 +47,17 @@ def _admin_rows(world: World) -> None:
         name="Cable H07V-K 1x2,5 mm²",
         unit=unit,
         category=world.objects["materialcategory"],
+    )
+    world.objects["materialrequest"] = request = MaterialRequest.objects.create(
+        project=org.hospital, procurement_branch=org.a_mad, requested_by=people.tech_mad
+    )
+    world.objects["materialrequestline"] = MaterialRequestLine.objects.create(
+        request=request,
+        project=org.hospital,
+        line_no=1,
+        material=world.objects["material"],
+        unit=unit,
+        requested_qty=Decimal("10.000"),
     )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)

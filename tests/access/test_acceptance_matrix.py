@@ -107,7 +107,7 @@ def admin_page(
 # --- admin objects -----------------------------------------------------------------------
 
 ADMIN_MODEL_URL = re.compile(
-    r"^admin:(?P<app>[a-z]+)_(?P<model>[a-z]+)_(?P<view>changelist|add|history|delete|change)$"
+    r"^admin:(?P<app>[a-z_]+?)_(?P<model>[a-z]+)_(?P<view>changelist|add|history|delete|change)$"
 )
 
 
@@ -158,6 +158,7 @@ READ_ONLY_MODELS = {
     "organizations": ("membership",),
     "projects": ("project", "projectassignment"),
     "catalog": ("unitofmeasure",),
+    "material_requests": ("materialrequest", "materialrequestline"),
 }
 MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),
