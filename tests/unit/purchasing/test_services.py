@@ -728,6 +728,21 @@ class TestCloseLineShort:
         }
         assert breaker_line.closed_short_at is None
 
+    def test_a_line_received_in_full_is_not_closed_short(
+        self,
+        mm: SessionPrincipal,
+        buy: Buy,
+        make_line: MakeLine,
+        breaker: Material,
+        received: FakeReceipts,
+    ) -> None:
+        line = make_line("10")
+        order = buy((line, "10"), (make_line("3", material=breaker), "3"))
+        cable_line = order.lines.get(line_no=1)
+        received.receive(cable_line, "10", {allocation(order, line): "10"})
+        assert codes(services.close_line_short, mm, cable_line.pk, reason="x") == {"received"}
+        assert cable_line.closed_short_at is None
+
 
 class TestSettle:
     def test_a_closed_order_with_capacity_again_reopens(

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 22:08+0100\n"
+"POT-Creation-Date: 2026-10-31 22:18+0100\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -2948,6 +2948,11 @@ msgstr ""
 msgid "This order line is already closed short."
 msgstr "Cette ligne de commande est déjà soldée."
 
+#: apps/purchasing/services/orders.py:426
+#| msgid "This order line has nothing left to receive."
+msgid "This order line has been received in full."
+msgstr "Cette ligne de commande a été reçue en totalité."
+
 #: apps/purchasing/templates/purchasing/amend.html:4
 #: apps/purchasing/templates/purchasing/detail.html:27
 msgid "Amend"
@@ -3269,78 +3274,89 @@ msgstr ""
 "Une réduction ou une clôture a libéré cette quantité : clôturez la ligne "
 "avec manque auprès du fournisseur, ou gardez la marchandise en stock."
 
-#: apps/purchasing/views/actions.py:73
+#: apps/purchasing/views/actions.py:78
+#, python-format
+#| msgid "Those lines have nothing left to purchase."
+msgid "%(count)s ticked line had nothing left to purchase and was left out."
+msgid_plural ""
+"%(count)s ticked lines had nothing left to purchase and were left out."
+msgstr[0] ""
+"%(count)s ligne cochée n'avait plus rien à acheter et a été écartée."
+msgstr[1] ""
+"%(count)s lignes cochées n'avaient plus rien à acheter et ont été écartées."
+
+#: apps/purchasing/views/actions.py:86
 msgid "Draft order created."
 msgstr "Commande en brouillon créée."
 
-#: apps/purchasing/views/actions.py:83
+#: apps/purchasing/views/actions.py:96
 #, python-format
 msgid "Draft order created with %(count)s request lines."
 msgstr "Commande en brouillon créée avec %(count)s lignes de demande."
 
-#: apps/purchasing/views/actions.py:102
+#: apps/purchasing/views/actions.py:115
 msgid "Draft saved."
 msgstr "Brouillon enregistré."
 
-#: apps/purchasing/views/actions.py:124
+#: apps/purchasing/views/actions.py:137
 msgid "Request lines added."
 msgstr "Lignes de demande ajoutées."
 
-#: apps/purchasing/views/actions.py:140
+#: apps/purchasing/views/actions.py:153
 #, python-format
 msgid "Line %(line)s saved."
 msgstr "Ligne %(line)s enregistrée."
 
-#: apps/purchasing/views/actions.py:152
+#: apps/purchasing/views/actions.py:165
 #, python-format
 msgid "Line %(line)s removed."
 msgstr "Ligne %(line)s retirée."
 
-#: apps/purchasing/views/actions.py:171
+#: apps/purchasing/views/actions.py:184
 msgid "Allocation raised."
 msgstr "Affectation augmentée."
 
-#: apps/purchasing/views/actions.py:177
+#: apps/purchasing/views/actions.py:190
 msgid "Allocation lowered."
 msgstr "Affectation réduite."
 
-#: apps/purchasing/views/actions.py:212
+#: apps/purchasing/views/actions.py:225
 #, python-format
 msgid "Order %(number)s issued."
 msgstr "Commande %(number)s émise."
 
-#: apps/purchasing/views/actions.py:227
+#: apps/purchasing/views/actions.py:240
 msgid "Order cancelled."
 msgstr "Commande annulée."
 
-#: apps/purchasing/views/actions.py:227
+#: apps/purchasing/views/actions.py:240
 msgid "Draft discarded."
 msgstr "Brouillon abandonné."
 
-#: apps/purchasing/views/actions.py:248
+#: apps/purchasing/views/actions.py:261
 #, python-format
 msgid "Line %(line)s closed short."
 msgstr "Ligne %(line)s clôturée avec manque."
 
-#: apps/purchasing/views/actions.py:282
+#: apps/purchasing/views/actions.py:295
 #, python-format
 msgid "Nothing changed: the order stays at revision %(n)s."
 msgstr "Rien n'a changé : la commande reste à la révision %(n)s."
 
-#: apps/purchasing/views/actions.py:285
+#: apps/purchasing/views/actions.py:298
 #, python-format
 msgid "Order amended: revision %(n)s."
 msgstr "Commande modifiée : révision %(n)s."
 
-#: apps/purchasing/views/pages.py:107
+#: apps/purchasing/views/pages.py:108
 msgid "Those lines have nothing left to purchase."
 msgstr "Ces lignes n'ont plus rien à acheter."
 
-#: apps/purchasing/views/pages.py:315
+#: apps/purchasing/views/pages.py:325
 msgid "Only an issued order is amended."
 msgstr "Seule une commande émise se modifie."
 
-#: apps/purchasing/views/pages.py:330
+#: apps/purchasing/views/pages.py:340
 msgid "Issue the order to print it."
 msgstr "Émettez la commande pour l'imprimer."
 

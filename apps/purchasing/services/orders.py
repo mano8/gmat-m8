@@ -422,6 +422,8 @@ def close_line_short(principal: Principal, po_line_id: UUID, *, reason: str) -> 
     line = PurchaseOrderLine.objects.get(pk=po_line_id)
     if line.closed_short_at is not None:
         raise ValidationError(_("This order line is already closed short."), code="closed_short")
+    if component.book().order_lines[line.pk].remaining <= 0:
+        raise ValidationError(_("This order line has been received in full."), code="received")
     line.closed_short_at, line.close_reason = db_now(), reason
     line.save()
     component.trim_to_attributed(

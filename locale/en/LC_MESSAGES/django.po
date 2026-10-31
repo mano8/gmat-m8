@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 22:08+0100\n"
+"POT-Creation-Date: 2026-10-31 22:18+0100\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -2865,6 +2865,10 @@ msgstr ""
 msgid "This order line is already closed short."
 msgstr ""
 
+#: apps/purchasing/services/orders.py:426
+msgid "This order line has been received in full."
+msgstr ""
+
 #: apps/purchasing/templates/purchasing/amend.html:4
 #: apps/purchasing/templates/purchasing/detail.html:27
 msgid "Amend"
@@ -3171,78 +3175,86 @@ msgid ""
 "supplier, or keep the goods as stock."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:73
+#: apps/purchasing/views/actions.py:78
+#, python-format
+msgid "%(count)s ticked line had nothing left to purchase and was left out."
+msgid_plural ""
+"%(count)s ticked lines had nothing left to purchase and were left out."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/purchasing/views/actions.py:86
 msgid "Draft order created."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:83
+#: apps/purchasing/views/actions.py:96
 #, python-format
 msgid "Draft order created with %(count)s request lines."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:102
+#: apps/purchasing/views/actions.py:115
 msgid "Draft saved."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:124
+#: apps/purchasing/views/actions.py:137
 msgid "Request lines added."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:140
+#: apps/purchasing/views/actions.py:153
 #, python-format
 msgid "Line %(line)s saved."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:152
+#: apps/purchasing/views/actions.py:165
 #, python-format
 msgid "Line %(line)s removed."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:171
+#: apps/purchasing/views/actions.py:184
 msgid "Allocation raised."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:177
+#: apps/purchasing/views/actions.py:190
 msgid "Allocation lowered."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:212
+#: apps/purchasing/views/actions.py:225
 #, python-format
 msgid "Order %(number)s issued."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:227
+#: apps/purchasing/views/actions.py:240
 msgid "Order cancelled."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:227
+#: apps/purchasing/views/actions.py:240
 msgid "Draft discarded."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:248
+#: apps/purchasing/views/actions.py:261
 #, python-format
 msgid "Line %(line)s closed short."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:282
+#: apps/purchasing/views/actions.py:295
 #, python-format
 msgid "Nothing changed: the order stays at revision %(n)s."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:285
+#: apps/purchasing/views/actions.py:298
 #, python-format
 msgid "Order amended: revision %(n)s."
 msgstr ""
 
-#: apps/purchasing/views/pages.py:107
+#: apps/purchasing/views/pages.py:108
 msgid "Those lines have nothing left to purchase."
 msgstr ""
 
-#: apps/purchasing/views/pages.py:315
+#: apps/purchasing/views/pages.py:325
 msgid "Only an issued order is amended."
 msgstr ""
 
-#: apps/purchasing/views/pages.py:330
+#: apps/purchasing/views/pages.py:340
 msgid "Issue the order to print it."
 msgstr ""
 

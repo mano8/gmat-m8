@@ -17,6 +17,8 @@ dispatch, after the outcome for a ``SENDING`` one) and registers the worker's
 from collections.abc import Callable
 from uuid import UUID
 
+from django.utils import timezone
+
 from apps.core.locking import LockLevel, LockOrder
 from apps.notifications.models import DISPATCH_KINDS, EmailOutbox, Kind, Status
 from apps.purchasing.models import PurchaseOrder
@@ -41,7 +43,9 @@ def cancel_dispatches(order: PurchaseOrder) -> int:
     Returns how many queued dispatches were cancelled. The order is saved by the caller.
     """
     orders = EmailOutbox.objects.filter(source_po=order, kind=Kind.PO_ORDER)
-    cancelled = orders.filter(status=Status.QUEUED).update(status=Status.CANCELLED)
+    cancelled = orders.filter(status=Status.QUEUED).update(
+        status=Status.CANCELLED, updated_at=timezone.now()
+    )
     if orders.filter(status__in=IN_FLIGHT).exists():
         order.cancellation_notice_required = True
     return cancelled

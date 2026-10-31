@@ -209,6 +209,18 @@ class TestBuilder:
         assert PurchaseOrder.objects.count() == 1
         assert PurchaseAllocation.objects.get().qty == D(4)
 
+    def test_a_ticked_line_with_nothing_left_to_buy_is_reported_as_left_out(
+        self, manager: Client, make_line: MakeLine, org: Org
+    ) -> None:
+        line, stock = make_line("10"), make_line("10", sourcing="STOCK")
+        data = new_order_data(page(manager, "new", line=str(line.pk)), org, line)
+        data[f"pick_{stock.pk}"] = "on"
+        response = manager.post(reverse("purchasing:create"), data, follow=True)
+        assert "1 ticked line had nothing left to purchase and was left out." in messages_of(
+            response
+        )
+        assert PurchaseAllocation.objects.get().request_line == line
+
     def test_an_empty_draft_can_be_created(self, manager: Client, org: Org) -> None:
         html = page(manager, "new")
         response = manager.post(
@@ -312,6 +324,23 @@ class TestOrderList:
         assert "Partly received" in page(manager, "orders")
         received.receive(only_line(order), "6", {allocation(order, line): "6"})
         assert "Received" in page(manager, "orders")
+
+    def test_paging_keeps_the_all_statuses_choice(
+        self, manager: Client, buy: Buy, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("apps.purchasing.selectors.PAGE_SIZE", 1)
+        buy(issue=False)
+        buy(issue=False)
+        html = page(manager, "orders", status="")
+        assert "?page=2&amp;status=" in html or "?page=2&status=" in html
+
+    def test_only_issued_orders_show_receipt_progress(
+        self, manager: Client, buy: Buy, make_line: MakeLine
+    ) -> None:
+        buy(issue=False)
+        assert "Not received" not in page(manager, "orders", status="")
+        buy((make_line("10"), "10"))
+        assert "Not received" in page(manager, "orders", status="")
 
     def test_filters_by_supplier(self, manager: Client, buy: Buy, org: Org) -> None:
         buy(issue=False)

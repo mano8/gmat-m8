@@ -10,6 +10,7 @@ same page without prices (§8.2). Every action is its own POST-only URL (``actio
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 from django.contrib import messages
@@ -139,11 +140,20 @@ def order_list(request: HttpRequest) -> HttpResponse:
     context = {
         "filters": filters,
         "page_obj": page,
-        "entries": [(found, progress.get(found.pk)) for found in page.object_list],
+        "entries": [
+            (
+                found,
+                progress.get(found.pk)
+                if found.number and found.status != Status.CANCELLED
+                else None,
+            )
+            for found in page.object_list
+        ],
         "can_manage": selectors.can_manage(ctx),
-        "extra_query": _query(
-            status=request.GET.get("status", ""), supplier=request.GET.get("supplier", "")
-        ),
+        # An empty status is the "All" choice: the pager must keep it (a missing one means
+        # "pending").
+        "extra_query": _query(supplier=request.GET.get("supplier", ""))
+        + (f"&status={quote(request.GET['status'])}" if "status" in request.GET else ""),
     }
     return render(request, template, context)
 

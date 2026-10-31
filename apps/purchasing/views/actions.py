@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating
@@ -53,6 +54,8 @@ def order_create(request: HttpRequest) -> HttpResponse:
     posted = [key.removeprefix("pick_") for key in request.POST if key.startswith("pick_")]
     rows = selectors.to_purchase(ctx, line_ids=_uuids(posted)) if posted else []
     form = NewOrderForm(request.POST, ctx=ctx, rows=rows)
+    ticked = {line_id for line_id in _uuids(posted) if request.POST.get(f"pick_{line_id}")}
+    left_out = len(ticked - {row.line.pk for row in rows})
     if not form.is_valid():
         return new_order_page(request, form)
     try:
@@ -68,6 +71,16 @@ def order_create(request: HttpRequest) -> HttpResponse:
         return idempotency_failure(request, exc)
     except RetryExhausted:
         return conflict(request)
+    if left_out:
+        messages.warning(
+            request,
+            ngettext(
+                "%(count)s ticked line had nothing left to purchase and was left out.",
+                "%(count)s ticked lines had nothing left to purchase and were left out.",
+                left_out,
+            )
+            % {"count": left_out},
+        )
     items = form.items()
     if not items:
         messages.success(request, _("Draft order created."))
