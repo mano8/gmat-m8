@@ -213,3 +213,34 @@
     @apply bg-brand-soft text-brand;
   }
 }
+
+/* --- print: black on white, no chrome; the purchase-order page prints from its snapshots --- */
+@media print {
+  :root {
+    color-scheme: light;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-sunken: #ffffff;
+    --line: #999999;
+    --ink: #000000;
+    --ink-soft: #333333;
+    --brand: #000000;
+    --danger: #8a0000;
+  }
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .print-page {
+    max-width: none;
+    padding: 0;
+  }
+  tr,
+  article {
+    break-inside: avoid;
+  }
+}

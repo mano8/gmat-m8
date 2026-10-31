@@ -14,8 +14,10 @@ object position (``Route.position``).
 
 The account pages (allauth), the admin (purchase orders included, M5.1), the health checks,
 the token pages (invitations, email changes), the screens of M2.6 (projects, people,
-invitations), the master-data screens of M3 (catalog, suppliers) and the request screens
-of M4 have rows; later business screens add theirs with the steps that build them.
+invitations), the master-data screens of M3 (catalog, suppliers), the request screens of M4
+and the purchasing screens of M5.2 have rows; later business screens add theirs with the
+steps that build them. The price is allowed only to its ``price.view`` holders
+(``Route.allowed_for``), so a warehouse operator reading an order is checked priceless.
 """
 
 import re
@@ -397,6 +399,43 @@ def source_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
 
 def line_of(name: str, key: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.objects[key].pk])
+
+
+# Purchasing (M5.2): po.view (group administrators, material managers, warehouse operators)
+# reads the orders of its branches; po.manage (not warehouse operators) builds and changes
+# them. The orders of the fixture are A-MAD's: the material manager of A-SEV and the mixed
+# user (a manager at A-SEV only) hold the capability elsewhere and get 404.
+PO_VIEWERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "mixed")
+PO_MANAGERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
+PO_READERS = ("group_admin", "mm_mad", "wo_mad")
+PO_ACTORS = ("group_admin", "mm_mad")
+# Price (and the quantities of other projects) a purchase screen may show: the manager's.
+PRICE_VIEWERS = {name: frozenset({Sentinel.PRICE}) for name in PO_ACTORS}
+PO_SENTINELS = SUPPLIER_SENTINELS | {Sentinel.OTHER_PROJECT_QUANTITY}
+
+
+def order_page(
+    capable: tuple[str, ...], readers: tuple[str, ...], ok: Outcome = OK
+) -> dict[str, Expect]:
+    """A page of one order: 404 outside its scope, ``ok`` inside; others of ``capable`` only."""
+    outcomes = _each(NOT_FOUND, capable) | _each(ok, readers)
+    return app_page(**{name: outcomes[name] for name in capable})
+
+
+def order_read(ok: Outcome = OK) -> dict[str, Expect]:
+    return order_page(PO_VIEWERS, PO_READERS, ok)
+
+
+def order_manage(ok: Outcome = OK) -> dict[str, Expect]:
+    return order_page(PO_MANAGERS, PO_ACTORS, ok)
+
+
+def order_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
+    return project_action(PO_MANAGERS, PO_ACTORS, PO_ACTORS, ok)
+
+
+def purchase_url(name: str, key: str) -> Callable[[World], str]:
+    return _object_url(name, key)
 
 
 PROJECT_POSITIONS = (
@@ -827,6 +866,128 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         Route(
             app_action(**_each(REDIRECT, SUPPLIER_MANAGERS)),
             path=_supplier_url("suppliers:reactivate"),
+        ),
+    ),
+    # Purchasing (M5.2): the issued order is the sentinel one (priced, other project's
+    # quantity); the draft is a plain one. An empty POST changes nothing (invalid or refused).
+    "purchasing:worklist": (
+        Route(
+            app_page(**_each(OK, PO_MANAGERS)),
+            allowed=PO_SENTINELS,
+            note="the supplier filter lists suppliers; the SEV-2 line is bought by A-MAD",
+        ),
+    ),
+    "purchasing:orders": (Route(app_page(**_each(OK, PO_VIEWERS)), allowed=SUPPLIER_SENTINELS),),
+    "purchasing:new": (Route(app_page(**_each(OK, PO_MANAGERS)), allowed=SUPPLIER_SENTINELS),),
+    "purchasing:create": (
+        Route(
+            app_action(**_each(OK, PO_MANAGERS)),
+            allowed=SUPPLIER_SENTINELS,
+            note="an empty form: 200 with errors",
+        ),
+    ),
+    "purchasing:detail": (
+        Route(
+            order_read(),
+            position="issued",
+            path=purchase_url("purchasing:detail", "purchaseorder"),
+            allowed=PO_SENTINELS,
+            allowed_for=PRICE_VIEWERS,
+        ),
+        Route(
+            order_read(),
+            position="draft",
+            path=purchase_url("purchasing:detail", "draftorder"),
+            allowed=SUPPLIER_SENTINELS,
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, PO_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("purchasing:detail"),
+        ),
+    ),
+    "purchasing:print": (
+        Route(
+            order_read(),
+            position="issued",
+            path=purchase_url("purchasing:print", "purchaseorder"),
+            allowed=PO_SENTINELS,
+            allowed_for=PRICE_VIEWERS,
+        ),
+        Route(
+            order_read(REDIRECT),
+            position="draft",
+            path=purchase_url("purchasing:print", "draftorder"),
+            note="a draft is not printed",
+        ),
+    ),
+    "purchasing:amendment": (
+        Route(
+            order_manage(),
+            position="issued",
+            path=purchase_url("purchasing:amendment", "purchaseorder"),
+            allowed=PO_SENTINELS,
+            allowed_for=PRICE_VIEWERS,
+        ),
+        Route(
+            order_manage(REDIRECT),
+            position="draft",
+            path=purchase_url("purchasing:amendment", "draftorder"),
+            note="only an issued order is amended",
+        ),
+    ),
+    "purchasing:update": (
+        Route(order_action(), path=purchase_url("purchasing:update", "draftorder")),
+    ),
+    "purchasing:add_lines": (
+        Route(order_action(), path=purchase_url("purchasing:add_lines", "draftorder")),
+    ),
+    "purchasing:issue": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:issue", "draftorder"),
+            note="unconfirmed: nothing happens",
+        ),
+    ),
+    "purchasing:cancel": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:cancel", "draftorder"),
+            note="the first allowed actor discards the draft; the others are refused",
+        ),
+    ),
+    "purchasing:amend": (
+        Route(
+            order_action(OK),
+            path=purchase_url("purchasing:amend", "purchaseorder"),
+            allowed=PO_SENTINELS,
+            allowed_for=PRICE_VIEWERS,
+            note="an empty form: 200 with errors",
+        ),
+    ),
+    "purchasing:update_line": (
+        Route(order_action(), path=purchase_url("purchasing:update_line", "draftline")),
+    ),
+    "purchasing:remove_line": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:remove_line", "purchaseorderline"),
+            note="an issued line: refused, nothing is removed",
+        ),
+    ),
+    "purchasing:close_line": (
+        Route(order_action(), path=purchase_url("purchasing:close_line", "purchaseorderline")),
+    ),
+    "purchasing:increase_allocation": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:increase_allocation", "draftallocation"),
+        ),
+    ),
+    "purchasing:unallocate": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:unallocate", "draftallocation"),
         ),
     ),
     # Group administrators only (org.manage); the target is the A-MAD technician.

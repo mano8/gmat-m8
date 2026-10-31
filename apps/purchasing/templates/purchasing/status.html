@@ -1,0 +1,11 @@
+{% load i18n %}
+{% comment %}The status chip of a purchase order. Parameter: obj (the order).{% endcomment %}
+{% if obj.status == "ISSUED" %}
+  {% include "components/status_chip.html" with label=obj.get_status_display tone="ok" %}
+{% elif obj.status == "DRAFT" %}
+  {% include "components/status_chip.html" with label=obj.get_status_display tone="warn" %}
+{% elif obj.status == "CANCELLED" %}
+  {% include "components/status_chip.html" with label=obj.get_status_display tone="danger" %}
+{% else %}
+  {% include "components/status_chip.html" with label=obj.get_status_display %}
+{% endif %}

@@ -8,13 +8,17 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 
+from apps.access.context import AccessContext
 from apps.access.principals import SessionPrincipal
 from apps.audit.models import AuditEvent
+from apps.material_requests import selectors as request_selectors
 from apps.material_requests import services as requests
 from apps.material_requests.models import MaterialRequest
 from apps.purchasing import services
-from tests.support import error_codes
+from tests.org import Org, People, client_for
+from tests.support import error_codes, principal_for
 from tests.unit.purchasing.conftest import Buy, FakeReceipts, MakeLine, allocation, flows, only_line
 
 pytestmark = pytest.mark.django_db
@@ -68,3 +72,23 @@ def test_nothing_is_cancelled_or_moved_to_stock_while_on_order(
     services.cancel(mm, draft.pk)  # the reservation is gone: both are possible again
     requests.set_sourcing(mm, line.pk, sourcing="STOCK")
     assert requests.cancel(mm, line.request_id, reason="Not needed").status == "CANCELLED"
+
+
+def test_a_manual_close_warns_when_an_order_ships_to_the_requests_own_worksite(
+    org: Org, people: People, buy: Buy, make_line: MakeLine
+) -> None:
+    line = make_line("10")
+    manager = AccessContext.for_user(people.mm_mad)
+    request = MaterialRequest.objects.get(pk=line.request_id)
+    warehouse = buy((line, "4"))  # an order to the warehouse: no warning
+    assert not request_selectors.ships_to_own_worksite(manager, request)
+    services.cancel(principal_for(people.mm_mad), warehouse.pk, reason="Wrong destination")
+    draft = buy((line, "4"), issue=False, ship_to=org.worksite(org.hospital))
+    assert not request_selectors.ships_to_own_worksite(manager, request)  # not issued yet
+    services.issue(principal_for(people.mm_mad), draft.pk)
+    assert request_selectors.ships_to_own_worksite(manager, request)
+    assert not request_selectors.ships_to_own_worksite(
+        AccessContext.for_user(people.wo_mad), request
+    )
+    page = client_for(people.mm_mad).get(reverse("requests:examine", args=[request.pk]))
+    assert 'data-testid="worksite-warning"' in page.content.decode()

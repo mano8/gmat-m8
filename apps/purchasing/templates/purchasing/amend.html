@@ -1,0 +1,79 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Amend" %} {{ order.number }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% blocktranslate with number=order.number revision=order.revision %}Amend {{ number }} (revision {{ revision }}){% endblocktranslate %}</h1>
+    <p class="mt-1 text-soft">
+      {% translate "Only what you change is sent. The supplier, the buyer and the destination never change: cancel and create a new order instead." %}
+    </p>
+  </div>
+  <form method="post"
+        action="{% url 'purchasing:amend' po_id=order.pk %}"
+        data-testid="amend-form">
+    {% csrf_token %}
+    {{ form.idempotency_key }}
+    {% if form.non_field_errors %}<div role="alert" class="errorlist">{{ form.non_field_errors }}</div>{% endif %}
+    <section class="card mb-4" aria-label="{% translate 'Order' %}">
+      {{ form.reason.as_field_group }}
+      {{ form.expected_date.as_field_group }}
+      {{ form.supplier_ref.as_field_group }}
+      {{ form.notes.as_field_group }}
+    </section>
+    <section class="mb-4" aria-label="{% translate 'Lines' %}">
+      <h2 class="mb-2">{% translate "Lines" %}</h2>
+      {% for block in blocks %}
+        {% with line=block.entry.line %}
+          <article class="card mb-3" data-line="{{ line.line_no }}">
+            <p class="font-semibold">{{ line.line_no }}. {{ line.material.reference }} · {{ line.material.name }}</p>
+            {{ block.entry.qty.as_field_group }}
+            {% if block.entry.unit_price %}
+              {{ block.entry.unit_price.as_field_group }}
+              {{ block.entry.discount_pct.as_field_group }}
+            {% endif %}
+            {% for row, entry in block.allocations %}
+              <div class="border-t border-line pt-2">
+                <p class="text-sm text-soft">
+                  {{ row.request_number }} · {{ row.project_code }} · {% translate "received" %} {{ row.attributed|quantity }}
+                </p>
+                {{ entry.qty.as_field_group }}
+              </div>
+            {% endfor %}
+          </article>
+        {% endwith %}
+      {% endfor %}
+    </section>
+    {% if entries %}
+      <section class="mb-4" aria-label="{% translate 'Add request lines' %}">
+        <h2 class="mb-2">{% translate "Add request lines" %}</h2>
+        {% for entry in entries %}
+          {% with line=entry.row.line %}
+            <div class="card mb-3">
+              <div class="flex items-start gap-3">
+                <span class="field mb-0 mt-1">{{ entry.pick }}</span>
+                <div class="flex-1">
+                  <p class="font-medium">{{ line.description }}</p>
+                  <p class="text-sm text-soft">
+                    {{ line.request.number }} · {{ line.project.code }} · {% translate "To purchase" %}
+                    {{ entry.row.to_purchase|quantity }} {{ line.unit.code }}
+                  </p>
+                  <div class="field mb-0 mt-2 max-w-40">
+                    <label for="{{ entry.qty.id_for_label }}">{% translate "Quantity" %}</label>
+                    {{ entry.qty }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endwith %}
+        {% endfor %}
+      </section>
+    {% endif %}
+    <div class="flex flex-wrap gap-3">
+      {% include "components/button.html" with type="submit" label=_("Save the amendment") variant="primary" %}
+      {% url 'purchasing:detail' po_id=order.pk as back_url %}
+      {% include "components/button.html" with href=back_url label=_("Back to the order") %}
+    </div>
+  </form>
+{% endblock content %}

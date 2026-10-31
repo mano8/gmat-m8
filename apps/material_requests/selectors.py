@@ -259,6 +259,22 @@ def can_source(ctx: AccessContext, of: MaterialRequest) -> bool:
     return ctx.can(SOURCE, of)
 
 
+def ships_to_own_worksite(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """Whether a live allocation of the request is on an issued order shipping to the
+    request's own worksite: after a manual close, goods may still arrive there (plan §4.9;
+    they are recorded as site surplus)."""
+    return (
+        MaterialRequestLine.objects.visible_to(ctx, SOURCE)
+        .filter(
+            request=of,
+            allocations__qty__gt=0,
+            allocations__po_line__po__status="ISSUED",
+            allocations__po_line__po__ship_to__project_id=of.project_id,
+        )
+        .exists()
+    )
+
+
 def can_cancel_any(ctx: AccessContext, of: MaterialRequest) -> bool:
     """Cancelling somebody else's request: only before anything is allocated or delivered."""
     return (
