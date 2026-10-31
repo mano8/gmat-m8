@@ -1,0 +1,40 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "New request" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-1">{% translate "New request" %}</h1>
+  <p class="mb-4 text-soft">{% translate "Which project is the material for?" %}</p>
+  {% url 'requests:new' as new_url %}
+  {% include "components/filter_form.html" with form=filters target="#project-results" action=new_url grid="sm:grid-cols-[1fr_auto]" %}
+  {% partialdef results inline %}
+    <div id="project-results">
+      {% if entries %}
+        <ul class="grid gap-2">
+          {% for project, start in entries %}
+            <li>
+              <form method="post" action="{% url 'requests:start' %}">
+                {% csrf_token %}
+                {{ start.project }}{{ start.idempotency_key }}
+                <button type="submit"
+                        class="btn btn-block justify-start py-3 text-left"
+                        data-project="{{ project.code }}">
+                  <span class="flex flex-col">
+                    <span class="font-semibold">{{ project.code }} · {{ project.name }}</span>
+                    <span class="text-sm font-normal text-soft">
+                      {% if project.client_name %}{{ project.client_name }} · {% endif %}{{ project.branch.company.code }}-{{ project.branch.code }}
+                    </span>
+                  </span>
+                </button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No projects") text=_("No active project is open for your requests.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

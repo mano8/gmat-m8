@@ -139,14 +139,19 @@ def materials(
     return _text_filter(rows, ctx, q).order_by("reference")
 
 
-def search(ctx: AccessContext, query: str, *, limit: int = SEARCH_LIMIT) -> list[Material]:
-    """The best ``limit`` active materials for ``query`` (the picker of request lines).
+def search(
+    ctx: AccessContext, query: str, *, limit: int = SEARCH_LIMIT, unit_id: UUID | None = None
+) -> list[Material]:
+    """The best ``limit`` active materials for ``query`` (the picker of request lines),
+    optionally only those measured in ``unit_id`` (filtered before the limit).
 
     Never returns a price. A query of nothing but spaces finds nothing.
     """
     if not _terms(query):
         return []
     rows: QuerySet[Material] = Material.objects.visible_to(ctx, VIEW).filter(is_active=True)
+    if unit_id is not None:
+        rows = rows.filter(unit_id=unit_id)
     rows = _text_filter(rows, ctx, query).select_related("unit", "category__parent")
     return list(_relevance(rows, query)[:limit])
 

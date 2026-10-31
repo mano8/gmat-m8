@@ -9,6 +9,22 @@
   {% include "components/icon.html" with name="home" %}
   <span>{% translate "Home" %}</span>
 </a>
+{% can "request.view" %}
+  <a href="{% url 'requests:list' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'requests' and request.resolver_match.url_name != 'inbox' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="clipboard" %}
+    <span>{% translate "Requests" %}</span>
+  </a>
+{% endcan %}
+{% can "request.review" %}
+  <a href="{% url 'requests:inbox' %}"
+     class="nav-link"
+     {% if request.resolver_match.url_name == 'inbox' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="check" %}
+    <span>{% translate "Inbox" %}</span>
+  </a>
+{% endcan %}
 {% can "project.view" %}
   <a href="{% url 'projects:list' %}"
      class="nav-link"

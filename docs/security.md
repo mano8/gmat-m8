@@ -122,6 +122,44 @@ Code in `apps/catalog/`, `apps/suppliers/`, `apps/core/{tabular,imports,demo}.py
 - **Imports** (`manage import_catalog | import_suppliers | import_projects`) are `OperatorCommand`s: `--operator` names an active user who holds the matching capability, no session or MFA exists and the audit shows `via=cli:<command>`. Rows reach the database only through the services, each authorizing the operator again for its own objects, so a material manager cannot import projects outside their branches. The file is read as text (CSV; XLSX in read-only mode with formulas as saved values and `defusedxml` guarding the XML), limited to 20 MB and 100,000 rows. A file with any error writes nothing; an error found while writing rolls the file back, and the report lists errors by line. The report never prints cell values beyond the offending one.
 - **`seed_demo`** refuses to run unless `DJANGO_SETTINGS_MODULE` is `config.settings.dev` or `config.settings.test` (an unset or any other value is refused before the database is touched). Demo users get `--password` (validated) or a random one printed once; they are ordinary accounts, so privileged roles still enroll MFA at sign-in.
 
+## Material requests: the requester's side (step M4.1)
+
+Code in `apps/material_requests/`; plan §3.4, §3.5 (S5), §4.3, §4.4, §4.6 (C3, C9), §4.7, §4.8.
+
+- **Scope (S5).** A request is a document of its procurement branch (set from the project when the draft starts, taken again at submit): group administrators see all, material managers and warehouse operators the requests their branches buy for, site managers those of their assigned projects. Own-reach grants (technicians, partners, and everyone's `request.create`) reach only the user's own requests, on any project of their branches (S3) or assigned projects; the project's active-only filter does not apply, so an own request stays visible when its project goes on hold. Lines are scoped through their request.
+- **Writes** go through `apps/material_requests/services/`: `authorize_in_txn` in full on the request (404 outside `request.view`, 403 without the operation's capability) and on the project for anything that starts or submits a request; the header locked `FOR UPDATE` and re-read (a change since the authorization retries the transaction); a line locked after its header; the number last. Only the requester edits, submits, withdraws or discards their own request; `request.cancel_any` cancels anyone's in scope. Editing follows the state (§4.4): material, unit and quantity only in `DRAFT`. Every write is audited and published as an event.
+- **Integrity in the database**: CHECK constraints on quantities, decisions and closures; the C9 key binds a line to its material's unit, so a unit change racing the first reference ends with exactly one committed (threaded test), and the line is refused rather than converted; the C3 key ties a line's project to its request's.
+- **Idempotency**: create forms and submit take a signed key (plan §4.8); a double submit yields one request number.
+
+## Material requests: review and sourcing (step M4.2)
+
+Code in `apps/material_requests/services/` and `ledger.py`; plan §3.4, §4.3–4.5, §4.9.
+
+- **Capabilities.** `request.review` (group administrators, the procurement branch's material managers, the project's assigned site managers) decides lines, returns a request for changes and reduces approved quantities; `request.source` (group administrators and material managers in scope) sets sourcing, resolves non-catalog lines, changes priority and needed-by, closes and reopens. Each service authorizes in full inside its transaction (404 outside `request.view`, 403 without the capability, session MFA for privileged grants); a material manager of another branch, or a user holding the capability through another membership, is refused (S5, S6).
+- **Self-approval.** Nobody approves or rejects lines of their own request unless the request's procurement branch sets `allow_self_approval` (403 otherwise); the project's branch setting does not count. Every request is reviewed; a submit never approves anything (Q4).
+- **Editing by state** (§4.4): decisions only while `SUBMITTED`, and a reviewer changes only their own; sourcing, schedule and closures only while `APPROVED`; reopen only from `CLOSED`. Approved quantities only go down, never on a closed-short line and never below what is delivered, received or on order, so R ≤ A and D ≤ A hold whatever the sequence (property test). Every change is audited with its reason or note; return to draft keeps the earlier decisions in the audit only.
+- **Locks.** The header (L2) before its lines (L3); operations that change ledger inputs lock every line of the request. Concurrent decisions finalise a request exactly once, and a withdrawal racing a decision ends with one of them refused (threaded tests).
+
+## Material requests: the requester's screens (step M4.3)
+
+Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templates/material_requests/`; plan §3.4–3.6, §5 (Web), §11 M4.3.
+
+- **Same checks as every screen.** Reads go through `selectors` (`visible_to`), writes through the M4.1 services from POST-only views (`@mutating`) on their own URLs; the order is S7: the capability somewhere (403), the request or line in scope (404), the capability on it (403 for a reviewer who sees a draft that is not theirs). Every URL and method has rows in the acceptance matrix, including the partner's and the technician's own request, an unknown id and the revoked and expired actors. `{% can %}` only hides buttons.
+- **Choices are never trusted.** The project of a new request, the material and the unit are hidden or select fields checked against selector querysets (`creatable_projects`: active projects in the user's `request.create` scope; active catalog materials; units): a forged id is a form error, not an object.
+- **Double taps.** Starting a request (one signed key per project button), submitting and adding a material outside the catalog carry the server-issued idempotency key; the review step's details are saved inside the submit transaction, and a replay with other details is a 409. The fragment returned after each change of a draft carries a fresh key.
+- **No leaks.** Requests hold no prices and the screens show no supplier; a partner's pages are checked for every sentinel. "My requests" lists only the user's own requests.
+- **Browser.** No inline script or style; htmx attributes only (`hx-post`, `hx-get`, `hx-trigger`), the CSRF token in the body's `hx-headers` and in each form; responses are `no-store, private`; the pages still work without JavaScript (forms post and redirect).
+
+## Material requests: the reviewer's screens (step M4.4)
+
+Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templates/material_requests/`; plan §3.4, §4.3, §4.4, §4.9, §11 M4.4.
+
+- **Capabilities per screen.** The inbox and the review page need `request.review` (group administrators, material managers, and site managers on their assigned projects); the sourcing, schedule, closing, resolution and link actions `request.source` (not site managers); cancelling another user's request `request.cancel_any`. Each action is its own POST-only URL (`@mutating`), checked in S7 order (capability somewhere 403, request in scope 404, capability on it 403) and then again by the service in its transaction; the buttons shown (`can_decide`, `can_source`, `can_cancel_any`) only hide.
+- **Self-approval.** A reviewer's own request shows no decision controls where the procurement branch does not allow it; the service refuses it (403) all the same.
+- **Scope.** The inbox lists through `visible_to(ctx, REQUEST_REVIEW)`; a request of another branch is not listed and its page is 404. The project filter offers only projects in the user's `project.view` scope, and a forged project or material id is a form error. The link dialog searches the catalog (no prices) and offers only materials in the line's unit.
+- **History.** The timeline reads the request's `AuditEvent` rows only for who reviews, sources or holds `audit.view` on the request, and shows the action, actor, time, line and the reason or note: never the raw payload. Requesters see no audit trail.
+- **Errors.** Service validation errors are flashed (text from the service), a busy database answers 409, and nothing is written by a GET. Same browser rules as before: no inline script or style, CSRF in each form, `no-store, private`; the pages work without JavaScript.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

@@ -13,9 +13,9 @@ sentinel is checked absent from every response. A URL with an object adds one ro
 object position (``Route.position``).
 
 The account pages (allauth), the admin, the health checks, the token pages (invitations,
-email changes), the screens of M2.6 (projects, people, invitations) and the master-data
-screens of M3 (catalog, suppliers) have rows; later business screens add theirs with the
-steps that build them.
+email changes), the screens of M2.6 (projects, people, invitations), the master-data
+screens of M3 (catalog, suppliers) and the requester's screens of M4.3 have rows; later
+business screens add theirs with the steps that build them.
 """
 
 import re
@@ -107,7 +107,7 @@ def admin_page(
 # --- admin objects -----------------------------------------------------------------------
 
 ADMIN_MODEL_URL = re.compile(
-    r"^admin:(?P<app>[a-z]+)_(?P<model>[a-z]+)_(?P<view>changelist|add|history|delete|change)$"
+    r"^admin:(?P<app>[a-z_]+?)_(?P<model>[a-z]+)_(?P<view>changelist|add|history|delete|change)$"
 )
 
 
@@ -158,6 +158,7 @@ READ_ONLY_MODELS = {
     "organizations": ("membership",),
     "projects": ("project", "projectassignment"),
     "catalog": ("unitofmeasure",),
+    "material_requests": ("materialrequest", "materialrequestline"),
 }
 MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),
@@ -324,6 +325,73 @@ def _unknown_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[UNKNOWN_ID])
 
 
+# Requests (M4.3): request.view reaches the lines of the procurement branch (S5) or of the
+# assigned projects; request.create and request.withdraw only the user's own requests.
+REQUEST_VIEWERS = PROJECT_VIEWERS
+REQUEST_CREATORS = tuple(name for name in PROJECT_VIEWERS if name != "wo_mad")
+# Who sees the technician's request (A-MAD buys for the hospital), and the partner's.
+TECH_REQUEST_VIEWERS = ("group_admin", "mm_mad", "wo_mad", "site_manager", "tech_mad")
+PARTNER_REQUEST_VIEWERS = ("group_admin", "mm_mad", "wo_mad", "site_manager", "partner")
+
+
+def _line_url(name: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[world.objects["materialrequestline"].pk])
+
+
+def request_read(visible: tuple[str, ...]) -> dict[str, Expect]:
+    """A request page: ``visible`` read it, other request viewers get 404."""
+    return project_page(REQUEST_VIEWERS, visible, visible)
+
+
+def request_own_page(visible: tuple[str, ...], owner: str) -> dict[str, Expect]:
+    """A requester's page: 404 outside the scope, 403 for who sees but is not the owner."""
+    return project_page(REQUEST_CREATORS, visible, (owner,))
+
+
+def request_own_action(visible: tuple[str, ...], owner: str, ok: Outcome) -> dict[str, Expect]:
+    return project_action(REQUEST_CREATORS, visible, (owner,), ok)
+
+
+def removed_by_the_technician(row: dict[str, Expect]) -> dict[str, Expect]:
+    """The actors after the technician (``ACTORS`` order) find the removed line gone."""
+    return {**row, "POST": {**row["POST"], "site_manager": NOT_FOUND}}
+
+
+def request_url(name: str, key: str) -> Callable[[World], str]:
+    return _object_url(name, key)
+
+
+# The reviewer's screens (M4.4). request.review is held somewhere by group administrators,
+# material managers and site managers; request.source (and cancel_any) not by site managers.
+# On the technician's request at the hospital (bought for by A-MAD) the readers are those
+# whose scope or assignment reaches it; the material manager of A-SEV holds the capability
+# elsewhere and gets 404, a warehouse operator or the technician none (403).
+REVIEWERS = ("group_admin", "mm_mad", "mm_sev", "site_manager", "mixed")
+SOURCERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
+REVIEW_READERS = ("group_admin", "mm_mad", "site_manager")
+SOURCE_READERS = ("group_admin", "mm_mad")
+
+
+def review_page() -> dict[str, Expect]:
+    return project_page(REVIEWERS, REVIEW_READERS, REVIEW_READERS)
+
+
+def review_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
+    return project_action(REVIEWERS, REVIEW_READERS, REVIEW_READERS, ok)
+
+
+def source_page() -> dict[str, Expect]:
+    return project_page(SOURCERS, SOURCE_READERS, SOURCE_READERS)
+
+
+def source_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
+    return project_action(SOURCERS, SOURCE_READERS, SOURCE_READERS, ok)
+
+
+def line_of(name: str, key: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[world.objects[key].pk])
+
+
 PROJECT_POSITIONS = (
     ("own scope", "hospital", HOSPITAL_VIEWERS),
     ("foreign scope", "sev_works", SEV_VIEWERS),
@@ -462,6 +530,242 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # Suppliers (M3.2): supplier.view (group administrators, material managers, warehouse
     # operators) reads every supplier; supplier.manage (not warehouse operators) changes them.
     # Site managers, technicians and partners get nothing: no supplier name, email or phone.
+    # Requests (M4.3): the requester's screens. Out of scope 404, in scope but not the
+    # requester's 403; a request is never shown to a role that does not reach it.
+    "requests:list": (Route(app_page(**_each(OK, REQUEST_VIEWERS))),),
+    "requests:new": (Route(app_page(**_each(OK, REQUEST_CREATORS))),),
+    "requests:start": (
+        Route(
+            app_action(**_each(REDIRECT, REQUEST_CREATORS)),
+            note="an empty form: back to the project list",
+        ),
+    ),
+    "requests:detail": (
+        Route(
+            request_read(TECH_REQUEST_VIEWERS),
+            position="the technician's draft",
+            path=request_url("requests:detail", "materialrequest"),
+        ),
+        Route(
+            request_read(PARTNER_REQUEST_VIEWERS),
+            position="the partner's draft",
+            path=request_url("requests:detail", "partner_request"),
+        ),
+        Route(
+            request_read(()),
+            position="unknown",
+            path=_unknown_url("requests:detail"),
+        ),
+    ),
+    "requests:materials": (
+        Route(
+            request_own_page(TECH_REQUEST_VIEWERS, "tech_mad"),
+            position="own draft",
+            path=request_url("requests:materials", "materialrequest"),
+        ),
+        Route(
+            request_own_page(PARTNER_REQUEST_VIEWERS, "partner"),
+            position="the partner's draft",
+            path=request_url("requests:materials", "partner_request"),
+        ),
+    ),
+    "requests:review": (
+        Route(
+            request_own_page(TECH_REQUEST_VIEWERS, "tech_mad"),
+            position="own draft",
+            path=request_url("requests:review", "materialrequest"),
+        ),
+        Route(
+            request_own_page(PARTNER_REQUEST_VIEWERS, "partner"),
+            position="the partner's draft",
+            path=request_url("requests:review", "partner_request"),
+        ),
+    ),
+    "requests:add_line": (
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", REDIRECT),
+            position="own draft",
+            path=request_url("requests:add_line", "materialrequest"),
+            note="an empty form: back to the request",
+        ),
+    ),
+    "requests:add_free_line": (
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", REDIRECT),
+            position="own draft",
+            path=request_url("requests:add_free_line", "materialrequest"),
+            note="an empty form: back to the request",
+        ),
+    ),
+    "requests:submit": (
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", OK),
+            position="own draft",
+            path=request_url("requests:submit", "materialrequest"),
+            note="an empty form: 200 with errors",
+        ),
+    ),
+    "requests:cancel": (
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", REDIRECT),
+            position="own draft",
+            path=request_url("requests:cancel", "materialrequest"),
+        ),
+        Route(
+            request_own_action(PARTNER_REQUEST_VIEWERS, "partner", REDIRECT),
+            position="the partner's draft",
+            path=request_url("requests:cancel", "partner_request"),
+        ),
+    ),
+    # The reviewer (M4.4): inbox and review page, then one POST per action. An empty form is
+    # invalid and changes nothing (back to the page), except approve-all and cancel, which
+    # take no input and have a request of their own.
+    "requests:inbox": (Route(app_page(**_each(OK, REVIEWERS))),),
+    "requests:examine": (
+        Route(
+            review_page(),
+            position="the technician's submitted request",
+            path=request_url("requests:examine", "review_request"),
+        ),
+        Route(
+            review_page(),
+            position="an approved request",
+            path=request_url("requests:examine", "approved_request"),
+        ),
+        Route(
+            project_page(REVIEWERS, (), ()),
+            position="unknown",
+            path=_unknown_url("requests:examine"),
+        ),
+    ),
+    "requests:approve_all": (
+        Route(
+            review_action(),
+            position="a submitted request",
+            path=request_url("requests:approve_all", "approve_request"),
+            note="the first reviewer approves it, the others find it decided",
+        ),
+    ),
+    "requests:return_to_draft": (
+        Route(
+            review_action(),
+            position="a submitted request",
+            path=request_url("requests:return_to_draft", "review_request"),
+            note="an empty note: back to the page",
+        ),
+    ),
+    "requests:decide_line": (
+        Route(
+            review_action(),
+            position="a line of a submitted request",
+            path=line_of("requests:decide_line", "review_request_line"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:reduce_line": (
+        Route(
+            review_action(),
+            position="a line of an approved request",
+            path=line_of("requests:reduce_line", "approved_request_line"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:set_sourcing": (
+        Route(
+            source_action(),
+            position="a line of an approved request",
+            path=line_of("requests:set_sourcing", "approved_request_line"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:link": (
+        Route(
+            source_page(),
+            position="a non-catalog line",
+            path=line_of("requests:link", "free_line"),
+        ),
+    ),
+    "requests:resolve_line": (
+        Route(
+            source_action(),
+            position="a non-catalog line",
+            path=line_of("requests:resolve_line", "free_line"),
+            note="an empty form: back to the dialog",
+        ),
+    ),
+    "requests:close_line": (
+        Route(
+            source_action(),
+            position="a line of an approved request",
+            path=line_of("requests:close_line", "approved_request_line"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:reopen_line": (
+        Route(
+            source_action(),
+            position="a line of an approved request",
+            path=line_of("requests:reopen_line", "approved_request_line"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:schedule": (
+        Route(
+            source_action(),
+            position="an approved request",
+            path=request_url("requests:schedule", "approved_request"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:close": (
+        Route(
+            source_action(),
+            position="an approved request",
+            path=request_url("requests:close", "approved_request"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:reopen": (
+        Route(
+            source_action(),
+            position="an approved request",
+            path=request_url("requests:reopen", "approved_request"),
+            note="no reason: back to the page",
+        ),
+    ),
+    "requests:cancel_any": (
+        Route(
+            source_action(),
+            position="a submitted request",
+            path=request_url("requests:cancel_any", "cancel_request"),
+            note="the first reviewer cancels it, the others find it cancelled",
+        ),
+    ),
+    "requests:withdraw": (
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", REDIRECT),
+            position="own submitted request",
+            path=request_url("requests:withdraw", "submitted_request"),
+        ),
+    ),
+    "requests:update_line": (
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", REDIRECT),
+            position="a line of the own draft",
+            path=_line_url("requests:update_line"),
+            note="an empty form: back to the request",
+        ),
+    ),
+    "requests:remove_line": (
+        Route(
+            removed_by_the_technician(
+                request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", REDIRECT)
+            ),
+            position="a line of the own draft",
+            path=_line_url("requests:remove_line"),
+            note="the site manager comes after the technician, who removes the line",
+        ),
+    ),
     "suppliers:list": (Route(app_page(**_each(OK, SUPPLIER_VIEWERS)), allowed=SUPPLIER_SENTINELS),),
     "suppliers:detail": (
         Route(

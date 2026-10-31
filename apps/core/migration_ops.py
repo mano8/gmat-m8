@@ -6,9 +6,11 @@ key field, so they are added with ``RunSQL``. The parent needs ``UNIQUE (id, <co
 first: declare it as a ``UniqueConstraint`` on the parent model, or add it here with
 ``AddCompositeUnique``. Both operations are reversible.
 
-The constraints are ``NOT DEFERRABLE`` and ``ON UPDATE NO ACTION``: changing a referenced
-parent key fails at once, and a concurrent first reference is serialized by the
-``FOR KEY SHARE`` lock that the foreign-key check takes (C9).
+The constraints are ``NOT DEFERRABLE`` and, by default, ``ON UPDATE NO ACTION``: changing a
+referenced parent key fails at once, and a concurrent first reference is serialized by the
+``FOR KEY SHARE`` lock that the foreign-key check takes (C9). ``on_update="CASCADE"`` is for
+a denormalized parent key that children follow (a draft request's lines follow a change of
+its project).
 
 Usage in a migration::
 
@@ -30,6 +32,7 @@ from django.db import migrations
 
 IDENTIFIER = re.compile(r"[a-z_][a-z0-9_]{0,62}")
 ON_DELETE = frozenset({"NO ACTION", "RESTRICT", "CASCADE"})
+ON_UPDATE = frozenset({"NO ACTION", "CASCADE"})
 
 
 def _quote(identifier: str) -> str:
@@ -62,6 +65,7 @@ def AddCompositeForeignKey(
     ref_table: str,
     ref_columns: Sequence[str],
     on_delete: str = "NO ACTION",
+    on_update: str = "NO ACTION",
     index: bool = True,
 ) -> migrations.RunSQL:
     """``FOREIGN KEY (columns) REFERENCES ref_table (ref_columns)`` plus an index on the child.
@@ -73,11 +77,13 @@ def AddCompositeForeignKey(
         raise ValueError("columns and ref_columns must have the same length")
     if on_delete not in ON_DELETE:
         raise ValueError(f"on_delete must be one of {sorted(ON_DELETE)}")
+    if on_update not in ON_UPDATE:
+        raise ValueError(f"on_update must be one of {sorted(ON_UPDATE)}")
     child = _column_list(columns)
     forward = [
         f"ALTER TABLE {_quote(table)} ADD CONSTRAINT {_quote(name)}"
         f" FOREIGN KEY ({child}) REFERENCES {_quote(ref_table)} ({_column_list(ref_columns)})"
-        f" ON UPDATE NO ACTION ON DELETE {on_delete} NOT DEFERRABLE;"
+        f" ON UPDATE {on_update} ON DELETE {on_delete} NOT DEFERRABLE;"
     ]
     reverse = [f"ALTER TABLE {_quote(table)} DROP CONSTRAINT {_quote(name)};"]
     if index:

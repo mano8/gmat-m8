@@ -63,6 +63,24 @@ def test_a_referenced_parent_key_cannot_change(tables: None) -> None:
     run("UPDATE mo_parent SET unit = 'L' WHERE id = 1")  # unreferenced: allowed
 
 
+def test_on_update_cascade_carries_the_parent_key_to_the_children(tables: None) -> None:
+    run(UNIQUE.sql)
+    cascade = AddCompositeForeignKey(
+        name="mo_child_parent_unit_fk",
+        table="mo_child",
+        columns=("parent_id", "unit"),
+        ref_table="mo_parent",
+        ref_columns=("id", "unit"),
+        on_update="CASCADE",
+    )
+    run(cascade.sql)
+    run("INSERT INTO mo_child VALUES (15, 2, 'KG')")
+    run("UPDATE mo_parent SET unit = 'L' WHERE id = 2")
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT unit FROM mo_child WHERE id = 15")
+        assert cursor.fetchone() == ("L",)
+
+
 def test_the_constraint_is_immediate(tables: None) -> None:
     run(UNIQUE.sql)
     run(FK.sql)
@@ -107,6 +125,7 @@ def test_index_is_optional() -> None:
         {"columns": ("a", "b"), "ref_columns": ("c", "d", "e")},
         {"columns": ("a", "b; DROP TABLE x"), "ref_columns": ("c", "d")},
         {"columns": ("a", "b"), "ref_columns": ("c", "d"), "on_delete": "SET NULL"},
+        {"columns": ("a", "b"), "ref_columns": ("c", "d"), "on_update": "SET NULL"},
     ],
 )
 def test_invalid_definitions_are_refused(kwargs: dict[str, Any]) -> None:

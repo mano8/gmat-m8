@@ -1,0 +1,92 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %}</h1>
+    {% include "material_requests/status.html" with obj=request_obj %}
+  </div>
+  <section class="card mb-4" aria-label="{% translate 'Request details' %}">
+    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+      <div>
+        <dt class="text-sm text-soft">{% translate "Project" %}</dt>
+        <dd>
+          {{ request_obj.project.code }} · {{ request_obj.project.name }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Priority" %}</dt>
+        <dd>
+          {{ request_obj.get_priority_display }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Needed by" %}</dt>
+        <dd>
+          {{ request_obj.needed_by|date:"SHORT_DATE_FORMAT"|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Requested by" %}</dt>
+        <dd>
+          {{ request_obj.requested_by.full_name|default:request_obj.requested_by.email }}
+        </dd>
+      </div>
+      {% if request_obj.notes %}
+        <div class="sm:col-span-2">
+          <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
+          <dd class="whitespace-pre-line">
+            {{ request_obj.notes }}
+          </dd>
+        </div>
+      {% endif %}
+    </dl>
+  </section>
+  {% if editable %}
+    <section class="card mb-4" aria-label="{% translate 'Add materials' %}">
+      <h2 class="card-title">{% translate "Add materials" %}</h2>
+      <form method="get"
+            action="{% url 'requests:materials' request_id=request_obj.pk %}"
+            role="search"
+            class="mb-3"
+            hx-get="{% url 'requests:materials' request_id=request_obj.pk %}"
+            hx-target="#material-picker"
+            hx-swap="outerHTML"
+            hx-trigger="input changed delay:250ms, search, submit">
+        {{ search.q.as_field_group }}
+      </form>
+      {% include "material_requests/material_picker.html" %}
+    </section>
+    {% include "material_requests/draft_lines.html" %}
+    <form method="post"
+          action="{% url 'requests:cancel' request_id=request_obj.pk %}"
+          class="mt-4">
+      {% csrf_token %}
+      {% include "components/button.html" with label=_("Discard draft") type="submit" variant="danger" block=True %}
+    </form>
+  {% else %}
+    <section class="mb-4">
+      <h2 class="mb-2">{% translate "Lines" %}</h2>
+      {% include "material_requests/lines_table.html" %}
+    </section>
+    {% if withdrawable %}
+      <form method="post"
+            action="{% url 'requests:withdraw' request_id=request_obj.pk %}">
+        {% csrf_token %}
+        <p class="mb-2 text-sm text-soft">{% translate "Withdraw the request to change it. You can send it again afterwards." %}</p>
+        {% include "components/button.html" with label=_("Withdraw") type="submit" block=True %}
+      </form>
+    {% endif %}
+    {% if reviewable %}
+      <p class="mb-4">
+        <a class="btn btn-primary btn-block"
+           href="{% url 'requests:examine' request_id=request_obj.pk %}"
+           data-testid="open-review">{% translate "Review and follow up" %}</a>
+      </p>
+    {% endif %}
+    {% url 'requests:list' as list_url %}
+    <p class="mt-4">{% include "components/button.html" with href=list_url label=_("My requests") variant="link" %}</p>
+  {% endif %}
+{% endblock content %}

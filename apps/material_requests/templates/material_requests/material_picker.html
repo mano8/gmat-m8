@@ -1,0 +1,43 @@
+{% load i18n %}
+{% comment %}
+  The picker's results: the best matches for a query, or the recent materials when there is
+  none. Each one adds a line (or one more to its line) with a single tap. Parameters:
+  request_obj, materials, query. Never shows prices (the catalog has none).
+{% endcomment %}
+<div id="material-picker">
+  {% if not query and materials %}
+    <h3 class="mb-2 text-sm font-semibold text-soft">{% translate "Recent materials" %}</h3>
+  {% endif %}
+  <ul class="grid gap-2">
+    {% for material in materials %}
+      <li>
+        <form method="post"
+              action="{% url 'requests:add_line' request_id=request_obj.pk %}"
+              hx-post="{% url 'requests:add_line' request_id=request_obj.pk %}"
+              hx-target="#draft-lines"
+              hx-swap="outerHTML">
+          {% csrf_token %}
+          <input type="hidden" name="material" value="{{ material.pk }}">
+          <button type="submit"
+                  class="btn btn-block justify-between py-3 text-left"
+                  data-material="{{ material.reference }}">
+            <span class="flex min-w-0 flex-col">
+              <span class="truncate font-semibold">{{ material.name }}</span>
+              <span class="text-sm font-normal text-soft">{{ material.reference }} · {{ material.unit.code }}</span>
+            </span>
+            <span class="shrink-0 text-brand" aria-hidden="true">+</span>
+            <span class="sr-only">{% translate "Add" %}</span>
+          </button>
+        </form>
+      </li>
+    {% empty %}
+      <li class="py-2 text-soft">
+        {% if query %}
+          {% translate "No material matches." %}
+        {% else %}
+          {% translate "Search the catalog to add materials." %}
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>

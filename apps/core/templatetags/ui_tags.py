@@ -1,9 +1,11 @@
 """Template helpers of the UI shell."""
 
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
 from django import template
+from django.utils.formats import number_format
 
 register = template.Library()
 
@@ -15,3 +17,13 @@ def at(items: Sequence[Any], index: int) -> Any:
         return items[index]
     except IndexError, TypeError:
         return ""
+
+
+@register.filter
+def quantity(value: Decimal | None) -> str:
+    """``10.000`` → ``10``, ``2.500`` → ``2,5`` (in Spanish): a quantity without trailing zeros."""
+    if value is None:
+        return ""
+    trimmed = value.normalize()
+    places = len(format(trimmed, "f").partition(".")[2])
+    return number_format(trimmed, decimal_pos=places)

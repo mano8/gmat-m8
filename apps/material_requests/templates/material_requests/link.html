@@ -1,0 +1,42 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Link to the catalog" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-1">{% translate "Link to the catalog" %}</h1>
+  <p class="mb-4 text-soft" data-testid="link-line">
+    {{ request_obj.number }} · {{ line.description }} · {{ line.requested_qty|quantity }} {{ line.unit.code }}
+  </p>
+  <p class="mb-3 text-sm text-soft">{% translate "Only materials measured in the same unit can be linked." %}</p>
+  <form method="get"
+        action="{% url 'requests:link' line_id=line.pk %}"
+        role="search"
+        class="mb-4">
+    {{ search.q.as_field_group }}
+    <button type="submit" class="btn">{% translate "Search" %}</button>
+  </form>
+  <ul class="mb-4 grid gap-2" data-testid="link-candidates">
+    {% for material in materials %}
+      <li class="card" data-material="{{ material.reference }}">
+        <form method="post"
+              action="{% url 'requests:resolve_line' line_id=line.pk %}"
+              class="flex items-center justify-between gap-3">
+          {% csrf_token %}
+          <input type="hidden" name="material" value="{{ material.pk }}">
+          <span>
+            {{ material.name }}
+            <span class="block text-sm text-soft">{{ material.reference }}</span>
+          </span>
+          <button type="submit" class="btn btn-primary">{% translate "Link" %}</button>
+        </form>
+      </li>
+    {% empty %}
+      {% if query %}
+        {% include "components/empty_state.html" with title=_("No material found") text=_("No active material in this unit matches your search.") %}
+      {% endif %}
+    {% endfor %}
+  </ul>
+  {% url 'requests:examine' request_id=request_obj.pk as back_url %}
+  {% include "components/button.html" with href=back_url label=_("Back to the request") variant="link" %}
+{% endblock content %}
