@@ -131,6 +131,15 @@ Code in `apps/material_requests/`; plan §3.4, §3.5 (S5), §4.3, §4.4, §4.6 (
 - **Integrity in the database**: CHECK constraints on quantities, decisions and closures; the C9 key binds a line to its material's unit, so a unit change racing the first reference ends with exactly one committed (threaded test), and the line is refused rather than converted; the C3 key ties a line's project to its request's.
 - **Idempotency**: create forms and submit take a signed key (plan §4.8); a double submit yields one request number.
 
+## Material requests: review and sourcing (step M4.2)
+
+Code in `apps/material_requests/services.py` and `ledger.py`; plan §3.4, §4.3–4.5, §4.9.
+
+- **Capabilities.** `request.review` (group administrators, the procurement branch's material managers, the project's assigned site managers) decides lines, returns a request for changes and reduces approved quantities; `request.source` (group administrators and material managers in scope) sets sourcing, resolves non-catalog lines, changes priority and needed-by, closes and reopens. Each service authorizes in full inside its transaction (404 outside `request.view`, 403 without the capability, session MFA for privileged grants); a material manager of another branch, or a user holding the capability through another membership, is refused (S5, S6).
+- **Self-approval.** Nobody approves or rejects lines of their own request unless the request's procurement branch sets `allow_self_approval` (403 otherwise); the project's branch setting does not count. Every request is reviewed; a submit never approves anything (Q4).
+- **Editing by state** (§4.4): decisions only while `SUBMITTED`, and a reviewer changes only their own; sourcing, schedule and closures only while `APPROVED`; reopen only from `CLOSED`. Approved quantities only go down, never on a closed-short line and never below what is delivered, received or on order, so R ≤ A and D ≤ A hold whatever the sequence (property test). Every change is audited with its reason or note; return to draft keeps the earlier decisions in the audit only.
+- **Locks.** The header (L2) before its lines (L3); operations that change ledger inputs lock every line of the request. Concurrent decisions finalise a request exactly once, and a withdrawal racing a decision ends with one of them refused (threaded tests).
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |
