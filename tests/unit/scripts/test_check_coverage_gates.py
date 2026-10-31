@@ -22,6 +22,7 @@ def _file(lines: int = 0, branches: int = 0) -> dict[str, Any]:
         "apps/access/rules.py",
         "apps/access/sub/deep.py",
         "apps/material_requests/services.py",
+        "apps/material_requests/services/review.py",
         "apps/material_requests/selectors.py",
         "apps\\handovers\\services.py",
     ],

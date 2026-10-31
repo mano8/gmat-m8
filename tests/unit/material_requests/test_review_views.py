@@ -402,6 +402,15 @@ class TestSourcingTools:
         bad = post(client_for(people.mm_mad), "set_sourcing", line, {"sourcing": "UNDECIDED"})
         assert messages_of(bad) and refreshed(line).sourcing == "PURCHASE"
 
+    def test_the_chosen_sourcing_is_preselected(
+        self, approved: MaterialRequest, people: People
+    ) -> None:
+        line = approved.lines.get(line_no=1)
+        client = client_for(people.mm_mad)
+        post(client, "set_sourcing", line, {"sourcing": "PURCHASE"})
+        html = page(client, approved)
+        assert '<option value="PURCHASE" selected>' in html
+
     def test_close_short_and_reopen_a_line(self, approved: MaterialRequest, people: People) -> None:
         line = approved.lines.get(line_no=1)
         client = client_for(people.mm_mad)

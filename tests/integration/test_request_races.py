@@ -26,6 +26,7 @@ from apps.core.idempotency import issue_key
 from apps.core.models import DocumentSequence
 from apps.material_requests import services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.material_requests.services import requester as requester_services
 from tests.integration.conftest import run_concurrently
 from tests.org import Org, People
 from tests.support import principal_for
@@ -234,7 +235,7 @@ def test_a_cancel_racing_a_decision_takes_the_stricter_path(
         status=MaterialRequest.Status.SUBMITTED, number="SOL-T-1", submitted_at=draft.created_at
     )
     calls = iter([False])
-    monkeypatch.setattr(services, "_decided", lambda request: next(calls, True))
+    monkeypatch.setattr(requester_services, "_decided", lambda request: next(calls, True))
     results = run_concurrently(
         1, lambda index: services.cancel(principal_for(people.tech_mad), draft.pk)
     )

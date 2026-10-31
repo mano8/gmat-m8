@@ -25,6 +25,8 @@ from apps.material_requests import ledger, services
 from apps.material_requests.ledger import Flows
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services import LineDecision
+from apps.material_requests.services import common as common_services
+from apps.material_requests.services import review as review_services
 from apps.organizations.models import Branch
 from tests.org import Org, People
 from tests.support import error_codes, principal_for
@@ -611,13 +613,13 @@ class TestResolve:
         check; the line is refused, never converted."""
         line = non_catalog(approved, unit="M")
         tray = Material.objects.create(reference="BAN-300", name="Bandeja 300", unit=line.unit)
-        original = services._save_line
+        original = common_services._save_line
 
         def unit_changes_first(target: MaterialRequestLine) -> None:
             Material.objects.filter(pk=tray.pk).update(unit=UnitOfMeasure.objects.get(code="KG"))
             original(target)
 
-        monkeypatch.setattr(services, "_save_line", unit_changes_first)
+        monkeypatch.setattr(review_services, "_save_line", unit_changes_first)
         with pytest.raises(ValidationError) as exc:
             services.resolve_non_catalog_line(mm(people), line.pk, material_id=tray.pk)
         assert set(exc.value.message_dict) == {"material"}

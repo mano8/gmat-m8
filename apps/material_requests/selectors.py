@@ -314,27 +314,51 @@ def _quantity(value: Any) -> str:
     return f"{Decimal(str(value)).normalize():f}"
 
 
+def _to(changes: dict[str, Any], name: str) -> Any:
+    """The new value of a changed field, if it changed."""
+    return (changes.get(name) or {}).get("to")
+
+
+def _join(*parts: str) -> str:
+    return " · ".join(part for part in parts if part)
+
+
+def _decided_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
+    decision, quantity = _to(changes, "decision"), _to(changes, "approved_qty")
+    return _join(
+        str(MaterialRequestLine.Decision(decision).label) if decision else "",
+        _quantity(quantity) if quantity is not None else "",
+        _to(changes, "decision_note") or "",
+    )
+
+
+def _reduced_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
+    change = changes.get("approved_qty") or {}
+    arrow = f"{_quantity(change['from'])} → {_quantity(change['to'])}" if change else ""
+    return _join(arrow, data.get("reason", ""))
+
+
+def _sourcing_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
+    return str(_to(changes, "sourcing") or "")
+
+
+def _rescheduled_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
+    return _join(*(f"{name}: {change.get('to') or '—'}" for name, change in changes.items()))
+
+
+_DETAILS = {
+    "request_line.decided": _decided_detail,
+    "request_line.reduced": _reduced_detail,
+    "request_line.sourcing_set": _sourcing_detail,
+    "request.rescheduled": _rescheduled_detail,
+}
+
+
 def _detail(action: str, data: dict[str, Any]) -> str:
     """The reason or note of an event, or what it changed; never the raw payload."""
-    changes = data.get("changes") or {}
-    if action == "request_line.decided":
-        decision = (changes.get("decision") or {}).get("to", "")
-        quantity = (changes.get("approved_qty") or {}).get("to")
-        note = (changes.get("decision_note") or {}).get("to", "")
-        parts = [
-            str(MaterialRequestLine.Decision(decision).label) if decision else "",
-            _quantity(quantity) if quantity is not None else "",
-            note,
-        ]
-        return " · ".join(part for part in parts if part)
-    if action == "request_line.reduced":
-        change = changes.get("approved_qty") or {}
-        arrow = f"{_quantity(change['from'])} → {_quantity(change['to'])}" if change else ""
-        return " · ".join(part for part in (arrow, data.get("reason", "")) if part)
-    if action == "request_line.sourcing_set":
-        return str((changes.get("sourcing") or {}).get("to", ""))
-    if action == "request.rescheduled":
-        return " · ".join(f"{name}: {change.get('to') or '—'}" for name, change in changes.items())
+    handler = _DETAILS.get(action)
+    if handler is not None:
+        return handler(data, data.get("changes") or {})
     return str(data.get("reason") or data.get("note") or "")
 
 

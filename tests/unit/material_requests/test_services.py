@@ -26,6 +26,7 @@ from apps.core.locking import LockOrder, LockSetChanged
 from apps.core.models import DocumentSequence
 from apps.material_requests import services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.material_requests.services import requester as requester_services
 from apps.organizations.models import Branch
 from apps.projects.models import Project
 from tests.org import Org, People
@@ -800,7 +801,7 @@ class TestCancel:
         """
         submitted = make_request(Status.SUBMITTED)
         calls = iter([False])
-        monkeypatch.setattr(services, "_decided", lambda request: next(calls, True))
+        monkeypatch.setattr(requester_services, "_decided", lambda request: next(calls, True))
         with pytest.raises(LockSetChanged):
             services.cancel(principal_for(people.tech_mad), submitted.pk)
         assert MaterialRequest.objects.get(pk=submitted.pk).status == Status.SUBMITTED

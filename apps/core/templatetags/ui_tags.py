@@ -25,6 +25,5 @@ def quantity(value: Decimal | None) -> str:
     if value is None:
         return ""
     trimmed = value.normalize()
-    exponent = trimmed.as_tuple().exponent
-    places = max(0, -exponent) if isinstance(exponent, int) else 0
+    places = len(format(trimmed, "f").partition(".")[2])
     return number_format(trimmed, decimal_pos=places)
