@@ -80,14 +80,11 @@ def _query(**params: str) -> str:
 
 def _own_draft(request: HttpRequest, request_id: UUID) -> MaterialRequest:
     """The request, if visible (404) and the user may create on it (403)."""
-    found = selectors.request(access_for(request), request_id)
-    require(request, CREATE, found, read=VIEW)
-    return found
+    return _on_request(request, request_id, CREATE)
 
 
 def _own_line_request(request: HttpRequest, line_id: UUID) -> tuple[MaterialRequest, Any]:
-    line = selectors.line(access_for(request), line_id)
-    require(request, CREATE, line.request, read=VIEW)
+    line = _on_line(request, line_id, CREATE)
     return line.request, line
 
 
@@ -720,19 +717,24 @@ def line_resolve(request: HttpRequest, line_id: UUID) -> HttpResponse:
 
 def _reason_action(
     request: HttpRequest,
-    line_id: UUID,
+    target_id: UUID,
     service: Callable[..., object],
     done: str,
+    *,
+    on_line: bool,
 ) -> HttpResponse:
+    """Close or reopen with a required reason, of a line or of the whole request."""
     ctx = access_for(request)
-    line = _on_line(request, line_id, SOURCE)
-    to = _examine_url(line)
+    target = (
+        _on_line(request, target_id, SOURCE) if on_line else _on_request(request, target_id, SOURCE)
+    )
+    to = _examine_url(target)
     form = RequiredReasonForm(request.POST)
     if not form.is_valid():
         return _invalid(request, form, to)
     return _perform(
         request,
-        lambda: service(ctx.principal, line.pk, reason=form.cleaned_data["reason"]),
+        lambda: service(ctx.principal, target.pk, reason=form.cleaned_data["reason"]),
         done,
         to,
     )
@@ -740,12 +742,14 @@ def _reason_action(
 
 @mutating(SOURCE)
 def line_close_short(request: HttpRequest, line_id: UUID) -> HttpResponse:
-    return _reason_action(request, line_id, services.close_line_short, _("Line closed short."))
+    return _reason_action(
+        request, line_id, services.close_line_short, _("Line closed short."), on_line=True
+    )
 
 
 @mutating(SOURCE)
 def line_reopen(request: HttpRequest, line_id: UUID) -> HttpResponse:
-    return _reason_action(request, line_id, services.reopen_line, _("Line reopened."))
+    return _reason_action(request, line_id, services.reopen_line, _("Line reopened."), on_line=True)
 
 
 @mutating(SOURCE)
@@ -768,34 +772,18 @@ def request_schedule(request: HttpRequest, request_id: UUID) -> HttpResponse:
     )
 
 
-def _request_reason_action(
-    request: HttpRequest,
-    request_id: UUID,
-    service: Callable[..., object],
-    done: str,
-) -> HttpResponse:
-    ctx = access_for(request)
-    found = _on_request(request, request_id, SOURCE)
-    to = _examine_url(found)
-    form = RequiredReasonForm(request.POST)
-    if not form.is_valid():
-        return _invalid(request, form, to)
-    return _perform(
-        request,
-        lambda: service(ctx.principal, found.pk, reason=form.cleaned_data["reason"]),
-        done,
-        to,
+@mutating(SOURCE)
+def request_close(request: HttpRequest, request_id: UUID) -> HttpResponse:
+    return _reason_action(
+        request, request_id, services.manual_close, _("Request closed."), on_line=False
     )
 
 
 @mutating(SOURCE)
-def request_close(request: HttpRequest, request_id: UUID) -> HttpResponse:
-    return _request_reason_action(request, request_id, services.manual_close, _("Request closed."))
-
-
-@mutating(SOURCE)
 def request_reopen(request: HttpRequest, request_id: UUID) -> HttpResponse:
-    return _request_reason_action(request, request_id, services.reopen, _("Request reopened."))
+    return _reason_action(
+        request, request_id, services.reopen, _("Request reopened."), on_line=False
+    )
 
 
 @mutating(CANCEL_ANY)

@@ -515,6 +515,38 @@ class TestLinkDialog:
         assert any("another unit" in message for message in messages_of(response))
         assert refreshed(free_line).material_id is None
 
+    def test_the_unit_filter_runs_before_the_search_limit(
+        self, approved: MaterialRequest, people: People, breaker: Material, cable: Material
+    ) -> None:
+        # More metre materials than the picker shows, all matching: the one in units
+        # is still found.
+        metre = UnitOfMeasure.objects.get(code="M")
+        Material.objects.bulk_create(
+            Material(reference=f"ZZ-{n:02d}", name="Cable de obra extra", unit=metre)
+            for n in range(25)
+        )
+        free = MaterialRequestLine.objects.create(
+            request=approved,
+            project=approved.project,
+            line_no=3,
+            free_text="Cable de obra",
+            unit=breaker.unit,
+            requested_qty=Decimal("4"),
+            decision=Decision.APPROVED,
+            approved_qty=Decimal("4"),
+            decided_by=people.mm_mad,
+            decided_at=approved.submitted_at,
+        )
+        Material.objects.create(
+            reference="UD-CABLE", name="Cable de obra unidad", unit=breaker.unit
+        )
+        html = (
+            client_for(people.mm_mad)
+            .get(reverse("requests:link", args=[free.pk]), {"q": "cable de obra"})
+            .content.decode()
+        )
+        assert 'data-material="UD-CABLE"' in html and 'data-material="ZZ-00"' not in html
+
     def test_a_catalog_line_has_no_dialog(self, approved: MaterialRequest, people: People) -> None:
         line = approved.lines.get(line_no=1)
         response = client_for(people.mm_mad).get(reverse("requests:link", args=[line.pk]))

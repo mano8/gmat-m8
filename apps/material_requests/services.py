@@ -647,6 +647,8 @@ def cancel(principal: Principal, request_id: UUID, *, reason: str = "") -> Mater
     locked = _lock_header(locks, request)
     if _cancel_path(principal, locked) != (capability, operation):
         raise LockSetChanged("A line was decided between authorization and locking")
+    if locked.status == Status.APPROVED:
+        _lock_lines(locks, locked)  # the allocations and handovers of its lines are checked
     left = transition(locked, Status.CANCELLED, operation)
     if left == Status.APPROVED:
         _require_nothing_allocated_or_delivered(locked)
@@ -982,7 +984,7 @@ def reduce_approved_qty(
                 "approved_qty": ValidationError(
                     _("%(floor)s are already delivered, received or on order."),
                     code="below_commitment",
-                    params={"floor": floor},
+                    params={"floor": f"{floor.normalize():f}"},
                 )
             }
         )
@@ -1144,6 +1146,11 @@ def close_line_short(principal: Principal, line_id: UUID, *, reason: str) -> Mat
     actor, locked, lines, line = _locked_line(principal, SOURCE, line_id, locks)
     _require_state(locked, Status.APPROVED)
     _require_live(line)
+    (entry,) = ledger.line_ledgers([line])
+    if entry.fully_delivered:
+        raise ValidationError(
+            _("This line is fully delivered: nothing is short."), code="fully_delivered"
+        )
     _close_line(line, actor, Closure.LINE, reason, db_now())
     _record_line(principal, "request_line.closed_short", locked, line, reason=reason)
     _reconcile(locks, locked, "close_line_short")
@@ -1167,6 +1174,11 @@ def reopen_line(principal: Principal, line_id: UUID, *, reason: str) -> Material
     return line
 
 
+def _short(entry: ledger.LineLedger) -> bool:
+    """A live line with something still to deliver."""
+    return ledger.is_live(entry.line) and not entry.fully_delivered
+
+
 @transactional
 def manual_close(principal: Principal, request_id: UUID, *, reason: str) -> MaterialRequest:
     """Close an approved request: every still-live line is closed short (source ``REQUEST``)
@@ -1179,7 +1191,8 @@ def manual_close(principal: Principal, request_id: UUID, *, reason: str) -> Mate
     lines = _lock_lines(locks, locked)
     transition(locked, Status.CLOSED, "manual_close")
     now = db_now()
-    closed = [line for line in lines if ledger.is_live(line)]
+    # A fully delivered line has nothing short: it is not marked closed short.
+    closed = [entry.line for entry in ledger.line_ledgers(lines) if _short(entry)]
     for line in closed:
         _close_line(line, actor, Closure.REQUEST, reason, now)
     locked.closed_at, locked.close_mode, locked.close_reason = (

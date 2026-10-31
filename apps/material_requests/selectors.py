@@ -239,7 +239,7 @@ def link_candidates(ctx: AccessContext, of: MaterialRequestLine, query: str) -> 
 
     Only a material in the line's own unit can be linked (no conversions, Q15).
     """
-    return [m for m in catalog_selectors.search(ctx, query) if m.unit_id == of.unit_id]
+    return catalog_selectors.search(ctx, query, unit_id=of.unit_id)
 
 
 def can_review(ctx: AccessContext, of: MaterialRequest) -> bool:

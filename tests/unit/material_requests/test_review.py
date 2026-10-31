@@ -734,6 +734,31 @@ class TestReopenLine:
         assert error_codes(exc) == {"required"}
 
 
+class TestFullyDeliveredLines:
+    """A line with D = A has nothing short: closing never marks it closed short."""
+
+    def test_close_line_short_refuses_a_delivered_line(
+        self, approved: MaterialRequest, people: People, flows_of: dict[UUID, Flows]
+    ) -> None:
+        line = lines_of(approved)[0]
+        flows_of[line.pk] = Flows(delivered=line.approved_qty)
+        with pytest.raises(ValidationError) as caught:
+            services.close_line_short(mm(people), line.pk, reason="x")
+        assert error_codes(caught.value) == {"fully_delivered"}
+        assert fresh(line).closed_short_at is None
+
+    def test_a_manual_close_leaves_a_delivered_line_alone(
+        self, make_request: MakeRequest, people: People, flows_of: dict[UUID, Flows]
+    ) -> None:
+        request = make_request(Status.APPROVED, lines=2, decided=True)
+        delivered, short = lines_of(request)
+        flows_of[delivered.pk] = Flows(delivered=delivered.approved_qty)
+        services.manual_close(mm(people), request.pk, reason="Works finished")
+        assert fresh(delivered).closed_short_at is None
+        assert fresh(short).closed_short_source == "REQUEST"
+        assert AuditEvent.objects.get(action="request.closed").data["lines"] == [2]
+
+
 class TestManualCloseAndReopen:
     def test_a_reopen_restores_only_the_lines_the_close_closed(
         self, make_request: MakeRequest, people: People, published: list[events.Event]

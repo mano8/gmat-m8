@@ -28,6 +28,7 @@
                 hx-target="#draft-lines"
                 hx-swap="outerHTML"
                 hx-trigger="submit, change"
+                hx-sync="this:replace"
                 class="flex items-center gap-1">
             {% csrf_token %}
             {# Enter in the field submits through this first button: it sets the typed value. #}
