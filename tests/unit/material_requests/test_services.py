@@ -625,6 +625,47 @@ class TestSubmit:
             services.submit(principal, draft.pk)
         assert error_codes(exc) == {"transition"}
 
+    def test_the_review_step_is_saved_with_the_submit(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        principal, draft = principal_for(people.tech_mad), make_request()
+        submitted = services.submit(
+            principal,
+            draft.pk,
+            priority=MaterialRequest.Priority.URGENT,
+            needed_by=date(2099, 1, 5),
+            notes="  Second floor  ",
+        )
+        assert (submitted.priority, submitted.needed_by, submitted.notes) == (
+            MaterialRequest.Priority.URGENT,
+            date(2099, 1, 5),
+            "Second floor",
+        )
+        event = AuditEvent.objects.get(action="request.submitted")
+        assert set(event.data["changes"]) == {"priority", "needed_by", "notes"}
+
+    def test_a_replay_with_other_details_is_a_conflict(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        principal, draft = principal_for(people.tech_mad), make_request()
+        key = issue_key(people.tech_mad.pk, "request.submit")
+        services.submit(principal, draft.pk, idempotency_key=key, notes="one")
+        again = services.submit(principal, draft.pk, idempotency_key=key, notes="one")
+        assert again.notes == "one"
+        with pytest.raises(IdempotencyConflict):
+            services.submit(principal, draft.pk, idempotency_key=key, notes="other")
+
+    def test_only_the_review_details_can_be_set(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        draft = make_request()
+        with pytest.raises(ValueError, match="project_id"):
+            services.submit(principal_for(people.tech_mad), draft.pk, project_id=new_id())
+        with pytest.raises(ValidationError):  # not a priority: nothing is submitted
+            services.submit(principal_for(people.tech_mad), draft.pk, priority="NOW")
+        draft.refresh_from_db()
+        assert draft.status == Status.DRAFT
+
     def test_an_empty_draft_is_refused(self, make_request: MakeRequest, people: People) -> None:
         with pytest.raises(ValidationError) as exc:
             services.submit(principal_for(people.tech_mad), make_request(lines=0).pk)

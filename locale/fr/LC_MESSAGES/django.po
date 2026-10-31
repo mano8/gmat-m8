@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 14:53+0000\n"
+"POT-Creation-Date: 2026-10-31 16:28+0100\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -391,7 +391,7 @@ msgstr ""
 "lien."
 
 #: apps/accounts/templates/accounts/invitation_account.html:20
-#: templates/partials/nav_items.html:56
+#: templates/partials/nav_items.html:64
 msgid "Sign out"
 msgstr "Se déconnecter"
 
@@ -431,9 +431,9 @@ msgstr "Adresse confirmée. Le changement s'applique après le délai d'attente.
 msgid "The email change is cancelled."
 msgstr "Le changement d'e-mail est annulé."
 
-#: apps/catalog/forms.py:26 apps/organizations/forms.py:20
-#: apps/organizations/forms.py:25 apps/projects/forms.py:21
-#: apps/suppliers/forms.py:14
+#: apps/catalog/forms.py:26 apps/material_requests/forms.py:49
+#: apps/organizations/forms.py:20 apps/organizations/forms.py:25
+#: apps/projects/forms.py:21 apps/suppliers/forms.py:14
 msgid "Search"
 msgstr "Rechercher"
 
@@ -449,7 +449,11 @@ msgid "All categories"
 msgstr "Toutes les catégories"
 
 #: apps/catalog/forms.py:31 apps/catalog/templates/catalog/list.html:30
-#: apps/catalog/templates/catalog/list.html:42 apps/organizations/forms.py:21
+#: apps/catalog/templates/catalog/list.html:42
+#: apps/material_requests/forms.py:53
+#: apps/material_requests/templates/material_requests/lines_table.html:14
+#: apps/material_requests/templates/material_requests/lines_table.html:35
+#: apps/organizations/forms.py:21
 #: apps/organizations/templates/organizations/people.html:23
 #: apps/organizations/templates/organizations/people.html:34
 #: apps/projects/forms.py:22 apps/projects/forms.py:53
@@ -475,7 +479,8 @@ msgstr "Actif"
 msgid "Inactive"
 msgstr "Inactif"
 
-#: apps/catalog/forms.py:36 apps/suppliers/forms.py:21
+#: apps/catalog/forms.py:36 apps/material_requests/forms.py:23
+#: apps/suppliers/forms.py:21
 msgid "All"
 msgstr "Tous"
 
@@ -496,6 +501,7 @@ msgid "Unit of measure"
 msgstr "Unité de mesure"
 
 #: apps/catalog/forms.py:52 apps/catalog/templates/catalog/detail.html:75
+#: apps/material_requests/forms.py:99
 msgid "Description"
 msgstr "Description"
 
@@ -689,7 +695,7 @@ msgstr "Catégories"
 #: apps/catalog/templates/catalog/category_list.html:11
 #: apps/catalog/templates/catalog/list.html:4
 #: apps/catalog/templates/catalog/list.html:8
-#: templates/partials/nav_items.html:25
+#: templates/partials/nav_items.html:33
 msgid "Catalog"
 msgstr "Catalogue"
 
@@ -739,6 +745,7 @@ msgstr "Modifier le matériel %(reference)s"
 
 #: apps/catalog/templates/catalog/list.html:29
 #: apps/catalog/templates/catalog/list.html:41
+#: apps/material_requests/forms.py:100
 msgid "Unit"
 msgstr "Unité"
 
@@ -751,6 +758,7 @@ msgid "No material matches the filters."
 msgstr "Aucun matériel ne correspond aux filtres."
 
 #: apps/catalog/templates/catalog/search_results.html:19
+#: apps/material_requests/templates/material_requests/material_picker.html:36
 msgid "No material matches."
 msgstr "Aucun matériel ne correspond."
 
@@ -815,11 +823,26 @@ msgstr "Accueil"
 msgid "Signed in as %(email)s."
 msgstr "Connecté en tant que %(email)s."
 
-#: apps/core/templates/core/home.html:9
+#: apps/core/templates/core/home.html:11
+#: apps/material_requests/templates/material_requests/list.html:11
+#: apps/material_requests/templates/material_requests/list.html:47
+#: apps/material_requests/templates/material_requests/new.html:4
+#: apps/material_requests/templates/material_requests/new.html:7
+msgid "New request"
+msgstr "Nouvelle demande"
+
+#: apps/core/templates/core/home.html:14 apps/core/templates/core/home.html:19
+#: apps/material_requests/templates/material_requests/detail.html:83
+#: apps/material_requests/templates/material_requests/list.html:4
+#: apps/material_requests/templates/material_requests/list.html:8
+msgid "My requests"
+msgstr "Mes demandes"
+
+#: apps/core/templates/core/home.html:21
 msgid "Nothing here yet"
 msgstr "Rien ici pour le moment"
 
-#: apps/core/templates/core/home.html:9
+#: apps/core/templates/core/home.html:21
 msgid ""
 "Your requests and tasks will appear here once the first features are "
 "switched on."
@@ -869,6 +892,44 @@ msgid "This is the branch's default warehouse; choose another first."
 msgstr ""
 "C'est l'entrepôt par défaut de l'agence ; choisissez-en d'abord un autre."
 
+#: apps/material_requests/forms.py:34
+#: apps/material_requests/templates/material_requests/draft_lines.html:45
+msgid "Quantity"
+msgstr "Quantité"
+
+#: apps/material_requests/forms.py:58
+msgid "Search materials"
+msgstr "Rechercher des matériaux"
+
+#: apps/material_requests/forms.py:129
+#: apps/material_requests/templates/material_requests/detail.html:20
+msgid "Priority"
+msgstr "Priorité"
+
+#: apps/material_requests/forms.py:134
+#: apps/material_requests/templates/material_requests/detail.html:26
+#: apps/material_requests/templates/material_requests/list.html:33
+msgid "Needed by"
+msgstr "Nécessaire pour le"
+
+#: apps/material_requests/forms.py:137
+msgid "When the material must be on site."
+msgstr "Quand le matériel doit être sur le chantier."
+
+#: apps/material_requests/forms.py:140
+#: apps/material_requests/templates/material_requests/detail.html:39
+#: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
+msgid "Notes"
+msgstr "Notes"
+
+#: apps/material_requests/forms.py:149
+msgid "The date cannot be in the past."
+msgstr "La date ne peut pas être dans le passé."
+
+#: apps/material_requests/forms.py:172 apps/organizations/forms.py:118
+msgid "Reason"
+msgstr "Motif"
+
 #: apps/material_requests/models.py:80
 msgid "Draft"
 msgstr "Brouillon"
@@ -878,10 +939,14 @@ msgid "Submitted"
 msgstr "Envoyée"
 
 #: apps/material_requests/models.py:82 apps/material_requests/models.py:179
+#: apps/material_requests/templates/material_requests/lines_table.html:11
+#: apps/material_requests/templates/material_requests/lines_table.html:26
+#: apps/material_requests/templates/material_requests/lines_table.html:39
 msgid "Approved"
 msgstr "Approuvée"
 
 #: apps/material_requests/models.py:83 apps/material_requests/models.py:180
+#: apps/material_requests/templates/material_requests/lines_table.html:41
 msgid "Rejected"
 msgstr "Refusée"
 
@@ -970,6 +1035,7 @@ msgid "material requests"
 msgstr "demandes de matériel"
 
 #: apps/material_requests/models.py:178
+#: apps/material_requests/templates/material_requests/lines_table.html:43
 msgid "Pending"
 msgstr "En attente"
 
@@ -1049,144 +1115,340 @@ msgstr "ligne de demande de matériel"
 msgid "material request lines"
 msgstr "lignes de demande de matériel"
 
-#: apps/material_requests/services.py:94
+#: apps/material_requests/services.py:98
 msgid "This material's unit has just changed; choose the material again."
 msgstr ""
 "L'unité de ce matériel vient de changer ; choisissez à nouveau le matériel."
 
-#: apps/material_requests/services.py:158
+#: apps/material_requests/services.py:162
 msgid "This project accepts no new requests."
 msgstr "Ce chantier n'accepte plus de nouvelles demandes."
 
-#: apps/material_requests/services.py:167
+#: apps/material_requests/services.py:171
 msgid "The project's branch is inactive."
 msgstr "L'agence du chantier est inactive."
 
-#: apps/material_requests/services.py:176
+#: apps/material_requests/services.py:180
 msgid "Lines change only while the request is a draft."
 msgstr "Les lignes ne changent que tant que la demande est un brouillon."
 
-#: apps/material_requests/services.py:190
+#: apps/material_requests/services.py:194
 msgid "Enter a quantity."
 msgstr "Saisissez une quantité."
 
-#: apps/material_requests/services.py:193
+#: apps/material_requests/services.py:197
 msgid "The quantity must be positive."
 msgstr "La quantité doit être positive."
 
-#: apps/material_requests/services.py:200
+#: apps/material_requests/services.py:204
 #, python-format
 msgid "%(unit)s quantities have at most %(decimals)s decimals."
 msgstr "Les quantités en %(unit)s ont au plus %(decimals)s décimales."
 
-#: apps/material_requests/services.py:226
-#: apps/material_requests/services.py:1052
+#: apps/material_requests/services.py:230
+#: apps/material_requests/services.py:1072
 msgid "Choose an active material."
 msgstr "Choisissez un matériel actif."
 
-#: apps/material_requests/services.py:232
+#: apps/material_requests/services.py:236
 msgid "A catalog material is requested in its own unit."
 msgstr "Un matériel du catalogue se demande dans sa propre unité."
 
-#: apps/material_requests/services.py:242
+#: apps/material_requests/services.py:246
 msgid "Describe the material, or choose one from the catalog."
 msgstr "Décrivez le matériel ou choisissez-en un dans le catalogue."
 
-#: apps/material_requests/services.py:249
+#: apps/material_requests/services.py:253
 msgid "Choose a unit."
 msgstr "Choisissez une unité."
 
-#: apps/material_requests/services.py:316
+#: apps/material_requests/services.py:320
 msgid "Material has already been ordered or delivered for this request."
 msgstr "Du matériel a déjà été commandé ou livré pour cette demande."
 
-#: apps/material_requests/services.py:404
+#: apps/material_requests/services.py:408
 #, python-format
 msgid "These details cannot be changed while the request is %(status)s."
 msgstr ""
 "Ces informations ne peuvent pas changer tant que la demande est à l'état "
 "%(status)s."
 
-#: apps/material_requests/services.py:560
+#: apps/material_requests/services.py:574
 msgid "Add at least one line before submitting."
 msgstr "Ajoutez au moins une ligne avant d'envoyer."
 
-#: apps/material_requests/services.py:596
+#: apps/material_requests/services.py:615
 msgid "A reviewer has already decided a line; it can no longer be withdrawn."
 msgstr "Un valideur a déjà décidé une ligne ; elle ne peut plus être retirée."
 
-#: apps/material_requests/services.py:649
+#: apps/material_requests/services.py:668
 #: apps/material_requests/transitions.py:52
 #, python-format
 msgid "This request is %(status)s; it cannot be changed this way."
 msgstr ""
 "Cette demande est à l'état %(status)s ; elle ne peut pas être modifiée ainsi."
 
-#: apps/material_requests/services.py:659
+#: apps/material_requests/services.py:678
 msgid "Give a reason."
 msgstr "Indiquez un motif."
 
-#: apps/material_requests/services.py:666
+#: apps/material_requests/services.py:685
 msgid "This line is closed short."
 msgstr "Cette ligne est soldée."
 
-#: apps/material_requests/services.py:668
+#: apps/material_requests/services.py:687
 msgid "This line has no approved quantity."
 msgstr "Cette ligne n'a pas de quantité approuvée."
 
-#: apps/material_requests/services.py:780
+#: apps/material_requests/services.py:801
 msgid "At most the requested quantity can be approved."
 msgstr "On peut approuver au plus la quantité demandée."
 
-#: apps/material_requests/services.py:797
+#: apps/material_requests/services.py:818
 msgid "Approve or reject the line."
 msgstr "Approuvez ou refusez la ligne."
 
-#: apps/material_requests/services.py:822
+#: apps/material_requests/services.py:843
 #, python-format
 msgid "Line %(line)s was decided by another reviewer."
 msgstr "La ligne %(line)s a été décidée par un autre valideur."
 
-#: apps/material_requests/services.py:872
+#: apps/material_requests/services.py:893
 msgid "Decide at least one line."
 msgstr "Décidez au moins une ligne."
 
-#: apps/material_requests/services.py:877
+#: apps/material_requests/services.py:897
 msgid "A line does not belong to this request."
 msgstr "Une ligne n'appartient pas à cette demande."
 
-#: apps/material_requests/services.py:951
+#: apps/material_requests/services.py:972
 msgid "An approved quantity can only be reduced."
 msgstr "Une quantité approuvée ne peut être que réduite."
 
-#: apps/material_requests/services.py:962
+#: apps/material_requests/services.py:983
 #, python-format
 msgid "%(floor)s are already delivered, received or on order."
 msgstr "%(floor)s sont déjà livrés, reçus ou commandés."
 
-#: apps/material_requests/services.py:995
+#: apps/material_requests/services.py:1016
 msgid "Choose stock or purchase."
 msgstr "Choisissez stock ou achat."
 
-#: apps/material_requests/services.py:1010
+#: apps/material_requests/services.py:1030
 msgid "Link the line to a catalog material before purchasing it."
 msgstr "Liez la ligne à un matériel du catalogue avant de l'acheter."
 
-#: apps/material_requests/services.py:1016
+#: apps/material_requests/services.py:1036
 msgid "Goods are on order for this line; it cannot move to stock."
-msgstr "Du matériel est commandé pour cette ligne ; elle ne peut pas passer au stock."
+msgstr ""
+"Du matériel est commandé pour cette ligne ; elle ne peut pas passer au stock."
 
-#: apps/material_requests/services.py:1048
+#: apps/material_requests/services.py:1068
 msgid "This line is already a catalog material."
 msgstr "Cette ligne est déjà un matériel du catalogue."
 
-#: apps/material_requests/services.py:1058
+#: apps/material_requests/services.py:1078
 msgid "This material is measured in another unit."
 msgstr "Ce matériel se mesure dans une autre unité."
 
-#: apps/material_requests/services.py:1142
+#: apps/material_requests/services.py:1162
 msgid "This line is not closed short."
 msgstr "Cette ligne n'est pas soldée."
+
+#: apps/material_requests/templates/material_requests/detail.html:4
+#: apps/material_requests/templates/material_requests/detail.html:8
+#: apps/material_requests/templates/material_requests/list.html:28
+msgid "Draft request"
+msgstr "Demande en brouillon"
+
+#: apps/material_requests/templates/material_requests/detail.html:11
+msgid "Request details"
+msgstr "Détails de la demande"
+
+#: apps/material_requests/templates/material_requests/detail.html:14
+#: apps/organizations/forms.py:135
+msgid "Project"
+msgstr "Chantier"
+
+#: apps/material_requests/templates/material_requests/detail.html:32
+msgid "Requested by"
+msgstr "Demandée par"
+
+#: apps/material_requests/templates/material_requests/detail.html:48
+#: apps/material_requests/templates/material_requests/detail.html:49
+msgid "Add materials"
+msgstr "Ajouter des matériaux"
+
+#: apps/material_requests/templates/material_requests/detail.html:67
+msgid "Discard draft"
+msgstr "Abandonner le brouillon"
+
+#: apps/material_requests/templates/material_requests/detail.html:71
+#: apps/material_requests/templates/material_requests/review.html:9
+#: apps/material_requests/templates/material_requests/review.html:10
+msgid "Lines"
+msgstr "Lignes"
+
+#: apps/material_requests/templates/material_requests/detail.html:78
+msgid "Withdraw the request to change it. You can send it again afterwards."
+msgstr "Retirez la demande pour la modifier. Vous pourrez la renvoyer ensuite."
+
+#: apps/material_requests/templates/material_requests/detail.html:79
+msgid "Withdraw"
+msgstr "Retirer"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:11
+msgid "Your request"
+msgstr "Votre demande"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:13
+#, python-format
+msgid "Your request: %(counter)s line"
+msgid_plural "Your request: %(counter)s lines"
+msgstr[0] "Votre demande : %(counter)s ligne"
+msgstr[1] "Votre demande : %(counter)s lignes"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:34
+msgid "Set quantity"
+msgstr "Fixer la quantité"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:39
+msgid "One less"
+msgstr "Une de moins"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:51
+msgid "One more"
+msgstr "Une de plus"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:59
+msgid "Remove"
+msgstr "Retirer"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:65
+msgid "No material yet. Pick one above."
+msgstr "Pas encore de matériel. Choisissez-en un ci-dessus."
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:68
+msgid "Not in the catalog?"
+msgstr "Pas dans le catalogue ?"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:77
+msgid "Add to the request"
+msgstr "Ajouter à la demande"
+
+#: apps/material_requests/templates/material_requests/draft_lines.html:83
+#, python-format
+msgid "Review and submit: %(counter)s line"
+msgid_plural "Review and submit: %(counter)s lines"
+msgstr[0] "Vérifier et envoyer : %(counter)s ligne"
+msgstr[1] "Vérifier et envoyer : %(counter)s lignes"
+
+#: apps/material_requests/templates/material_requests/lines_table.html:9
+#: apps/material_requests/templates/material_requests/lines_table.html:21
+msgid "Material"
+msgstr "Matériel"
+
+#: apps/material_requests/templates/material_requests/lines_table.html:10
+#: apps/material_requests/templates/material_requests/lines_table.html:25
+msgid "Requested"
+msgstr "Demandé"
+
+#: apps/material_requests/templates/material_requests/lines_table.html:12
+#: apps/material_requests/templates/material_requests/lines_table.html:29
+msgid "Delivered"
+msgstr "Livré"
+
+#: apps/material_requests/templates/material_requests/lines_table.html:13
+#: apps/material_requests/templates/material_requests/lines_table.html:32
+msgid "Outstanding"
+msgstr "Reste à livrer"
+
+#: apps/material_requests/templates/material_requests/lines_table.html:37
+msgid "Closed short"
+msgstr "Clôturée avec manque"
+
+#: apps/material_requests/templates/material_requests/list.html:15
+msgid "Filter by status"
+msgstr "Filtrer par statut"
+
+#: apps/material_requests/templates/material_requests/list.html:37
+#, python-format
+msgid "%(counter)s line"
+msgid_plural "%(counter)s lines"
+msgstr[0] "%(counter)s ligne"
+msgstr[1] "%(counter)s lignes"
+
+#: apps/material_requests/templates/material_requests/list.html:47
+#: apps/material_requests/templates/material_requests/list.html:49
+msgid "No requests"
+msgstr "Aucune demande"
+
+#: apps/material_requests/templates/material_requests/list.html:47
+msgid "Start a request for a project when you need material."
+msgstr "Lancez une demande pour un projet quand vous avez besoin de matériel."
+
+#: apps/material_requests/templates/material_requests/list.html:49
+msgid "You have not made any request yet."
+msgstr "Vous n'avez pas encore fait de demande."
+
+#: apps/material_requests/templates/material_requests/material_picker.html:9
+msgid "Recent materials"
+msgstr "Matériaux récents"
+
+#: apps/material_requests/templates/material_requests/material_picker.html:29
+msgid "Add"
+msgstr "Ajouter"
+
+#: apps/material_requests/templates/material_requests/material_picker.html:38
+msgid "Search the catalog to add materials."
+msgstr "Cherchez dans le catalogue pour ajouter des matériaux."
+
+#: apps/material_requests/templates/material_requests/new.html:8
+msgid "Which project is the material for?"
+msgstr "Pour quel projet est le matériel ?"
+
+#: apps/material_requests/templates/material_requests/new.html:36
+#: apps/projects/templates/projects/list.html:43
+msgid "No projects"
+msgstr "Aucun chantier"
+
+#: apps/material_requests/templates/material_requests/new.html:36
+msgid "No active project is open for your requests."
+msgstr "Aucun projet actif n'est ouvert à vos demandes."
+
+#: apps/material_requests/templates/material_requests/review.html:4
+#: apps/material_requests/templates/material_requests/review.html:7
+msgid "Review request"
+msgstr "Vérifier la demande"
+
+#: apps/material_requests/templates/material_requests/review.html:21
+msgid "Change the lines"
+msgstr "Modifier les lignes"
+
+#: apps/material_requests/templates/material_requests/review.html:28
+msgid "Submit request"
+msgstr "Envoyer la demande"
+
+#: apps/material_requests/views.py:136
+msgid "Choose a project."
+msgstr "Choisissez un projet."
+
+#: apps/material_requests/views.py:317
+msgid "The quantity must be positive; remove the line instead."
+msgstr "La quantité doit être positive ; supprimez plutôt la ligne."
+
+#: apps/material_requests/views.py:366
+#, python-format
+msgid "Request %(number)s submitted."
+msgstr "Demande %(number)s envoyée."
+
+#: apps/material_requests/views.py:385
+msgid "Request withdrawn; it is a draft again."
+msgstr "Demande retirée ; c'est de nouveau un brouillon."
+
+#: apps/material_requests/views.py:403
+msgid "Request discarded."
+msgstr "Demande abandonnée."
 
 #: apps/notifications/models.py:22
 msgid "Notification"
@@ -1307,10 +1569,6 @@ msgstr "Nouvel e-mail"
 msgid "I understand this cannot be undone."
 msgstr "Je comprends que cela ne peut pas être annulé."
 
-#: apps/organizations/forms.py:118
-msgid "Reason"
-msgstr "Motif"
-
 #: apps/organizations/forms.py:126
 #: apps/organizations/templates/organizations/people.html:20
 #: apps/organizations/templates/organizations/people.html:29
@@ -1325,10 +1583,6 @@ msgstr "Nom complet"
 #: apps/organizations/forms.py:132
 msgid "Required for partners; their role is on this company."
 msgstr "Obligatoire pour les partenaires ; leur rôle porte sur cette société."
-
-#: apps/organizations/forms.py:135
-msgid "Project"
-msgstr "Chantier"
 
 #: apps/organizations/forms.py:138
 msgid "Site managers and partners: the project shared with them."
@@ -1536,7 +1790,7 @@ msgstr "Aucune invitation en attente"
 
 #: apps/organizations/templates/organizations/people.html:4
 #: apps/organizations/templates/organizations/people.html:8
-#: templates/partials/nav_items.html:41
+#: templates/partials/nav_items.html:49
 msgid "People"
 msgstr "Personnes"
 
@@ -1813,13 +2067,9 @@ msgstr "Modifier le chantier %(code)s"
 
 #: apps/projects/templates/projects/list.html:4
 #: apps/projects/templates/projects/list.html:8
-#: templates/partials/nav_items.html:17
+#: templates/partials/nav_items.html:25
 msgid "Projects"
 msgstr "Chantiers"
-
-#: apps/projects/templates/projects/list.html:43
-msgid "No projects"
-msgstr "Aucun chantier"
 
 #: apps/projects/templates/projects/list.html:43
 msgid "No project matches, or none is shared with you yet."
@@ -1861,10 +2111,6 @@ msgstr "Personne de contact"
 msgid "Phone"
 msgstr "Téléphone"
 
-#: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
-msgid "Notes"
-msgstr "Notes"
-
 #: apps/suppliers/models.py:27
 msgid "contact person"
 msgstr "personne de contact"
@@ -1902,7 +2148,7 @@ msgstr "Modifier le fournisseur %(name)s"
 
 #: apps/suppliers/templates/suppliers/list.html:4
 #: apps/suppliers/templates/suppliers/list.html:8
-#: templates/partials/nav_items.html:33
+#: templates/partials/nav_items.html:41
 msgid "Suppliers"
 msgstr "Fournisseurs"
 
@@ -2099,6 +2345,10 @@ msgstr "Navigation principale"
 msgid "Language"
 msgstr "Langue"
 
-#: templates/partials/nav_items.html:48
+#: templates/partials/nav_items.html:17
+msgid "Requests"
+msgstr "Demandes"
+
+#: templates/partials/nav_items.html:56
 msgid "Security"
 msgstr "Sécurité"

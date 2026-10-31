@@ -1,0 +1,54 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The lines of a submitted request with what was decided and delivered. Parameter: lines (the
+  ledgers of `selectors.lines`). Outstanding only counts on an approved request.
+{% endcomment %}
+<table class="table-responsive" data-testid="request-lines">
+  <thead>
+    <tr>
+      <th scope="col">{% translate "Material" %}</th>
+      <th scope="col">{% translate "Requested" %}</th>
+      <th scope="col">{% translate "Approved" %}</th>
+      <th scope="col">{% translate "Delivered" %}</th>
+      <th scope="col">{% translate "Outstanding" %}</th>
+      <th scope="col">{% translate "Status" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in lines %}
+      {% with line=entry.line %}
+        <tr data-line="{{ line.line_no }}">
+          <td data-label="{% translate 'Material' %}">
+            {{ line.description }}
+            {% if line.material_id %}<span class="block text-sm text-soft">{{ line.material.reference }}</span>{% endif %}
+          </td>
+          <td data-label="{% translate 'Requested' %}">{{ line.requested_qty|quantity }} {{ line.unit.code }}</td>
+          <td data-label="{% translate 'Approved' %}">
+            {% if line.approved_qty is not None %}{{ line.approved_qty|quantity }} {{ line.unit.code }}{% else %}—{% endif %}
+          </td>
+          <td data-label="{% translate 'Delivered' %}">
+            {% if line.decision == "APPROVED" %}{{ entry.flows.delivered|quantity }} {{ line.unit.code }}{% else %}—{% endif %}
+          </td>
+          <td data-label="{% translate 'Outstanding' %}">
+            {% if entry.is_open %}{{ entry.outstanding|quantity }} {{ line.unit.code }}{% else %}—{% endif %}
+          </td>
+          <td data-label="{% translate 'Status' %}">
+            {% if line.closed_short_at %}
+              {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
+            {% elif line.decision == "APPROVED" %}
+              {% include "components/status_chip.html" with label=_("Approved") tone="ok" %}
+            {% elif line.decision == "REJECTED" %}
+              {% include "components/status_chip.html" with label=_("Rejected") tone="danger" %}
+            {% else %}
+              {% include "components/status_chip.html" with label=_("Pending") %}
+            {% endif %}
+            {% if line.decision_note %}<span class="mt-1 block text-sm text-soft">{{ line.decision_note }}</span>{% endif %}
+            {% if line.closed_short_at and line.close_reason %}
+              <span class="mt-1 block text-sm text-soft">{{ line.close_reason }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endwith %}
+    {% endfor %}
+  </tbody>
+</table>

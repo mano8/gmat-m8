@@ -1,0 +1,30 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Review request" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-1">{% translate "Review request" %}</h1>
+  <p class="mb-4 text-soft">{{ request_obj.project.code }} · {{ request_obj.project.name }}</p>
+  <section class="card mb-4" aria-label="{% translate 'Lines' %}">
+    <h2 class="card-title">{% translate "Lines" %}</h2>
+    <ul class="divide-y divide-line">
+      {% for entry in lines %}
+        <li class="flex items-baseline justify-between gap-3 py-2"
+            data-line="{{ entry.line.line_no }}">
+          <span>{{ entry.line.description }}</span>
+          <span class="shrink-0 font-medium">{{ entry.line.requested_qty|quantity }} {{ entry.line.unit.code }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    {% url 'requests:detail' request_id=request_obj.pk as back_url %}
+    {% include "components/button.html" with href=back_url label=_("Change the lines") variant="link" %}
+  </section>
+  <form method="post"
+        action="{% url 'requests:submit' request_id=request_obj.pk %}"
+        class="card">
+    {% csrf_token %}
+    {{ form }}
+    {% include "components/button.html" with label=_("Submit request") type="submit" variant="primary" block=True %}
+  </form>
+{% endblock content %}

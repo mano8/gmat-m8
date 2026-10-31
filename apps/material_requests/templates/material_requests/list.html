@@ -1,0 +1,52 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "My requests" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "My requests" %}</h1>
+    {% if can_create %}
+      {% url 'requests:new' as new_url %}
+      {% include "components/button.html" with href=new_url label=_("New request") variant="primary" %}
+    {% endif %}
+  </div>
+  <nav class="mb-4 flex flex-wrap gap-2"
+       aria-label="{% translate 'Filter by status' %}">
+    {% for value, label in statuses %}
+      <a href="?{% if value %}status={{ value }}{% endif %}"
+         class="chip {% if value == status %}chip-brand{% endif %} min-h-9 no-underline hover:no-underline"
+         {% if value == status %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  {% if rows %}
+    {% for item, entries in rows %}
+      <article class="card mb-3" data-request="{{ item.pk }}">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <a class="font-semibold"
+             href="{% url 'requests:detail' request_id=item.pk %}">
+            {% if item.number %}{{ item.number }}{% else %}{% translate "Draft request" %}{% endif %}
+          </a>
+          {% include "material_requests/status.html" with obj=item %}
+        </div>
+        <p class="text-sm text-soft">
+          {{ item.project.code }} · {{ item.get_priority_display }}{% if item.needed_by %} · {% translate "Needed by" %} {{ item.needed_by|date:"SHORT_DATE_FORMAT" }}{% endif %}
+        </p>
+        <details class="mt-2">
+          <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">
+            {% blocktranslate count counter=entries|length %}{{ counter }} line{% plural %}{{ counter }} lines{% endblocktranslate %}
+          </summary>
+          {% include "material_requests/lines_table.html" with lines=entries %}
+        </details>
+      </article>
+    {% endfor %}
+    {% include "components/pagination.html" %}
+  {% else %}
+    {% url 'requests:new' as new_url %}
+    {% if can_create %}
+      {% include "components/empty_state.html" with title=_("No requests") text=_("Start a request for a project when you need material.") href=new_url label=_("New request") %}
+    {% else %}
+      {% include "components/empty_state.html" with title=_("No requests") text=_("You have not made any request yet.") %}
+    {% endif %}
+  {% endif %}
+{% endblock content %}

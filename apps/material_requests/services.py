@@ -80,6 +80,8 @@ EDITABLE_FIELDS: Mapping[str, frozenset[str]] = {
     Status.APPROVED: frozenset({"notes"}),
 }
 LINE_FIELDS = frozenset({"material_id", "free_text", "unit_id", "requested_qty"})
+# The details the review step of the requester's flow sets together with the submit.
+SUBMIT_FIELDS = frozenset({"priority", "needed_by", "notes"})
 
 # The closure fields of a line that is not closed short (CHECK ``mr_line_closure_fields``).
 NO_CLOSURE: Mapping[str, Any] = {
@@ -541,13 +543,23 @@ def remove_line(principal: Principal, line_id: UUID) -> MaterialRequest:
 
 @transactional
 def submit(
-    principal: Principal, request_id: UUID, *, idempotency_key: str | None = None
+    principal: Principal,
+    request_id: UUID,
+    *,
+    idempotency_key: str | None = None,
+    **header: Any,
 ) -> MaterialRequest:
     """Send a draft for review: take the procurement-branch snapshot, assign the number.
 
     The number is taken at the first submit and kept if the request comes back to draft.
     With an idempotency key a repeated submit (a double tap) returns the request again.
+    ``header`` (``priority``, ``needed_by``, ``notes``) is the review step of the mobile
+    flow: it is saved in the same transaction, so a double tap cannot leave a submitted
+    request with half of the details.
     """
+    unknown = sorted(set(header) - SUBMIT_FIELDS)
+    if unknown:
+        raise ValueError(f"Request fields that cannot be set at submit: {unknown}")
     locks = LockOrder()
     request = MaterialRequest.objects.get(pk=request_id)
     _authorize(principal, CREATE, request, locks)
@@ -560,8 +572,12 @@ def submit(
         transition(locked, Status.SUBMITTED, "submit")
         if not locked.lines.exists():
             raise ValidationError(_("Add at least one line before submitting."), code="empty")
+        if isinstance(header.get("notes"), str):
+            header["notes"] = header["notes"].strip()
+        diff = apply_changes(locked, header, SUBMIT_FIELDS)
         locked.procurement_branch_id = project.procurement_branch_id
         locked.submitted_at = db_now()
+        locked.full_clean(validate_constraints=False)
         if locked.number is None:
             _assign_number(locked, locks)
         locked.save()
@@ -571,6 +587,7 @@ def submit(
             locked,
             procurement_branch_id=locked.procurement_branch_id,
             lines=locked.lines.count(),
+            **({"changes": diff} if diff else {}),
         )
         events.publish("request.submitted", request_id=locked.pk, number=locked.number)
         return locked
@@ -579,7 +596,7 @@ def submit(
         actor_id=principal.user_id,
         key=idempotency_key,
         operation="request.submit",
-        payload={"request_id": request_id},
+        payload={"request_id": request_id, **header},
         execute=execute,
         replay=lambda _type, pk: MaterialRequest.objects.get(pk=pk),
     )

@@ -1,0 +1,87 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The lines of a draft with the quantity stepper (− and + change by one, the field sets it),
+  and the way on to the review. htmx replaces this whole block after each change. Parameters:
+  request_obj, lines, error, editable, free_form (the form for a material outside the catalog;
+  a fresh one after each change, so its idempotency key is never reused).
+{% endcomment %}
+<section id="draft-lines"
+         class="card"
+         aria-live="polite"
+         aria-label="{% translate 'Your request' %}">
+  <h2 class="card-title">
+    {% blocktranslate count counter=lines|length %}Your request: {{ counter }} line{% plural %}Your request: {{ counter }} lines{% endblocktranslate %}
+  </h2>
+  {% if error %}<p role="alert" class="errorlist" data-testid="lines-error">{{ error }}</p>{% endif %}
+  {% for entry in lines %}
+    {% with line=entry.line %}
+      <div class="border-b border-line py-3 last:border-b-0"
+           data-line="{{ line.line_no }}">
+        <p class="font-medium">{{ line.description }}</p>
+        <p class="mb-2 text-sm text-soft">
+          {% if line.material_id %}{{ line.material.reference }} · {% endif %}{{ line.unit.code }}
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <form method="post"
+                action="{% url 'requests:update_line' line_id=line.pk %}"
+                hx-post="{% url 'requests:update_line' line_id=line.pk %}"
+                hx-target="#draft-lines"
+                hx-swap="outerHTML"
+                hx-trigger="submit, change"
+                class="flex items-center gap-1">
+            {% csrf_token %}
+            {# Enter in the field submits through this first button: it sets the typed value. #}
+            <button type="submit" class="sr-only" tabindex="-1">{% translate "Set quantity" %}</button>
+            <button type="submit"
+                    name="step"
+                    value="dec"
+                    class="btn px-0 w-11"
+                    aria-label="{% translate 'One less' %}">−</button>
+            <input type="text"
+                   name="requested_qty"
+                   value="{{ line.requested_qty|quantity }}"
+                   inputmode="decimal"
+                   autocomplete="off"
+                   aria-label="{% translate 'Quantity' %}"
+                   class="block min-h-11 w-20 rounded-lg border border-line bg-raised px-2 py-2 text-center text-base text-ink">
+            <button type="submit"
+                    name="step"
+                    value="inc"
+                    class="btn px-0 w-11"
+                    aria-label="{% translate 'One more' %}">+</button>
+          </form>
+          <form method="post"
+                action="{% url 'requests:remove_line' line_id=line.pk %}"
+                hx-post="{% url 'requests:remove_line' line_id=line.pk %}"
+                hx-target="#draft-lines"
+                hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-link">{% translate "Remove" %}</button>
+          </form>
+        </div>
+      </div>
+    {% endwith %}
+  {% empty %}
+    <p class="py-2 text-soft">{% translate "No material yet. Pick one above." %}</p>
+  {% endfor %}
+  <details class="mt-4"{% if free_form.is_bound %} open{% endif %}>
+    <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Not in the catalog?" %}</summary>
+    <form method="post"
+          action="{% url 'requests:add_free_line' request_id=request_obj.pk %}"
+          hx-post="{% url 'requests:add_free_line' request_id=request_obj.pk %}"
+          hx-target="#draft-lines"
+          hx-swap="outerHTML"
+          class="mt-2">
+      {% csrf_token %}
+      {{ free_form }}
+      {% include "components/button.html" with label=_("Add to the request") type="submit" %}
+    </form>
+  </details>
+  {% if lines %}
+    <div class="sticky bottom-16 -mx-4 mt-3 bg-raised/95 px-4 py-2 sm:-mx-6 sm:px-6 md:bottom-0">
+      {% url 'requests:review' request_id=request_obj.pk as review_url %}
+      {% blocktranslate asvar review_label count counter=lines|length %}Review and submit: {{ counter }} line{% plural %}Review and submit: {{ counter }} lines{% endblocktranslate %}
+      {% include "components/button.html" with href=review_url label=review_label variant="primary" block=True %}
+    </div>
+  {% endif %}
+</section>

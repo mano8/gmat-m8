@@ -59,6 +59,25 @@ def _admin_rows(world: World) -> None:
         unit=unit,
         requested_qty=Decimal("10.000"),
     )
+    world.objects["partner_request"] = MaterialRequest.objects.create(
+        project=org.hospital, procurement_branch=org.a_mad, requested_by=people.partner
+    )
+    world.objects["submitted_request"] = submitted = MaterialRequest.objects.create(
+        project=org.hospital,
+        procurement_branch=org.a_mad,
+        requested_by=people.tech_mad,
+        status=MaterialRequest.Status.SUBMITTED,
+        number="SOL-A-MAD-2026-00001",
+        submitted_at=timezone.now(),
+    )
+    MaterialRequestLine.objects.create(
+        request=submitted,
+        project=org.hospital,
+        line_no=1,
+        material=world.objects["material"],
+        unit=unit,
+        requested_qty=Decimal("3.000"),
+    )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)
