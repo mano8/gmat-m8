@@ -102,9 +102,9 @@ class TestRead:
         assert "DIF-40" in body and "CAB-25" not in body
         assert "<html" not in body
         nothing = client.get(reverse("catalog:search"), {"q": "zzz"}).content.decode()
-        assert "No material matches." in nothing and 'role="option"' not in nothing
+        assert "text-soft" in nothing and 'role="option"' not in nothing  # the empty message
         blank = client.get(reverse("catalog:search"))  # no query: an empty list, no message
-        assert blank.status_code == 200 and "No material matches." not in blank.content.decode()
+        assert blank.status_code == 200 and "text-soft" not in blank.content.decode()
 
     def test_a_malformed_filter_is_ignored(self, org: Org, people: People, materials: Any) -> None:
         response = client_for(people.tech_mad).get(

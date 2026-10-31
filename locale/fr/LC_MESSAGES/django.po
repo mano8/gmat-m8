@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 12:12+0000\n"
+"POT-Creation-Date: 2026-10-31 12:17+0000\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -54,7 +54,7 @@ msgstr "Nouveau compte"
 msgid "Existing account"
 msgstr "Compte existant"
 
-#: apps/accounts/models.py:107
+#: apps/accounts/models.py:107 apps/suppliers/models.py:28
 msgid "email"
 msgstr "e-mail"
 
@@ -391,7 +391,7 @@ msgstr ""
 "lien."
 
 #: apps/accounts/templates/accounts/invitation_account.html:20
-#: templates/partials/nav_items.html:48
+#: templates/partials/nav_items.html:56
 msgid "Sign out"
 msgstr "Se déconnecter"
 
@@ -433,6 +433,7 @@ msgstr "Le changement d'e-mail est annulé."
 
 #: apps/catalog/forms.py:26 apps/organizations/forms.py:20
 #: apps/organizations/forms.py:25 apps/projects/forms.py:21
+#: apps/suppliers/forms.py:14
 msgid "Search"
 msgstr "Rechercher"
 
@@ -444,10 +445,8 @@ msgid "Category"
 msgstr "Catégorie"
 
 #: apps/catalog/forms.py:28
-#, fuzzy
-#| msgid "All statuses"
 msgid "All categories"
-msgstr "Tous les statuts"
+msgstr "Toutes les catégories"
 
 #: apps/catalog/forms.py:31 apps/catalog/templates/catalog/list.html:30
 #: apps/catalog/templates/catalog/list.html:42 apps/organizations/forms.py:21
@@ -455,24 +454,28 @@ msgstr "Tous les statuts"
 #: apps/organizations/templates/organizations/people.html:34
 #: apps/projects/forms.py:22 apps/projects/forms.py:53
 #: apps/projects/templates/projects/list.html:25
-#: apps/projects/templates/projects/list.html:36
+#: apps/projects/templates/projects/list.html:36 apps/suppliers/forms.py:16
+#: apps/suppliers/templates/suppliers/list.html:26
+#: apps/suppliers/templates/suppliers/list.html:38
 msgid "Status"
 msgstr "Statut"
 
 #: apps/catalog/forms.py:34 apps/catalog/templates/catalog/status.html:3
 #: apps/organizations/forms.py:16
 #: apps/organizations/templates/organizations/account_status.html:7
-#: apps/projects/models.py:28
+#: apps/projects/models.py:28 apps/suppliers/forms.py:19
+#: apps/suppliers/templates/suppliers/status.html:3
 msgid "Active"
 msgstr "Actif"
 
 #: apps/catalog/forms.py:35 apps/catalog/templates/catalog/status.html:5
 #: apps/organizations/forms.py:16
 #: apps/organizations/templates/organizations/account_status.html:5
+#: apps/suppliers/forms.py:20 apps/suppliers/templates/suppliers/status.html:5
 msgid "Inactive"
 msgstr "Inactif"
 
-#: apps/catalog/forms.py:36
+#: apps/catalog/forms.py:36 apps/suppliers/forms.py:21
 msgid "All"
 msgstr "Tous"
 
@@ -482,7 +485,9 @@ msgstr "Tous"
 #: apps/organizations/templates/organizations/people.html:21
 #: apps/organizations/templates/organizations/people.html:32
 #: apps/projects/forms.py:39 apps/projects/templates/projects/list.html:23
-#: apps/projects/templates/projects/list.html:34
+#: apps/projects/templates/projects/list.html:34 apps/suppliers/forms.py:27
+#: apps/suppliers/templates/suppliers/list.html:22
+#: apps/suppliers/templates/suppliers/list.html:32
 msgid "Name"
 msgstr "Nom"
 
@@ -539,11 +544,13 @@ msgstr "Les catégories ont deux niveaux au maximum."
 
 #: apps/catalog/models.py:23
 msgid "A reference is one line of text without control characters."
-msgstr "Une référence est une seule ligne de texte sans caractères de contrôle."
+msgstr ""
+"Une référence est une seule ligne de texte sans caractères de contrôle."
 
 #: apps/catalog/models.py:58 apps/catalog/models.py:104
 #: apps/catalog/models.py:142 apps/locations/models.py:46
 #: apps/organizations/models.py:121 apps/projects/models.py:33
+#: apps/suppliers/models.py:24
 msgid "name"
 msgstr "nom"
 
@@ -552,16 +559,12 @@ msgid "parent category"
 msgstr "catégorie parente"
 
 #: apps/catalog/models.py:71
-#, fuzzy
-#| msgid "Material manager"
 msgid "material category"
-msgstr "Chargé de matériel"
+msgstr "catégorie de matériel"
 
 #: apps/catalog/models.py:72
-#, fuzzy
-#| msgid "Material manager"
 msgid "material categories"
-msgstr "Chargé de matériel"
+msgstr "catégories de matériel"
 
 #: apps/catalog/models.py:103 apps/organizations/models.py:29
 #: apps/organizations/models.py:120 apps/projects/models.py:32
@@ -610,6 +613,7 @@ msgstr "article de stock"
 
 #: apps/catalog/models.py:169 apps/locations/models.py:48
 #: apps/organizations/models.py:33 apps/organizations/models.py:141
+#: apps/suppliers/models.py:32
 msgid "active"
 msgstr "actif"
 
@@ -622,10 +626,8 @@ msgid "materials"
 msgstr "matériels"
 
 #: apps/catalog/services.py:53
-#, fuzzy
-#| msgid "An account with this email exists."
 msgid "A category with this name already exists."
-msgstr "Un compte avec cet e-mail existe."
+msgstr "Une catégorie portant ce nom existe déjà."
 
 #: apps/catalog/services.py:56
 msgid "This category already has a subcategory with this name."
@@ -636,14 +638,14 @@ msgid "A category cannot be its own parent."
 msgstr "Une catégorie ne peut pas être sa propre parente."
 
 #: apps/catalog/services.py:68
-#, fuzzy
-#| msgid "An account with this email exists."
 msgid "A material with this reference exists."
-msgstr "Un compte avec cet e-mail existe."
+msgstr "Un matériel avec cette référence existe déjà."
 
 #: apps/catalog/services.py:107
 msgid "A category with subcategories cannot be placed under another."
-msgstr "Une catégorie ayant des sous-catégories ne peut pas être placée sous une autre."
+msgstr ""
+"Une catégorie ayant des sous-catégories ne peut pas être placée sous une "
+"autre."
 
 #: apps/catalog/services.py:247
 msgid "A material that documents use keeps its unit."
@@ -656,10 +658,9 @@ msgid "New category"
 msgstr "Nouvelle catégorie"
 
 #: apps/catalog/templates/catalog/category_form.html:9
-#, fuzzy, python-format
-#| msgid "Edit project %(code)s"
+#, python-format
 msgid "Edit category %(name)s"
-msgstr "Modifier le chantier %(code)s"
+msgstr "Modifier la catégorie %(name)s"
 
 #: apps/catalog/templates/catalog/category_form.html:20
 #: apps/catalog/templates/catalog/form.html:20
@@ -667,6 +668,7 @@ msgstr "Modifier le chantier %(code)s"
 #: apps/organizations/templates/organizations/person.html:115
 #: apps/projects/templates/projects/detail.html:98
 #: apps/projects/templates/projects/form.html:20
+#: apps/suppliers/templates/suppliers/form.html:20
 msgid "Save"
 msgstr "Enregistrer"
 
@@ -674,6 +676,7 @@ msgstr "Enregistrer"
 #: apps/catalog/templates/catalog/form.html:26
 #: apps/organizations/templates/organizations/invitation_form.html:19
 #: apps/projects/templates/projects/form.html:26
+#: apps/suppliers/templates/suppliers/form.html:26
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -693,6 +696,7 @@ msgstr "Catalogue"
 #: apps/catalog/templates/catalog/category_list.html:25
 #: apps/catalog/templates/catalog/detail.html:15
 #: apps/projects/templates/projects/detail.html:14
+#: apps/suppliers/templates/suppliers/detail.html:15
 msgid "Edit"
 msgstr "Modifier"
 
@@ -705,16 +709,14 @@ msgid "The catalog has no categories yet."
 msgstr "Le catalogue n'a pas encore de catégories."
 
 #: apps/catalog/templates/catalog/detail.html:20
-#, fuzzy
-#| msgid "active"
+#: apps/suppliers/templates/suppliers/detail.html:20
 msgid "Deactivate"
-msgstr "actif"
+msgstr "Désactiver"
 
 #: apps/catalog/templates/catalog/detail.html:26
-#, fuzzy
-#| msgid "active"
+#: apps/suppliers/templates/suppliers/detail.html:26
 msgid "Reactivate"
-msgstr "actif"
+msgstr "Réactiver"
 
 #: apps/catalog/templates/catalog/detail.html:68
 msgid "Yes"
@@ -727,10 +729,8 @@ msgstr "Non"
 #: apps/catalog/templates/catalog/form.html:4
 #: apps/catalog/templates/catalog/form.html:11
 #: apps/catalog/templates/catalog/list.html:14
-#, fuzzy
-#| msgid "New email"
 msgid "New material"
-msgstr "Nouvel e-mail"
+msgstr "Nouveau matériel"
 
 #: apps/catalog/templates/catalog/form.html:9
 #, python-format
@@ -751,10 +751,8 @@ msgid "No material matches the filters."
 msgstr "Aucun matériel ne correspond aux filtres."
 
 #: apps/catalog/templates/catalog/search_results.html:19
-#, fuzzy
-#| msgid "Material manager"
 msgid "No material matches."
-msgstr "Chargé de matériel"
+msgstr "Aucun matériel ne correspond."
 
 #: apps/catalog/views.py:129
 #, python-format
@@ -848,7 +846,7 @@ msgid "project"
 msgstr "chantier"
 
 #: apps/locations/models.py:47 apps/organizations/models.py:123
-#: apps/projects/models.py:35
+#: apps/projects/models.py:35 apps/suppliers/models.py:30
 msgid "address"
 msgstr "adresse"
 
@@ -1000,6 +998,7 @@ msgstr "Motif"
 #: apps/organizations/forms.py:126
 #: apps/organizations/templates/organizations/people.html:20
 #: apps/organizations/templates/organizations/people.html:29
+#: apps/suppliers/forms.py:30 apps/suppliers/templates/suppliers/detail.html:47
 msgid "Email"
 msgstr "E-mail"
 
@@ -1049,7 +1048,7 @@ msgstr "Groupement"
 msgid "legal name"
 msgstr "raison sociale"
 
-#: apps/organizations/models.py:31
+#: apps/organizations/models.py:31 apps/suppliers/models.py:26
 msgid "tax id"
 msgstr "numéro fiscal"
 
@@ -1221,7 +1220,7 @@ msgstr "Aucune invitation en attente"
 
 #: apps/organizations/templates/organizations/people.html:4
 #: apps/organizations/templates/organizations/people.html:8
-#: templates/partials/nav_items.html:33
+#: templates/partials/nav_items.html:41
 msgid "People"
 msgstr "Personnes"
 
@@ -1380,6 +1379,7 @@ msgid "Client"
 msgstr "Client"
 
 #: apps/projects/forms.py:42 apps/projects/templates/projects/detail.html:26
+#: apps/suppliers/forms.py:33 apps/suppliers/templates/suppliers/detail.html:59
 msgid "Address"
 msgstr "Adresse"
 
@@ -1538,6 +1538,101 @@ msgstr "Chantier partagé."
 #: apps/projects/views.py:186
 msgid "Access to the project revoked."
 msgstr "Accès au chantier révoqué."
+
+#: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
+#: apps/suppliers/templates/suppliers/list.html:23
+#: apps/suppliers/templates/suppliers/list.html:35
+msgid "Tax id"
+msgstr "N° fiscal"
+
+#: apps/suppliers/forms.py:29 apps/suppliers/templates/suppliers/detail.html:41
+#: apps/suppliers/templates/suppliers/list.html:24
+#: apps/suppliers/templates/suppliers/list.html:36
+msgid "Contact person"
+msgstr "Personne de contact"
+
+#: apps/suppliers/forms.py:31 apps/suppliers/templates/suppliers/detail.html:53
+#: apps/suppliers/templates/suppliers/list.html:25
+#: apps/suppliers/templates/suppliers/list.html:37
+msgid "Phone"
+msgstr "Téléphone"
+
+#: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
+msgid "Notes"
+msgstr "Notes"
+
+#: apps/suppliers/models.py:27
+msgid "contact person"
+msgstr "personne de contact"
+
+#: apps/suppliers/models.py:29
+msgid "phone"
+msgstr "téléphone"
+
+#: apps/suppliers/models.py:31
+msgid "notes"
+msgstr "notes"
+
+#: apps/suppliers/models.py:37
+msgid "supplier"
+msgstr "fournisseur"
+
+#: apps/suppliers/models.py:38
+msgid "suppliers"
+msgstr "fournisseurs"
+
+#: apps/suppliers/services.py:36
+msgid "A supplier with this name exists."
+msgstr "Un fournisseur portant ce nom existe déjà."
+
+#: apps/suppliers/services.py:37
+msgid "A supplier with this tax id exists."
+msgstr "Un fournisseur avec ce numéro fiscal existe déjà."
+
+#: apps/suppliers/templates/suppliers/form.html:4
+#: apps/suppliers/templates/suppliers/form.html:11
+#: apps/suppliers/templates/suppliers/list.html:11
+msgid "New supplier"
+msgstr "Nouveau fournisseur"
+
+#: apps/suppliers/templates/suppliers/form.html:9
+#, python-format
+msgid "Edit supplier %(name)s"
+msgstr "Modifier le fournisseur %(name)s"
+
+#: apps/suppliers/templates/suppliers/list.html:4
+#: apps/suppliers/templates/suppliers/list.html:8
+#: templates/partials/nav_items.html:33
+msgid "Suppliers"
+msgstr "Fournisseurs"
+
+#: apps/suppliers/templates/suppliers/list.html:45
+msgid "No suppliers"
+msgstr "Aucun fournisseur"
+
+#: apps/suppliers/templates/suppliers/list.html:45
+msgid "No supplier matches the filters."
+msgstr "Aucun fournisseur ne correspond aux filtres."
+
+#: apps/suppliers/views.py:94
+#, python-format
+msgid "Supplier %(name)s added."
+msgstr "Fournisseur %(name)s ajouté."
+
+#: apps/suppliers/views.py:120
+#, python-format
+msgid "Supplier %(name)s saved."
+msgstr "Fournisseur %(name)s enregistré."
+
+#: apps/suppliers/views.py:138
+#, python-format
+msgid "Supplier %(name)s reactivated."
+msgstr "Fournisseur %(name)s réactivé."
+
+#: apps/suppliers/views.py:140
+#, python-format
+msgid "Supplier %(name)s deactivated."
+msgstr "Fournisseur %(name)s désactivé."
 
 #: templates/400.html:4
 msgid "Bad request"
@@ -1704,6 +1799,6 @@ msgstr "Navigation principale"
 msgid "Language"
 msgstr "Langue"
 
-#: templates/partials/nav_items.html:40
+#: templates/partials/nav_items.html:48
 msgid "Security"
 msgstr "Sécurité"

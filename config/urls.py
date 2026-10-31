@@ -9,6 +9,7 @@ urlpatterns = [
     path("account/email-change/", include("apps.accounts.email_change_urls")),
     path("projects/", include("apps.projects.urls")),
     path("catalog/", include("apps.catalog.urls")),
+    path("suppliers/", include("apps.suppliers.urls")),
     path("org/", include("apps.organizations.urls")),
     path("i18n/", include("django.conf.urls.i18n")),
     path("", include("apps.core.urls")),

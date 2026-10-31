@@ -1,0 +1,49 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Suppliers" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Suppliers" %}</h1>
+    {% if manageable %}
+      {% url 'suppliers:new' as new_url %}
+      {% include "components/button.html" with href=new_url label=_("New supplier") variant="primary" %}
+    {% endif %}
+  </div>
+  {% url 'suppliers:list' as list_url %}
+  {% include "components/filter_form.html" with form=filters target="#supplier-results" action=list_url %}
+  {% partialdef results inline %}
+    <div id="supplier-results">
+      {% if page_obj.object_list %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Name" %}</th>
+              <th scope="col">{% translate "Tax id" %}</th>
+              <th scope="col">{% translate "Contact person" %}</th>
+              <th scope="col">{% translate "Phone" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for supplier in page_obj.object_list %}
+              <tr>
+                <td data-label="{% translate 'Name' %}">
+                  <a href="{% url 'suppliers:detail' supplier_id=supplier.pk %}">{{ supplier.name }}</a>
+                </td>
+                <td data-label="{% translate 'Tax id' %}">{{ supplier.tax_id|default:"—" }}</td>
+                <td data-label="{% translate 'Contact person' %}">{{ supplier.contact_name|default:"—" }}</td>
+                <td data-label="{% translate 'Phone' %}">{{ supplier.phone|default:"—" }}</td>
+                <td data-label="{% translate 'Status' %}">{% include "suppliers/status.html" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No suppliers") text=_("No supplier matches the filters.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

@@ -64,6 +64,7 @@ from tests.access.matrix import (
     send,
     url_patterns,
 )
+from tests.org import Sentinel
 
 pytestmark = pytest.mark.django_db
 
@@ -121,6 +122,7 @@ def admin_object(world: World, model: str) -> Any:
         "branch": lambda: org.a_mad,
         "project": lambda: org.hospital,
         "location": lambda: org.warehouses["A Madrid"],
+        "supplier": lambda: org.supplier,
     }
     return rows.get(model, lambda: world.objects[model])()
 
@@ -141,6 +143,10 @@ def admin_redirect_path(app: str, model: str) -> Callable[[World], str]:
     return path
 
 
+SUPPLIER_SENTINELS = frozenset(
+    {Sentinel.SUPPLIER_NAME, Sentinel.SUPPLIER_EMAIL, Sentinel.SUPPLIER_PHONE}
+)
+
 # Access and document models are read-only; master data is editable by GROUP_ADMIN only
 # (the platform operator only views it). Nothing is ever deleted (plan §5, §8.2).
 READ_ONLY_MODELS = {
@@ -157,7 +163,10 @@ MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),
     "locations": ("location",),
     "catalog": ("materialcategory", "material"),
+    "suppliers": ("supplier",),
 }
+# The admin pages of a model that shows its own sentinels (the supplier's contact details).
+ADMIN_SENTINELS = {"supplier": SUPPLIER_SENTINELS}
 
 
 def _admin_model_routes() -> dict[str, Route]:
@@ -183,11 +192,14 @@ def _admin_model_routes() -> dict[str, Route]:
                     "delete": admin_page(DENIED, DENIED),
                     "change": change,
                 }
+                shown = ADMIN_SENTINELS.get(model, frozenset())
                 for view, methods in views.items():
                     key = f"{base}_{view}"
-                    routes[key] = Route(methods, path=admin_model_path(key))
+                    routes[key] = Route(methods, path=admin_model_path(key), allowed=shown)
                 routes[f"admin:{app}/{model}/<path:object_id>/"] = Route(
-                    admin_page(REDIRECT, REDIRECT), path=admin_redirect_path(app, model)
+                    admin_page(REDIRECT, REDIRECT),
+                    path=admin_redirect_path(app, model),
+                    allowed=shown,
                 )
     return routes
 
@@ -296,6 +308,16 @@ UNKNOWN_ID = "00000000-0000-7000-8000-000000000000"
 # Every account with a valid membership reads the catalog; managers change it (M3.1).
 CATALOG_VIEWERS = (*PROJECT_VIEWERS, "revoked_assignment")
 CATALOG_MANAGERS = PROJECT_MANAGERS
+
+
+# Suppliers are read by who holds supplier.view and changed by who holds supplier.manage; the
+# mixed user manages through A-SEV (S6). Not site managers, technicians or partners.
+SUPPLIER_VIEWERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "mixed")
+SUPPLIER_MANAGERS = PROJECT_MANAGERS
+
+
+def _supplier_url(name: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[world.org.supplier.pk])
 
 
 def _unknown_url(name: str) -> Callable[[World], str]:
@@ -435,6 +457,65 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             app_action(**_each(OK, CATALOG_MANAGERS)),
             path=_object_url("catalog:category_update", "materialcategory"),
             note="an empty form: 200 with errors",
+        ),
+    ),
+    # Suppliers (M3.2): supplier.view (group administrators, material managers, warehouse
+    # operators) reads every supplier; supplier.manage (not warehouse operators) changes them.
+    # Site managers, technicians and partners get nothing: no supplier name, email or phone.
+    "suppliers:list": (Route(app_page(**_each(OK, SUPPLIER_VIEWERS)), allowed=SUPPLIER_SENTINELS),),
+    "suppliers:detail": (
+        Route(
+            app_page(**_each(OK, SUPPLIER_VIEWERS)),
+            position="a supplier",
+            path=_supplier_url("suppliers:detail"),
+            allowed=SUPPLIER_SENTINELS,
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, SUPPLIER_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("suppliers:detail"),
+        ),
+    ),
+    "suppliers:new": (Route(app_page(**_each(OK, SUPPLIER_MANAGERS))),),
+    "suppliers:create": (
+        Route(app_action(**_each(OK, SUPPLIER_MANAGERS)), note="an empty form: 200 with errors"),
+    ),
+    "suppliers:edit": (
+        Route(
+            app_page(**_each(OK, SUPPLIER_MANAGERS)),
+            position="a supplier",
+            path=_supplier_url("suppliers:edit"),
+            allowed=SUPPLIER_SENTINELS,
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, SUPPLIER_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("suppliers:edit"),
+        ),
+    ),
+    "suppliers:update": (
+        Route(
+            app_action(**_each(OK, SUPPLIER_MANAGERS)),
+            path=_supplier_url("suppliers:update"),
+            allowed=SUPPLIER_SENTINELS,
+            note="an empty form: 200 with errors",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, SUPPLIER_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("suppliers:update"),
+        ),
+    ),
+    "suppliers:deactivate": (
+        Route(
+            app_action(**_each(REDIRECT, SUPPLIER_MANAGERS)),
+            path=_supplier_url("suppliers:deactivate"),
+        ),
+    ),
+    "suppliers:reactivate": (
+        Route(
+            app_action(**_each(REDIRECT, SUPPLIER_MANAGERS)),
+            path=_supplier_url("suppliers:reactivate"),
         ),
     ),
     # Group administrators only (org.manage); the target is the A-MAD technician.

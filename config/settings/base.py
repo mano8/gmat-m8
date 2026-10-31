@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.projects",
     "apps.locations",
     "apps.catalog",
+    "apps.suppliers",
     "apps.notifications",
 ]
 
