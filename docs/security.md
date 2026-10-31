@@ -122,6 +122,15 @@ Code in `apps/catalog/`, `apps/suppliers/`, `apps/core/{tabular,imports,demo}.py
 - **Imports** (`manage import_catalog | import_suppliers | import_projects`) are `OperatorCommand`s: `--operator` names an active user who holds the matching capability, no session or MFA exists and the audit shows `via=cli:<command>`. Rows reach the database only through the services, each authorizing the operator again for its own objects, so a material manager cannot import projects outside their branches. The file is read as text (CSV; XLSX in read-only mode with formulas as saved values and `defusedxml` guarding the XML), limited to 20 MB and 100,000 rows. A file with any error writes nothing; an error found while writing rolls the file back, and the report lists errors by line. The report never prints cell values beyond the offending one.
 - **`seed_demo`** refuses to run unless `DJANGO_SETTINGS_MODULE` is `config.settings.dev` or `config.settings.test` (an unset or any other value is refused before the database is touched). Demo users get `--password` (validated) or a random one printed once; they are ordinary accounts, so privileged roles still enroll MFA at sign-in.
 
+## Material requests: the requester's side (step M4.1)
+
+Code in `apps/material_requests/`; plan §3.4, §3.5 (S5), §4.3, §4.4, §4.6 (C3, C9), §4.7, §4.8.
+
+- **Scope (S5).** A request is a document of its procurement branch (set from the project when the draft starts, taken again at submit): group administrators see all, material managers and warehouse operators the requests their branches buy for, site managers those of their assigned projects. Own-reach grants (technicians, partners, and everyone's `request.create`) reach only the user's own requests, on any project of their branches (S3) or assigned projects; the project's active-only filter does not apply, so an own request stays visible when its project goes on hold. Lines are scoped through their request.
+- **Writes** go through `apps/material_requests/services.py`: `authorize_in_txn` in full on the request (404 outside `request.view`, 403 without the operation's capability) and on the project for anything that starts or submits a request; the header locked `FOR UPDATE` and re-read (a change since the authorization retries the transaction); a line locked after its header; the number last. Only the requester edits, submits, withdraws or discards their own request; `request.cancel_any` cancels anyone's in scope. Editing follows the state (§4.4): material, unit and quantity only in `DRAFT`. Every write is audited and published as an event.
+- **Integrity in the database**: CHECK constraints on quantities, decisions and closures; the C9 key binds a line to its material's unit, so a unit change racing the first reference ends with exactly one committed (threaded test), and the line is refused rather than converted; the C3 key ties a line's project to its request's.
+- **Idempotency**: create forms and submit take a signed key (plan §4.8); a double submit yields one request number.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

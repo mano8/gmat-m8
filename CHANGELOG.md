@@ -85,6 +85,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - `manage import_catalog | import_suppliers | import_projects <file.csv|xlsx> --operator <email> [--dry-run]` (M3.3, `openpyxl` + `defusedxml`): rows matched by natural key, written through the same services as the screens, one transaction per file, a line-level report, nothing written when any row has an error, a second run changes nothing, one audit event per import (`via=cli:<command>`); templates and rules in `docs/import-templates/`;
   - `manage seed_demo --operator <email>` (M3.4, development and test settings only): the A/B/C organization of plan §3.2, one user per role plus a mixed one, four projects, about 200 materials and five suppliers, idempotently;
   - `OperatorCommand.also_capabilities` / `principal_for` for a command that spans several capabilities, `InstallationQuerySet` in the access engine, and `constraint_errors` (database constraint violations as field errors).
+- Material requests, the requester's side (M4.1, `apps/material_requests`):
+  - `MaterialRequest` and `MaterialRequestLine` with their CHECK constraints (quantities, decisions, closures, a number once submitted), the C9 composite foreign key `(material_id, unit_id) → catalog_material(id, unit_id)` and the C3 key `(request_id, project_id)` that a draft's lines follow when its project changes (`AddCompositeForeignKey(on_update="CASCADE")`); read-only admin;
+  - the state machine as one table (`transitions.ALLOWED_TRANSITIONS`, plan §4.3);
+  - services `create_draft`, `update_request`, `add_line`, `update_line`, `remove_line` (catalog and non-catalog lines), `submit`, `withdraw` and `cancel`: authorized in full in their transaction, header locked before any line, the requester's editing rules of plan §4.4, quantities checked against the unit's decimals, audit events and domain events; `submit` takes the procurement-branch snapshot and the number `SOL-{company}-{branch}-{yyyy}-{00001}` (`REQUEST_NUMBER_PREFIX`), kept through a withdrawal, and is idempotent with a key;
+  - request scope (S5): by procurement branch, by project for assigned projects, own requests on the projects of the requester's branches for own-reach grants.
 
 ### Changed
 
