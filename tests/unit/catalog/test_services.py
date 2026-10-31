@@ -303,3 +303,12 @@ class TestAuthorization:
         User.objects.filter(pk=user.pk).update(is_active=False)
         with pytest.raises(AccessDenied):
             services.create_material(principal, reference="X", name="X", unit_id=unit.pk)
+
+
+def test_create_material_refuses_an_unknown_argument(
+    admin_principal: SessionPrincipal, unit: UnitOfMeasure
+) -> None:
+    with pytest.raises(TypeError, match="unexpected arguments"):
+        services.create_material(
+            admin_principal, reference="R", name="N", unit_id=unit.pk, colour="red"
+        )

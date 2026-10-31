@@ -154,3 +154,8 @@ class TestAuthorization:
     def test_a_privileged_role_needs_session_mfa(self, org: Org, people: Any) -> None:
         with pytest.raises(MFARequired):
             services.create_supplier(principal_for(people.mm_mad, mfa_at=None), name="X")
+
+
+def test_create_supplier_refuses_an_unknown_argument(admin_principal: SessionPrincipal) -> None:
+    with pytest.raises(TypeError, match="unexpected arguments"):
+        services.create_supplier(admin_principal, name="X", colour="red")

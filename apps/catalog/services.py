@@ -168,6 +168,16 @@ def update_category(principal: Principal, category_id: UUID, **changes: Any) -> 
 # --- materials ----------------------------------------------------------------------
 
 
+MATERIAL_DEFAULTS: dict[str, Any] = {
+    "category_id": None,
+    "description": "",
+    "manufacturer": "",
+    "manufacturer_ref": "",
+    "ean": None,
+    "is_stock_item": False,
+}
+
+
 @transactional
 def create_material(
     principal: Principal,
@@ -175,26 +185,22 @@ def create_material(
     reference: str,
     name: str,
     unit_id: UUID,
-    category_id: UUID | None = None,
-    description: str = "",
-    manufacturer: str = "",
-    manufacturer_ref: str = "",
-    ean: str | None = None,
-    is_stock_item: bool = False,
     idempotency_key: str | None = None,
+    **optional: Any,
 ) -> Material:
-    """Add a material to the catalog (active)."""
+    """Add a material to the catalog (active).
+
+    ``optional`` takes any of ``MATERIAL_DEFAULTS`` (``category_id``, ``description``,
+    ``manufacturer``, ``manufacturer_ref``, ``ean``, ``is_stock_item``); another key is a
+    ``TypeError``.
+    """
+    unknown = sorted(set(optional) - MATERIAL_DEFAULTS.keys())
+    if unknown:
+        raise TypeError(f"create_material() got unexpected arguments: {unknown}")
+    given = MATERIAL_DEFAULTS | optional
     _authorize(principal)
-    values = _clean_text(
-        {
-            "reference": reference,
-            "name": name,
-            "description": description,
-            "manufacturer": manufacturer,
-            "manufacturer_ref": manufacturer_ref,
-            "ean": ean,
-        }
-    )
+    is_stock_item, category_id = given.pop("is_stock_item"), given.pop("category_id")
+    values = _clean_text({"reference": reference, "name": name, **given})
     payload = {**values, "unit_id": unit_id, "category_id": category_id, "stock": is_stock_item}
 
     def execute() -> Material:

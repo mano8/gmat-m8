@@ -51,32 +51,34 @@ def _clean(values: dict[str, Any]) -> dict[str, Any]:
     return cleaned
 
 
+SUPPLIER_DEFAULTS: dict[str, Any] = {
+    "tax_id": None,
+    "contact_name": "",
+    "email": "",
+    "phone": "",
+    "address": "",
+    "notes": "",
+}
+
+
 @transactional
 def create_supplier(
     principal: Principal,
     *,
     name: str,
-    tax_id: str | None = None,
-    contact_name: str = "",
-    email: str = "",
-    phone: str = "",
-    address: str = "",
-    notes: str = "",
     idempotency_key: str | None = None,
+    **optional: Any,
 ) -> Supplier:
-    """Add a supplier (active)."""
+    """Add a supplier (active).
+
+    ``optional`` takes any of ``SUPPLIER_DEFAULTS`` (``tax_id``, ``contact_name``, ``email``,
+    ``phone``, ``address``, ``notes``); another key is a ``TypeError``.
+    """
+    unknown = sorted(set(optional) - SUPPLIER_DEFAULTS.keys())
+    if unknown:
+        raise TypeError(f"create_supplier() got unexpected arguments: {unknown}")
     _authorize(principal)
-    values = _clean(
-        {
-            "name": name,
-            "tax_id": tax_id,
-            "contact_name": contact_name,
-            "email": email,
-            "phone": phone,
-            "address": address,
-            "notes": notes,
-        }
-    )
+    values = _clean({"name": name, **(SUPPLIER_DEFAULTS | optional)})
 
     def execute() -> Supplier:
         supplier = Supplier(**values)
