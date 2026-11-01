@@ -67,8 +67,8 @@ class EmailOutbox(BaseModel):
     - ``PO_ORDER`` / ``PO_CANCELLATION``: ``recipient_address`` and ``source_po``; their
       eligibility belongs to the purchasing app (``apps.notifications.dispatch``).
 
-    ``source_po`` is a plain UUID until the purchase-order model exists (M5.1 turns it into
-    a foreign key on the same column).
+    ``source_po`` points at the purchase order (column ``source_po``; a plain UUID before
+    M5.1).
     """
 
     kind = models.CharField(max_length=20, choices=Kind.choices)
@@ -79,7 +79,15 @@ class EmailOutbox(BaseModel):
     eligibility_rule = models.CharField(max_length=100, blank=True)
     eligibility_object_type = models.CharField(max_length=100, blank=True)
     eligibility_object_id = models.UUIDField(null=True, blank=True)
-    source_po = models.UUIDField(null=True, blank=True)
+    source_po = models.ForeignKey(
+        "purchasing.PurchaseOrder",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        db_column="source_po",
+        db_index=False,  # ``notifications_outbox_source_po`` below
+        related_name="dispatches",
+    )
     source_ref = models.CharField(max_length=100, blank=True)
     from_email = models.CharField(max_length=254)
     subject = models.TextField()

@@ -6,7 +6,7 @@
 {% endcomment %}
 {% block shell %}
   <div class="min-h-dvh md:grid md:grid-cols-[15rem_1fr]">
-    <aside class="hidden border-r border-line bg-raised p-4 md:flex md:flex-col md:gap-6"
+    <aside class="hidden border-r border-line bg-raised p-4 md:flex md:flex-col md:gap-6 print:hidden"
            aria-label="{% translate 'Main navigation' %}">
       <a href="{% url 'core:home' %}"
          class="inline-flex min-h-11 items-center text-xl font-bold text-ink no-underline hover:no-underline">gmat-m8</a>
@@ -15,7 +15,7 @@
       </nav>
     </aside>
     <div class="flex min-h-dvh flex-col">
-      <header class="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-raised px-4 py-2">
+      <header class="sticky top-0 z-20 print:hidden flex items-center justify-between gap-3 border-b border-line bg-raised px-4 py-2">
         <a href="{% url 'core:home' %}"
            class="inline-flex min-h-11 items-center text-lg font-bold text-ink no-underline hover:no-underline md:hidden">gmat-m8</a>
         <span class="hidden truncate text-sm text-soft md:inline">{{ request.user.email }}</span>
@@ -27,7 +27,7 @@
         {% endblock content %}
       </main>
     </div>
-    <nav class="fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t border-line bg-raised p-1 md:hidden"
+    <nav class="fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t border-line bg-raised p-1 md:hidden print:hidden"
          aria-label="{% translate 'Main navigation' %}">
       {% include "partials/nav_items.html" with variant="bottom" %}
     </nav>

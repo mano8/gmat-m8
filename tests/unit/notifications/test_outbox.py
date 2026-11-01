@@ -23,6 +23,7 @@ from apps.notifications.outbox import (
     queue_dispatch,
     queue_notification,
 )
+from apps.purchasing.models import PurchaseOrder
 from tests.org import Org
 from tests.outbox import SECRET_BODY
 
@@ -175,9 +176,11 @@ class TestDispatch:
                 kind=Kind.SECURITY, po_id=org.hospital.pk, address="a@b.c", subject="s", body="b"
             )
 
-    def test_queued_with_its_order(self, dispatch: Callable[..., EmailOutbox], org: Org) -> None:
+    def test_queued_with_its_order(
+        self, dispatch: Callable[..., EmailOutbox], purchase_order: PurchaseOrder
+    ) -> None:
         message = dispatch()
-        assert message.source_po == org.hospital.pk
+        assert message.source_po_id == purchase_order.pk
         assert message.is_dispatch
         assert message.sensitive is False
 

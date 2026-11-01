@@ -8,10 +8,6 @@
   turns it ``AMBIGUOUS`` once the deadline and grace have passed, and resends nothing.
 """
 
-import os
-import subprocess
-import sys
-import textwrap
 import threading
 import time
 from collections.abc import Callable
@@ -19,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from django.db import connection, transaction
+from django.db import transaction
 from django.test import override_settings
 
 from apps.access.principals import SystemPrincipal
@@ -31,15 +27,14 @@ from apps.notifications.models import EmailAttempt, EmailOutbox, Kind, Outcome, 
 from apps.notifications.outbox import queue_dispatch, queue_security_email
 from apps.notifications.services import Claim, claim_next, record_outcome
 from apps.notifications.worker import Worker
-from apps.projects.models import Project
+from apps.purchasing.models import PurchaseOrder
+from tests import orders as purchase_orders
 from tests.integration.conftest import run_concurrently
-from tests.org import Org, build_org
-from tests.outbox import SECRET_BODY, FakeOrders
+from tests.org import build_org
+from tests.outbox import SECRET_BODY, FakeOrders, no_dispatch_source, start_worker
 from tests.smtp import Behaviour, fake_smtp
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 def security_mails(user: User, count: int) -> list[EmailOutbox]:
@@ -86,30 +81,31 @@ class SlowOrders(FakeOrders):
 @pytest.fixture
 def orders() -> Any:
     source = SlowOrders()
-    unregister = register_dispatch_source(source)
-    yield source
-    unregister()
+    with no_dispatch_source():
+        unregister = register_dispatch_source(source)
+        yield source
+        unregister()
 
 
 @pytest.fixture
-def order_and_dispatch(db: None) -> tuple[Org, EmailOutbox]:
-    org = build_org()
+def order_and_dispatch(db: None) -> tuple[PurchaseOrder, EmailOutbox]:
+    order = purchase_orders.order(build_org())
     with transaction.atomic():
         message = queue_dispatch(
             kind=Kind.PO_ORDER,
-            po_id=org.hospital.pk,
+            po_id=order.pk,
             address="orders@supplier.example",
             subject="Order",
             body="Please deliver.",
         )
-    return org, message
+    return order, message
 
 
 def _cancel(order_id: Any, message_id: Any, locked: threading.Event, hold: float) -> str:
     """What M5's cancel does: the order FOR UPDATE (L4), then its dispatch rows (L4b)."""
     with transaction.atomic():
         locks = LockOrder()
-        locks.lock(LockLevel.PO_HEADERS, Project, [order_id], mode=LockMode.UPDATE)
+        locks.lock(LockLevel.PO_HEADERS, PurchaseOrder, [order_id], mode=LockMode.UPDATE)
         locks.lock(LockLevel.PO_OUTBOX, EmailOutbox, [message_id], mode=LockMode.UPDATE)
         locked.set()
         time.sleep(hold)
@@ -120,14 +116,14 @@ def _cancel(order_id: Any, message_id: Any, locked: threading.Event, hold: float
 
 
 def test_a_dispatch_claim_waits_for_a_cancellation_holding_the_order(
-    orders: SlowOrders, order_and_dispatch: tuple[Org, EmailOutbox]
+    orders: SlowOrders, order_and_dispatch: tuple[PurchaseOrder, EmailOutbox]
 ) -> None:
-    org, message = order_and_dispatch
+    order, message = order_and_dispatch
     locked = threading.Event()
 
     def run(index: int) -> Any:
         if index == 0:
-            return _cancel(org.hospital.pk, message.pk, locked, hold=0.5)
+            return _cancel(order.pk, message.pk, locked, hold=0.5)
         locked.wait(10)
         started = time.monotonic()
         result = claim_next(SystemPrincipal())
@@ -142,9 +138,9 @@ def test_a_dispatch_claim_waits_for_a_cancellation_holding_the_order(
 
 
 def test_a_cancellation_waits_for_a_claim_in_progress(
-    orders: SlowOrders, order_and_dispatch: tuple[Org, EmailOutbox]
+    orders: SlowOrders, order_and_dispatch: tuple[PurchaseOrder, EmailOutbox]
 ) -> None:
-    org, message = order_and_dispatch
+    order, message = order_and_dispatch
     orders.hold = 0.5
     locked = threading.Event()
 
@@ -152,7 +148,7 @@ def test_a_cancellation_waits_for_a_claim_in_progress(
         if index == 0:
             return claim_next(SystemPrincipal())
         time.sleep(0.2)  # the claim holds the order FOR SHARE by now
-        return _cancel(org.hospital.pk, message.pk, locked, hold=0)
+        return _cancel(order.pk, message.pk, locked, hold=0)
 
     claimed, seen_by_cancel = run_concurrently(2, run)
     assert isinstance(claimed, Claim)
@@ -160,51 +156,14 @@ def test_a_cancellation_waits_for_a_claim_in_progress(
     assert seen_by_cancel == Status.SENDING
 
 
-WORKER_SCRIPT = textwrap.dedent(
-    """
-    import os, sys
-    import django
-
-    django.setup()
-    from django.conf import settings
-
-    settings.MAILERS = {
-        "default": {"BACKEND": "apps.notifications.backends.OutboxEmailBackend"},
-        "outbound": {
-            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
-            "OPTIONS": {"host": "127.0.0.1", "port": int(sys.argv[1]), "timeout": 10},
-        },
-    }
-    settings.OUTBOUND_EMAIL = True
-    from apps.notifications.worker import main
-
-    main()
-    """
-)
-
-
 def test_a_worker_killed_after_data_leaves_ambiguous_and_never_resends(
     make_user: Callable[..., User], tmp_path: Path
 ) -> None:
     user = make_user("crash@example.org")
     (message,) = security_mails(user, 1)
-    env = {
-        **os.environ,
-        "DJANGO_SETTINGS_MODULE": "config.settings.test",
-        "DB_NAME": str(connection.settings_dict["NAME"]),
-        "WORKER_FLAGS_DIR": str(tmp_path),
-        "WORKER_HEARTBEAT_FILE": str(tmp_path / "heartbeat"),
-        "PYTHONPATH": str(ROOT),
-    }
     # The server takes the whole message, then never answers: the worker is past DATA.
     with fake_smtp(Behaviour(hang_at="final")) as server:
-        process = subprocess.Popen(  # noqa: S603 (fixed interpreter and script)
-            [sys.executable, "-c", WORKER_SCRIPT, str(server.port)],
-            cwd=ROOT,
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        process = start_worker(server.port, tmp_path)
         try:
             assert server.hanging.wait(60), "the worker never reached the end of DATA"
             assert server.contents, "the message content was not transmitted"

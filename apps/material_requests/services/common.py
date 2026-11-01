@@ -1,7 +1,6 @@
 """Shared rules of the material request services: authorization, locks, editing rules."""
 
 from collections.abc import Mapping
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -15,11 +14,13 @@ from apps.access.roles import Capability
 from apps.accounts.models import User
 from apps.audit.recorder import record
 from apps.catalog.models import Material, UnitOfMeasure
+from apps.catalog.quantities import check_quantity
 from apps.core import events
 from apps.core.db import constraint_errors, db_now
 from apps.core.locking import LockLevel, LockOrder, LockSetChanged
 from apps.core.sequences import format_number, next_number
-from apps.material_requests import ledger
+from apps.material_requests import commitments, ledger
+from apps.material_requests.commitments import LockedComponent
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.transitions import transition
 from apps.organizations.models import Branch
@@ -145,30 +146,6 @@ def _decided(request: MaterialRequest) -> bool:
     return request.lines.exclude(decision=Decision.PENDING).exists()
 
 
-def _check_quantity(
-    quantity: Any, unit: UnitOfMeasure, field: str = "requested_qty", *, zero: bool = False
-) -> None:
-    """A positive ``Decimal`` (or zero, with ``zero``) with no more decimals than the unit
-    allows."""
-    if not isinstance(quantity, Decimal) or not quantity.is_finite():
-        raise ValidationError({field: ValidationError(_("Enter a quantity."), code="invalid")})
-    if quantity < 0 or (quantity == 0 and not zero):
-        raise ValidationError(
-            {field: ValidationError(_("The quantity must be positive."), code="positive")}
-        )
-    exponent = quantity.normalize().as_tuple().exponent
-    if isinstance(exponent, int) and -exponent > unit.decimals:
-        raise ValidationError(
-            {
-                field: ValidationError(
-                    _("%(unit)s quantities have at most %(decimals)s decimals."),
-                    code="precision",
-                    params={"unit": unit.code, "decimals": unit.decimals},
-                )
-            }
-        )
-
-
 def _line_values(
     *,
     material_id: UUID | None,
@@ -212,7 +189,7 @@ def _line_values(
         if found is None:
             raise ValidationError({"unit": ValidationError(_("Choose a unit."), code="required")})
         unit = found
-    _check_quantity(requested_qty, unit)
+    check_quantity(requested_qty, unit, "requested_qty")
     return {
         "material_id": material_id,
         "free_text": free_text,
@@ -336,19 +313,35 @@ def _lock_lines(
     return list(lines.filter(pk__in=ids))
 
 
-def _locked_line(
-    principal: Principal, capability: str, line_id: UUID, locks: LockOrder
-) -> tuple[User, MaterialRequest, list[MaterialRequestLine], MaterialRequestLine]:
-    """Authorize on the line's request, lock it (L2) and all its lines (L3).
+def _lock_component(
+    locks: LockOrder, request: MaterialRequest
+) -> tuple[MaterialRequest, list[MaterialRequestLine], LockedComponent]:
+    """L2-L5: the request's allocation component (``commitments``), before any line.
 
-    Returns the actor, the request, its lines and the one asked for.
+    Every request header of the component (this one included) is locked at L2, every line
+    at L3, then the purchase orders at L4/L5. The header is re-read under its lock and the
+    transaction retried if what was authorized has changed (discover → lock → verify).
+    Returns the header, all its lines (in line order) and the component.
+    """
+    component = commitments.lock_component(locks, [request.pk])
+    locked = MaterialRequest.objects.get(pk=request.pk)
+    if _verified(locked) != _verified(request):
+        raise LockSetChanged("The request changed between authorization and locking")
+    return locked, list(locked.lines.select_related("unit")), component
+
+
+def _component_line(
+    principal: Principal, capability: str, line_id: UUID, locks: LockOrder
+) -> tuple[User, MaterialRequest, list[MaterialRequestLine], MaterialRequestLine, LockedComponent]:
+    """Authorize on the line's request, then lock its component (``_lock_component``).
+
+    Returns the actor, the request, its lines, the one asked for and the component.
     """
     request = _line_request(line_id)
     actor = _authorize(principal, capability, request, locks)
-    locked = _lock_header(locks, request)
-    lines = _lock_lines(locks, locked)
+    locked, lines, component = _lock_component(locks, request)
     line = next(item for item in lines if item.pk == line_id)
-    return actor, locked, lines, line
+    return actor, locked, lines, line, component
 
 
 def _record_line(
@@ -374,15 +367,6 @@ def _reopen_line(line: MaterialRequestLine) -> None:
     for name, value in NO_CLOSURE.items():
         setattr(line, name, value)
     line.save()
-
-
-def _reconcile(locks: LockOrder, request: MaterialRequest, cause: str) -> None:
-    """Restore I2 over the request's component after a ledger input changed (§4.5).
-
-    M5.1 wires the allocation trims of a closure and ``reconcile_component`` in here, and
-    widens the locks to the whole component before L3. Until purchase orders exist nothing
-    is allocated, so no line can be committed beyond its approved quantity.
-    """
 
 
 def _settle_closure(

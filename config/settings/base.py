@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.catalog",
     "apps.suppliers",
     "apps.material_requests",
+    "apps.purchasing",
     "apps.notifications",
 ]
 
@@ -122,8 +123,10 @@ PASSWORD_RESET_TIMEOUT = 3600  # one hour (plan §5)
 IDEMPOTENCY_KEY_MAX_AGE = 24 * 3600
 IDEMPOTENCY_RECORD_RETENTION = 7 * 24 * 3600
 
-# Document number prefixes (plan §4.2): SOL-{company}-{branch}-{yyyy}-{00001}.
+# Document number prefixes (plan §4.2): SOL-{company}-{branch}-{yyyy}-{00001} for requests,
+# PED-{company}-{yyyy}-{00001} for purchase orders (per buyer company).
 REQUEST_NUMBER_PREFIX = "SOL"
+PURCHASE_ORDER_NUMBER_PREFIX = "PED"
 
 # --- allauth (plan §5, "Identity, sessions and MFA"; floor 65.20.1) ---------------------
 ACCOUNT_ADAPTER = "apps.accounts.adapters.AccountAdapter"
@@ -218,6 +221,10 @@ DEFAULT_FROM_EMAIL = env_str("DJANGO_DEFAULT_FROM_EMAIL", "gmat-m8 <no-reply@loc
 PUBLIC_BASE_URL = "http://localhost:8000"
 # Off unless switched on: with it off the worker never claims or opens an SMTP connection.
 OUTBOUND_EMAIL = env_bool("OUTBOUND_EMAIL", False)
+# Supplier dispatch (M5.3, Q7): with it on, issuing or amending an order queues it by email to
+# the supplier's address as issued. ADR-0010 keeps the MVP on the printable page, so it is off
+# unless switched on. Cancellation notices for orders already sent are queued either way.
+PO_DISPATCH = env_bool("PO_DISPATCH", False)
 # Seconds per SMTP socket operation (the plan's EMAIL_TIMEOUT; Django reserves that name).
 OUTBOX_SMTP_TIMEOUT = 10
 OUTBOX_SEND_DEADLINE = 60  # seconds per message, every stage included (SIGALRM)

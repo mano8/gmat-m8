@@ -1,0 +1,56 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Purchase orders" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Purchase orders" %}</h1>
+    {% if can_manage %}
+      {% url 'purchasing:worklist' as worklist_url %}
+      {% include "components/button.html" with href=worklist_url label=_("To purchase") variant="primary" %}
+    {% endif %}
+  </div>
+  {% url 'purchasing:orders' as orders_url %}
+  {% include "components/filter_form.html" with form=filters target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_1fr_auto]" %}
+  {% partialdef results inline %}
+    <div id="order-results" data-testid="orders">
+      {% if entries %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Order" %}</th>
+              <th scope="col">{% translate "Supplier" %}</th>
+              <th scope="col">{% translate "Ship to" %}</th>
+              <th scope="col">{% translate "Expected" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order, progress in entries %}
+              <tr data-testid="order-row">
+                <td data-label="{% translate 'Order' %}">
+                  <a href="{% url 'purchasing:detail' po_id=order.pk %}">{{ order.number|default:_("Draft order") }}</a>
+                </td>
+                <td data-label="{% translate 'Supplier' %}">{{ order.supplier.name }}</td>
+                <td data-label="{% translate 'Ship to' %}">{{ order.ship_to.name }}</td>
+                <td data-label="{% translate 'Expected' %}">{{ order.expected_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</td>
+                <td data-label="{% translate 'Status' %}">
+                  <span class="flex flex-wrap justify-end gap-1 sm:justify-start">
+                    {% include "purchasing/status.html" with obj=order %}
+                    {% if progress %}
+                      {% include "purchasing/progress.html" with progress=progress %}
+                    {% endif %}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No purchase orders") text=_("No order matches the filters.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

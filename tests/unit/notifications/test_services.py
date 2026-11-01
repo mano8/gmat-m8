@@ -251,12 +251,12 @@ class TestDispatchClaim:
         system: SystemPrincipal,
         dispatch: Callable[..., EmailOutbox],
         orders: FakeOrders,
-        org: Any,
+        purchase_order: Any,
     ) -> None:
         message = dispatch()
         claimed = claim(system)
         assert claimed.to == ("orders@supplier.example",)
-        assert orders.locked == [org.hospital.pk]
+        assert orders.locked == [purchase_order.pk]
         assert reload(message).status == Status.SENDING
 
     @pytest.mark.parametrize("refusal", [Status.CANCELLED, Status.SUPERSEDED])
@@ -265,16 +265,20 @@ class TestDispatchClaim:
         system: SystemPrincipal,
         dispatch: Callable[..., EmailOutbox],
         orders: FakeOrders,
-        org: Any,
+        purchase_order: Any,
         refusal: Status,
     ) -> None:
         message = dispatch()
-        orders.refusals[org.hospital.pk] = refusal
+        orders.refusals[purchase_order.pk] = refusal
         assert claim_next(system) == Settled(message.pk, refusal)
 
     def test_one_source_at_a_time(self, orders: FakeOrders) -> None:
         with pytest.raises(ValueError, match="already registered"):
             register_dispatch_source(FakeOrders())
+
+    def test_registering_the_same_source_again_is_harmless(self, orders: FakeOrders) -> None:
+        register_dispatch_source(orders)
+        assert dispatch_source() is orders
 
     def test_unregistering_twice_is_harmless(self) -> None:
         unregister = register_dispatch_source(FakeOrders())
@@ -366,6 +370,32 @@ class TestOutcome:
         # AMBIGUOUS, not a FAILED attempt that will be retried.
         assert reload(failed).status == Status.QUEUED
         assert orders.outcomes == [(ambiguous.pk, Status.AMBIGUOUS), (sent.pk, Status.SENT)]
+
+    def test_every_dispatch_attempt_reaches_the_source(
+        self,
+        system: SystemPrincipal,
+        dispatch: Callable[..., EmailOutbox],
+        security_mail: Callable[..., EmailOutbox],
+        orders: FakeOrders,
+    ) -> None:
+        """Started, ended, abandoned and late: each one is audited by the source (M5.3)."""
+        message = dispatch()
+        first = claim(system)
+        record_outcome(system, first.attempt_id, Outcome.FAILED, error="refused")
+        make_due(message)
+        second = claim(system)
+        age(second.attempt_id, 3600)
+        reconcile_abandoned(system)
+        record_outcome(system, second.attempt_id, Outcome.SENT)  # late
+        security_mail()
+        record_outcome(system, claim(system).attempt_id, Outcome.SENT)  # not a dispatch
+        assert orders.attempts == [
+            (message.pk, 1, ""),
+            (message.pk, 1, Outcome.FAILED),
+            (message.pk, 2, ""),
+            (message.pk, 2, Outcome.AMBIGUOUS),
+            (message.pk, 2, Outcome.SENT),
+        ]
 
     def test_a_dispatch_outcome_needs_the_source(
         self, system: SystemPrincipal, dispatch: Callable[..., EmailOutbox]

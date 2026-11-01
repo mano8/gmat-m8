@@ -1,0 +1,57 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "New purchase order" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% translate "New purchase order" %}</h1>
+    <p class="mt-1 text-soft">{% translate "It starts as a draft: nothing reaches the supplier until you issue it." %}</p>
+  </div>
+  <form method="post"
+        action="{% url 'purchasing:create' %}"
+        data-testid="new-order-form">
+    {% csrf_token %}
+    {{ form.idempotency_key }}
+    {{ form.items_key }}
+    {% if form.non_field_errors %}<div role="alert" class="errorlist">{{ form.non_field_errors }}</div>{% endif %}
+    <section class="card mb-4" aria-label="{% translate 'Order' %}">
+      {{ form.branch.as_field_group }}
+      {{ form.supplier.as_field_group }}
+      {{ form.ship_to.as_field_group }}
+      {{ form.expected_date.as_field_group }}
+      {{ form.supplier_ref.as_field_group }}
+      {{ form.notes.as_field_group }}
+    </section>
+    {% if form.rows %}
+      <section class="mb-4" aria-label="{% translate 'Lines' %}">
+        <h2 class="mb-2">{% translate "Request lines" %}</h2>
+        <p class="mb-2 text-sm text-soft">
+          {% translate "Untick a line to leave it out; lower the quantity to buy only part of it." %}
+        </p>
+        {% for entry in form.entries %}
+          {% with line=entry.row.line %}
+            <div class="card mb-3" data-testid="new-order-line">
+              <div class="flex items-start gap-3">
+                <span class="field mb-0 mt-1">{{ entry.pick }}</span>
+                <div class="flex-1">
+                  <p class="font-medium">{{ line.description }}</p>
+                  <p class="text-sm text-soft">
+                    {{ line.request.number }} · {{ line.project.code }} · {% translate "To purchase" %}
+                    {{ entry.row.to_purchase|quantity }} {{ line.unit.code }}
+                  </p>
+                  {{ entry.qty.errors }}
+                  <div class="field mb-0 mt-2 max-w-40">
+                    <label for="{{ entry.qty.id_for_label }}">{% translate "Quantity" %} ({{ line.unit.code }})</label>
+                    {{ entry.qty }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endwith %}
+        {% endfor %}
+      </section>
+    {% endif %}
+    {% include "components/button.html" with type="submit" label=_("Create the draft") variant="primary" block=True %}
+  </form>
+{% endblock content %}

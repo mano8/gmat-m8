@@ -21,9 +21,13 @@ from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.notifications.models import Status as MailStatus
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
 from tests.access.matrix import World, build_world
+from tests.orders import allocate, line, order
+from tests.org import build_sentinel_order
+from tests.outbox import make_dispatch
 
 
 def _admin_rows(world: World) -> None:
@@ -128,6 +132,21 @@ def _admin_rows(world: World) -> None:
         approved_qty=Decimal("2.000"),
         decided_by=people.mm_mad,
         decided_at=decided,
+    )
+    # The issued order carrying the price and other-project quantity sentinels (M5.1).
+    sentinel = build_sentinel_order(org, people)
+    world.objects["purchaseorder"] = sentinel.order
+    world.objects["purchaseorderline"] = sentinel.line
+    world.objects["purchaseallocation"] = sentinel.hospital
+    # Its dispatch to the sentinel supplier, left AMBIGUOUS by the worker (M5.3).
+    world.objects["dispatch"] = make_dispatch(
+        sentinel.order, MailStatus.AMBIGUOUS, address=org.supplier.email
+    )
+    # A draft of A-MAD with one line allocated to the approved request: the builder's URLs.
+    world.objects["draftorder"] = draft = order(org)
+    world.objects["draftline"] = draft_line = line(draft, material, "3")
+    world.objects["draftallocation"] = allocate(
+        draft_line, world.objects["approved_request_line"], "3"
     )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)

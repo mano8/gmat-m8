@@ -25,6 +25,22 @@
     <span>{% translate "Inbox" %}</span>
   </a>
 {% endcan %}
+{% can "po.manage" %}
+  <a href="{% url 'purchasing:worklist' %}"
+     class="nav-link"
+     {% if request.resolver_match.url_name == 'worklist' or request.resolver_match.url_name == 'new' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="cart" %}
+    <span>{% translate "To purchase" %}</span>
+  </a>
+{% endcan %}
+{% can "po.view" %}
+  <a href="{% url 'purchasing:orders' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'purchasing' and request.resolver_match.url_name != 'worklist' and request.resolver_match.url_name != 'new' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="truck" %}
+    <span>{% translate "Orders" %}</span>
+  </a>
+{% endcan %}
 {% can "project.view" %}
   <a href="{% url 'projects:list' %}"
      class="nav-link"

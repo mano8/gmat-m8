@@ -24,6 +24,14 @@
     });
   });
 
+  // A print button (the purchase-order page): without JavaScript the browser's own print
+  // command does the same.
+  document.addEventListener("click", function (event) {
+    if (event.target.closest("[data-print]")) {
+      window.print();
+    }
+  });
+
   // The language switcher submits when the selection changes (without JavaScript the form
   // still has its button).
   document.addEventListener("change", function (event) {

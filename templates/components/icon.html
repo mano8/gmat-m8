@@ -1,4 +1,4 @@
-{% comment %}Decorative 24px outline icon: `name` is home, folder, people, shield, logout, check, alert, box, truck or clipboard.{% endcomment %}
+{% comment %}Decorative 24px outline icon: `name` is home, folder, people, shield, logout, check, alert, box, truck, cart or clipboard.{% endcomment %}
 <svg xmlns="http://www.w3.org/2000/svg"
      class="size-6 shrink-0"
      fill="none"
@@ -24,6 +24,8 @@
     <path d="m5 12.5 4.5 4.5L19 7.5" />
   {% elif name == "alert" %}
     <path d="M12 4 3 19.5h18L12 4Zm0 6v4.5m0 2.5v.01" />
+  {% elif name == "cart" %}
+    <path d="M3 4.5h2.5l2 10.5h9.5l2-7.5H6.5M10 19.5h.01M16.5 19.5h.01" />
   {% elif name == "box" %}
     <path d="m12 3 8.5 4.5v9L12 21l-8.5-4.5v-9L12 3Zm0 9 8.5-4.5M12 12v9M12 12 3.5 7.5" />
   {% elif name == "clipboard" %}

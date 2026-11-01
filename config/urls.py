@@ -11,6 +11,7 @@ urlpatterns = [
     path("catalog/", include("apps.catalog.urls")),
     path("requests/", include("apps.material_requests.urls")),
     path("suppliers/", include("apps.suppliers.urls")),
+    path("purchasing/", include("apps.purchasing.urls")),
     path("org/", include("apps.organizations.urls")),
     path("i18n/", include("django.conf.urls.i18n")),
     path("", include("apps.core.urls")),

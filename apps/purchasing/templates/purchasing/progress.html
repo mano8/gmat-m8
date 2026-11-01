@@ -1,0 +1,8 @@
+{% comment %}How much has arrived (derived). Parameter: progress (a selectors.Progress).{% endcomment %}
+{% if progress.value == "RECEIVED" %}
+  {% include "components/status_chip.html" with label=progress.label tone="ok" %}
+{% elif progress.value == "PARTIAL" %}
+  {% include "components/status_chip.html" with label=progress.label tone="brand" %}
+{% else %}
+  {% include "components/status_chip.html" with label=progress.label %}
+{% endif %}

@@ -1,0 +1,173 @@
+{% load i18n ui_tags %}
+{% comment %}
+  One order line with its ledger and its allocation breakdown, and the tools of its state.
+  Parameter: lv (a views.pages.LineView). The page's `order`, `managing` and `prices` apply.
+{% endcomment %}
+{% with line=lv.row.line totals=lv.row.totals %}
+  <article class="card mb-3"
+           data-line="{{ line.line_no }}"
+           data-testid="order-line">
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <span class="font-semibold">{{ line.line_no }}. {{ lv.row.name }}</span>
+        <span class="block text-sm text-soft">{{ lv.row.reference }}</span>
+      </div>
+      <span class="flex flex-wrap gap-1">
+        {% if line.closed_short_at %}
+          {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
+        {% endif %}
+        {% if totals.unallocated > 0 %}
+          {% include "components/status_chip.html" with label=_("Ordered for nobody") tone="warn" %}
+        {% endif %}
+      </span>
+    </div>
+    <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+      <div>
+        <dt class="text-soft">{% translate "Ordered" %}</dt>
+        <dd data-field="ordered">
+          {{ totals.ordered|quantity }} {{ line.unit.code }}
+        </dd>
+      </div>
+      {% if order.status == "DRAFT" %}
+        <div>
+          <dt class="text-soft">{% translate "Allocated" %}</dt>
+          <dd data-field="allocated">
+            {{ totals.allocated|quantity }} {{ line.unit.code }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-soft">{% translate "Not allocated" %}</dt>
+          <dd data-field="unreserved">
+            {{ lv.row.unreserved|quantity }} {{ line.unit.code }}
+          </dd>
+        </div>
+      {% else %}
+        <div>
+          <dt class="text-soft">{% translate "Received" %}</dt>
+          <dd data-field="received">
+            {{ totals.received|quantity }} {{ line.unit.code }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-soft">{% translate "Pending" %}</dt>
+          <dd data-field="pending">
+            {{ totals.pending|quantity }} {{ line.unit.code }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-soft">{% translate "Ordered for nobody" %}</dt>
+          <dd data-field="unallocated">
+            {{ totals.unallocated|quantity }} {{ line.unit.code }}
+          </dd>
+        </div>
+      {% endif %}
+      {% if prices and lv.row.unit_price is not None %}
+        <div>
+          <dt class="text-soft">{% translate "Unit price" %}</dt>
+          <dd data-field="price">
+            {{ lv.row.unit_price }}
+            {% if lv.row.discount_pct %}(−{{ lv.row.discount_pct }} %){% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-soft">{% translate "Total" %}</dt>
+          <dd data-field="total">
+            {{ lv.row.total }}
+          </dd>
+        </div>
+      {% endif %}
+    </dl>
+    {% if line.closed_short_at %}
+      <p class="mt-2 text-sm text-soft" data-testid="line-closure">
+        {{ line.closed_short_at|date:"SHORT_DATETIME_FORMAT" }} · {{ line.close_reason }}
+      </p>
+    {% endif %}
+    {% if lv.allocations %}
+      <h3 class="mb-1 mt-3 text-sm font-semibold text-soft">{% translate "Who it is for" %}</h3>
+      <ul data-testid="allocations">
+        {% for av in lv.allocations %}
+          {% with row=av.row alloc=av.row.allocation %}
+            <li class="border-t border-line py-2"
+                data-testid="allocation"
+                {% if alloc.qty == 0 %}data-trimmed="true"{% endif %}>
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <span class="font-medium">{{ row.request_number }} · {% translate "line" %} {{ row.request_line_no }}</span>
+                <span class="text-sm text-soft">{{ row.project_code }}</span>
+              </div>
+              <p class="text-sm">
+                <span data-field="ceiling">{{ alloc.qty|quantity }}</span> {{ line.unit.code }}
+                {% if order.status == "DRAFT" %}
+                  {% if row.reserved > 0 %}
+                    · {% translate "reserved" %} <span data-field="reserved">{{ row.reserved|quantity }}</span>
+                  {% endif %}
+                {% else %}
+                  · {% translate "received" %} <span data-field="attributed">{{ row.attributed|quantity }}</span>
+                  · {% translate "pending" %} <span data-field="alloc-pending">{{ row.pending|quantity }}</span>
+                {% endif %}
+                {% if alloc.qty == 0 %}· {% translate "trimmed to zero" %}{% endif %}
+              </p>
+              {% if av.raise_form %}
+                <details>
+                  <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium text-brand">{% translate "Change the allocation" %}</summary>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <form method="post"
+                          action="{% url 'purchasing:increase_allocation' allocation_id=alloc.pk %}"
+                          class="flex items-end gap-2">
+                      {% csrf_token %}
+                      <div class="field mb-0 flex-1">
+                        <label for="{{ av.raise_form.qty.id_for_label }}">{% translate "Raise to" %}</label>
+                        {{ av.raise_form.qty }}
+                      </div>
+                      {% include "components/button.html" with type="submit" label=_("Raise") %}
+                    </form>
+                    <form method="post"
+                          action="{% url 'purchasing:unallocate' allocation_id=alloc.pk %}"
+                          class="flex items-end gap-2">
+                      {% csrf_token %}
+                      <div class="field mb-0 flex-1">
+                        <label for="{{ av.lower_form.qty.id_for_label }}">{% translate "Lower to (0 removes it)" %}</label>
+                        {{ av.lower_form.qty }}
+                      </div>
+                      {% include "components/button.html" with type="submit" label=_("Lower") %}
+                    </form>
+                  </div>
+                </details>
+              {% endif %}
+            </li>
+          {% endwith %}
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if lv.form %}
+      <details class="mt-2">
+        <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium text-brand">{% translate "Edit the line" %}</summary>
+        <form method="post"
+              action="{% url 'purchasing:update_line' line_id=line.pk %}">
+          {% csrf_token %}
+          {% for field in lv.form %}{{ field.as_field_group }}{% endfor %}
+          {% include "components/button.html" with type="submit" label=_("Save the line") %}
+        </form>
+        <form method="post"
+              action="{% url 'purchasing:remove_line' line_id=line.pk %}"
+              class="mt-2">
+          {% csrf_token %}
+          {% include "components/button.html" with type="submit" label=_("Remove the line") variant="danger" %}
+        </form>
+      </details>
+    {% endif %}
+    {% if lv.close_form %}
+      <details class="mt-2">
+        <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium text-brand">{% translate "Close the line short" %}</summary>
+        <p class="mb-2 text-sm text-soft">
+          {% translate "Give up what has not arrived (agreed with the supplier). Its allocations keep only what was received." %}
+        </p>
+        <form method="post"
+              action="{% url 'purchasing:close_line' line_id=line.pk %}">
+          {% csrf_token %}
+          {{ lv.close_form.reason.as_field_group }}
+          {% include "components/button.html" with type="submit" label=_("Close the line short") variant="danger" %}
+        </form>
+      </details>
+    {% endif %}
+  </article>
+{% endwith %}

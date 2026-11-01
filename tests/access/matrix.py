@@ -245,6 +245,8 @@ class Route:
     path: Callable[[World], str] | None = None
     data: Callable[[World], dict[str, Any]] | None = None
     allowed: frozenset[Sentinel] = frozenset()
+    # Sentinels only some actors may see (the price: ``price.view`` holders), on top of ``allowed``.
+    allowed_for: Mapping[str, frozenset[Sentinel]] = field(default_factory=dict)
     note: str = ""
 
     def url(self, key: str, world: World) -> str:
@@ -286,7 +288,8 @@ def check_route(
             if not outcome.matches(response):
                 got = f"{response.status_code} {response.get('Location', '')}".strip()
                 problems.append(f"{method} {label} as {actor}: expected {outcome}, got {got}")
-            for sentinel in leaked(response, route.allowed):
+            shown = route.allowed | route.allowed_for.get(actor, frozenset())
+            for sentinel in leaked(response, shown):
                 problems.append(f"{method} {label} as {actor}: leaks {sentinel.name}")
     return problems
 

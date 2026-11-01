@@ -160,6 +160,40 @@ Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templ
 - **History.** The timeline reads the request's `AuditEvent` rows only for who reviews, sources or holds `audit.view` on the request, and shows the action, actor, time, line and the reason or note: never the raw payload. Requesters see no audit trail.
 - **Errors.** Service validation errors are flashed (text from the service), a busy database answers 409, and nothing is written by a GET. Same browser rules as before: no inline script or style, CSRF in each form, `no-store, private`; the pages work without JavaScript.
 
+## Purchasing: orders, allocations and reconciliation (step M5.1)
+
+Code in `apps/purchasing/`; plan §3.4, §3.5 (S5, S9), §4.2-4.9.
+
+- **Capabilities.** Every write needs `po.manage` (group administrators and material managers in scope) on the order, or on the branch and destination of a new one, and on the requests it allocates to; `po.view` is the read capability (404 outside it, 403 inside it without `po.manage`: warehouse operators). Setting a price also needs `price.view`. Each service authorizes in full inside its transaction, with session MFA for privileged grants; a capability held through another membership is refused (S6). A service-level matrix calls every operation as every actor of the shared fixture.
+- **Prices.** Optional (Q10). Selectors return a line's price, discount and total only to who holds `price.view` on the order; the admin never shows them (platform operators hold no `price.view`). The shared fixture's sentinel order carries the price and another project's quantity, and the acceptance matrix checks every response for them.
+- **Scope.** Orders are documents of their branch (S5); an order ships to a warehouse of its branch or of a branch it manages, or to the worksite of an active project it buys for, and a worksite order serves only that project (C6). An allocation needs an open `PURCHASE` line of the order's procurement branch, the same material, an active project and branches (C5, S9).
+- **Integrity in the database.** CHECK constraints on quantities, prices, discounts, closures and issue fields; the C9 key binds an order line to its material's unit; the outbox's `source_po` is a foreign key.
+- **Commitments.** Allocations grow only through an authorized allocation within *to purchase* and the ordered quantity (C5, I3) and shrink only through audited trims, never below what is attributed (I6). Every operation that changes a reconciliation input locks its allocation component (L2-L5, verified, retried when it changes, refused above 200 lines) and cuts any excess commitment (I2); issue refuses an over-committed draft instead. Threaded tests race drafts, allocations and closures over the same quantities.
+- **Snapshots.** Issued orders keep the buyer, supplier, destination and material as they were at issue; documents use the snapshots, not the live master data.
+
+## Purchasing: the screens (step M5.2)
+
+Code in `apps/purchasing/views/`, `forms.py`, `selectors.py` and `templates/purchasing/`; plan §3.4, §4.4, §4.5, §8.2, §11 M5.2.
+
+- **Capabilities per screen.** The worklist, the builder and every action need `po.manage` (group administrators, material managers); the orders list, the order page and the printable page need `po.view` (also warehouse operators). Every action is its own POST-only URL (`@mutating`), checked in S7 order (capability somewhere 403, order in scope 404, `po.manage` on it 403); the services authorize again. The amendment page is for `po.manage`; a draft has none and a draft has no printable page (both redirect with a message).
+- **Prices.** The order page, the amendment form and the printable page show a price, discount or total only to who holds `price.view` on the order; the price fields do not exist in the forms of anyone else (a forged `unit_price` is ignored). The acceptance matrix allows the price sentinel per actor (`Route.allowed_for`): a warehouse operator reading the sentinel order is checked priceless, in the page and in the print.
+- **Choices.** The supplier, buying branch, destination and request lines of every form come from selectors (`visible_to`); a request line is a form field only if the worklist (or the order's candidates) offered it, so a forged id is ignored or refused, never trusted. The builder re-checks that the destination belongs to the chosen branch and that every ticked line is bought for by it; the services check C5, C6 and S9 again.
+- **Double taps and forged keys.** Creating an order, adding lines, issuing and amending carry server-issued idempotency keys (a second key for the lines of a new order); a replay returns the same result, a forged key is a 400, a reused one a 409. Issuing needs a ticked confirmation.
+- **History.** The order's timeline (revisions with their reason, closures, the reconciliation trims with their cause) reads `AuditEvent` rows only for who holds `po.manage` or `audit.view` on the order; it shows the action, actor, time and a short detail, never the raw payload.
+- **Print.** The printable page renders the issued snapshots (buyer, supplier, destination, material), never the live master data; print CSS hides the navigation, and the print button is a `data-print` hook in `app.js` (no inline handler).
+- **Errors.** Service validation errors are flashed or shown on the form, a busy database answers 409, and nothing is written by a GET. Same browser rules as before: no inline script or style, CSRF in each form, `no-store, private`; the pages work without JavaScript.
+
+## Purchasing: supplier dispatch (step M5.3)
+
+Code in `apps/purchasing/dispatch.py`, `services/dispatches.py` and `templates/purchasing/email/`; plan §4.7 (L4b), §5, Q7.
+
+- **Off by default.** Nothing is sent to a supplier unless `PO_DISPATCH=on` (ADR-0010: the MVP prints the order). The switch gates new `PO_ORDER` dispatches only: the cancellation notice of an order the supplier may already have is always owed.
+- **Frozen content.** Recipients and content come from the order's snapshots at issue or amendment (the address the order was issued to, never the live supplier record) and are frozen by the outbox trigger, `Message-ID` included. The text body is plain text; the HTML body is autoescaped. Prices go to the supplier as recorded on its own order.
+- **Locks and races.** Every path locks the order before its dispatch rows (L4 → L4b): the worker's claim and outcome `FOR SHARE`, cancel, amend and the human decisions `FOR UPDATE`. Threaded tests show that two workers send one dispatch once and that claim and cancel wait for each other in either order without a deadlock.
+- **Eligibility at the claim.** A `PO_ORDER` goes only while its order is issued at that revision (else `CANCELLED` or `SUPERSEDED`); a `PO_CANCELLATION` only for a cancelled order; one notice per order (unique index).
+- **Ambiguity.** A dispatch that timed out or was cut after DATA, or whose worker died mid-send, ends `AMBIGUOUS` and is never resent automatically. A `po.manage` holder confirms it or sends it again (a new attempt), both audited with a note; nothing else changes a dispatch's status by hand.
+- **Audit.** Every attempt (start and outcome, abandoned and late ones) is an audit event on the order by `system:worker`, with the revision, attempt number and error stage, never the address or the content. Warehouse operators (`po.view`, who hold `supplier.view`) see the dispatches' status and address without the decision.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

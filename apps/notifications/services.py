@@ -12,6 +12,8 @@ at the database clock (``apps.notifications.eligibility``).
   I/O; the returned ``Claim`` carries what the worker needs to send.
 - ``record_outcome``: in a new transaction (a dispatch: order, then row), conditional on
   ``current_attempt`` still being that attempt; applies the retry policy of the kind.
+- A dispatch's attempts are audited by its source (``record_attempt``) when they start and
+  when they end, abandoned and late outcomes included (M5.3).
 - ``reconcile_abandoned``: a ``SENDING`` message whose attempt started more than the send
   deadline + ``OUTBOX_ABANDON_GRACE`` ago becomes ``AMBIGUOUS`` (conditional on the attempt
   id, so a newer attempt is never touched). A late outcome of that attempt may still turn it
@@ -156,33 +158,50 @@ def _domain(from_email: str) -> str | None:
     return domain if at and domain else None
 
 
-def _prepare(message: EmailOutbox, source: DispatchSource | None, worker: str) -> Claim | Settled:
-    """Expiry and eligibility under the row lock; then the attempt, before any I/O."""
-    if message.expires_at is not None and message.expires_at <= db_now():
-        return _settle(message, Status.EXPIRED)
-    users: list[UUID] = []
-    to: tuple[str, ...] = (message.recipient_address,)
+@dataclass(frozen=True)
+class _Recipients:
+    """Who a claimed message goes to: notification recipients by id, and the addresses."""
+
+    users: list[UUID]
+    to: tuple[str, ...]
     bcc: tuple[str, ...] = ()
+
+
+def _recipients(message: EmailOutbox, source: DispatchSource | None) -> _Recipients | Status:
+    """The eligibility check of the claim: the recipients, or the status the message gets."""
     if message.kind == Kind.NOTIFICATION:
         recipients = eligibility.eligible_recipients(message)
         if not recipients:
-            return _settle(message, Status.SUPPRESSED)
-        users = [user.pk for user in recipients]
+            return Status.SUPPRESSED
         addresses = tuple(user.email for user in recipients)
         to, bcc = (addresses, ()) if len(addresses) == 1 else ((), addresses)
-    elif message.kind == Kind.SECURITY:
+        return _Recipients([user.pk for user in recipients], to, bcc)
+    if message.kind == Kind.SECURITY:
         if not eligibility.security_target_ok(message):
-            return _settle(message, Status.SUPPRESSED)
+            return Status.SUPPRESSED
     else:
         # Dispatches are only claimed while a source is registered (``_claim``).
         refusal = cast(DispatchSource, source).refusal(message)
         if refusal is not None:
-            return _settle(message, refusal)
-    try:
-        body = unseal(message.body) if message.sensitive else message.body
-        html_body = unseal(message.html_body) if message.sensitive else message.html_body
-    except InvalidToken:
-        return _settle(message, Status.FAILED, "the body cannot be decrypted with any key")
+            return refusal
+    return _Recipients([], (message.recipient_address,))
+
+
+def _bodies(message: EmailOutbox) -> tuple[str, str]:
+    """The text and HTML bodies, unsealed (``InvalidToken`` when no key opens them)."""
+    if not message.sensitive:
+        return message.body, message.html_body
+    return unseal(message.body), unseal(message.html_body)
+
+
+def _start_attempt(
+    principal: SystemPrincipal,
+    message: EmailOutbox,
+    source: DispatchSource | None,
+    users: list[UUID],
+    worker: str,
+) -> EmailAttempt:
+    """The attempt, committed with ``SENDING`` before any I/O; a dispatch's is audited."""
     attempt = EmailAttempt.objects.create(
         message=message, number=message.attempts + 1, recipient_users=users, worker=worker
     )
@@ -192,14 +211,33 @@ def _prepare(message: EmailOutbox, source: DispatchSource | None, worker: str) -
     if not message.message_id:
         message.message_id = make_msgid(domain=_domain(message.from_email))
     message.save(update_fields=["status", "current_attempt", "attempts", "message_id"])
+    if message.is_dispatch:
+        cast(DispatchSource, source).record_attempt(principal, message, attempt)
+    return attempt
+
+
+def _prepare(
+    principal: SystemPrincipal, message: EmailOutbox, source: DispatchSource | None, worker: str
+) -> Claim | Settled:
+    """Expiry and eligibility under the row lock; then the attempt, before any I/O."""
+    if message.expires_at is not None and message.expires_at <= db_now():
+        return _settle(message, Status.EXPIRED)
+    recipients = _recipients(message, source)
+    if not isinstance(recipients, _Recipients):
+        return _settle(message, recipients)
+    try:
+        body, html_body = _bodies(message)
+    except InvalidToken:
+        return _settle(message, Status.FAILED, "the body cannot be decrypted with any key")
+    attempt = _start_attempt(principal, message, source, recipients.users, worker)
     return Claim(
         message_id=message.pk,
         attempt_id=attempt.pk,
         attempt_number=attempt.number,
         kind=message.kind,
         from_email=message.from_email,
-        to=to,
-        bcc=bcc,
+        to=recipients.to,
+        bcc=recipients.bcc,
         subject=message.subject,
         header_message_id=message.message_id,
         body=body,
@@ -220,7 +258,7 @@ def _claim(
         return None
     if candidate["kind"] in DISPATCH_KINDS:
         # Discover → lock → verify (plan §4.7): the order at L4, then its row at L4b.
-        cast(DispatchSource, source).lock_order(locks, cast(UUID, candidate["source_po"]))
+        cast(DispatchSource, source).lock_order(locks, candidate["source_po"])
         locks.enter(LockLevel.PO_OUTBOX)
         message = _due().filter(pk=candidate["pk"]).select_for_update(skip_locked=True).first()
     else:
@@ -235,7 +273,7 @@ def _claim(
         return None  # taken by another worker in the meantime
     try:
         with transaction.atomic():
-            return _prepare(message, source, worker)
+            return _prepare(principal, message, source, worker)
     except DatabaseError:
         raise
     except Exception:
@@ -253,6 +291,14 @@ def claim_next(principal: SystemPrincipal, *, worker: str = "") -> Claim | Settl
 # --- outcomes ------------------------------------------------------------------------------
 
 
+def _record_attempt(
+    principal: SystemPrincipal, message: EmailOutbox | None, attempt: EmailAttempt
+) -> None:
+    """Audit a dispatch attempt's outcome (``_lock_message`` refused one without a source)."""
+    if message is not None and message.is_dispatch:
+        cast(DispatchSource, dispatch_source()).record_attempt(principal, message, attempt)
+
+
 def _lock_message(locks: LockOrder, message_id: UUID) -> EmailOutbox | None:
     """The message row ``FOR UPDATE``; a dispatch's order first (L4 → L4b)."""
     found = EmailOutbox.objects.filter(pk=message_id).values("kind", "source_po").first()
@@ -262,7 +308,7 @@ def _lock_message(locks: LockOrder, message_id: UUID) -> EmailOutbox | None:
         source = dispatch_source()
         if source is None:
             raise RuntimeError("A dispatch outcome needs the purchasing app's dispatch source")
-        source.lock_order(locks, cast(UUID, found["source_po"]))
+        source.lock_order(locks, found["source_po"])
         locks.enter(LockLevel.PO_OUTBOX)
     return EmailOutbox.objects.select_for_update().filter(pk=message_id).first()
 
@@ -325,6 +371,7 @@ def _record(principal: SystemPrincipal, attempt_id: UUID, outcome: Outcome, erro
     attempt.abandoned = False
     attempt.finished_at = Now()
     attempt.save(update_fields=["outcome", "error", "abandoned", "finished_at"])
+    _record_attempt(principal, message, attempt)
     current = message is not None and message.current_attempt_id == attempt.pk
     allowed = {Status.SENDING} | ({Status.AMBIGUOUS, Status.QUEUED} if late else set())
     if not current or message is None or message.status not in allowed:
@@ -370,6 +417,7 @@ def _abandon(principal: SystemPrincipal, message_id: UUID, attempt_id: UUID) -> 
     attempt.error = ABANDONED_ERROR
     attempt.finished_at = Now()
     attempt.save(update_fields=["outcome", "abandoned", "error", "finished_at"])
+    _record_attempt(principal, message, attempt)
     _apply(message, attempt, Outcome.AMBIGUOUS, locks)
     return True
 

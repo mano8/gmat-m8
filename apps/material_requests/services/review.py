@@ -14,11 +14,12 @@ from apps.access.policy import require_not_self_approval
 from apps.access.principals import Principal
 from apps.accounts.models import User
 from apps.catalog.models import Material
+from apps.catalog.quantities import check_quantity
 from apps.core import events
 from apps.core.changes import apply_changes
 from apps.core.db import db_now
 from apps.core.locking import LockOrder, transactional
-from apps.material_requests import ledger
+from apps.material_requests import commitments, ledger
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services.common import (
     REVIEW,
@@ -29,14 +30,13 @@ from apps.material_requests.services.common import (
     Sourcing,
     Status,
     _authorize,
-    _check_quantity,
     _close_line,
+    _component_line,
     _line_request,
+    _lock_component,
     _lock_header,
     _lock_lines,
-    _locked_line,
     _reason,
-    _reconcile,
     _record,
     _record_line,
     _reopen_line,
@@ -67,7 +67,7 @@ class LineDecision:
 def _decision_values(decision: LineDecision, line: MaterialRequestLine) -> dict[str, Any]:
     if decision.decision == Decision.APPROVED:
         quantity = line.requested_qty if decision.approved_qty is None else decision.approved_qty
-        _check_quantity(quantity, line.unit, "approved_qty")
+        check_quantity(quantity, line.unit, "approved_qty")
         if quantity > line.requested_qty:
             raise ValidationError(
                 {
@@ -233,10 +233,10 @@ def reduce_approved_qty(
     more takes a new request. A line reduced to zero is no longer live.
     """
     locks = LockOrder()
-    _actor, locked, lines, line = _locked_line(principal, REVIEW, line_id, locks)
+    _actor, locked, lines, line, component = _component_line(principal, REVIEW, line_id, locks)
     _require_state(locked, Status.APPROVED)
     _require_live(line)
-    _check_quantity(approved_qty, line.unit, "approved_qty", zero=True)
+    check_quantity(approved_qty, line.unit, "approved_qty", zero=True)
     (entry,) = ledger.line_ledgers([line])
     current = entry.approved
     if approved_qty > current:
@@ -270,8 +270,8 @@ def reduce_approved_qty(
         changes={"approved_qty": {"from": current, "to": approved_qty}},
         reason=reason.strip(),
     )
-    _reconcile(locks, locked, "reduce_approved_qty")
     _settle_closure(principal, locked, lines)
+    component.reconcile(principal, "reduce_approved_qty")
     return line
 
 
@@ -380,8 +380,7 @@ def change_schedule(
     locks = LockOrder()
     request = MaterialRequest.objects.get(pk=request_id)
     _authorize(principal, SOURCE, request, locks)
-    locked = _lock_header(locks, request)
-    _lock_lines(locks, locked)
+    locked, _lines, component = _lock_component(locks, request)
     _require_state(locked, Status.APPROVED)
     diff = apply_changes(locked, changes, {"priority", "needed_by"})
     if not diff:
@@ -390,7 +389,7 @@ def change_schedule(
     locked.save()
     _record(principal, "request.rescheduled", locked, changes=diff)
     events.publish("request.rescheduled", request_id=locked.pk, fields=sorted(diff))
-    _reconcile(locks, locked, "schedule")
+    component.reconcile(principal, "change_schedule")
     return locked
 
 
@@ -415,7 +414,7 @@ def close_line_short(principal: Principal, line_id: UUID, *, reason: str) -> Mat
     """
     reason = _reason(reason)
     locks = LockOrder()
-    actor, locked, lines, line = _locked_line(principal, SOURCE, line_id, locks)
+    actor, locked, lines, line, component = _component_line(principal, SOURCE, line_id, locks)
     _require_state(locked, Status.APPROVED)
     _require_live(line)
     (entry,) = ledger.line_ledgers([line])
@@ -425,8 +424,11 @@ def close_line_short(principal: Principal, line_id: UUID, *, reason: str) -> Mat
         )
     _close_line(line, actor, Closure.LINE, reason, db_now())
     _record_line(principal, "request_line.closed_short", locked, line, reason=reason)
-    _reconcile(locks, locked, "close_line_short")
+    component.trim_request_lines(
+        principal, [line.pk], reason=commitments.LINE_CLOSED, cause="close_line_short"
+    )
     _settle_closure(principal, locked, lines)
+    component.reconcile(principal, "close_line_short")
     return line
 
 
@@ -435,14 +437,14 @@ def reopen_line(principal: Principal, line_id: UUID, *, reason: str) -> Material
     """Reopen a line closed on its own (``LINE``); it keeps its trimmed allocations (E5)."""
     reason = _reason(reason)
     locks = LockOrder()
-    _actor, locked, _lines, line = _locked_line(principal, SOURCE, line_id, locks)
+    _actor, locked, _lines, line, component = _component_line(principal, SOURCE, line_id, locks)
     _require_state(locked, Status.APPROVED)
     if line.closed_short_source != Closure.LINE:
         raise ValidationError(_("This line is not closed short."), code="not_closed")
     closed = {"closed_short_at": line.closed_short_at, "close_reason": line.close_reason}
     _reopen_line(line)
     _record_line(principal, "request_line.reopened", locked, line, reason=reason, closed=closed)
-    _reconcile(locks, locked, "reopen_line")
+    component.reconcile(principal, "reopen_line")
     return line
 
 
@@ -459,8 +461,7 @@ def manual_close(principal: Principal, request_id: UUID, *, reason: str) -> Mate
     locks = LockOrder()
     request = MaterialRequest.objects.get(pk=request_id)
     actor = _authorize(principal, SOURCE, request, locks)
-    locked = _lock_header(locks, request)
-    lines = _lock_lines(locks, locked)
+    locked, lines, component = _lock_component(locks, request)
     transition(locked, Status.CLOSED, "manual_close")
     now = db_now()
     # A fully delivered line has nothing short: it is not marked closed short.
@@ -477,7 +478,13 @@ def manual_close(principal: Principal, request_id: UUID, *, reason: str) -> Mate
         principal, "request.closed", locked, reason=reason, lines=[line.line_no for line in closed]
     )
     events.publish("request.closed", request_id=locked.pk)
-    _reconcile(locks, locked, "manual_close")
+    component.trim_request_lines(
+        principal,
+        [line.pk for line in closed],
+        reason=commitments.REQUEST_CLOSED,
+        cause="manual_close",
+    )
+    component.reconcile(principal, "manual_close")
     return locked
 
 
@@ -493,8 +500,7 @@ def reopen(principal: Principal, request_id: UUID, *, reason: str) -> MaterialRe
     locks = LockOrder()
     request = MaterialRequest.objects.get(pk=request_id)
     _authorize(principal, SOURCE, request, locks)
-    locked = _lock_header(locks, request)
-    lines = _lock_lines(locks, locked)
+    locked, lines, component = _lock_component(locks, request)
     transition(locked, Status.APPROVED, "reopen")
     reopened = [line for line in lines if line.closed_short_source == Closure.REQUEST]
     for line in reopened:
@@ -511,5 +517,5 @@ def reopen(principal: Principal, request_id: UUID, *, reason: str) -> MaterialRe
         lines=[line.line_no for line in reopened],
     )
     events.publish("request.reopened", request_id=locked.pk)
-    _reconcile(locks, locked, "reopen")
+    component.reconcile(principal, "reopen")
     return locked

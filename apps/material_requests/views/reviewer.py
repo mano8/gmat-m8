@@ -194,6 +194,9 @@ def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
         "can_decide": selectors.can_decide(ctx, found),
         "can_source": sourcing,
         "can_cancel_any": selectors.can_cancel_any(ctx, found),
+        "worksite_warning": sourcing
+        and found.status == Status.APPROVED
+        and selectors.ships_to_own_worksite(ctx, found),
         "own_request": found.requested_by_id == ctx.user_id,
         "return_form": ReturnForm(),
         "schedule_form": ScheduleForm(initial=ScheduleForm.initial_for(found))

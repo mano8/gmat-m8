@@ -1,0 +1,125 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "To purchase" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "To purchase" %}</h1>
+    <span class="flex flex-wrap gap-2">
+      {% url 'purchasing:new' as empty_url %}
+      {% include "components/button.html" with href=empty_url label=_("New empty order") %}
+      {% url 'purchasing:orders' as orders_url %}
+      {% include "components/button.html" with href=orders_url label=_("Orders") %}
+    </span>
+  </div>
+  {% url 'purchasing:worklist' as worklist_url %}
+  {% include "components/filter_form.html" with form=filters target="#worklist-results" action=worklist_url grid="sm:grid-cols-[1fr_1fr_1fr_auto]" %}
+  {% partialdef results inline %}
+    <div id="worklist-results" data-testid="worklist">
+      <form method="get" action="{% url 'purchasing:new' %}">
+        {% for group in groups %}
+          <section class="card mb-3"
+                   data-testid="worklist-material"
+                   aria-label="{{ group.name }}">
+            <header class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <h2 class="text-base">{{ group.name }}</h2>
+                {% if group.reference %}<span class="text-sm text-soft">{{ group.reference }}</span>{% endif %}
+              </div>
+              <span class="font-semibold"
+                    data-field="to-purchase">{{ group.to_purchase|quantity }} {{ group.unit }}</span>
+            </header>
+            {% for row in group.rows %}
+              {% with line=row.line request_obj=row.line.request %}
+                <label class="flex min-h-11 items-start gap-3 border-t border-line py-2"
+                       data-testid="worklist-line">
+                  {% if row.to_purchase > 0 %}
+                    <input type="checkbox"
+                           name="line"
+                           value="{{ line.pk }}"
+                           class="mt-1 size-5 shrink-0 accent-brand"
+                           aria-label="{% blocktranslate with number=request_obj.number %}Add {{ number }} to an order{% endblocktranslate %}">
+                  {% else %}
+                    <span class="mt-1 size-5 shrink-0" aria-hidden="true"></span>
+                  {% endif %}
+                  <span class="flex-1">
+                    <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span class="font-medium">{{ request_obj.number }}</span>
+                      <span class="text-sm text-soft">{{ line.project.code }}</span>
+                      {% if request_obj.priority == "URGENT" %}
+                        {% include "components/status_chip.html" with label=request_obj.get_priority_display tone="danger" %}
+                      {% elif request_obj.priority == "HIGH" %}
+                        {% include "components/status_chip.html" with label=request_obj.get_priority_display tone="warn" %}
+                      {% endif %}
+                      {% if request_obj.needed_by %}
+                        <span class="text-sm text-soft">{% translate "Needed by" %} {{ request_obj.needed_by|date:"SHORT_DATE_FORMAT" }}</span>
+                      {% endif %}
+                      {% if row.reserved > 0 %}
+                        {% include "components/status_chip.html" with label=_("Reserved in drafts") tone="brand" %}
+                      {% endif %}
+                    </span>
+                    <span class="mt-1 grid grid-cols-3 gap-2 text-sm">
+                      <span><span class="block text-soft">{% translate "Approved" %}</span>{{ row.approved|quantity }}</span>
+                      <span><span class="block text-soft">{% translate "Committed" %}</span>{{ row.committed|quantity }}</span>
+                      <span><span class="block text-soft">{% translate "To purchase" %}</span><span data-field="line-to-purchase">{{ row.to_purchase|quantity }}</span></span>
+                    </span>
+                  </span>
+                </label>
+              {% endwith %}
+            {% endfor %}
+          </section>
+        {% empty %}
+          {% include "components/empty_state.html" with title=_("Nothing to purchase") text=_("No approved line is waiting to be bought for these filters.") %}
+        {% endfor %}
+        {% if groups %}
+          <div class="mb-6">
+            {% include "components/button.html" with type="submit" label=_("Start an order with the ticked lines") variant="primary" block=True %}
+          </div>
+        {% endif %}
+      </form>
+      {% if drafts %}
+        <section class="mb-6" aria-label="{% translate 'Draft orders' %}">
+          <h2 class="mb-2">{% translate "Draft orders" %}</h2>
+          <p class="mb-2 text-sm text-soft">
+            {% translate "A draft keeps its quantities reserved: other drafts cannot take them." %}
+          </p>
+          {% for draft, stale in drafts %}
+            <article class="card mb-3" data-testid="draft-order">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <a class="font-semibold"
+                   href="{% url 'purchasing:detail' po_id=draft.pk %}">{{ draft.supplier.name }}</a>
+                <span class="text-sm text-soft">{{ draft.created_at|date:"SHORT_DATE_FORMAT" }}</span>
+              </div>
+              <p class="text-sm text-soft">{{ draft.ship_to.name }}</p>
+              {% if stale %}
+                <p class="mt-1" data-testid="stale-draft">
+                  {% blocktranslate asvar stale_label with days=stale_days %}Older than {{ days }} days: still reserving quantities{% endblocktranslate %}
+                  {% include "components/status_chip.html" with label=stale_label tone="warn" %}
+                </p>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </section>
+      {% endif %}
+      {% if unallocated %}
+        <section class="mb-6" aria-label="{% translate 'Ordered for nobody' %}">
+          <h2 class="mb-2">{% translate "Ordered for nobody" %}</h2>
+          <p class="mb-2 text-sm text-soft">
+            {% translate "A cut or a closure freed this quantity: close the line short with the supplier, or keep the goods as stock." %}
+          </p>
+          {% for row in unallocated %}
+            <article class="card mb-3" data-testid="unallocated-line">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <a class="font-semibold"
+                   href="{% url 'purchasing:detail' po_id=row.line.po_id %}">{{ row.line.po.number }}</a>
+                <span class="font-semibold">{{ row.unallocated|quantity }} {{ row.line.unit.code }}</span>
+              </div>
+              <p class="text-sm text-soft">{{ row.line.material.reference }} · {{ row.line.material.name }}</p>
+            </article>
+          {% endfor %}
+        </section>
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}
