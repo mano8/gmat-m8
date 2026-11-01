@@ -27,7 +27,14 @@ from apps.projects.models import Project
 from apps.purchasing import services
 from apps.purchasing.components import Component
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
-from apps.purchasing.services import AllocationAmendment, LineAmendment, RequestItem, common, orders
+from apps.purchasing.services import (
+    AllocationAmendment,
+    HeaderAmendment,
+    LineAmendment,
+    RequestItem,
+    common,
+    orders,
+)
 from apps.suppliers.models import Supplier
 from tests.org import Org, People
 from tests.support import error_codes, principal_for
@@ -478,9 +485,9 @@ class TestAmend:
             mm,
             order.pk,
             reason="Supplier call",
-            expected_date=date(2026, 12, 1),
-            supplier_ref=" OF-9 ",
-            notes="",
+            header=HeaderAmendment(
+                expected_date=date(2026, 12, 1), supplier_ref=" OF-9 ", notes=""
+            ),
             allocations=[
                 AllocationAmendment(allocation(order, y).pk, D(1)),
                 AllocationAmendment(allocation(order, x).pk, D(9)),
@@ -535,7 +542,7 @@ class TestAmend:
             mm,
             order.pk,
             reason="Same",
-            notes="",
+            header=HeaderAmendment(notes=""),
             allocations=[AllocationAmendment(allocation(order, line).pk, D(10))],
             lines=[LineAmendment(only_line(order).pk)],
         )
@@ -625,7 +632,9 @@ class TestAmend:
         key = issue_key(people.mm_mad.pk, "purchase_order.amend")
         fresh = buy((make_line("10"), "5"))
         for _ in range(2):  # a double tap with the key: one revision
-            services.amend(mm, fresh.pk, reason="r", notes="Twice", idempotency_key=key)
+            services.amend(
+                mm, fresh.pk, reason="r", header=HeaderAmendment(notes="Twice"), idempotency_key=key
+            )
         assert reload(fresh).revision == 1
 
 

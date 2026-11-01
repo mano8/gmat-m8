@@ -19,7 +19,7 @@ from django.utils import timezone
 from apps.access.principals import SessionPrincipal
 from apps.audit.models import AuditEvent
 from apps.core.locking import RetryExhausted
-from apps.material_requests import services as requests
+from apps.material_requests import services as request_services
 from apps.material_requests.models import MaterialRequestLine
 from apps.notifications.models import EmailOutbox
 from apps.notifications.models import Status as MailStatus
@@ -127,7 +127,7 @@ class TestWorklist:
         line = make_line("10")
         order = buy((line, "10"))
         received.receive(only_line(order), "6", {allocation(order, line): "6"})
-        requests.close_line_short(mm, line.pk, reason="Enough")
+        request_services.close_line_short(mm, line.pk, reason="Enough")
 
         html = page(manager, "worklist")
         assert 'data-testid="stale-draft"' in html
@@ -801,8 +801,10 @@ class TestDispatches:
         self, manager: Client, mm: SessionPrincipal, ambiguous: EmailOutbox
     ) -> None:
         EmailOutbox.objects.filter(pk=ambiguous.pk).update(status=MailStatus.FAILED)
-        services.amend(mm, ambiguous.source_po_id, reason="More", notes="x")  # type: ignore[arg-type]
-        html = page(manager, "detail", ambiguous.source_po_id)
+        po_id = ambiguous.source_po_id
+        assert po_id is not None
+        services.amend(mm, po_id, reason="More", header=services.HeaderAmendment(notes="x"))
+        html = page(manager, "detail", po_id)
         assert "Failed" in html
         assert reverse("purchasing:resend_dispatch", args=[ambiguous.pk]) not in html
 

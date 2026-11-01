@@ -28,7 +28,7 @@ from apps.catalog.models import Material, UnitOfMeasure
 from apps.core import events
 from apps.core.locking import LockSetChanged
 from apps.material_requests import ledger
-from apps.material_requests import services as requests
+from apps.material_requests import services as request_services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.purchasing import components, receipts, services
 from apps.purchasing.ledger import book_for_nodes
@@ -228,8 +228,8 @@ def test_two_closures_handing_quantity_to_one_request_are_serialized(
     order(org, mm, (z, "10"), issue=True)
     slowly("request_line.closed_short")
     results = second_starts_later(
-        lambda: requests.close_line_short(mm, w.pk, reason="Not needed"),
-        lambda: requests.close_line_short(mm, y.pk, reason="Not needed"),
+        lambda: request_services.close_line_short(mm, w.pk, reason="Not needed"),
+        lambda: request_services.close_line_short(mm, y.pk, reason="Not needed"),
     )
     assert outcome(results) == ["MaterialRequestLine", "MaterialRequestLine"]
     assert alloc(first, z).qty == 0  # cut once, by whichever came first
@@ -251,7 +251,7 @@ def test_two_closures_of_one_allocation_stop_at_what_is_attributed(
     slowly("purchase_allocation.trimmed")
     results = second_starts_later(
         lambda: services.close_line_short(mm, po.lines.get().pk, reason="Supplier ran out"),
-        lambda: requests.close_line_short(mm, line.pk, reason="Enough"),
+        lambda: request_services.close_line_short(mm, line.pk, reason="Enough"),
     )
     assert outcome(results) == ["PurchaseOrderLine", "MaterialRequestLine"]
     assert alloc(po, line).qty == 6  # I6: attributed ≤ qty, trimmed once
@@ -284,7 +284,7 @@ def test_a_component_that_grows_while_waiting_is_retried(
     slowly("purchase_allocation.created")
     results = second_starts_later(
         lambda: services.add_request_lines(mm, draft.pk, [RequestItem(r.pk, D(4))]),
-        lambda: requests.change_priority(mm, r.request_id, priority="URGENT"),
+        lambda: request_services.change_priority(mm, r.request_id, priority="URGENT"),
     )
     assert outcome(results) == ["PurchaseOrder", "MaterialRequest"]
     assert changed == ["retry"]

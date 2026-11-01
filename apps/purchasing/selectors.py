@@ -481,28 +481,50 @@ def _quantity(value: Any) -> str:
     return f"{Decimal(str(value)).normalize():f}"
 
 
+def _amended(data: dict[str, Any]) -> list[str]:
+    return [f"#{data.get('revision')}", str(data.get("reason", ""))]
+
+
+def _trimmed(data: dict[str, Any]) -> list[str]:
+    reason = TrimReason(data["reason"]) if data.get("reason") in TrimReason else None
+    return [
+        f"{data.get('request')} / {data.get('order_line')}: "
+        f"{_quantity(data.get('from'))} → {_quantity(data.get('to'))}",
+        str(TRIM_LABELS.get(reason, "")) if reason else "",
+    ]
+
+
+def _closed_short(data: dict[str, Any]) -> list[str]:
+    return [f"#{data.get('line_no')}", str(data.get("reason", ""))]
+
+
+def _dispatched(data: dict[str, Any]) -> list[str]:
+    notice = data.get("kind") == Kind.PO_CANCELLATION
+    return [
+        str(_("cancellation notice")) if notice else f"#{data.get('revision')}",
+        str(data.get("error") or data.get("note") or ""),
+    ]
+
+
+def _reason_only(data: dict[str, Any]) -> list[str]:
+    return [str(data.get("reason", ""))]
+
+
+DETAILS = {
+    "purchase_order.amended": _amended,
+    "purchase_allocation.trimmed": _trimmed,
+    "purchase_order_line.closed_short": _closed_short,
+}
+
+
 def _detail(action: str, data: dict[str, Any]) -> str:
     """The reason or what changed in a few words; never the raw payload."""
-    if action == "purchase_order.amended":
-        parts = [f"#{data.get('revision')}", str(data.get("reason", ""))]
-    elif action == "purchase_allocation.trimmed":
-        reason = TrimReason(data["reason"]) if data.get("reason") in TrimReason else None
-        parts = [
-            f"{data.get('request')} / {data.get('order_line')}: "
-            f"{_quantity(data.get('from'))} → {_quantity(data.get('to'))}",
-            str(TRIM_LABELS.get(reason, "")) if reason else "",
-        ]
-    elif action == "purchase_order_line.closed_short":
-        parts = [f"#{data.get('line_no')}", str(data.get("reason", ""))]
-    elif action.startswith("purchase_order.dispatch_"):
-        notice = data.get("kind") == Kind.PO_CANCELLATION
-        parts = [
-            str(_("cancellation notice")) if notice else f"#{data.get('revision')}",
-            str(data.get("error") or data.get("note") or ""),
-        ]
-    else:
-        parts = [str(data.get("reason", ""))]
-    return " · ".join(part for part in parts if part)
+    describe = (
+        _dispatched
+        if action.startswith("purchase_order.dispatch_")
+        else DETAILS.get(action, _reason_only)
+    )
+    return " · ".join(part for part in describe(data) if part)
 
 
 # --- supplier dispatches (M5.3) ---------------------------------------------------------

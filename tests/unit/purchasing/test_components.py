@@ -22,7 +22,7 @@ from apps.access.principals import SessionPrincipal
 from apps.audit.models import AuditEvent
 from apps.core.locking import LockLevel, LockOrder, LockSetChanged
 from apps.material_requests import commitments
-from apps.material_requests import services as requests
+from apps.material_requests import services as request_services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.purchasing import components
 from apps.purchasing.components import (
@@ -143,7 +143,7 @@ class TestLocking:
         # Inside the test's transaction the wrapper does not retry (savepoint); in a real
         # request it retries up to three times (``apps.core.locking``).
         with pytest.raises(LockSetChanged):
-            requests.change_priority(mm, r1.request_id, priority="LOW")
+            request_services.change_priority(mm, r1.request_id, priority="LOW")
         assert MaterialRequest.objects.get(pk=r1.request_id).priority == "NORMAL"
 
     def test_the_dispatch_hook_runs_between_orders_and_lines(
@@ -372,7 +372,7 @@ class TestCommitments:
             assert locks.level == LockLevel.REQUEST_LINES
             component.trim_request_lines(mm, [line.pk], reason="X", cause="y")
             assert component.reconcile(mm, "y") == []
-        requests.close_line_short(mm, line.pk, reason="Without purchasing")
+        request_services.close_line_short(mm, line.pk, reason="Without purchasing")
         assert MaterialRequest.objects.get(pk=line.request_id).status == "CLOSED"
 
     def test_registering_returns_its_undo(self, monkeypatch: pytest.MonkeyPatch) -> None:

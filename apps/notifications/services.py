@@ -158,35 +158,50 @@ def _domain(from_email: str) -> str | None:
     return domain if at and domain else None
 
 
-def _prepare(
-    principal: SystemPrincipal, message: EmailOutbox, source: DispatchSource | None, worker: str
-) -> Claim | Settled:
-    """Expiry and eligibility under the row lock; then the attempt, before any I/O."""
-    if message.expires_at is not None and message.expires_at <= db_now():
-        return _settle(message, Status.EXPIRED)
-    users: list[UUID] = []
-    to: tuple[str, ...] = (message.recipient_address,)
+@dataclass(frozen=True)
+class _Recipients:
+    """Who a claimed message goes to: notification recipients by id, and the addresses."""
+
+    users: list[UUID]
+    to: tuple[str, ...]
     bcc: tuple[str, ...] = ()
+
+
+def _recipients(message: EmailOutbox, source: DispatchSource | None) -> _Recipients | Status:
+    """The eligibility check of the claim: the recipients, or the status the message gets."""
     if message.kind == Kind.NOTIFICATION:
         recipients = eligibility.eligible_recipients(message)
         if not recipients:
-            return _settle(message, Status.SUPPRESSED)
-        users = [user.pk for user in recipients]
+            return Status.SUPPRESSED
         addresses = tuple(user.email for user in recipients)
         to, bcc = (addresses, ()) if len(addresses) == 1 else ((), addresses)
-    elif message.kind == Kind.SECURITY:
+        return _Recipients([user.pk for user in recipients], to, bcc)
+    if message.kind == Kind.SECURITY:
         if not eligibility.security_target_ok(message):
-            return _settle(message, Status.SUPPRESSED)
+            return Status.SUPPRESSED
     else:
         # Dispatches are only claimed while a source is registered (``_claim``).
         refusal = cast(DispatchSource, source).refusal(message)
         if refusal is not None:
-            return _settle(message, refusal)
-    try:
-        body = unseal(message.body) if message.sensitive else message.body
-        html_body = unseal(message.html_body) if message.sensitive else message.html_body
-    except InvalidToken:
-        return _settle(message, Status.FAILED, "the body cannot be decrypted with any key")
+            return refusal
+    return _Recipients([], (message.recipient_address,))
+
+
+def _bodies(message: EmailOutbox) -> tuple[str, str]:
+    """The text and HTML bodies, unsealed (``InvalidToken`` when no key opens them)."""
+    if not message.sensitive:
+        return message.body, message.html_body
+    return unseal(message.body), unseal(message.html_body)
+
+
+def _start_attempt(
+    principal: SystemPrincipal,
+    message: EmailOutbox,
+    source: DispatchSource | None,
+    users: list[UUID],
+    worker: str,
+) -> EmailAttempt:
+    """The attempt, committed with ``SENDING`` before any I/O; a dispatch's is audited."""
     attempt = EmailAttempt.objects.create(
         message=message, number=message.attempts + 1, recipient_users=users, worker=worker
     )
@@ -198,14 +213,31 @@ def _prepare(
     message.save(update_fields=["status", "current_attempt", "attempts", "message_id"])
     if message.is_dispatch:
         cast(DispatchSource, source).record_attempt(principal, message, attempt)
+    return attempt
+
+
+def _prepare(
+    principal: SystemPrincipal, message: EmailOutbox, source: DispatchSource | None, worker: str
+) -> Claim | Settled:
+    """Expiry and eligibility under the row lock; then the attempt, before any I/O."""
+    if message.expires_at is not None and message.expires_at <= db_now():
+        return _settle(message, Status.EXPIRED)
+    recipients = _recipients(message, source)
+    if not isinstance(recipients, _Recipients):
+        return _settle(message, recipients)
+    try:
+        body, html_body = _bodies(message)
+    except InvalidToken:
+        return _settle(message, Status.FAILED, "the body cannot be decrypted with any key")
+    attempt = _start_attempt(principal, message, source, recipients.users, worker)
     return Claim(
         message_id=message.pk,
         attempt_id=attempt.pk,
         attempt_number=attempt.number,
         kind=message.kind,
         from_email=message.from_email,
-        to=to,
-        bcc=bcc,
+        to=recipients.to,
+        bcc=recipients.bcc,
         subject=message.subject,
         header_message_id=message.message_id,
         body=body,

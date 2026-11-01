@@ -39,6 +39,7 @@ from apps.purchasing.services.drafts import (
 )
 from apps.purchasing.services.orders import (
     AllocationAmendment,
+    HeaderAmendment,
     LineAmendment,
     amend,
     cancel,
@@ -48,6 +49,7 @@ from apps.purchasing.services.orders import (
 
 __all__ = [
     "AllocationAmendment",
+    "HeaderAmendment",
     "LineAmendment",
     "RequestItem",
     "add_request_lines",

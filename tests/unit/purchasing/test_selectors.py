@@ -16,7 +16,7 @@ from apps.access.exceptions import NotInScope
 from apps.access.principals import SessionPrincipal
 from apps.catalog.models import Material
 from apps.locations.models import Location
-from apps.material_requests import services as requests
+from apps.material_requests import services as request_services
 from apps.material_requests.models import MaterialRequest
 from apps.projects.models import Project
 from apps.purchasing import selectors, services
@@ -111,7 +111,7 @@ class TestAllocations:
         MaterialRequest.objects.filter(pk=y_request.pk).update(priority="URGENT")
         order = buy((x, "10"), (y, "10"), (units, "3"))
         received.receive(only_line_of(order, 1), "4", {allocation(order, y): "4"})
-        requests.close_line_short(mm, units.pk, reason="Not needed")
+        request_services.close_line_short(mm, units.pk, reason="Not needed")
         rows = selectors.allocations(ctx(people.wo_mad), order)
         assert [(row.request_number, row.request_line_no) for row in rows] == [
             (y.request.number, 1),  # urgent first
@@ -172,7 +172,7 @@ class TestWorklist:
         buy((make_line("10"), "10"), issue=False)  # drafts are not on order
         assert selectors.unallocated_on_order(ctx(people.mm_mad)) == []
         received.receive(only_line(order), "6", {allocation(order, line): "6"})
-        requests.close_line_short(mm, line.pk, reason="Enough")
+        request_services.close_line_short(mm, line.pk, reason="Enough")
         (row,) = selectors.unallocated_on_order(ctx(people.mm_mad))
         assert (row.line, row.unallocated) == (only_line(order), D(4))
         assert selectors.unallocated_on_order(ctx(people.wo_mad)) == []
@@ -232,7 +232,7 @@ class TestWorklistByMaterial:
         line = make_line("10")
         order = buy((line, "10"))
         received.receive(only_line(order), "6", {allocation(order, line): "6"})
-        requests.close_line_short(mm, line.pk, reason="Enough")
+        request_services.close_line_short(mm, line.pk, reason="Enough")
         manager = ctx(people.mm_mad)
         assert len(selectors.unallocated_on_order(manager, supplier_id=org.supplier.pk)) == 1
         assert selectors.unallocated_on_order(manager, supplier_id=org.a.pk) == []
@@ -367,8 +367,10 @@ class TestHistory:
     ) -> None:
         line = make_line("10")
         order = buy((line, "10"))
-        services.amend(mm, order.pk, reason="Quote changed", notes="note")
-        requests.close_line_short(mm, line.pk, reason="Enough")
+        services.amend(
+            mm, order.pk, reason="Quote changed", header=services.HeaderAmendment(notes="note")
+        )
+        request_services.close_line_short(mm, line.pk, reason="Enough")
         services.close_line_short(mm, only_line(order).pk, reason="Supplier short")
         entries = selectors.history(ctx(people.mm_mad), order)
         labels = [str(entry.label) for entry in entries]

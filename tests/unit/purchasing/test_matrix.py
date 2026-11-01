@@ -107,7 +107,9 @@ OPERATIONS: dict[str, Operation] = {
     ),
     "remove_line": lambda p, s, org: services.remove_line(p, s.draft_line.pk),
     "issue": lambda p, s, org: services.issue(p, s.draft.pk),
-    "amend": lambda p, s, org: services.amend(p, s.issued.pk, reason="Call", notes="x"),
+    "amend": lambda p, s, org: services.amend(
+        p, s.issued.pk, reason="Call", header=services.HeaderAmendment(notes="x")
+    ),
     "cancel": lambda p, s, org: services.cancel(p, s.issued.pk, reason="Not needed"),
     "close_line_short": lambda p, s, org: services.close_line_short(
         p, s.issued_line.pk, reason="Short"

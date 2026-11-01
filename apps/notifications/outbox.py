@@ -135,24 +135,23 @@ def queue_dispatch(
     html_body: str = "",
     source_ref: str = "",
     message_id: str = "",
-    from_email: str | None = None,
-    using: str = DEFAULT_DB_ALIAS,
 ) -> EmailOutbox:
     """Queue a supplier dispatch of purchase order ``po_id``, under its L4 lock (M5.3).
 
     ``message_id`` is the ``Message-ID`` header, stable per revision so the supplier can
-    deduplicate; without one the worker generates it at the first claim.
+    deduplicate; without one the worker generates it at the first claim. Dispatches come
+    from ``DEFAULT_FROM_EMAIL`` and live in the default database.
     """
-    _require_transaction(using)
+    _require_transaction(DEFAULT_DB_ALIAS)
     if kind not in DISPATCH_KINDS:
         raise ValueError(f"{kind} is not a dispatch kind")
-    return EmailOutbox.objects.using(using).create(
+    return EmailOutbox.objects.create(
         kind=kind,
         recipient_address=address,
         source_po_id=po_id,
         source_ref=source_ref,
         message_id=message_id,
-        from_email=_from(from_email),
+        from_email=_from(None),
         subject=subject,
         body=body,
         html_body=html_body,

@@ -13,6 +13,7 @@
   what is attributed and the order closes once no line has capacity (§4.9).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -32,7 +33,7 @@ from apps.core.locking import LockOrder, LockSetChanged, transactional
 from apps.material_requests.models import MaterialRequestLine
 from apps.purchasing import receipts
 from apps.purchasing.components import Component, TrimReason, over_committed
-from apps.purchasing.dispatch import cancel_dispatches, lock_dispatches, queue_order
+from apps.purchasing.dispatch import Cancelled, cancel_dispatches, lock_dispatches, queue_order
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.services.common import (
     RequestItem,
@@ -181,28 +182,84 @@ class AllocationAmendment:
     qty: Decimal
 
 
+@dataclass(frozen=True)
+class HeaderAmendment:
+    """An issued order's new expected date, supplier reference and notes.
+
+    ``...`` (the date) and ``None`` (the texts) leave a field unchanged; an expected date of
+    ``None`` clears it. Texts are stripped.
+    """
+
+    expected_date: date | EllipsisType | None = ...
+    supplier_ref: str | None = None
+    notes: str | None = None
+
+    def changes(self) -> dict[str, Any]:
+        found: dict[str, Any] = {}
+        if not isinstance(self.expected_date, EllipsisType):
+            found["expected_date"] = self.expected_date
+        for name, value in (("supplier_ref", self.supplier_ref), ("notes", self.notes)):
+            if value is not None:
+                found[name] = value.strip()
+        return found
+
+
 HEADER_AMENDMENTS = frozenset({"expected_date", "supplier_ref", "notes"})
 
 
-def _payload(
-    po_id: UUID,
-    reason: str,
-    header: dict[str, Any],
-    lines: list[LineAmendment],
-    allocations: list[AllocationAmendment],
-    add: list[RequestItem],
-) -> dict[str, Any]:
-    return {
-        "po_id": po_id,
-        "reason": reason,
-        "header": header,
-        "lines": [
-            {"line_id": item.line_id, "ordered_qty": item.ordered_qty, **item.prices}
-            for item in lines
-        ],
-        "allocations": [{"id": item.allocation_id, "qty": item.qty} for item in allocations],
-        "add": [{"request_line_id": item.request_line_id, "qty": item.qty} for item in add],
-    }
+@dataclass(frozen=True)
+class _Wanted:
+    """What one ``amend`` call asks for; each line and allocation at most once."""
+
+    header: dict[str, Any]
+    lines: list[LineAmendment]
+    allocations: list[AllocationAmendment]
+    add: list[RequestItem]
+
+    @classmethod
+    def of(
+        cls,
+        header: HeaderAmendment | None,
+        lines: list[LineAmendment] | None,
+        allocations: list[AllocationAmendment] | None,
+        add: list[RequestItem] | None,
+    ) -> _Wanted:
+        wanted = cls(
+            (header or HeaderAmendment()).changes(),
+            list(lines or ()),
+            list(allocations or ()),
+            list(add or ()),
+        )
+        for listed in (wanted.line_ids, wanted.allocation_ids):
+            if len(set(listed)) != len(listed):
+                raise ValueError("Each line and allocation is amended once per call")
+        return wanted
+
+    @property
+    def line_ids(self) -> list[UUID]:
+        return [item.line_id for item in self.lines]
+
+    @property
+    def allocation_ids(self) -> list[UUID]:
+        return [item.allocation_id for item in self.allocations]
+
+    def payload(self, po_id: UUID, reason: str) -> dict[str, Any]:
+        """What the idempotency record binds the key to."""
+        return {
+            "po_id": po_id,
+            "reason": reason,
+            "header": self.header,
+            "lines": [
+                {"line_id": item.line_id, "ordered_qty": item.ordered_qty, **item.prices}
+                for item in self.lines
+            ],
+            "allocations": [
+                {"id": item.allocation_id, "qty": item.qty} for item in self.allocations
+            ],
+            "add": [
+                {"request_line_id": item.request_line_id, "qty": item.qty} for item in self.add
+            ],
+        }
 
 
 def _amend_allocations(
@@ -262,15 +319,89 @@ def _amend_line(
     return {"line_id": line.pk, "line_no": line.line_no, "changes": diff}
 
 
+def _amend_lines(
+    principal: Principal, order: PurchaseOrder, component: Component, lines: list[LineAmendment]
+) -> list[dict[str, Any]]:
+    return [
+        change
+        for item in lines
+        if (change := _amend_line(principal, order, component, item)) is not None
+    ]
+
+
+def _check_on_order(order: PurchaseOrder, wanted: _Wanted, amended: list[UUID]) -> None:
+    """Every line and allocation of the amendment belongs to this order."""
+    foreign = (
+        PurchaseAllocation.objects.filter(pk__in=wanted.allocation_ids)
+        .exclude(po_line__po=order)
+        .exists()
+    )
+    unknown = set(wanted.line_ids) - set(order.lines.values_list("pk", flat=True))
+    if unknown or foreign or len(amended) != len(wanted.allocations):
+        raise ValidationError(_("A line or allocation is not on this order."), code="unknown")
+
+
+def _apply_amendment(
+    principal: Principal, order: PurchaseOrder, component: Component, wanted: _Wanted
+) -> dict[str, Any]:
+    """Apply the amendment in its order (header, trims, lines, increases, new lines);
+    return what changed, by part."""
+    changes: dict[str, Any] = {}
+    if diff := apply_changes(order, wanted.header, HEADER_AMENDMENTS):
+        order.full_clean(validate_constraints=False)
+        changes["header"] = diff
+    steps: tuple[tuple[str, Callable[[], list[dict[str, Any]]]], ...] = (
+        (
+            "trimmed",
+            lambda: _amend_allocations(principal, order, component, wanted.allocations, lower=True),
+        ),
+        ("lines", lambda: _amend_lines(principal, order, component, wanted.lines)),
+        (
+            "raised",
+            lambda: _amend_allocations(
+                principal, order, component, wanted.allocations, lower=False
+            ),
+        ),
+        ("added", lambda: _add_items(principal, order, component, wanted.add)),
+    )
+    for name, step in steps:
+        if done := step():
+            changes[name] = done
+    return changes
+
+
+def _new_revision(
+    principal: Principal,
+    order: PurchaseOrder,
+    component: Component,
+    reason: str,
+    changes: dict[str, Any],
+) -> PurchaseOrder:
+    """``revision + 1``, audited and queued to the supplier; then settle and reconcile."""
+    transition(order, Status.ISSUED, "amend")
+    order.revision += 1
+    order.save()
+    _record(
+        principal,
+        "purchase_order.amended",
+        order,
+        revision=order.revision,
+        reason=reason,
+        changes=changes,
+        dispatch=queue_order(order),
+    )
+    _settle_order(principal, order, component)
+    component.reconcile(principal, "purchase_order.amend")
+    return order
+
+
 @transactional
 def amend(
     principal: Principal,
     po_id: UUID,
     *,
     reason: str,
-    expected_date: date | EllipsisType | None = ...,
-    supplier_ref: str | None = None,
-    notes: str | None = None,
+    header: HeaderAmendment | None = None,
     lines: list[LineAmendment] | None = None,
     allocations: list[AllocationAmendment] | None = None,
     add: list[RequestItem] | None = None,
@@ -279,33 +410,24 @@ def amend(
     """Amend an issued order (§4.4): ``revision + 1``, a reason, audited; a no-op without a
     change.
 
-    Allowed: expected date, supplier reference, notes; ordered quantities (down to what is
-    received; allocations above it are trimmed first); prices of lines with no posted
-    receipt; allocations raised (C5) or trimmed; request lines added (with allocations,
-    aggregated per material). Never the supplier, the buyer or the destination: cancel and
-    create a new order instead. Snapshots refresh only for what changed (new lines).
+    Allowed: expected date, supplier reference, notes (``header``); ordered quantities (down
+    to what is received; allocations above it are trimmed first); prices of lines with no
+    posted receipt; allocations raised (C5) or trimmed; request lines added (with
+    allocations, aggregated per material). Never the supplier, the buyer or the destination:
+    cancel and create a new order instead. Snapshots refresh only for what changed (new
+    lines).
     """
     reason = _reason(reason)
-    lines, allocations, add = list(lines or ()), list(allocations or ()), list(add or ())
-    header: dict[str, Any] = {
-        name: value
-        for name, value in (
-            ("expected_date", expected_date),
-            ("supplier_ref", supplier_ref.strip() if supplier_ref is not None else None),
-            ("notes", notes.strip() if notes is not None else None),
-        )
-        if value is not ... and (value is not None or name == "expected_date")
-    }
-    for listed in ([item.line_id for item in lines], [item.allocation_id for item in allocations]):
-        if len(set(listed)) != len(listed):
-            raise ValueError("Each line and allocation is amended once per call")
+    wanted = _Wanted.of(header, lines, allocations, add)
     locks = LockOrder()
     order = _order(po_id)
-    amended = PurchaseAllocation.objects.filter(
-        pk__in=[item.allocation_id for item in allocations]
-    ).values_list("request_line_id", flat=True)
-    request_lines = {item.request_line_id for item in add} | set(amended)
-    prices = any(item.prices for item in lines)
+    amended = list(
+        PurchaseAllocation.objects.filter(pk__in=wanted.allocation_ids).values_list(
+            "request_line_id", flat=True
+        )
+    )
+    request_lines = {item.request_line_id for item in wanted.add} | set(amended)
+    prices = any(item.prices for item in wanted.lines)
     _authorize(principal, order, locks, *_requests(request_lines), prices=prices)
 
     def execute() -> PurchaseOrder:
@@ -317,59 +439,58 @@ def amend(
         )
         if locked.status != Status.ISSUED:
             raise _status_error(locked)
-        known_lines = set(locked.lines.values_list("pk", flat=True))
-        if {item.line_id for item in lines} - known_lines or (
-            PurchaseAllocation.objects.filter(pk__in=[a.allocation_id for a in allocations])
-            .exclude(po_line__po=locked)
-            .exists()
-            or len(amended) != len(allocations)
-        ):
-            raise ValidationError(_("A line or allocation is not on this order."), code="unknown")
-        changes: dict[str, Any] = {}
-        if diff := apply_changes(locked, header, HEADER_AMENDMENTS):
-            locked.full_clean(validate_constraints=False)
-            changes["header"] = diff
-        if trimmed := _amend_allocations(principal, locked, component, allocations, lower=True):
-            changes["trimmed"] = trimmed
-        if amended_lines := [
-            change
-            for item in lines
-            if (change := _amend_line(principal, locked, component, item)) is not None
-        ]:
-            changes["lines"] = amended_lines
-        if raised := _amend_allocations(principal, locked, component, allocations, lower=False):
-            changes["raised"] = raised
-        if added := _add_items(principal, locked, component, add):
-            changes["added"] = added
+        _check_on_order(locked, wanted, amended)
+        changes = _apply_amendment(principal, locked, component, wanted)
         if not changes:
             return locked
-        transition(locked, Status.ISSUED, "amend")
-        locked.revision += 1
-        locked.save()
-        _record(
-            principal,
-            "purchase_order.amended",
-            locked,
-            revision=locked.revision,
-            reason=reason,
-            changes=changes,
-            dispatch=queue_order(locked),
-        )
-        _settle_order(principal, locked, component)
-        component.reconcile(principal, "purchase_order.amend")
-        return locked
+        return _new_revision(principal, locked, component, reason, changes)
 
     return execute_once(
         actor_id=principal.user_id,
         key=idempotency_key,
         operation="purchase_order.amend",
-        payload=_payload(po_id, reason, header, lines, allocations, add),
+        payload=wanted.payload(po_id, reason),
         execute=execute,
         replay=lambda _type, pk: PurchaseOrder.objects.get(pk=pk),
     )
 
 
 # --- cancel and close -----------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _Ending:
+    """How an order ends: an issued one is cancelled, a draft discarded."""
+
+    operation: str
+    trim: TrimReason
+    action: str
+
+
+ENDINGS = {
+    True: _Ending("cancel", TrimReason.ORDER_CANCELLED, "purchase_order.cancelled"),
+    False: _Ending("discard", TrimReason.DRAFT_DISCARDED, "purchase_order.discarded"),
+}
+
+
+def _lock_to_end(locks: LockOrder, order: PurchaseOrder) -> tuple[PurchaseOrder, Component, bool]:
+    """The order's component, and an issued order's dispatch rows (L4b); verified."""
+    issued = order.status == Status.ISSUED
+    locked, component = _lock_order(
+        locks, order, between_orders_and_lines=lock_dispatches(order.pk) if issued else None
+    )
+    if (locked.status == Status.ISSUED) != issued:
+        raise LockSetChanged("The order was issued or closed between reading and locking it")
+    return locked, component, issued
+
+
+def _require_no_receipts(order: PurchaseOrder) -> None:
+    posted = receipts.line_receipts(list(order.lines.values_list("pk", flat=True)))
+    if any(found.posted for found in posted.values()):
+        raise ValidationError(
+            _("Goods have been received on this order; it can no longer be cancelled."),
+            code="has_receipts",
+        )
 
 
 @transactional
@@ -379,41 +500,31 @@ def cancel(principal: Principal, po_id: UUID, *, reason: str = "") -> PurchaseOr
     locks = LockOrder()
     order = _order(po_id)
     _authorize(principal, order, locks)
-    issued = order.status == Status.ISSUED
-    locked, component = _lock_order(
-        locks, order, between_orders_and_lines=lock_dispatches(order.pk) if issued else None
-    )
-    if (locked.status == Status.ISSUED) != issued:
-        raise LockSetChanged("The order was issued or closed between reading and locking it")
-    operation = "cancel" if issued else "discard"
-    left = transition(locked, Status.CANCELLED, operation)
+    locked, component, issued = _lock_to_end(locks, order)
+    ending = ENDINGS[issued]
+    left = transition(locked, Status.CANCELLED, ending.operation)
     if issued:
         reason = _reason(reason)
-        posted = receipts.line_receipts(list(locked.lines.values_list("pk", flat=True)))
-        if any(found.posted for found in posted.values()):
-            raise ValidationError(
-                _("Goods have been received on this order; it can no longer be cancelled."),
-                code="has_receipts",
-            )
-    trim = TrimReason.ORDER_CANCELLED if issued else TrimReason.DRAFT_DISCARDED
-    order_lines = list(locked.lines.values_list("pk", flat=True))
+        _require_no_receipts(locked)
     component.trim_to_attributed(
-        principal, order_lines=order_lines, reason=trim, cause=f"purchase_order.{operation}"
+        principal,
+        order_lines=list(locked.lines.values_list("pk", flat=True)),
+        reason=ending.trim,
+        cause=f"purchase_order.{ending.operation}",
     )
-    dispatches = cancel_dispatches(locked) if issued else None
+    dispatches = cancel_dispatches(locked) if issued else Cancelled(0, notice_queued=False)
     locked.save()
-    action = "purchase_order.cancelled" if issued else "purchase_order.discarded"
     _record(
         principal,
-        action,
+        ending.action,
         locked,
         from_status=left,
         reason=reason.strip(),
-        dispatches_cancelled=dispatches.cancelled if dispatches else 0,
+        dispatches_cancelled=dispatches.cancelled,
         cancellation_notice_required=locked.cancellation_notice_required,
-        cancellation_notice_queued=bool(dispatches and dispatches.notice_queued),
+        cancellation_notice_queued=dispatches.notice_queued,
     )
-    component.reconcile(principal, f"purchase_order.{operation}")
+    component.reconcile(principal, f"purchase_order.{ending.operation}")
     return locked
 
 

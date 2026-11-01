@@ -33,7 +33,8 @@ from apps.purchasing.forms import (
     ReasonForm,
     RequiredReasonForm,
 )
-from apps.purchasing.selectors import MANAGE
+from apps.purchasing.models import PurchaseOrder
+from apps.purchasing.selectors import MANAGE, WorklistRow
 from apps.purchasing.views.common import (
     Status,
     _detail_url,
@@ -49,20 +50,11 @@ from apps.purchasing.views.pages import _uuids, amend_form_for, amend_page, new_
 # --- a new order ----------------------------------------------------------------------------
 
 
-@mutating(MANAGE)
-def order_create(request: HttpRequest) -> HttpResponse:
-    """Start the draft, then put the lines ticked on it (one idempotency key for each)."""
-    ctx = access_for(request)
-    posted = [key.removeprefix("pick_") for key in request.POST if key.startswith("pick_")]
-    rows = selectors.to_purchase(ctx, line_ids=_uuids(posted)) if posted else []
-    form = NewOrderForm(request.POST, ctx=ctx, rows=rows)
-    ticked = {line_id for line_id in _uuids(posted) if request.POST.get(f"pick_{line_id}")}
-    left_out = len(ticked - {row.line.pk for row in rows})
-    if not form.is_valid():
-        return new_order_page(request, form)
+def _create_draft(request: HttpRequest, form: NewOrderForm) -> PurchaseOrder | HttpResponse:
+    """The draft of a valid builder form, or the answer to a refusal."""
     try:
-        order = services.create_po(
-            ctx.principal,
+        return services.create_po(
+            access_for(request).principal,
             idempotency_key=form.cleaned_data["idempotency_key"],
             **form.header(),
         )
@@ -73,6 +65,12 @@ def order_create(request: HttpRequest) -> HttpResponse:
         return idempotency_failure(request, exc)
     except RetryExhausted:
         return conflict(request)
+
+
+def _warn_left_out(request: HttpRequest, posted: list[str], rows: list[WorklistRow]) -> None:
+    """Ticked lines the worklist no longer offers (nothing left to purchase)."""
+    ticked = {line_id for line_id in _uuids(posted) if request.POST.get(f"pick_{line_id}")}
+    left_out = len(ticked - {row.line.pk for row in rows})
     if left_out:
         messages.warning(
             request,
@@ -83,6 +81,21 @@ def order_create(request: HttpRequest) -> HttpResponse:
             )
             % {"count": left_out},
         )
+
+
+@mutating(MANAGE)
+def order_create(request: HttpRequest) -> HttpResponse:
+    """Start the draft, then put the lines ticked on it (one idempotency key for each)."""
+    ctx = access_for(request)
+    posted = [key.removeprefix("pick_") for key in request.POST if key.startswith("pick_")]
+    rows = selectors.to_purchase(ctx, line_ids=_uuids(posted)) if posted else []
+    form = NewOrderForm(request.POST, ctx=ctx, rows=rows)
+    if not form.is_valid():
+        return new_order_page(request, form)
+    order = _create_draft(request, form)
+    if isinstance(order, HttpResponse):
+        return order
+    _warn_left_out(request, posted, rows)
     items = form.items()
     if not items:
         messages.success(request, _("Draft order created."))
@@ -280,9 +293,9 @@ def order_amend(request: HttpRequest, po_id: UUID) -> HttpResponse:
             reason=form.cleaned_data["reason"],
             lines=form.line_amendments(),
             allocations=form.allocation_amendments(),
+            header=services.HeaderAmendment(**form.header_changes()),
             add=form.items(),
             idempotency_key=form.cleaned_data["idempotency_key"],
-            **form.header_changes(),
         )
     except ValidationError as exc:
         add_service_errors(form, exc)

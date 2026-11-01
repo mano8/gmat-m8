@@ -24,7 +24,7 @@ from apps.audit.models import AuditEvent
 from apps.catalog.models import Material
 from apps.core.models import DocumentSequence
 from apps.locations.models import Location
-from apps.material_requests import services as requests
+from apps.material_requests import services as request_services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.organizations.models import Company
 from apps.purchasing import components, services
@@ -154,10 +154,10 @@ class TestE5:
         second_line(line)  # keeps the request open once the first line is closed
         order = buy((line, "10"))
         received.receive(only_line(order), "6", {allocation(order, line): "6"})
-        requests.close_line_short(mm, line.pk, reason="Enough for now")
+        request_services.close_line_short(mm, line.pk, reason="Enough for now")
         assert allocation(order, line).qty == 6
         assert trims("REQUEST_LINE_CLOSED") == [q(10, 6)]
-        requests.reopen_line(mm, line.pk, reason="Needed after all")
+        request_services.reopen_line(mm, line.pk, reason="Needed after all")
         found = flows(line)
         assert (found.received, found.pending) == q(6, 0)
         assert ledger_of(line).to_purchase == 4
@@ -209,7 +209,7 @@ class TestE10:
         mm: SessionPrincipal,
     ) -> None:
         _x, y, z, first = e10
-        requests.close_line_short(mm, y.pk, reason="Not needed")
+        request_services.close_line_short(mm, y.pk, reason="Not needed")
         # The waterfall would give Z 10 on the first order (committed 15): cut to 5.
         assert allocation(first, z).qty == 5
         assert flows(z).pending == 10  # 5 on each order
@@ -223,7 +223,7 @@ class TestE10:
         mm: SessionPrincipal,
     ) -> None:
         _x, y, z, first = e10
-        requests.change_priority(mm, z.request_id, priority=MaterialRequest.Priority.URGENT)
+        request_services.change_priority(mm, z.request_id, priority=MaterialRequest.Priority.URGENT)
         assert allocation(first, z).qty == 5
         assert ledger_of(z).committed == 10
         assert flows(y).pending == 10  # Y gets back what Z gave up
@@ -250,9 +250,11 @@ class TestE11:
         received.receive(only_line(order), "16", {allocation(order, w): "10"})
         assert flows(r).pending == 4
         MaterialRequestLine.objects.filter(pk=r.pk).update(approved_qty=D(1))
-        requests.change_needed_by(mm, r.request_id, needed_by=None)  # a no-op: nothing changes
+        request_services.change_needed_by(
+            mm, r.request_id, needed_by=None
+        )  # a no-op: nothing changes
         assert allocation(order, r).qty == 10
-        requests.change_priority(mm, r.request_id, priority=MaterialRequest.Priority.LOW)
+        request_services.change_priority(mm, r.request_id, priority=MaterialRequest.Priority.LOW)
         assert allocation(order, r).qty == 1
         assert flows(r).pending == 1
         assert trims("EXCESS_COMMITMENT") == [q(10, 1)]
@@ -279,7 +281,7 @@ class TestCascade:
         buy((v, "10"))
         assert [flows(item).pending for item in (y, z, v)] == [5, 15, 10]
         assert flows(v).pending == 10  # all of it on the second order: V is not over
-        requests.close_line_short(mm, y.pk, reason="Not needed")
+        request_services.close_line_short(mm, y.pk, reason="Not needed")
         assert allocation(first, z).qty == 10
         assert allocation(first, v).qty == 0
         assert [ledger_of(item).committed for item in (z, v)] == [15, 10]
@@ -367,7 +369,7 @@ class TestBound:
         assert error_codes(exc) == {"component_too_large"}
         request = MaterialRequest.objects.get(number="SOL-T-BIG")
         with pytest.raises(ValidationError) as exc:
-            requests.change_priority(mm, request.pk, priority=MaterialRequest.Priority.HIGH)
+            request_services.change_priority(mm, request.pk, priority=MaterialRequest.Priority.HIGH)
         assert error_codes(exc) == {"component_too_large"}
         assert PurchaseOrder.objects.get(pk=order.pk).status == Status.DRAFT
         assert MaterialRequest.objects.get(pk=request.pk).priority == "NORMAL"

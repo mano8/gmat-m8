@@ -41,7 +41,7 @@ from apps.purchasing.forms import (
     RequiredReasonForm,
     WorklistFilterForm,
 )
-from apps.purchasing.models import PurchaseOrder
+from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.selectors import MANAGE, VIEW, AllocationRow, LineRow
 from apps.purchasing.views.common import Status, _detail_url, _on_order, _query
 
@@ -178,6 +178,40 @@ class LineView:
     close_form: RequiredReasonForm | None = None  # an issued line still receivable
 
 
+def _allocation_views(
+    line: PurchaseOrderLine, entries: list[AllocationRow], editable: bool
+) -> list[AllocationView]:
+    """A line's allocations; on a draft its manager raises or lowers each one."""
+    views = []
+    for number, entry in enumerate(entries, start=1):
+        view = AllocationView(entry)
+        if editable:
+            tag = f"{line.line_no}_{number}"
+            view.raise_form = AllocationQuantityForm(
+                auto_id=_fresh("r", tag), initial={"qty": entry.allocation.qty}
+            )
+            view.lower_form = AllocationQuantityForm(auto_id=_fresh("l", tag))
+        views.append(view)
+    return views
+
+
+def _line_view(
+    row: LineRow, allocations: list[AllocationRow], status: str | None, prices: bool
+) -> LineView:
+    """A line with its tools for a manager: ``status`` is the order's (``None``: no tools)."""
+    line = row.line
+    view = LineView(row, _allocation_views(line, allocations, status == Status.DRAFT))
+    if status == Status.DRAFT:
+        view.form = LineForm(
+            initial=LineForm.initial_for(line, prices=prices),
+            prices=prices,
+            auto_id=_fresh("line", line.line_no),
+        )
+    elif status == Status.ISSUED and line.closed_short_at is None:
+        view.close_form = RequiredReasonForm(auto_id=_fresh("close", line.line_no))
+    return view
+
+
 def _line_views(
     ctx: Any, found: PurchaseOrder, managing: bool, prices: bool
 ) -> tuple[list[LineView], list[LineRow]]:
@@ -185,37 +219,8 @@ def _line_views(
     by_line: dict[UUID, list[AllocationRow]] = {}
     for allocation in selectors.allocations(ctx, found):
         by_line.setdefault(allocation.allocation.po_line_id, []).append(allocation)
-    draft = found.status == Status.DRAFT
-    issued = found.status == Status.ISSUED
-    views = []
-    for row in rows:
-        line = row.line
-        allocations = []
-        for number, entry in enumerate(by_line.get(line.pk, []), start=1):
-            view = AllocationView(entry)
-            if managing and draft:
-                tag = f"{line.line_no}_{number}"
-                view.raise_form = AllocationQuantityForm(
-                    auto_id=_fresh("r", tag), initial={"qty": entry.allocation.qty}
-                )
-                view.lower_form = AllocationQuantityForm(auto_id=_fresh("l", tag))
-            allocations.append(view)
-        views.append(
-            LineView(
-                row,
-                allocations,
-                form=LineForm(
-                    initial=LineForm.initial_for(line, prices=prices),
-                    prices=prices,
-                    auto_id=_fresh("line", line.line_no),
-                )
-                if managing and draft
-                else None,
-                close_form=RequiredReasonForm(auto_id=_fresh("close", line.line_no))
-                if managing and issued and line.closed_short_at is None
-                else None,
-            )
-        )
+    status = found.status if managing else None
+    views = [_line_view(row, by_line.get(row.line.pk, []), status, prices) for row in rows]
     return views, rows
 
 
@@ -227,7 +232,6 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
     managing = selectors.can_manage(ctx, found)
     prices = selectors.shows_prices(ctx, found)
     lines, rows = _line_views(ctx, found, managing, prices)
-    draft, issued = found.status == Status.DRAFT, found.status == Status.ISSUED
     totals = [row.total for row in rows if row.total is not None]
     context: dict[str, Any] = {
         "order": found,
@@ -243,8 +247,16 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
         "history": selectors.history(ctx, found),
         "printable": found.number is not None,
     }
-    if managing and draft:
-        context |= {
+    if managing:
+        context |= _manager_tools(ctx, found)
+    context |= _dispatch_panel(ctx, found)
+    return render(request, "purchasing/detail.html", context)
+
+
+def _manager_tools(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
+    """The forms of the order page for who manages the order, by its state."""
+    if found.status == Status.DRAFT:
+        return {
             "header_form": DraftHeaderForm(
                 initial=DraftHeaderForm.initial_for(found), ctx=ctx, order=found
             ),
@@ -254,10 +266,15 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
             "issue_form": IssueForm(actor_id=ctx.user_id),
             "discard_form": ReasonForm(auto_id=_fresh("discard", 0)),
         }
-    if managing and issued:
-        context["cancel_form"] = RequiredReasonForm(auto_id=_fresh("cancel", 0))
+    if found.status == Status.ISSUED:
+        return {"cancel_form": RequiredReasonForm(auto_id=_fresh("cancel", 0))}
+    return {}
+
+
+def _dispatch_panel(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
+    """The order's supplier dispatches, each with its note form (M5.3)."""
     dispatches = selectors.dispatches(ctx, found)
-    context |= {
+    return {
         "dispatches": [
             (row, DispatchNoteForm(auto_id=_fresh("dispatch", index)))
             for index, row in enumerate(dispatches)
@@ -265,7 +282,6 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
         "dispatch_on": settings.PO_DISPATCH,
         "awaiting_decision": selectors.awaiting_decision(dispatches),
     }
-    return render(request, "purchasing/detail.html", context)
 
 
 # --- the amendment form ---------------------------------------------------------------------------

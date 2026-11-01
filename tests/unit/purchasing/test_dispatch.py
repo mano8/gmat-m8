@@ -191,7 +191,12 @@ class TestAmend:
         self, issued: PurchaseOrder, mm: SessionPrincipal
     ) -> None:
         (first,) = dispatches(issued)
-        services.amend(mm, issued.pk, reason="Morning", notes="Deliver in the morning")
+        services.amend(
+            mm,
+            issued.pk,
+            reason="Morning",
+            header=services.HeaderAmendment(notes="Deliver in the morning"),
+        )
         old, new = dispatches(issued)
         assert (old.pk, old.status) == (first.pk, Status.SUPERSEDED)
         assert (old.subject, old.body, old.html_body, old.message_id) == (
@@ -216,7 +221,7 @@ class TestAmend:
         if status != Status.SENDING:
             outcome = Outcome.SENT if status == Status.SENT else Outcome.AMBIGUOUS
             record_outcome(system, claimed.attempt_id, outcome)
-        services.amend(mm, issued.pk, reason="More", notes="x")
+        services.amend(mm, issued.pk, reason="More", header=services.HeaderAmendment(notes="x"))
         assert reload(first).status == status
         assert [message.status for message in dispatches(issued)] == [status, Status.QUEUED]
 
@@ -226,7 +231,7 @@ class TestAmend:
         original = org.supplier.email
         org.supplier.email = "new-address@supplier.example"
         org.supplier.save()
-        services.amend(mm, issued.pk, reason="Later", notes="x")
+        services.amend(mm, issued.pk, reason="Later", header=services.HeaderAmendment(notes="x"))
         assert {message.recipient_address for message in dispatches(issued)} == {original}
 
     def test_a_no_op_amendment_queues_nothing(
@@ -240,7 +245,7 @@ class TestAmend:
     ) -> None:
         """Turning the switch off stops new dispatches; queued ones still go out."""
         settings.PO_DISPATCH = False
-        services.amend(mm, issued.pk, reason="Later", notes="x")
+        services.amend(mm, issued.pk, reason="Later", header=services.HeaderAmendment(notes="x"))
         assert [message.status for message in dispatches(issued)] == [Status.QUEUED]
         event = AuditEvent.objects.get(action="purchase_order.amended")
         assert event.data["dispatch"] == dispatch.Queued.OFF
@@ -289,7 +294,7 @@ class TestCancel:
         self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal, worker: Worker
     ) -> None:
         first = claim(system)
-        services.amend(mm, issued.pk, reason="More", notes="x")
+        services.amend(mm, issued.pk, reason="More", header=services.HeaderAmendment(notes="x"))
         second = claim(system)  # both revisions are being sent
         order = services.cancel(mm, issued.pk, reason="Not needed")
         assert (order.cancellation_notice_required, notices(issued)) == (True, [])
@@ -519,7 +524,7 @@ class TestDecision:
         self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal
     ) -> None:
         message = ended(system, Outcome.AMBIGUOUS)
-        services.amend(mm, issued.pk, reason="More", notes="x")
+        services.amend(mm, issued.pk, reason="More", header=services.HeaderAmendment(notes="x"))
         assert codes(services.resend_dispatch, mm, message.pk) == {"not_eligible"}
         services.cancel(mm, issued.pk, reason="Stop")
         assert codes(services.resend_dispatch, mm, message.pk) == {"not_eligible"}
@@ -540,7 +545,7 @@ class TestRows:
         self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal, people: People
     ) -> None:
         old = ended(system, Outcome.AMBIGUOUS)
-        services.amend(mm, issued.pk, reason="More", notes="x")
+        services.amend(mm, issued.pk, reason="More", header=services.HeaderAmendment(notes="x"))
         operator = ctx(people.wo_mad)
         new_row, old_row = selectors.dispatches(operator, PurchaseOrder.objects.get(pk=issued.pk))
         assert (old_row.dispatch.pk, old_row.revision, old_row.notice) == (old.pk, 0, False)
