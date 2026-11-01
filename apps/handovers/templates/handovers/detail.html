@@ -70,6 +70,7 @@
       {% endfor %}
     </div>
   </section>
+  {% include "attachments/panel.html" with panel=attachments %}
   {% if can_void %}
     <section class="card mb-4" aria-label="{% translate 'Void the handover' %}">
       <details>

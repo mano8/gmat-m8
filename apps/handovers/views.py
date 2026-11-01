@@ -26,6 +26,7 @@ from django.views.decorators.http import require_safe
 from apps.access.exceptions import NotInScope
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
+from apps.attachments import selectors as attachment_selectors
 from apps.core.forms import add_service_errors
 from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError, recorded_result
@@ -89,6 +90,7 @@ def handover_detail(request: HttpRequest, handover_id: UUID) -> HttpResponse:
         "lines": selectors.handover_lines(ctx, found),
         "can_void": can_void,
         "void_form": RequiredReasonForm(auto_id="id_void_%s") if can_void else None,
+        "attachments": attachment_selectors.panel(ctx, found),
     }
     return render(request, "handovers/detail.html", context)
 

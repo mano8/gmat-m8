@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 09:43+0000\n"
+"POT-Creation-Date: 2026-11-01 10:30+0000\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -263,13 +263,13 @@ msgid ""
 "If the new address confirms, the change takes effect %(cooling_off_hours)s "
 "hours later and every session of your account ends."
 msgstr ""
-"Si la nueva dirección lo confirma, el cambio se aplica %(cooling_off_hours)s"
-" horas después y se cierran todas las sesiones de tu cuenta."
+"Si la nueva dirección lo confirma, el cambio se aplica %(cooling_off_hours)s "
+"horas después y se cierran todas las sesiones de tu cuenta."
 
 #: apps/accounts/templates/accounts/email/email_change_notice.txt:5
 msgid ""
-"If you did not expect this, cancel the change with this link before it takes"
-" effect:"
+"If you did not expect this, cancel the change with this link before it takes "
+"effect:"
 msgstr ""
 "Si no lo esperabas, cancela el cambio con este enlace antes de que se "
 "aplique:"
@@ -372,8 +372,8 @@ msgstr "Invitación"
 #: apps/accounts/templates/accounts/invitation_account.html:10
 #, python-format
 msgid ""
-"This invitation is for the existing account %(email)s. Sign in with it, then"
-" open the link again."
+"This invitation is for the existing account %(email)s. Sign in with it, then "
+"open the link again."
 msgstr ""
 "Esta invitación es para la cuenta existente %(email)s. Inicia sesión con "
 "ella y abre el enlace otra vez."
@@ -404,8 +404,8 @@ msgstr "Este enlace no es válido"
 
 #: apps/accounts/templates/accounts/token_invalid.html:9
 msgid ""
-"It may have expired, been used already, or been replaced by a newer one. Ask"
-" your administrator for a new link."
+"It may have expired, been used already, or been replaced by a newer one. Ask "
+"your administrator for a new link."
 msgstr ""
 "Puede haber caducado, haberse usado ya o haber sido sustituido por uno más "
 "reciente. Pide un enlace nuevo a tu administrador."
@@ -429,6 +429,293 @@ msgstr "Dirección confirmada. El cambio se aplica tras el periodo de espera."
 #: apps/accounts/views.py:216
 msgid "The email change is cancelled."
 msgstr "El cambio de correo está cancelado."
+
+#: apps/attachments/forms.py:12
+#: apps/attachments/templates/attachments/panel.html:41
+#: apps/handovers/forms.py:56 apps/material_requests/forms.py:176
+#: apps/material_requests/forms.py:223 apps/material_requests/forms.py:244
+#: apps/material_requests/forms.py:285 apps/organizations/forms.py:118
+#: apps/purchasing/forms.py:347 apps/purchasing/forms.py:354
+#: apps/purchasing/forms.py:395 apps/receiving/forms.py:56
+msgid "Reason"
+msgstr "Motivo"
+
+#: apps/attachments/models.py:73
+msgid "Image"
+msgstr "Imagen"
+
+#: apps/attachments/models.py:74
+msgid "PDF"
+msgstr "PDF"
+
+#: apps/attachments/models.py:76 apps/attachments/models.py:158
+#: apps/material_requests/models.py:192
+msgid "request"
+msgstr "solicitud"
+
+#: apps/attachments/models.py:77 apps/attachments/models.py:159
+#: apps/receiving/models.py:139
+msgid "receipt"
+msgstr "recepción"
+
+#: apps/attachments/models.py:78 apps/attachments/models.py:160
+#: apps/handovers/models.py:116 apps/handovers/models.py:153
+msgid "handover"
+msgstr "entrega"
+
+#: apps/attachments/models.py:79 apps/attachments/models.py:203
+msgid "storage key"
+msgstr "clave de almacenamiento"
+
+#: apps/attachments/models.py:80
+msgid "file name"
+msgstr "nombre del archivo"
+
+#: apps/attachments/models.py:81
+msgid "type"
+msgstr "tipo"
+
+#: apps/attachments/models.py:82 apps/attachments/models.py:204
+msgid "size"
+msgstr "tamaño"
+
+#: apps/attachments/models.py:83
+msgid "SHA-256"
+msgstr "SHA-256"
+
+#: apps/attachments/models.py:88
+msgid "uploaded by"
+msgstr "subido por"
+
+#: apps/attachments/models.py:90
+msgid "uploaded at"
+msgstr "subido el"
+
+#: apps/attachments/models.py:91
+msgid "removed at"
+msgstr "retirado el"
+
+#: apps/attachments/models.py:98
+msgid "removed by"
+msgstr "retirado por"
+
+#: apps/attachments/models.py:100
+msgid "removal reason"
+msgstr "motivo de la retirada"
+
+#: apps/attachments/models.py:103
+msgid "attachment"
+msgstr "adjunto"
+
+#: apps/attachments/models.py:104
+msgid "attachments"
+msgstr "adjuntos"
+
+#: apps/attachments/models.py:134
+msgid "limit"
+msgstr "límite"
+
+#: apps/attachments/models.py:135
+msgid "stored"
+msgstr "almacenado"
+
+#: apps/attachments/models.py:136 apps/attachments/models.py:167
+#: apps/purchasing/templates/purchasing/line.html:101
+msgid "reserved"
+msgstr "reservado"
+
+#: apps/attachments/models.py:137
+msgid "alert raised at"
+msgstr "alerta emitida el"
+
+#: apps/attachments/models.py:140 apps/attachments/models.py:141
+msgid "storage quota"
+msgstr "cuota de almacenamiento"
+
+#: apps/attachments/models.py:154
+msgid "Processing"
+msgstr "En proceso"
+
+#: apps/attachments/models.py:155
+msgid "Finalized"
+msgstr "Finalizada"
+
+#: apps/attachments/models.py:156
+msgid "Released"
+msgstr "Liberada"
+
+#: apps/attachments/models.py:165
+msgid "reserved by"
+msgstr "reservada por"
+
+#: apps/attachments/models.py:168
+msgid "state"
+msgstr "estado"
+
+#: apps/attachments/models.py:169
+msgid "lease until"
+msgstr "plazo hasta"
+
+#: apps/attachments/models.py:170
+msgid "finished at"
+msgstr "terminada el"
+
+#: apps/attachments/models.py:173
+msgid "attachment reservation"
+msgstr "reserva de adjunto"
+
+#: apps/attachments/models.py:174
+msgid "attachment reservations"
+msgstr "reservas de adjuntos"
+
+#: apps/attachments/models.py:205
+msgid "delete after"
+msgstr "borrar después de"
+
+#: apps/attachments/models.py:208
+msgid "media deletion"
+msgstr "borrado de archivo"
+
+#: apps/attachments/models.py:209
+msgid "media deletions"
+msgstr "borrados de archivos"
+
+#: apps/attachments/processing.py:58
+msgid "Only JPEG, PNG and WebP images or PDF files can be attached."
+msgstr "Solo se pueden adjuntar imágenes JPEG, PNG y WebP o archivos PDF."
+
+#: apps/attachments/processing.py:59
+msgid "This image has too many pixels."
+msgstr "Esta imagen tiene demasiados píxeles."
+
+#: apps/attachments/processing.py:60
+msgid "The file is too large."
+msgstr "El archivo es demasiado grande."
+
+#: apps/attachments/processing.py:61
+msgid "This image could not be read."
+msgstr "No se ha podido leer esta imagen."
+
+#: apps/attachments/processing.py:62
+msgid "This image took too long to process."
+msgstr "El procesamiento de esta imagen ha tardado demasiado."
+
+#: apps/attachments/processing.py:63
+msgid "The file is empty."
+msgstr "El archivo está vacío."
+
+#: apps/attachments/services.py:73
+msgid "The file is larger than 10 MB."
+msgstr "El archivo supera los 10 MB."
+
+#: apps/attachments/services.py:74
+msgid "The attachment storage is full. Ask an administrator."
+msgstr "El almacenamiento de adjuntos está lleno. Avisa a un administrador."
+
+#: apps/attachments/services.py:75
+msgid "This document already has the maximum number of attachments."
+msgstr "Este documento ya tiene el número máximo de adjuntos."
+
+#: apps/attachments/services.py:76
+msgid "Other files are being processed. Try again in a moment."
+msgstr "Se están procesando otros archivos. Vuelve a intentarlo en un momento."
+
+#: apps/attachments/services.py:77
+msgid "Files can no longer be attached to this document."
+msgstr "Ya no se pueden adjuntar archivos a este documento."
+
+#: apps/attachments/services.py:78
+msgid "The upload took too long. Try again."
+msgstr "La subida ha tardado demasiado. Vuelve a intentarlo."
+
+#: apps/attachments/services.py:79
+msgid "This attachment was already removed."
+msgstr "Este adjunto ya se había retirado."
+
+#: apps/attachments/services.py:350 apps/handovers/forms.py:56
+#: apps/handovers/services.py:98 apps/material_requests/forms.py:228
+#: apps/material_requests/forms.py:285
+#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
+#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
+#: apps/receiving/forms.py:56 apps/receiving/services.py:157
+msgid "Give a reason."
+msgstr "Indica un motivo."
+
+#: apps/attachments/templates/attachments/panel.html:9
+#: apps/attachments/templates/attachments/panel.html:11
+msgid "Attachments"
+msgstr "Adjuntos"
+
+#: apps/attachments/templates/attachments/panel.html:19
+#, python-format
+msgid "Removed by %(who)s on %(when)s"
+msgstr "Retirado por %(who)s el %(when)s"
+
+#: apps/attachments/templates/attachments/panel.html:33
+#: apps/material_requests/templates/material_requests/draft_lines.html:60
+msgid "Remove"
+msgstr "Quitar"
+
+#: apps/attachments/templates/attachments/panel.html:49
+msgid "Remove the attachment"
+msgstr "Retirar el adjunto"
+
+#: apps/attachments/templates/attachments/panel.html:67
+msgid "Photo or PDF"
+msgstr "Foto o PDF"
+
+#: apps/attachments/templates/attachments/panel.html:74
+#, python-format
+msgid ""
+"JPEG, PNG, WebP or PDF, up to 10 MB. %(left)s more file can be attached."
+msgid_plural ""
+"JPEG, PNG, WebP or PDF, up to 10 MB. %(left)s more files can be attached."
+msgstr[0] ""
+"JPEG, PNG, WebP o PDF, hasta 10 MB. Se puede adjuntar %(left)s archivo más."
+msgstr[1] ""
+"JPEG, PNG, WebP o PDF, hasta 10 MB. Se pueden adjuntar %(left)s archivos más."
+
+#: apps/attachments/templates/attachments/panel.html:81
+msgid "Attach"
+msgstr "Adjuntar"
+
+#: apps/attachments/templates/attachments/refused.html:4
+msgid "Not attached"
+msgstr "No adjuntado"
+
+#: apps/attachments/templates/attachments/refused.html:8
+msgid "The file was not attached"
+msgstr "El archivo no se ha adjuntado"
+
+#: apps/attachments/templates/attachments/refused.html:10
+msgid "Back to the document"
+msgstr "Volver al documento"
+
+#: apps/attachments/views.py:76
+msgid "The upload did not come from this site."
+msgstr "La subida no procede de este sitio."
+
+#: apps/attachments/views.py:77
+msgid "The upload did not say how large it is."
+msgstr "La subida no indicaba su tamaño."
+
+#: apps/attachments/views.py:78
+msgid "Send one file with the form."
+msgstr "Envía un solo archivo con el formulario."
+
+#: apps/attachments/views.py:79
+msgid "Choose a file to attach."
+msgstr "Elige un archivo para adjuntar."
+
+#: apps/attachments/views.py:147
+#, python-format
+msgid "%(name)s attached."
+msgstr "%(name)s adjuntado."
+
+#: apps/attachments/views.py:238
+#, python-format
+msgid "%(name)s removed."
+msgstr "%(name)s retirado."
 
 #: apps/catalog/forms.py:26 apps/handovers/forms.py:32
 #: apps/material_requests/forms.py:49
@@ -856,7 +1143,7 @@ msgid "Signed in as %(email)s."
 msgstr "Sesión iniciada como %(email)s."
 
 #: apps/core/templates/core/home.html:12
-#: apps/material_requests/templates/material_requests/examine.html:320
+#: apps/material_requests/templates/material_requests/examine.html:321
 #: apps/material_requests/templates/material_requests/inbox.html:4
 #: apps/material_requests/templates/material_requests/inbox.html:8
 msgid "Approval inbox"
@@ -871,7 +1158,7 @@ msgid "New request"
 msgstr "Nueva solicitud"
 
 #: apps/core/templates/core/home.html:20 apps/core/templates/core/home.html:25
-#: apps/material_requests/templates/material_requests/detail.html:90
+#: apps/material_requests/templates/material_requests/detail.html:92
 #: apps/material_requests/templates/material_requests/list.html:4
 #: apps/material_requests/templates/material_requests/list.html:8
 msgid "My requests"
@@ -894,8 +1181,7 @@ msgstr ""
 msgid "Kind"
 msgstr "Tipo"
 
-#: apps/handovers/forms.py:43
-#: apps/handovers/templates/handovers/detail.html:17
+#: apps/handovers/forms.py:43 apps/handovers/templates/handovers/detail.html:17
 #: apps/handovers/templates/handovers/list.html:23
 #: apps/handovers/templates/handovers/list.html:36
 #: apps/material_requests/forms.py:198
@@ -905,45 +1191,25 @@ msgstr "Tipo"
 msgid "Project"
 msgstr "Obra"
 
-#: apps/handovers/forms.py:56 apps/material_requests/forms.py:176
-#: apps/material_requests/forms.py:223 apps/material_requests/forms.py:244
-#: apps/material_requests/forms.py:285 apps/organizations/forms.py:118
-#: apps/purchasing/forms.py:347 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:395 apps/receiving/forms.py:56
-msgid "Reason"
-msgstr "Motivo"
-
-#: apps/handovers/forms.py:56 apps/handovers/services.py:98
-#: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
-#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
-#: apps/receiving/forms.py:56 apps/receiving/services.py:157
-msgid "Give a reason."
-msgstr "Indica un motivo."
-
-#: apps/handovers/forms.py:79
-#| msgid "Valid from"
+#: apps/handovers/forms.py:91
 msgid "Take it from"
 msgstr "Tomarlo de"
 
-#: apps/handovers/forms.py:80
-#: apps/handovers/templates/handovers/detail.html:29
+#: apps/handovers/forms.py:92 apps/handovers/templates/handovers/detail.html:29
 #: apps/handovers/templates/handovers/list.html:25
 #: apps/handovers/templates/handovers/list.html:38
-#| msgid "received by"
 msgid "Received by"
 msgstr "Recibe"
 
-#: apps/handovers/forms.py:82
+#: apps/handovers/forms.py:94
 msgid "Or type the name of who takes it"
 msgstr "O escriba el nombre de quien lo recoge"
 
-#: apps/handovers/forms.py:85
-#| msgid "This material is measured in another unit."
+#: apps/handovers/forms.py:97
 msgid "The material is in the warehouse: hand it over anyway."
 msgstr "El material está en el almacén: entregarlo de todos modos."
 
-#: apps/handovers/forms.py:112 apps/material_requests/forms.py:34
+#: apps/handovers/forms.py:114 apps/material_requests/forms.py:34
 #: apps/material_requests/templates/material_requests/draft_lines.html:46
 #: apps/purchasing/forms.py:332
 #: apps/purchasing/templates/purchasing/amend.html:63
@@ -954,8 +1220,7 @@ msgstr "El material está en el almacén: entregarlo de todos modos."
 msgid "Quantity"
 msgstr "Cantidad"
 
-#: apps/handovers/forms.py:140
-#| msgid "Enter at least one line."
+#: apps/handovers/forms.py:142
 msgid "Enter the quantity handed over for at least one line."
 msgstr "Indique la cantidad entregada de al menos una línea."
 
@@ -1039,10 +1304,6 @@ msgstr "anulado por"
 msgid "void reason"
 msgstr "motivo de la anulación"
 
-#: apps/handovers/models.py:116 apps/handovers/models.py:153
-msgid "handover"
-msgstr "entrega"
-
 #: apps/handovers/models.py:117
 msgid "handovers"
 msgstr "entregas"
@@ -1092,8 +1353,7 @@ msgstr "Una línea no pertenece a esta obra."
 msgid "This project accepts no handovers."
 msgstr "Esta obra no admite entregas."
 
-#: apps/handovers/services.py:155
-#: apps/material_requests/services/common.py:132
+#: apps/handovers/services.py:155 apps/material_requests/services/common.py:132
 msgid "The project's branch is inactive."
 msgstr "La delegación de la obra está inactiva."
 
@@ -1121,8 +1381,7 @@ msgstr "%(request)s, línea %(line)s: no se puede entregar nada en ella."
 #, python-format
 msgid ""
 "%(request)s, line %(line)s: only %(outstanding)s remain to be handed over."
-msgstr ""
-"%(request)s, línea %(line)s: solo quedan %(outstanding)s por entregar."
+msgstr "%(request)s, línea %(line)s: solo quedan %(outstanding)s por entregar."
 
 #: apps/handovers/services.py:296 apps/receiving/services.py:396
 msgid "Enter at least one line."
@@ -1133,7 +1392,6 @@ msgid "This material was received on site; void its goods receipt instead."
 msgstr "Este material se recibió en la obra; anula su recepción de mercancía."
 
 #: apps/handovers/templates/handovers/detail.html:14
-#| msgid "Order details"
 msgid "Handover details"
 msgstr "Detalles de la entrega"
 
@@ -1143,19 +1401,17 @@ msgstr "Desde"
 
 #: apps/handovers/templates/handovers/detail.html:33
 #: apps/handovers/templates/handovers/new.html:59
-#| msgid "handed over by"
 msgid "Handed over"
 msgstr "Entregado"
 
 #: apps/handovers/templates/handovers/detail.html:40
-#| msgid "goods receipt"
 msgid "Goods receipt"
 msgstr "Recepción de mercancía"
 
 #: apps/handovers/templates/handovers/detail.html:61
 #: apps/handovers/templates/handovers/detail.html:62
 #: apps/handovers/templates/handovers/new.html:51
-#: apps/material_requests/templates/material_requests/detail.html:71
+#: apps/material_requests/templates/material_requests/detail.html:72
 #: apps/material_requests/templates/material_requests/examine.html:92
 #: apps/material_requests/templates/material_requests/examine.html:93
 #: apps/material_requests/templates/material_requests/review.html:9
@@ -1171,14 +1427,13 @@ msgstr "Recepción de mercancía"
 msgid "Lines"
 msgstr "Líneas"
 
-#: apps/handovers/templates/handovers/detail.html:74
-#: apps/handovers/templates/handovers/detail.html:76
-#: apps/handovers/templates/handovers/detail.html:86
-#| msgid "handover"
+#: apps/handovers/templates/handovers/detail.html:75
+#: apps/handovers/templates/handovers/detail.html:77
+#: apps/handovers/templates/handovers/detail.html:87
 msgid "Void the handover"
 msgstr "Anular la entrega"
 
-#: apps/handovers/templates/handovers/detail.html:78
+#: apps/handovers/templates/handovers/detail.html:79
 msgid ""
 "The material counts as not handed over again and the requests reopen. Hand "
 "it over again if it was only wrong."
@@ -1186,9 +1441,7 @@ msgstr ""
 "El material vuelve a contar como no entregado y las solicitudes se reabren. "
 "Vuelva a entregarlo si solo había un error."
 
-#: apps/handovers/templates/handovers/detail.html:92
-#| msgid ""
-#| "This material was received on site; void its goods receipt instead."
+#: apps/handovers/templates/handovers/detail.html:93
 msgid ""
 "This material was received on site: it is voided together with its goods "
 "receipt."
@@ -1199,7 +1452,6 @@ msgstr ""
 #: apps/handovers/templates/handovers/list.html:4
 #: apps/handovers/templates/handovers/list.html:8
 #: templates/partials/nav_items.html:57
-#| msgid "handovers"
 msgid "Handovers"
 msgstr "Entregas"
 
@@ -1208,34 +1460,28 @@ msgstr "Entregas"
 #: apps/handovers/templates/handovers/new.html:8
 #: apps/handovers/templates/handovers/projects.html:4
 #: apps/handovers/templates/handovers/projects.html:8
-#| msgid "handover"
 msgid "New handover"
 msgstr "Nueva entrega"
 
 #: apps/handovers/templates/handovers/list.html:22
 #: apps/handovers/templates/handovers/list.html:33
-#| msgid "handover"
 msgid "Handover"
 msgstr "Entrega"
 
 #: apps/handovers/templates/handovers/list.html:26
 #: apps/handovers/templates/handovers/list.html:39
-#| msgid "Dates"
 msgid "Date"
 msgstr "Fecha"
 
 #: apps/handovers/templates/handovers/list.html:47
-#| msgid "handovers"
 msgid "No handovers"
 msgstr "Sin entregas"
 
 #: apps/handovers/templates/handovers/list.html:47
-#| msgid "No order matches the filters."
 msgid "No handover matches the filters."
 msgstr "Ninguna entrega coincide con los filtros."
 
 #: apps/handovers/templates/handovers/new.html:15
-#| msgid "Nothing to purchase"
 msgid "Nothing left to hand over"
 msgstr "Nada que entregar"
 
@@ -1256,7 +1502,6 @@ msgstr ""
 "Si el material está ahí, marque la casilla y envíe de nuevo."
 
 #: apps/handovers/templates/handovers/new.html:38
-#| msgid "handover"
 msgid "handing over"
 msgstr "se entregan"
 
@@ -1269,14 +1514,12 @@ msgid "Who and from where"
 msgstr "Quién y desde dónde"
 
 #: apps/handovers/templates/handovers/new.html:52
-#| msgid "Material manager"
 msgid "Material to hand over"
 msgstr "Material a entregar"
 
 #: apps/handovers/templates/handovers/new.html:58
 #: apps/material_requests/forms.py:190 apps/material_requests/models.py:82
-#: apps/material_requests/models.py:179
-#: apps/material_requests/selectors.py:300
+#: apps/material_requests/models.py:179 apps/material_requests/selectors.py:300
 #: apps/material_requests/templates/material_requests/examine.html:112
 #: apps/material_requests/templates/material_requests/examine.html:127
 #: apps/material_requests/templates/material_requests/lines_table.html:11
@@ -1293,7 +1536,6 @@ msgid "Outstanding"
 msgstr "Pendiente de entrega"
 
 #: apps/handovers/templates/handovers/new.html:68
-#| msgid "When the material must be on site."
 msgid "Hand the material over"
 msgstr "Entregar el material"
 
@@ -1307,12 +1549,10 @@ msgstr ""
 #: apps/handovers/templates/handovers/projects.html:17
 #: apps/material_requests/templates/material_requests/examine.html:14
 #: apps/projects/templates/projects/detail.html:20
-#| msgid "Add materials"
 msgid "Hand material over"
 msgstr "Entregar material"
 
 #: apps/handovers/templates/handovers/projects.html:21
-#| msgid "Nothing to purchase"
 msgid "Nothing to hand over"
 msgstr "Nada que entregar"
 
@@ -1325,25 +1565,22 @@ msgstr "Ninguna solicitud aprobada tiene material pendiente de entrega."
 msgid "This handover is %(status)s; it cannot be changed this way."
 msgstr "Esta entrega está en estado %(status)s; no se puede cambiar así."
 
-#: apps/handovers/views.py:108
+#: apps/handovers/views.py:110
 #, python-format
-#| msgid "Order %(number)s issued."
 msgid "Handover %(number)s voided."
 msgstr "Entrega %(number)s anulada."
 
-#: apps/handovers/views.py:199
+#: apps/handovers/views.py:200
 #, python-format
-#| msgid "Order %(number)s issued."
 msgid "Handover %(number)s posted."
 msgstr "Entrega %(number)s registrada."
 
-#: apps/handovers/views.py:223
+#: apps/handovers/views.py:224
 #, python-format
-#| msgid "Order %(number)s issued."
 msgid "Handover %(number)s was already posted."
 msgstr "La entrega %(number)s ya estaba registrada."
 
-#: apps/handovers/views.py:242 apps/material_requests/views/requester.py:119
+#: apps/handovers/views.py:243 apps/material_requests/views/requester.py:120
 msgid "Choose a project."
 msgstr "Elija un proyecto."
 
@@ -1413,11 +1650,9 @@ msgstr "Cuándo debe estar el material en la obra."
 #: apps/purchasing/templates/purchasing/email/order.html:79
 #: apps/purchasing/templates/purchasing/email/order.txt:18
 #: apps/purchasing/templates/purchasing/print.html:103
-#: apps/receiving/forms.py:97
-#: apps/receiving/templates/receiving/detail.html:61
+#: apps/receiving/forms.py:97 apps/receiving/templates/receiving/detail.html:61
 #: apps/receiving/templates/receiving/receive.html:108
-#: apps/suppliers/forms.py:36
-#: apps/suppliers/templates/suppliers/detail.html:65
+#: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
 msgid "Notes"
 msgstr "Notas"
 
@@ -1589,10 +1824,6 @@ msgstr "Línea cerrada"
 msgid "Request closed"
 msgstr "Solicitud cerrada"
 
-#: apps/material_requests/models.py:192
-msgid "request"
-msgstr "solicitud"
-
 #: apps/material_requests/models.py:197 apps/purchasing/models.py:160
 #: apps/purchasing/templates/purchasing/line.html:94
 msgid "line"
@@ -1718,6 +1949,14 @@ msgstr "Línea cerrada con faltante"
 msgid "Line reopened"
 msgstr "Línea reabierta"
 
+#: apps/material_requests/selectors.py:316
+msgid "File attached"
+msgstr "Archivo adjuntado"
+
+#: apps/material_requests/selectors.py:317
+msgid "File removed"
+msgstr "Archivo retirado"
+
 #: apps/material_requests/services/common.py:59
 #: apps/purchasing/services/common.py:43
 msgid "This material's unit has just changed; choose the material again."
@@ -1825,7 +2064,7 @@ msgid "Goods are on order for this line; it cannot move to stock."
 msgstr "Hay material pedido para esta línea; no puede pasar a almacén."
 
 #: apps/material_requests/services/review.py:342
-#: apps/material_requests/views/reviewer.py:310
+#: apps/material_requests/views/reviewer.py:312
 msgid "This line is already a catalog material."
 msgstr "Esta línea ya es un material del catálogo."
 
@@ -1862,20 +2101,19 @@ msgstr "Solicitada por"
 msgid "Add materials"
 msgstr "Añadir materiales"
 
-#: apps/material_requests/templates/material_requests/detail.html:67
+#: apps/material_requests/templates/material_requests/detail.html:68
 msgid "Discard draft"
 msgstr "Descartar el borrador"
 
-#: apps/material_requests/templates/material_requests/detail.html:78
+#: apps/material_requests/templates/material_requests/detail.html:80
 msgid "Withdraw the request to change it. You can send it again afterwards."
-msgstr ""
-"Retire la solicitud para modificarla. Podrá enviarla de nuevo después."
+msgstr "Retire la solicitud para modificarla. Podrá enviarla de nuevo después."
 
-#: apps/material_requests/templates/material_requests/detail.html:79
+#: apps/material_requests/templates/material_requests/detail.html:81
 msgid "Withdraw"
 msgstr "Retirar"
 
-#: apps/material_requests/templates/material_requests/detail.html:86
+#: apps/material_requests/templates/material_requests/detail.html:88
 msgid "Review and follow up"
 msgstr "Revisar y hacer seguimiento"
 
@@ -1901,10 +2139,6 @@ msgstr "Una menos"
 #: apps/material_requests/templates/material_requests/draft_lines.html:52
 msgid "One more"
 msgstr "Una más"
-
-#: apps/material_requests/templates/material_requests/draft_lines.html:60
-msgid "Remove"
-msgstr "Quitar"
 
 #: apps/material_requests/templates/material_requests/draft_lines.html:66
 msgid "No material yet. Pick one above."
@@ -2084,14 +2318,14 @@ msgstr "Solo es posible mientras no se haya pedido ni entregado nada."
 msgid "Cancel request"
 msgstr "Cancelar solicitud"
 
-#: apps/material_requests/templates/material_requests/examine.html:304
 #: apps/material_requests/templates/material_requests/examine.html:305
+#: apps/material_requests/templates/material_requests/examine.html:306
 #: apps/purchasing/templates/purchasing/detail.html:205
 #: apps/purchasing/templates/purchasing/detail.html:206
 msgid "History"
 msgstr "Historial"
 
-#: apps/material_requests/templates/material_requests/examine.html:310
+#: apps/material_requests/templates/material_requests/examine.html:311
 #, python-format
 msgid "line %(line)s"
 msgstr "línea %(line)s"
@@ -2196,69 +2430,69 @@ msgstr "Cambiar las líneas"
 msgid "Submit request"
 msgstr "Enviar la solicitud"
 
-#: apps/material_requests/views/requester.py:298
+#: apps/material_requests/views/requester.py:300
 msgid "The quantity must be positive; remove the line instead."
 msgstr "La cantidad debe ser positiva; elimine la línea en su lugar."
 
-#: apps/material_requests/views/requester.py:347
+#: apps/material_requests/views/requester.py:349
 #, python-format
 msgid "Request %(number)s submitted."
 msgstr "Solicitud %(number)s enviada."
 
-#: apps/material_requests/views/requester.py:366
+#: apps/material_requests/views/requester.py:368
 msgid "Request withdrawn; it is a draft again."
 msgstr "Solicitud retirada; vuelve a ser un borrador."
 
-#: apps/material_requests/views/requester.py:384
+#: apps/material_requests/views/requester.py:386
 msgid "Request discarded."
 msgstr "Solicitud descartada."
 
-#: apps/material_requests/views/reviewer.py:231
+#: apps/material_requests/views/reviewer.py:233
 #, python-format
 msgid "Line %(line)s decided."
 msgstr "Línea %(line)s resuelta."
 
-#: apps/material_requests/views/reviewer.py:243
+#: apps/material_requests/views/reviewer.py:245
 msgid "Every pending line is approved."
 msgstr "Todas las líneas pendientes están aprobadas."
 
-#: apps/material_requests/views/reviewer.py:260
+#: apps/material_requests/views/reviewer.py:262
 msgid "Request returned to its requester."
 msgstr "Solicitud devuelta a su solicitante."
 
-#: apps/material_requests/views/reviewer.py:280
+#: apps/material_requests/views/reviewer.py:282
 msgid "Approved quantity reduced."
 msgstr "Cantidad aprobada reducida."
 
-#: apps/material_requests/views/reviewer.py:298
+#: apps/material_requests/views/reviewer.py:300
 msgid "Sourcing saved."
 msgstr "Abastecimiento guardado."
 
-#: apps/material_requests/views/reviewer.py:337
+#: apps/material_requests/views/reviewer.py:339
 msgid "Line linked to the catalog."
 msgstr "Línea vinculada al catálogo."
 
-#: apps/material_requests/views/reviewer.py:370
+#: apps/material_requests/views/reviewer.py:372
 msgid "Line closed short."
 msgstr "Línea cerrada con faltante."
 
-#: apps/material_requests/views/reviewer.py:376
+#: apps/material_requests/views/reviewer.py:378
 msgid "Line reopened."
 msgstr "Línea reabierta."
 
-#: apps/material_requests/views/reviewer.py:394
+#: apps/material_requests/views/reviewer.py:396
 msgid "Schedule saved."
 msgstr "Planificación guardada."
 
-#: apps/material_requests/views/reviewer.py:402
+#: apps/material_requests/views/reviewer.py:404
 msgid "Request closed."
 msgstr "Solicitud cerrada."
 
-#: apps/material_requests/views/reviewer.py:409
+#: apps/material_requests/views/reviewer.py:411
 msgid "Request reopened."
 msgstr "Solicitud reabierta."
 
-#: apps/material_requests/views/reviewer.py:423
+#: apps/material_requests/views/reviewer.py:425
 msgid "Request cancelled."
 msgstr "Solicitud cancelada."
 
@@ -2387,8 +2621,7 @@ msgstr "Entiendo que no se puede deshacer."
 #: apps/organizations/forms.py:126
 #: apps/organizations/templates/organizations/people.html:20
 #: apps/organizations/templates/organizations/people.html:29
-#: apps/suppliers/forms.py:30
-#: apps/suppliers/templates/suppliers/detail.html:47
+#: apps/suppliers/forms.py:30 apps/suppliers/templates/suppliers/detail.html:47
 msgid "Email"
 msgstr "Correo electrónico"
 
@@ -2414,8 +2647,7 @@ msgstr "La pertenencia de un asociado es en la empresa que lo emplea."
 
 #: apps/organizations/models.py:20
 msgid ""
-"Use upper-case letters, digits, '-' and '_', starting with a letter or "
-"digit."
+"Use upper-case letters, digits, '-' and '_', starting with a letter or digit."
 msgstr ""
 "Usa mayúsculas, dígitos, '-' y '_', empezando por una letra o un dígito."
 
@@ -2678,9 +2910,8 @@ msgid ""
 "The new address confirms the change; the current one can cancel it. It "
 "applies 24 hours after confirmation and ends every session of the account."
 msgstr ""
-"La nueva dirección confirma el cambio; la actual puede cancelarlo. Se aplica"
-" 24 horas después de la confirmación y cierra todas las sesiones de la "
-"cuenta."
+"La nueva dirección confirma el cambio; la actual puede cancelarlo. Se aplica "
+"24 horas después de la confirmación y cierra todas las sesiones de la cuenta."
 
 #: apps/organizations/templates/organizations/person.html:145
 #: apps/organizations/templates/organizations/person.html:154
@@ -2763,8 +2994,7 @@ msgid "Client"
 msgstr "Cliente"
 
 #: apps/projects/forms.py:42 apps/projects/templates/projects/detail.html:38
-#: apps/suppliers/forms.py:33
-#: apps/suppliers/templates/suppliers/detail.html:59
+#: apps/suppliers/forms.py:33 apps/suppliers/templates/suppliers/detail.html:59
 msgid "Address"
 msgstr "Dirección"
 
@@ -2854,7 +3084,6 @@ msgstr "Esta asignación ya está revocada."
 #: apps/receiving/templates/receiving/expected.html:4
 #: apps/receiving/templates/receiving/expected.html:8
 #: apps/receiving/templates/receiving/projects.html:20
-#| msgid "Expected date"
 msgid "Expected deliveries"
 msgstr "Entregas esperadas"
 
@@ -3366,8 +3595,7 @@ msgstr "Solo se puede confirmar un envío cuya entrega es incierta."
 
 #: apps/purchasing/services/dispatches.py:80
 msgid ""
-"Only a dispatch that failed or whose delivery is uncertain can be sent "
-"again."
+"Only a dispatch that failed or whose delivery is uncertain can be sent again."
 msgstr ""
 "Solo se puede enviar de nuevo un envío fallido o cuya entrega es incierta."
 
@@ -3507,7 +3735,6 @@ msgstr "Página para imprimir"
 #: apps/receiving/templates/receiving/orders.html:9
 #: apps/receiving/templates/receiving/receive.html:4
 #: apps/receiving/templates/receiving/receive.html:8
-#| msgid "Received"
 msgid "Receive goods"
 msgstr "Recibir mercancía"
 
@@ -3591,8 +3818,8 @@ msgid ""
 "Only possible while no goods have been received. Every allocation is "
 "released."
 msgstr ""
-"Solo es posible mientras no se haya recibido mercancía. Se liberan todas las"
-" asignaciones."
+"Solo es posible mientras no se haya recibido mercancía. Se liberan todas las "
+"asignaciones."
 
 #: apps/purchasing/templates/purchasing/dispatches.html:13
 msgid ""
@@ -3601,13 +3828,13 @@ msgid ""
 "again."
 msgstr ""
 "La entrega de un correo al proveedor es incierta. Nunca se reenvía "
-"automáticamente: compruébalo con el proveedor y después confírmalo o envíalo"
-" de nuevo."
+"automáticamente: compruébalo con el proveedor y después confírmalo o envíalo "
+"de nuevo."
 
 #: apps/purchasing/templates/purchasing/dispatches.html:18
 msgid ""
-"The order was cancelled while it was being sent: if it reaches the supplier,"
-" a cancellation notice follows."
+"The order was cancelled while it was being sent: if it reaches the supplier, "
+"a cancellation notice follows."
 msgstr ""
 "El pedido se anuló mientras se enviaba: si llega al proveedor, se le envía "
 "un aviso de anulación."
@@ -3655,8 +3882,8 @@ msgid ""
 "Please do not deliver or invoice it. If goods are already on their way, "
 "contact us before delivering them."
 msgstr ""
-"No lo entreguen ni lo facturen. Si la mercancía ya está en camino, contacten"
-" con nosotros antes de entregarla."
+"No lo entreguen ni lo facturen. Si la mercancía ya está en camino, contacten "
+"con nosotros antes de entregarla."
 
 #: apps/purchasing/templates/purchasing/email/cancellation.html:14
 #: apps/purchasing/templates/purchasing/email/cancellation.txt:5
@@ -3666,8 +3893,7 @@ msgstr ""
 #: apps/purchasing/templates/purchasing/email/order.txt:7
 #: apps/purchasing/templates/purchasing/print.html:27
 #: apps/purchasing/templates/purchasing/print.html:36
-#: apps/suppliers/forms.py:28
-#: apps/suppliers/templates/suppliers/detail.html:35
+#: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
 #: apps/suppliers/templates/suppliers/list.html:23
 #: apps/suppliers/templates/suppliers/list.html:35
 msgid "Tax id"
@@ -3701,10 +3927,6 @@ msgstr "Sin asignar"
 #: apps/purchasing/templates/purchasing/line.html:86
 msgid "Who it is for"
 msgstr "Para quién es"
-
-#: apps/purchasing/templates/purchasing/line.html:101
-msgid "reserved"
-msgstr "reservado"
 
 #: apps/purchasing/templates/purchasing/line.html:107
 msgid "trimmed to zero"
@@ -3972,32 +4194,26 @@ msgstr "El reparto imputa más de lo aceptado (%(accepted)s)."
 msgid "Order number, supplier or project"
 msgstr "Número de pedido, proveedor o proyecto"
 
-#: apps/receiving/forms.py:95
-#: apps/receiving/templates/receiving/detail.html:45
-#| msgid "delivery note"
+#: apps/receiving/forms.py:95 apps/receiving/templates/receiving/detail.html:45
 msgid "Delivery note"
 msgstr "Albarán"
 
 #: apps/receiving/forms.py:117
 #, python-format
-#| msgid "accepted quantity"
 msgid "Accepted (%(unit)s)"
 msgstr "Aceptado (%(unit)s)"
 
 #: apps/receiving/forms.py:120
 #, python-format
-#| msgid "rejected quantity"
 msgid "Rejected (%(unit)s)"
 msgstr "Rechazado (%(unit)s)"
 
 #: apps/receiving/forms.py:123
 #: apps/receiving/templates/receiving/detail.html:110
-#| msgid "incident"
 msgid "Incident"
 msgstr "Incidencia"
 
 #: apps/receiving/forms.py:126
-#| msgid "incident note"
 msgid "Incident note"
 msgstr "Nota de la incidencia"
 
@@ -4011,7 +4227,6 @@ msgid "%(request)s · %(project)s"
 msgstr "%(request)s · %(project)s"
 
 #: apps/receiving/forms.py:193
-#| msgid "Enter at least one line."
 msgid "Enter what arrived of at least one line."
 msgstr "Indique lo que llegó de al menos una línea."
 
@@ -4046,10 +4261,6 @@ msgstr "Dañado"
 #: apps/receiving/models.py:136
 msgid "Delivery note mismatch"
 msgstr "No coincide con el albarán"
-
-#: apps/receiving/models.py:139
-msgid "receipt"
-msgstr "recepción"
 
 #: apps/receiving/models.py:151
 msgid "accepted quantity"
@@ -4095,8 +4306,8 @@ msgstr "imputaciones de recepción"
 #, python-format
 msgid "This purchase order is %(status)s; nothing can be received on it."
 msgstr ""
-"Este pedido de compra está en estado %(status)s; no se puede recibir nada en"
-" él."
+"Este pedido de compra está en estado %(status)s; no se puede recibir nada en "
+"él."
 
 #: apps/receiving/services.py:175
 msgid "The order's branch is inactive."
@@ -4130,7 +4341,6 @@ msgid "A line is not on this order."
 msgstr "Una línea no pertenece a este pedido."
 
 #: apps/receiving/templates/receiving/detail.html:17
-#| msgid "Request details"
 msgid "Receipt details"
 msgstr "Detalles de la recepción"
 
@@ -4141,34 +4351,30 @@ msgid "Where"
 msgstr "Dónde"
 
 #: apps/receiving/templates/receiving/detail.html:53
-#| msgid "handed over at"
 msgid "Handed over on site"
 msgstr "Entregado en obra"
 
 #: apps/receiving/templates/receiving/detail.html:87
-#| msgid "accepted"
 msgid "Accepted"
 msgstr "Aceptado"
 
 #: apps/receiving/templates/receiving/detail.html:102
-#| msgid "surplus"
 msgid "Surplus"
 msgstr "Excedente"
 
-#: apps/receiving/templates/receiving/detail.html:132
-#: apps/receiving/templates/receiving/detail.html:134
-#: apps/receiving/templates/receiving/detail.html:144
-#| msgid "goods receipt"
+#: apps/receiving/templates/receiving/detail.html:133
+#: apps/receiving/templates/receiving/detail.html:135
+#: apps/receiving/templates/receiving/detail.html:145
 msgid "Void the receipt"
 msgstr "Anular la recepción"
 
-#: apps/receiving/templates/receiving/detail.html:136
+#: apps/receiving/templates/receiving/detail.html:137
 msgid ""
 "A void takes the goods out of the receipts (and out of the handover made on "
 "site). Enter the receipt again if it was only wrong."
 msgstr ""
-"Una anulación saca la mercancía de las recepciones (y de la entrega hecha en"
-" obra). Registre la recepción de nuevo si solo había un error."
+"Una anulación saca la mercancía de las recepciones (y de la entrega hecha en "
+"obra). Registre la recepción de nuevo si solo había un error."
 
 #: apps/receiving/templates/receiving/expected.html:25
 msgid "Receive these goods"
@@ -4184,7 +4390,6 @@ msgstr ""
 #: apps/receiving/templates/receiving/list.html:4
 #: apps/receiving/templates/receiving/list.html:8
 #: templates/partials/nav_items.html:49
-#| msgid "receipt"
 msgid "Receipts"
 msgstr "Recepciones"
 
@@ -4192,23 +4397,19 @@ msgstr "Recepciones"
 #: apps/receiving/templates/receiving/orders.html:14
 #: apps/receiving/templates/receiving/projects.html:4
 #: apps/receiving/templates/receiving/projects.html:8
-#| msgid "Expected date"
 msgid "Expected on site"
 msgstr "Esperado en obra"
 
 #: apps/receiving/templates/receiving/list.html:26
 #: apps/receiving/templates/receiving/list.html:36
-#| msgid "receipt"
 msgid "Receipt"
 msgstr "Recepción"
 
 #: apps/receiving/templates/receiving/list.html:49
-#| msgid "goods receipts"
 msgid "No receipts"
 msgstr "Sin recepciones"
 
 #: apps/receiving/templates/receiving/list.html:49
-#| msgid "No request matches the filters."
 msgid "No receipt matches the filters."
 msgstr "Ninguna recepción coincide con los filtros."
 
@@ -4217,17 +4418,14 @@ msgid "Find the purchase order the goods belong to."
 msgstr "Busque el pedido al que pertenece la mercancía."
 
 #: apps/receiving/templates/receiving/orders.html:31
-#| msgid "locations"
 msgid "Actions"
 msgstr "Acciones"
 
 #: apps/receiving/templates/receiving/orders.html:49
-#| msgid "Received"
 msgid "Receive"
 msgstr "Recibir"
 
 #: apps/receiving/templates/receiving/orders.html:57
-#| msgid "Not received"
 msgid "No orders to receive"
 msgstr "Sin pedidos por recibir"
 
@@ -4244,17 +4442,14 @@ msgid "Choose a project to see what is still coming to its worksite."
 msgstr "Elija un proyecto para ver lo que aún llega a su obra."
 
 #: apps/receiving/templates/receiving/projects.html:24
-#| msgid "No project matches, or none is shared with you yet."
 msgid "No project with a worksite is assigned to you."
 msgstr "No tiene asignado ningún proyecto con obra."
 
 #: apps/receiving/templates/receiving/receive.html:18
-#| msgid "Not received"
 msgid "Nowhere to receive"
 msgstr "Ningún lugar de recepción"
 
 #: apps/receiving/templates/receiving/receive.html:18
-#| msgid "Goods of this order cannot arrive here."
 msgid "Goods of this order cannot be received at any place you can use."
 msgstr ""
 "La mercancía de este pedido no se puede recibir en ningún lugar que usted "
@@ -4269,7 +4464,6 @@ msgid "Arriving at"
 msgstr "Llega a"
 
 #: apps/receiving/templates/receiving/receive.html:44
-#| msgid "Closed: nothing left to receive"
 msgid "Nothing left to receive here"
 msgstr "Nada que recibir aquí"
 
@@ -4282,7 +4476,6 @@ msgstr ""
 "pedido no está emitido."
 
 #: apps/receiving/templates/receiving/receive.html:55
-#| msgid "Delivered"
 msgid "Delivery"
 msgstr "Entrega"
 
@@ -4292,44 +4485,39 @@ msgstr "Lo que llegó"
 
 #: apps/receiving/templates/receiving/receive.html:61
 msgid ""
-"The quantities are prefilled with what is still to receive. Lower or clear a"
-" quantity for goods that did not arrive."
+"The quantities are prefilled with what is still to receive. Lower or clear a "
+"quantity for goods that did not arrive."
 msgstr ""
-"Las cantidades se rellenan con lo que falta por recibir. Reduzca o borre una"
-" cantidad si la mercancía no llegó."
+"Las cantidades se rellenan con lo que falta por recibir. Reduzca o borre una "
+"cantidad si la mercancía no llegó."
 
 #: apps/receiving/templates/receiving/receive.html:73
-#| msgid "Partly received"
 msgid "Still to receive"
 msgstr "Falta por recibir"
 
 #: apps/receiving/templates/receiving/receive.html:80
-#| msgid "Choose an incident."
 msgid "Rejected goods or an incident"
 msgstr "Mercancía rechazada o una incidencia"
 
 #: apps/receiving/templates/receiving/receive.html:87
-#| msgid "Close the request"
 msgid "Split between requests"
 msgstr "Reparto entre solicitudes"
 
 #: apps/receiving/templates/receiving/receive.html:89
 msgid ""
 "By default the goods go to the requests in order of priority and date. Tick "
-"the box to give each request its own share; what no request takes is kept as"
-" surplus."
+"the box to give each request its own share; what no request takes is kept as "
+"surplus."
 msgstr ""
 "Por defecto la mercancía va a las solicitudes por orden de prioridad y "
 "fecha. Marque la casilla para dar a cada solicitud su parte; lo que ninguna "
 "solicitud toma queda como excedente."
 
 #: apps/receiving/templates/receiving/receive.html:96
-#| msgid "Ship to"
 msgid "up to"
 msgstr "hasta"
 
 #: apps/receiving/templates/receiving/receive.html:111
-#| msgid "goods receipt"
 msgid "Post the receipt"
 msgstr "Registrar la recepción"
 
@@ -4340,13 +4528,11 @@ msgstr "Esta recepción está en estado %(status)s; no se puede cambiar así."
 
 #: apps/receiving/views/actions.py:55
 #, python-format
-#| msgid "Request %(number)s submitted."
 msgid "Receipt %(number)s posted."
 msgstr "Recepción %(number)s registrada."
 
 #: apps/receiving/views/actions.py:76
 #, python-format
-#| msgid "Request %(number)s submitted."
 msgid "Receipt %(number)s was already posted."
 msgstr "La recepción %(number)s ya estaba registrada."
 
@@ -4356,23 +4542,20 @@ msgstr "Elija dónde llegó la mercancía."
 
 #: apps/receiving/views/actions.py:112
 #, python-format
-#| msgid "Request %(number)s submitted."
 msgid "Receipt %(number)s voided."
 msgstr "Recepción %(number)s anulada."
 
-#: apps/receiving/views/pages.py:161
+#: apps/receiving/views/pages.py:163
 msgid "Nothing is expected here."
 msgstr "No se espera nada aquí."
 
-#: apps/suppliers/forms.py:29
-#: apps/suppliers/templates/suppliers/detail.html:41
+#: apps/suppliers/forms.py:29 apps/suppliers/templates/suppliers/detail.html:41
 #: apps/suppliers/templates/suppliers/list.html:24
 #: apps/suppliers/templates/suppliers/list.html:36
 msgid "Contact person"
 msgstr "Persona de contacto"
 
-#: apps/suppliers/forms.py:31
-#: apps/suppliers/templates/suppliers/detail.html:53
+#: apps/suppliers/forms.py:31 apps/suppliers/templates/suppliers/detail.html:53
 #: apps/suppliers/templates/suppliers/list.html:25
 #: apps/suppliers/templates/suppliers/list.html:37
 msgid "Phone"
@@ -4619,8 +4802,3 @@ msgstr "Bandeja"
 #: templates/partials/nav_items.html:96
 msgid "Security"
 msgstr "Seguridad"
-
-#~ msgid ""
-#~ "The supplier may have this order: a cancellation notice is sent to them."
-#~ msgstr ""
-#~ "Puede que el proveedor tenga este pedido: se le envía un aviso de anulación."

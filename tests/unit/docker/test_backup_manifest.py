@@ -11,9 +11,14 @@ from typing import Any
 
 import pytest
 from django.db import connection, transaction
+from django.utils import timezone
 
+from apps.attachments.files import new_storage_key
+from apps.attachments.models import Attachment
 from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
+from apps.material_requests.models import MaterialRequest
+from tests.org import Org, People
 
 ROOT = Path(__file__).resolve().parents[3]
 MANIFEST_SQL = ROOT / "docker" / "backup" / "manifest.sql"
@@ -53,3 +58,30 @@ def test_the_newest_audit_event_is_the_highest_uuidv7() -> None:
 
 def test_no_audit_table_gives_no_newest_event() -> None:
     assert _manifest("audit_table_not_created_yet")["audit_last_event_id"] is None
+
+
+def test_no_attachment_gives_an_empty_list() -> None:
+    assert _manifest()["attachments"] == []
+
+
+def test_the_stored_attachments_are_listed_for_the_media_copy(org: Org, people: People) -> None:
+    """backup.sh copies exactly these files and checks each against its digest (M6.4)."""
+    draft = MaterialRequest.objects.create(
+        project=org.hospital, procurement_branch=org.a_mad, requested_by=people.tech_mad
+    )
+    keys = sorted(new_storage_key() for _ in range(2))
+    for index, key in enumerate(keys):
+        Attachment.objects.create(
+            request=draft,
+            storage_key=key,
+            file_name=f"{index}.pdf",
+            content_type=Attachment.ContentType.PDF,
+            size_bytes=10 + index,
+            sha256=f"{index}" * 64,
+            uploaded_by=people.tech_mad,
+            uploaded_at=timezone.now(),
+        )
+    assert _manifest()["attachments"] == [
+        {"storage_key": key, "size_bytes": 10 + index, "sha256": f"{index}" * 64}
+        for index, key in enumerate(keys)
+    ]

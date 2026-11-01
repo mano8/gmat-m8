@@ -21,6 +21,7 @@ allowed only to its ``price.view`` holders (``Route.allowed_for``), so a warehou
 operator reading an order is checked priceless.
 """
 
+import io
 import re
 from collections.abc import Callable
 from datetime import timedelta
@@ -32,8 +33,10 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.hashers import make_password
 from django.contrib.contenttypes.models import ContentType
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from apps.access.admin import CapabilityModelAdmin
 from apps.access.models import AccessState
@@ -165,6 +168,7 @@ READ_ONLY_MODELS = {
     "purchasing": ("purchaseorder", "purchaseorderline", "purchaseallocation"),
     "receiving": ("goodsreceipt", "goodsreceiptline", "receiptattribution"),
     "handovers": ("handover", "handoverline"),
+    "attachments": ("attachment", "attachmentreservation", "storagequota", "mediadeletion"),
 }
 MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),
@@ -452,6 +456,36 @@ def order_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
 
 
 def purchase_url(name: str, key: str) -> Callable[[World], str]:
+    return _object_url(name, key)
+
+
+# Attachments (M6.4): every operation is checked against the parent (plan §5). View with the
+# parent's view capability; add with request.create (the requester, on a draft),
+# receipt.post or handover.post; remove by the uploader on a draft, else with request.source,
+# receipt.void or handover.void (the managers). Removal rows post no reason: a manager is sent
+# back to the page with the error and nothing changes, so every actor meets the same file;
+# the technician removes their own draft's file, which needs none.
+UPLOAD_ORIGIN = {"Origin": "http://testserver"}
+FILE_MANAGERS = ("group_admin", "mm_mad")
+
+
+def _upload_body(world: World) -> dict[str, Any]:
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), "red").save(buffer, "PNG")
+    return {"file": SimpleUploadedFile("photo.png", buffer.getvalue())}
+
+
+def _download_unknown() -> dict[str, Expect]:
+    """An unknown attachment is not found for anyone signed in (its parent decides 403)."""
+    row = expect(NOT_FOUND, signed_out=LOGIN, no_mfa=STEP_UP)
+    return {"GET": row, "HEAD": row, "POST": expect(NOT_ALLOWED, no_mfa=DENIED)}
+
+
+def _upload(name: str, key: str) -> Callable[[World], str]:
+    return _object_url(name, key)
+
+
+def _attachment_url(name: str, key: str) -> Callable[[World], str]:
     return _object_url(name, key)
 
 
@@ -1185,6 +1219,86 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="received on site",
             path=_object_url("handovers:void", "handover"),
             note="no reason: back to the handover (it goes with its receipt)",
+        ),
+    ),
+    "attachments:upload_request": (
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", REDIRECT),
+            position="the technician's draft",
+            path=_upload("attachments:upload_request", "materialrequest"),
+            data=_upload_body,
+            headers=UPLOAD_ORIGIN,
+            note="only the requester adds to their draft; back to the request",
+        ),
+    ),
+    "attachments:upload_receipt": (
+        Route(
+            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS, REDIRECT),
+            position="worksite",
+            path=_upload("attachments:upload_receipt", "goodsreceipt"),
+            data=_upload_body,
+            headers=UPLOAD_ORIGIN,
+            note="the site manager adds to the receipt of their worksite",
+        ),
+        Route(
+            project_action(RECEIPT_HOLDERS, WHOLE_ORDER, WHOLE_ORDER, REDIRECT),
+            position="warehouse",
+            path=_upload("attachments:upload_receipt", "warehousereceipt"),
+            data=_upload_body,
+            headers=UPLOAD_ORIGIN,
+        ),
+    ),
+    "attachments:upload_handover": (
+        Route(
+            project_action(HANDOVER_POSTERS, WHOLE_ORDER, WHOLE_ORDER, REDIRECT),
+            position="from a warehouse",
+            path=_upload("attachments:upload_handover", "warehousehandover"),
+            data=_upload_body,
+            headers=UPLOAD_ORIGIN,
+            note="the site manager reads the handover but never posts one",
+        ),
+    ),
+    "attachments:download": (
+        Route(
+            request_read(TECH_REQUEST_VIEWERS),
+            position="the technician's draft",
+            path=_attachment_url("attachments:download", "requestattachment"),
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            position="worksite receipt",
+            path=_attachment_url("attachments:download", "attachment"),
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, WHOLE_ORDER, WHOLE_ORDER),
+            position="warehouse receipt",
+            path=_attachment_url("attachments:download", "warehouseattachment"),
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            position="handover",
+            path=_attachment_url("attachments:download", "handoverattachment"),
+        ),
+        Route(_download_unknown(), position="unknown", path=_unknown_url("attachments:download")),
+    ),
+    "attachments:remove": (
+        Route(
+            project_action(
+                REQUEST_VIEWERS, TECH_REQUEST_VIEWERS, (*FILE_MANAGERS, "tech_mad"), REDIRECT
+            ),
+            position="the technician's draft",
+            path=_attachment_url("attachments:remove", "requestattachment"),
+            note="the uploader removes from the draft; the managers need a reason",
+        ),
+        Route(
+            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, REDIRECT),
+            position="worksite receipt",
+            path=_attachment_url("attachments:remove", "attachment"),
+        ),
+        Route(
+            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, REDIRECT),
+            position="handover",
+            path=_attachment_url("attachments:remove", "handoverattachment"),
         ),
     ),
     # Group administrators only (org.manage); the target is the A-MAD technician.

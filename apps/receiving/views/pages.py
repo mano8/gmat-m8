@@ -20,6 +20,7 @@ from django.views.decorators.http import require_safe
 
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
+from apps.attachments import selectors as attachment_selectors
 from apps.core.http import is_htmx
 from apps.locations.models import Location
 from apps.purchasing.models import PurchaseOrder
@@ -67,6 +68,7 @@ def receipt_detail(request: HttpRequest, receipt_id: UUID) -> HttpResponse:
         "handover": selectors.direct_handover(ctx, found),
         "can_void": can_void,
         "void_form": RequiredReasonForm(auto_id="id_void_%s") if can_void else None,
+        "attachments": attachment_selectors.panel(ctx, found),
     }
     return render(request, "receiving/detail.html", context)
 

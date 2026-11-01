@@ -122,6 +122,13 @@ RUN DJANGO_SETTINGS_MODULE=config.settings.build python manage.py collectstatic 
 # deletes the code instead of ignoring the report.
 RUN /usr/local/bin/python -m pip uninstall -y pip     && rm -rf "$(/usr/local/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/pip"     && rm -f /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.*
 
+# The private media volume (attachments, M6.4): a fresh named volume copies this folder,
+# so it starts owned by the app user and closed to everyone else.
+ENV ATTACHMENT_ROOT=/srv/media
+RUN mkdir -p /srv/media/files /srv/media/staging \
+    && chown -R 1000:1000 /srv/media \
+    && chmod -R 0700 /srv/media
+
 USER 1000:1000
 EXPOSE 8000
 ENTRYPOINT ["/app/docker/app/entrypoint.sh"]

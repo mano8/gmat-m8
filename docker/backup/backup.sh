@@ -9,7 +9,8 @@
 #      READ ONLY transaction and exports its snapshot; the session stays open;
 #   2. pg_dump -Fc --snapshot=<id>, sessions and the rate-limit cache excluded (data only);
 #   3. the manifest queries run in that same snapshot, so dump and manifest always agree;
-#   4. the media directory, if any, is copied under the lock and checksummed;
+#   4. the attachment files the snapshot lists are copied under the lock and checked against
+#      the checksums the snapshot holds;
 #   5. the transaction ends and the lock is released;
 #   then: pg_restore --list, local retention, the append-only offsite upload and the heartbeat.
 #
@@ -107,17 +108,21 @@ run_backup() {
     local data="$SESSION_OUT"
     jq -e . >/dev/null <<<"$data" || die "the manifest query returned no valid JSON"
 
-    # --- 4. media (until M6.4 there is normally none) -----------------------------------
+    # --- 4. media: the files the snapshot lists, checked against it ---------------------
+    # Still under the advisory lock, so the worker's purge cannot delete one meanwhile.
     local media_json='null'
-    if [ -n "${MEDIA_DIR:-}" ] && [ -d "$MEDIA_DIR" ] && [ -n "$(ls -A "$MEDIA_DIR" 2>/dev/null)" ]; then
-        mkdir -p "$media.partial"
-        cp -a "$MEDIA_DIR"/. "$media.partial"/
-        local listing count
-        listing=$(cd "$media.partial" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum)
-        count=$(printf '%s' "$listing" | grep -c . || true)
-        media_json=$(jq -n --arg dir "$base.media" --argjson files "$count" \
-            --arg digest "$(printf '%s' "$listing" | sha256sum | cut -d' ' -f1)" \
-            '{directory: $dir, file_count: $files, listing_sha256: $digest}')
+    if [ -n "${MEDIA_DIR:-}" ] && [ -d "$MEDIA_DIR" ]; then
+        copy_media "$data" "$media.partial"
+        if [ "$MEDIA_COPIED" -gt 0 ] || [ "$MEDIA_PROBLEMS" != "[]" ]; then
+            local listing
+            listing=$(cd "$media.partial" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum)
+            media_json=$(jq -n --arg dir "$base.media" --argjson files "$MEDIA_COPIED" \
+                --arg digest "$(printf '%s' "$listing" | sha256sum | cut -d' ' -f1)" \
+                --argjson problems "$MEDIA_PROBLEMS" \
+                '{directory: $dir, file_count: $files, listing_sha256: $digest, problems: $problems}')
+        else
+            rmdir "$media.partial"
+        fi
     fi
 
     # --- 5. release the snapshot and the lock -------------------------------------------
@@ -157,6 +162,34 @@ run_backup() {
     heartbeat ""
     log "backup $base finished in $(($(date +%s) - started)) s"
     echo "$base"
+}
+
+# Copy each stored attachment the manifest lists (storage key and sha256) into $2 and check
+# the copy. A file that is missing or differs is recorded in MEDIA_PROBLEMS (JSON) and logged
+# instead of failing the whole backup: the database dump is still worth keeping.
+copy_media() {
+    local data="$1" target="$2" key sum problems=()
+    mkdir -p "$target"
+    MEDIA_COPIED=0
+    while read -r key sum; do
+        [ -n "$key" ] || continue
+        [[ "$key" =~ ^[0-9a-f]{64}$ ]] || die "the snapshot lists an invalid storage key"
+        if [ ! -f "$MEDIA_DIR/$key" ]; then
+            problems+=("missing:$key")
+            continue
+        fi
+        cp -p "$MEDIA_DIR/$key" "$target/$key"
+        if [ "$(sha256_of "$target/$key")" != "$sum" ]; then
+            problems+=("checksum:$key")
+        fi
+        MEDIA_COPIED=$((MEDIA_COPIED + 1))
+    done < <(jq -r '.attachments[]? | "\(.storage_key) \(.sha256)"' <<<"$data")
+    if [ "${#problems[@]}" -gt 0 ]; then
+        log "WARNING: ${#problems[@]} attachment file(s) missing or different: ${problems[*]}"
+        MEDIA_PROBLEMS=$(printf '%s\n' "${problems[@]}" | jq -R . | jq -s -c .)
+    else
+        MEDIA_PROBLEMS='[]'
+    fi
 }
 
 # restic with credentials that can append but not delete or overwrite (plan §9). Forget and

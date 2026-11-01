@@ -313,6 +313,8 @@ ACTION_LABELS = {
     "request_line.resolved": _("Linked to the catalog"),
     "request_line.closed_short": _("Line closed short"),
     "request_line.reopened": _("Line reopened"),
+    "attachment.added": _("File attached"),
+    "attachment.removed": _("File removed"),
 }
 
 
@@ -362,7 +364,13 @@ def _rescheduled_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
     return _join(*(f"{name}: {change.get('to') or '—'}" for name, change in changes.items()))
 
 
+def _attachment_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
+    return _join(data.get("file_name", ""), data.get("reason", ""))
+
+
 _DETAILS = {
+    "attachment.added": _attachment_detail,
+    "attachment.removed": _attachment_detail,
     "request_line.decided": _decided_detail,
     "request_line.reduced": _reduced_detail,
     "request_line.sourcing_set": _sourcing_detail,

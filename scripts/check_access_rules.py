@@ -69,6 +69,9 @@ ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
     {
         # The service-backed base itself (plan §5, "Django Admin").
         ("apps/core/admin.py", "plain-model-admin"),
+        # The single upload entry point: admission must run before CSRF parses the body
+        # (plan §5 "Attachments", F73); its inner view is csrf_protect.
+        ("apps/attachments/views.py", "csrf_exempt"),
     }
 )
 

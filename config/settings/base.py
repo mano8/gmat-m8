@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.purchasing",
     "apps.receiving",
     "apps.handovers",
+    "apps.attachments",
     "apps.notifications",
 ]
 
@@ -244,6 +245,31 @@ WORKER_HEARTBEAT_FILE = env_str("WORKER_HEARTBEAT_FILE", "/tmp/gmat-worker.heart
 WORKER_POLL_INTERVAL = 2
 WORKER_RECONCILE_INTERVAL = 60
 WORKER_HOUSEKEEPING_INTERVAL = 3600
+
+# --- attachments (plan §5, Q22; M6.4) -------------------------------------------------
+# Files live on the private media volume and are never served from it directly
+# (apps.attachments.views.download). Sizes in bytes, times in seconds.
+ATTACHMENT_ROOT = env_str("ATTACHMENT_ROOT", str(BASE_DIR / "media"))
+ATTACHMENT_MAX_FILE_BYTES = 10 * 1024 * 1024
+# The upload's declared Content-Length may add the form's other fields and the multipart
+# framing to the file; Caddy's request_body limit (MAX_UPLOAD_SIZE) sits just above it.
+ATTACHMENT_MAX_REQUEST_BYTES = ATTACHMENT_MAX_FILE_BYTES + 64 * 1024
+ATTACHMENT_MAX_PER_PARENT = 10
+ATTACHMENT_STORAGE_LIMIT = env_int("ATTACHMENT_STORAGE_LIMIT_MB", 5 * 1024, minimum=1) * 1024 * 1024
+ATTACHMENT_ALERT_PERCENT = 80
+ATTACHMENT_MAX_PROCESSING = 2  # uploads between admission and finalization, installation-wide
+# The reservation lease. It must outlast every enforced limit of an upload: Caddy's body
+# timeout (120 s), the decoder's kill (ATTACHMENT_DECODE_TIMEOUT) and the lock timeouts.
+ATTACHMENT_LEASE = 15 * 60
+ATTACHMENT_DECODE_TIMEOUT = 60  # wall time, then the child is killed
+ATTACHMENT_DECODE_CPU = 60  # RLIMIT_CPU of the child
+ATTACHMENT_DECODE_MEMORY = 512 * 1024 * 1024  # RLIMIT_AS of the child
+ATTACHMENT_MAX_PIXELS = 40_000_000
+ATTACHMENT_MAX_SIDE = 2560
+# Removed attachments are kept this long, then purged; their files are deleted after a
+# grace period longer than the longest backup copy (plan §9).
+ATTACHMENT_RETENTION_DAYS = 90
+MEDIA_PURGE_GRACE = 24 * 3600
 
 LANGUAGE_CODE = "es"
 LANGUAGES = [("es", "Español"), ("en", "English"), ("fr", "Français")]

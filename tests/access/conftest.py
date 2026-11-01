@@ -11,12 +11,21 @@ from decimal import Decimal
 
 import pytest
 from allauth.account.models import EmailAddress
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from pytest_django import DjangoDbBlocker
 
 from apps.accounts.models import EmailChangeRequest, Invitation
 from apps.accounts.tokens import new_token
+from apps.attachments import files
+from apps.attachments.models import (
+    QUOTA_ID,
+    Attachment,
+    AttachmentReservation,
+    MediaDeletion,
+    StorageQuota,
+)
 from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
@@ -227,6 +236,7 @@ def _admin_rows(world: World) -> None:
         request_line=world.objects["approved_request_line"],
         qty=Decimal("1.000"),
     )
+    _attachments(world)
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)
@@ -247,6 +257,46 @@ def _admin_rows(world: World) -> None:
         expires_at=later,
     )
     assert AuditEvent.objects.exists()
+
+
+def _attachments(world: World) -> None:
+    """One stored file on the technician's draft, the worksite and warehouse receipts and the
+    warehouse handover (M6.4), and a row of each attachment model for the admin."""
+    people = world.people
+    parents = {
+        "requestattachment": ("request", world.objects["materialrequest"], people.tech_mad),
+        "attachment": ("receipt", world.objects["goodsreceipt"], people.wo_mad),
+        "warehouseattachment": ("receipt", world.objects["warehousereceipt"], people.wo_mad),
+        "handoverattachment": ("handover", world.objects["warehousehandover"], people.wo_mad),
+    }
+    files.ensure_dirs()
+    for key, (field, parent, uploader) in parents.items():
+        storage_key = files.new_storage_key()
+        files.stored_path(storage_key).write_bytes(b"%PDF-1.4\n%%EOF\n")
+        world.objects[key] = Attachment.objects.create(
+            **{field: parent},
+            storage_key=storage_key,
+            file_name=f"{key}.pdf",
+            content_type=Attachment.ContentType.PDF,
+            size_bytes=15,
+            sha256="0" * 64,
+            uploaded_by=uploader,
+            uploaded_at=timezone.now(),
+        )
+    world.objects["attachmentreservation"] = AttachmentReservation.objects.create(
+        receipt=world.objects["goodsreceipt"],
+        reserved_by=people.wo_mad,
+        reserved_bytes=100,
+        state=AttachmentReservation.State.RELEASED,
+        lease_until=timezone.now(),
+        finished_at=timezone.now(),
+    )
+    world.objects["storagequota"], _ = StorageQuota.objects.get_or_create(
+        pk=QUOTA_ID, defaults={"limit_bytes": settings.ATTACHMENT_STORAGE_LIMIT}
+    )
+    world.objects["mediadeletion"] = MediaDeletion.objects.create(
+        storage_key=files.new_storage_key(), size_bytes=1, delete_after=timezone.now()
+    )
 
 
 @pytest.fixture(scope="module")

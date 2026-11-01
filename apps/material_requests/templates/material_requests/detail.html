@@ -60,6 +60,7 @@
       {% include "material_requests/material_picker.html" %}
     </section>
     {% include "material_requests/draft_lines.html" %}
+    {% include "attachments/panel.html" with panel=attachments %}
     <form method="post"
           action="{% url 'requests:cancel' request_id=request_obj.pk %}"
           class="mt-4">
@@ -71,6 +72,7 @@
       <h2 class="mb-2">{% translate "Lines" %}</h2>
       {% include "material_requests/lines_table.html" %}
     </section>
+    {% include "attachments/panel.html" with panel=attachments %}
     {% if withdrawable %}
       <form method="post"
             action="{% url 'requests:withdraw' request_id=request_obj.pk %}">

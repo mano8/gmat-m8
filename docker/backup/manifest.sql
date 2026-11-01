@@ -40,5 +40,18 @@ SELECT json_build_object(
         ELSE (xpath('/row/j/text()',
                     query_to_xml(format('SELECT (SELECT id FROM public.%I ORDER BY id DESC LIMIT 1)::text AS j',
                                         :'audit_table'), false, true, '')))[1]::text
+    END,
+    -- The stored attachments of this snapshot (M6.4): what backup.sh copies and checks, and
+    -- what restore.sh expects in the media copy. An empty array before the table exists.
+    'attachments', CASE
+        WHEN to_regclass('public.attachments_attachment') IS NULL THEN '[]'::json
+        ELSE (xpath('/row/j/text()',
+                    query_to_xml($q$
+                        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                                   'storage_key', storage_key,
+                                   'size_bytes', size_bytes,
+                                   'sha256', sha256) ORDER BY storage_key), '[]'::jsonb) AS j
+                        FROM public.attachments_attachment
+                    $q$, false, true, '')))[1]::text::json
     END
 );

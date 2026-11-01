@@ -17,6 +17,7 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require_capability
 from apps.access.roles import Capability
+from apps.attachments import selectors as attachment_selectors
 from apps.core.http import is_htmx
 from apps.material_requests import ledger, selectors, services
 from apps.material_requests.forms import (
@@ -205,6 +206,7 @@ def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
         "reason_form": RequiredReasonForm(),
         "cancel_form": ReasonForm(),
         "history": selectors.history(ctx, found),
+        "attachments": attachment_selectors.panel(ctx, found, back="examine"),
     }
     return render(request, "material_requests/examine.html", context)
 

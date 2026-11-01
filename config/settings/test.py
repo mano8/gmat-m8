@@ -7,6 +7,8 @@ password is a throwaway for the test database only.
 """
 
 import os
+import tempfile
+from pathlib import Path
 
 _TEST_ENV = {
     "DB_NAME": "gmat",
@@ -40,3 +42,6 @@ MAILERS = {
     "default": {"BACKEND": OUTBOX_BACKEND},
     "outbound": {"BACKEND": "django.core.mail.backends.locmem.EmailBackend"},
 }
+# Attachments go to a scratch folder, never the checkout; tests that look at the files use
+# their own (``settings.ATTACHMENT_ROOT = tmp_path``).
+ATTACHMENT_ROOT = str(Path(tempfile.gettempdir()) / "gmat-test-media")

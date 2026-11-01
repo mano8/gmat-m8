@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 09:43+0000\n"
+"POT-Creation-Date: 2026-11-01 10:30+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -396,6 +396,291 @@ msgstr ""
 
 #: apps/accounts/views.py:216
 msgid "The email change is cancelled."
+msgstr ""
+
+#: apps/attachments/forms.py:12
+#: apps/attachments/templates/attachments/panel.html:41
+#: apps/handovers/forms.py:56 apps/material_requests/forms.py:176
+#: apps/material_requests/forms.py:223 apps/material_requests/forms.py:244
+#: apps/material_requests/forms.py:285 apps/organizations/forms.py:118
+#: apps/purchasing/forms.py:347 apps/purchasing/forms.py:354
+#: apps/purchasing/forms.py:395 apps/receiving/forms.py:56
+msgid "Reason"
+msgstr ""
+
+#: apps/attachments/models.py:73
+msgid "Image"
+msgstr ""
+
+#: apps/attachments/models.py:74
+msgid "PDF"
+msgstr ""
+
+#: apps/attachments/models.py:76 apps/attachments/models.py:158
+#: apps/material_requests/models.py:192
+msgid "request"
+msgstr ""
+
+#: apps/attachments/models.py:77 apps/attachments/models.py:159
+#: apps/receiving/models.py:139
+msgid "receipt"
+msgstr ""
+
+#: apps/attachments/models.py:78 apps/attachments/models.py:160
+#: apps/handovers/models.py:116 apps/handovers/models.py:153
+msgid "handover"
+msgstr ""
+
+#: apps/attachments/models.py:79 apps/attachments/models.py:203
+msgid "storage key"
+msgstr ""
+
+#: apps/attachments/models.py:80
+msgid "file name"
+msgstr ""
+
+#: apps/attachments/models.py:81
+msgid "type"
+msgstr ""
+
+#: apps/attachments/models.py:82 apps/attachments/models.py:204
+msgid "size"
+msgstr ""
+
+#: apps/attachments/models.py:83
+msgid "SHA-256"
+msgstr ""
+
+#: apps/attachments/models.py:88
+msgid "uploaded by"
+msgstr ""
+
+#: apps/attachments/models.py:90
+msgid "uploaded at"
+msgstr ""
+
+#: apps/attachments/models.py:91
+msgid "removed at"
+msgstr ""
+
+#: apps/attachments/models.py:98
+msgid "removed by"
+msgstr ""
+
+#: apps/attachments/models.py:100
+msgid "removal reason"
+msgstr ""
+
+#: apps/attachments/models.py:103
+msgid "attachment"
+msgstr ""
+
+#: apps/attachments/models.py:104
+msgid "attachments"
+msgstr ""
+
+#: apps/attachments/models.py:134
+msgid "limit"
+msgstr ""
+
+#: apps/attachments/models.py:135
+msgid "stored"
+msgstr ""
+
+#: apps/attachments/models.py:136 apps/attachments/models.py:167
+#: apps/purchasing/templates/purchasing/line.html:101
+msgid "reserved"
+msgstr ""
+
+#: apps/attachments/models.py:137
+msgid "alert raised at"
+msgstr ""
+
+#: apps/attachments/models.py:140 apps/attachments/models.py:141
+msgid "storage quota"
+msgstr ""
+
+#: apps/attachments/models.py:154
+msgid "Processing"
+msgstr ""
+
+#: apps/attachments/models.py:155
+msgid "Finalized"
+msgstr ""
+
+#: apps/attachments/models.py:156
+msgid "Released"
+msgstr ""
+
+#: apps/attachments/models.py:165
+msgid "reserved by"
+msgstr ""
+
+#: apps/attachments/models.py:168
+msgid "state"
+msgstr ""
+
+#: apps/attachments/models.py:169
+msgid "lease until"
+msgstr ""
+
+#: apps/attachments/models.py:170
+msgid "finished at"
+msgstr ""
+
+#: apps/attachments/models.py:173
+msgid "attachment reservation"
+msgstr ""
+
+#: apps/attachments/models.py:174
+msgid "attachment reservations"
+msgstr ""
+
+#: apps/attachments/models.py:205
+msgid "delete after"
+msgstr ""
+
+#: apps/attachments/models.py:208
+msgid "media deletion"
+msgstr ""
+
+#: apps/attachments/models.py:209
+msgid "media deletions"
+msgstr ""
+
+#: apps/attachments/processing.py:58
+msgid "Only JPEG, PNG and WebP images or PDF files can be attached."
+msgstr ""
+
+#: apps/attachments/processing.py:59
+msgid "This image has too many pixels."
+msgstr ""
+
+#: apps/attachments/processing.py:60
+msgid "The file is too large."
+msgstr ""
+
+#: apps/attachments/processing.py:61
+msgid "This image could not be read."
+msgstr ""
+
+#: apps/attachments/processing.py:62
+msgid "This image took too long to process."
+msgstr ""
+
+#: apps/attachments/processing.py:63
+msgid "The file is empty."
+msgstr ""
+
+#: apps/attachments/services.py:73
+msgid "The file is larger than 10 MB."
+msgstr ""
+
+#: apps/attachments/services.py:74
+msgid "The attachment storage is full. Ask an administrator."
+msgstr ""
+
+#: apps/attachments/services.py:75
+msgid "This document already has the maximum number of attachments."
+msgstr ""
+
+#: apps/attachments/services.py:76
+msgid "Other files are being processed. Try again in a moment."
+msgstr ""
+
+#: apps/attachments/services.py:77
+msgid "Files can no longer be attached to this document."
+msgstr ""
+
+#: apps/attachments/services.py:78
+msgid "The upload took too long. Try again."
+msgstr ""
+
+#: apps/attachments/services.py:79
+msgid "This attachment was already removed."
+msgstr ""
+
+#: apps/attachments/services.py:350 apps/handovers/forms.py:56
+#: apps/handovers/services.py:98 apps/material_requests/forms.py:228
+#: apps/material_requests/forms.py:285
+#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
+#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
+#: apps/receiving/forms.py:56 apps/receiving/services.py:157
+msgid "Give a reason."
+msgstr ""
+
+#: apps/attachments/templates/attachments/panel.html:9
+#: apps/attachments/templates/attachments/panel.html:11
+msgid "Attachments"
+msgstr ""
+
+#: apps/attachments/templates/attachments/panel.html:19
+#, python-format
+msgid "Removed by %(who)s on %(when)s"
+msgstr ""
+
+#: apps/attachments/templates/attachments/panel.html:33
+#: apps/material_requests/templates/material_requests/draft_lines.html:60
+msgid "Remove"
+msgstr ""
+
+#: apps/attachments/templates/attachments/panel.html:49
+msgid "Remove the attachment"
+msgstr ""
+
+#: apps/attachments/templates/attachments/panel.html:67
+msgid "Photo or PDF"
+msgstr ""
+
+#: apps/attachments/templates/attachments/panel.html:74
+#, python-format
+msgid ""
+"JPEG, PNG, WebP or PDF, up to 10 MB. %(left)s more file can be attached."
+msgid_plural ""
+"JPEG, PNG, WebP or PDF, up to 10 MB. %(left)s more files can be attached."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/attachments/templates/attachments/panel.html:81
+msgid "Attach"
+msgstr ""
+
+#: apps/attachments/templates/attachments/refused.html:4
+msgid "Not attached"
+msgstr ""
+
+#: apps/attachments/templates/attachments/refused.html:8
+msgid "The file was not attached"
+msgstr ""
+
+#: apps/attachments/templates/attachments/refused.html:10
+msgid "Back to the document"
+msgstr ""
+
+#: apps/attachments/views.py:76
+msgid "The upload did not come from this site."
+msgstr ""
+
+#: apps/attachments/views.py:77
+msgid "The upload did not say how large it is."
+msgstr ""
+
+#: apps/attachments/views.py:78
+msgid "Send one file with the form."
+msgstr ""
+
+#: apps/attachments/views.py:79
+msgid "Choose a file to attach."
+msgstr ""
+
+#: apps/attachments/views.py:147
+#, python-format
+msgid "%(name)s attached."
+msgstr ""
+
+#: apps/attachments/views.py:238
+#, python-format
+msgid "%(name)s removed."
 msgstr ""
 
 #: apps/catalog/forms.py:26 apps/handovers/forms.py:32
@@ -823,7 +1108,7 @@ msgid "Signed in as %(email)s."
 msgstr ""
 
 #: apps/core/templates/core/home.html:12
-#: apps/material_requests/templates/material_requests/examine.html:320
+#: apps/material_requests/templates/material_requests/examine.html:321
 #: apps/material_requests/templates/material_requests/inbox.html:4
 #: apps/material_requests/templates/material_requests/inbox.html:8
 msgid "Approval inbox"
@@ -838,7 +1123,7 @@ msgid "New request"
 msgstr ""
 
 #: apps/core/templates/core/home.html:20 apps/core/templates/core/home.html:25
-#: apps/material_requests/templates/material_requests/detail.html:90
+#: apps/material_requests/templates/material_requests/detail.html:92
 #: apps/material_requests/templates/material_requests/list.html:4
 #: apps/material_requests/templates/material_requests/list.html:8
 msgid "My requests"
@@ -869,41 +1154,25 @@ msgstr ""
 msgid "Project"
 msgstr ""
 
-#: apps/handovers/forms.py:56 apps/material_requests/forms.py:176
-#: apps/material_requests/forms.py:223 apps/material_requests/forms.py:244
-#: apps/material_requests/forms.py:285 apps/organizations/forms.py:118
-#: apps/purchasing/forms.py:347 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:395 apps/receiving/forms.py:56
-msgid "Reason"
-msgstr ""
-
-#: apps/handovers/forms.py:56 apps/handovers/services.py:98
-#: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
-#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
-#: apps/receiving/forms.py:56 apps/receiving/services.py:157
-msgid "Give a reason."
-msgstr ""
-
-#: apps/handovers/forms.py:79
+#: apps/handovers/forms.py:91
 msgid "Take it from"
 msgstr ""
 
-#: apps/handovers/forms.py:80 apps/handovers/templates/handovers/detail.html:29
+#: apps/handovers/forms.py:92 apps/handovers/templates/handovers/detail.html:29
 #: apps/handovers/templates/handovers/list.html:25
 #: apps/handovers/templates/handovers/list.html:38
 msgid "Received by"
 msgstr ""
 
-#: apps/handovers/forms.py:82
+#: apps/handovers/forms.py:94
 msgid "Or type the name of who takes it"
 msgstr ""
 
-#: apps/handovers/forms.py:85
+#: apps/handovers/forms.py:97
 msgid "The material is in the warehouse: hand it over anyway."
 msgstr ""
 
-#: apps/handovers/forms.py:112 apps/material_requests/forms.py:34
+#: apps/handovers/forms.py:114 apps/material_requests/forms.py:34
 #: apps/material_requests/templates/material_requests/draft_lines.html:46
 #: apps/purchasing/forms.py:332
 #: apps/purchasing/templates/purchasing/amend.html:63
@@ -914,7 +1183,7 @@ msgstr ""
 msgid "Quantity"
 msgstr ""
 
-#: apps/handovers/forms.py:140
+#: apps/handovers/forms.py:142
 msgid "Enter the quantity handed over for at least one line."
 msgstr ""
 
@@ -996,10 +1265,6 @@ msgstr ""
 
 #: apps/handovers/models.py:111 apps/receiving/models.py:101
 msgid "void reason"
-msgstr ""
-
-#: apps/handovers/models.py:116 apps/handovers/models.py:153
-msgid "handover"
 msgstr ""
 
 #: apps/handovers/models.py:117
@@ -1107,7 +1372,7 @@ msgstr ""
 #: apps/handovers/templates/handovers/detail.html:61
 #: apps/handovers/templates/handovers/detail.html:62
 #: apps/handovers/templates/handovers/new.html:51
-#: apps/material_requests/templates/material_requests/detail.html:71
+#: apps/material_requests/templates/material_requests/detail.html:72
 #: apps/material_requests/templates/material_requests/examine.html:92
 #: apps/material_requests/templates/material_requests/examine.html:93
 #: apps/material_requests/templates/material_requests/review.html:9
@@ -1123,19 +1388,19 @@ msgstr ""
 msgid "Lines"
 msgstr ""
 
-#: apps/handovers/templates/handovers/detail.html:74
-#: apps/handovers/templates/handovers/detail.html:76
-#: apps/handovers/templates/handovers/detail.html:86
+#: apps/handovers/templates/handovers/detail.html:75
+#: apps/handovers/templates/handovers/detail.html:77
+#: apps/handovers/templates/handovers/detail.html:87
 msgid "Void the handover"
 msgstr ""
 
-#: apps/handovers/templates/handovers/detail.html:78
+#: apps/handovers/templates/handovers/detail.html:79
 msgid ""
 "The material counts as not handed over again and the requests reopen. Hand "
 "it over again if it was only wrong."
 msgstr ""
 
-#: apps/handovers/templates/handovers/detail.html:92
+#: apps/handovers/templates/handovers/detail.html:93
 msgid ""
 "This material was received on site: it is voided together with its goods "
 "receipt."
@@ -1253,22 +1518,22 @@ msgstr ""
 msgid "This handover is %(status)s; it cannot be changed this way."
 msgstr ""
 
-#: apps/handovers/views.py:108
+#: apps/handovers/views.py:110
 #, python-format
 msgid "Handover %(number)s voided."
 msgstr ""
 
-#: apps/handovers/views.py:199
+#: apps/handovers/views.py:200
 #, python-format
 msgid "Handover %(number)s posted."
 msgstr ""
 
-#: apps/handovers/views.py:223
+#: apps/handovers/views.py:224
 #, python-format
 msgid "Handover %(number)s was already posted."
 msgstr ""
 
-#: apps/handovers/views.py:242 apps/material_requests/views/requester.py:119
+#: apps/handovers/views.py:243 apps/material_requests/views/requester.py:120
 msgid "Choose a project."
 msgstr ""
 
@@ -1512,10 +1777,6 @@ msgstr ""
 msgid "Request closed"
 msgstr ""
 
-#: apps/material_requests/models.py:192
-msgid "request"
-msgstr ""
-
 #: apps/material_requests/models.py:197 apps/purchasing/models.py:160
 #: apps/purchasing/templates/purchasing/line.html:94
 msgid "line"
@@ -1641,6 +1902,14 @@ msgstr ""
 msgid "Line reopened"
 msgstr ""
 
+#: apps/material_requests/selectors.py:316
+msgid "File attached"
+msgstr ""
+
+#: apps/material_requests/selectors.py:317
+msgid "File removed"
+msgstr ""
+
 #: apps/material_requests/services/common.py:59
 #: apps/purchasing/services/common.py:43
 msgid "This material's unit has just changed; choose the material again."
@@ -1745,7 +2014,7 @@ msgid "Goods are on order for this line; it cannot move to stock."
 msgstr ""
 
 #: apps/material_requests/services/review.py:342
-#: apps/material_requests/views/reviewer.py:310
+#: apps/material_requests/views/reviewer.py:312
 msgid "This line is already a catalog material."
 msgstr ""
 
@@ -1782,19 +2051,19 @@ msgstr ""
 msgid "Add materials"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/detail.html:67
+#: apps/material_requests/templates/material_requests/detail.html:68
 msgid "Discard draft"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/detail.html:78
+#: apps/material_requests/templates/material_requests/detail.html:80
 msgid "Withdraw the request to change it. You can send it again afterwards."
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/detail.html:79
+#: apps/material_requests/templates/material_requests/detail.html:81
 msgid "Withdraw"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/detail.html:86
+#: apps/material_requests/templates/material_requests/detail.html:88
 msgid "Review and follow up"
 msgstr ""
 
@@ -1819,10 +2088,6 @@ msgstr ""
 
 #: apps/material_requests/templates/material_requests/draft_lines.html:52
 msgid "One more"
-msgstr ""
-
-#: apps/material_requests/templates/material_requests/draft_lines.html:60
-msgid "Remove"
 msgstr ""
 
 #: apps/material_requests/templates/material_requests/draft_lines.html:66
@@ -1997,14 +2262,14 @@ msgstr ""
 msgid "Cancel request"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/examine.html:304
 #: apps/material_requests/templates/material_requests/examine.html:305
+#: apps/material_requests/templates/material_requests/examine.html:306
 #: apps/purchasing/templates/purchasing/detail.html:205
 #: apps/purchasing/templates/purchasing/detail.html:206
 msgid "History"
 msgstr ""
 
-#: apps/material_requests/templates/material_requests/examine.html:310
+#: apps/material_requests/templates/material_requests/examine.html:311
 #, python-format
 msgid "line %(line)s"
 msgstr ""
@@ -2109,69 +2374,69 @@ msgstr ""
 msgid "Submit request"
 msgstr ""
 
-#: apps/material_requests/views/requester.py:298
+#: apps/material_requests/views/requester.py:300
 msgid "The quantity must be positive; remove the line instead."
 msgstr ""
 
-#: apps/material_requests/views/requester.py:347
+#: apps/material_requests/views/requester.py:349
 #, python-format
 msgid "Request %(number)s submitted."
 msgstr ""
 
-#: apps/material_requests/views/requester.py:366
+#: apps/material_requests/views/requester.py:368
 msgid "Request withdrawn; it is a draft again."
 msgstr ""
 
-#: apps/material_requests/views/requester.py:384
+#: apps/material_requests/views/requester.py:386
 msgid "Request discarded."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:231
+#: apps/material_requests/views/reviewer.py:233
 #, python-format
 msgid "Line %(line)s decided."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:243
+#: apps/material_requests/views/reviewer.py:245
 msgid "Every pending line is approved."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:260
+#: apps/material_requests/views/reviewer.py:262
 msgid "Request returned to its requester."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:280
+#: apps/material_requests/views/reviewer.py:282
 msgid "Approved quantity reduced."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:298
+#: apps/material_requests/views/reviewer.py:300
 msgid "Sourcing saved."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:337
+#: apps/material_requests/views/reviewer.py:339
 msgid "Line linked to the catalog."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:370
+#: apps/material_requests/views/reviewer.py:372
 msgid "Line closed short."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:376
+#: apps/material_requests/views/reviewer.py:378
 msgid "Line reopened."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:394
+#: apps/material_requests/views/reviewer.py:396
 msgid "Schedule saved."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:402
+#: apps/material_requests/views/reviewer.py:404
 msgid "Request closed."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:409
+#: apps/material_requests/views/reviewer.py:411
 msgid "Request reopened."
 msgstr ""
 
-#: apps/material_requests/views/reviewer.py:423
+#: apps/material_requests/views/reviewer.py:425
 msgid "Request cancelled."
 msgstr ""
 
@@ -3572,10 +3837,6 @@ msgstr ""
 msgid "Who it is for"
 msgstr ""
 
-#: apps/purchasing/templates/purchasing/line.html:101
-msgid "reserved"
-msgstr ""
-
 #: apps/purchasing/templates/purchasing/line.html:107
 msgid "trimmed to zero"
 msgstr ""
@@ -3898,10 +4159,6 @@ msgstr ""
 msgid "Delivery note mismatch"
 msgstr ""
 
-#: apps/receiving/models.py:139
-msgid "receipt"
-msgstr ""
-
 #: apps/receiving/models.py:151
 msgid "accepted quantity"
 msgstr ""
@@ -4000,13 +4257,13 @@ msgstr ""
 msgid "Surplus"
 msgstr ""
 
-#: apps/receiving/templates/receiving/detail.html:132
-#: apps/receiving/templates/receiving/detail.html:134
-#: apps/receiving/templates/receiving/detail.html:144
+#: apps/receiving/templates/receiving/detail.html:133
+#: apps/receiving/templates/receiving/detail.html:135
+#: apps/receiving/templates/receiving/detail.html:145
 msgid "Void the receipt"
 msgstr ""
 
-#: apps/receiving/templates/receiving/detail.html:136
+#: apps/receiving/templates/receiving/detail.html:137
 msgid ""
 "A void takes the goods out of the receipts (and out of the handover made on "
 "site). Enter the receipt again if it was only wrong."
@@ -4168,7 +4425,7 @@ msgstr ""
 msgid "Receipt %(number)s voided."
 msgstr ""
 
-#: apps/receiving/views/pages.py:161
+#: apps/receiving/views/pages.py:163
 msgid "Nothing is expected here."
 msgstr ""
 

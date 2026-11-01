@@ -560,6 +560,8 @@ class TestHousekeeping:
             "security_cache": 1,
             "sensitive_bodies": 2,
             "email_changes": 0,  # apps.accounts (M2.6)
+            "attachment_reservations": 0,  # apps.attachments (M6.4)
+            "attachment_media": 0,
         }
         assert authorized == [f"housekeeping.{name}" for name in done]
         assert (reload(queued).status, reload(queued).body) == (Status.EXPIRED, "")
