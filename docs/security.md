@@ -206,6 +206,17 @@ Code in `apps/receiving/` and `apps/handovers/` (direct handovers); plan §3.4, 
 - **Requests.** A request with received goods is no longer cancelled or returned to draft, even once its order has closed (I13).
 - **Projection.** `expected_deliveries` shows a project's incoming goods to who holds `receipt.view` on that project: the order number, the supplier's display name and the expected date as issued, the material, the unit and the quantity still expected for that project; never a price, the supplier's contact details or another project's quantity (tested with the sentinels). A branch that does not buy for the project sees none of its orders. The admin shows receipts and handovers read-only.
 
+## Handovers from a warehouse (step M6.2)
+
+Code in `apps/handovers/services.py` and `selectors.py`; plan §2.3 (point 3), §3.4, §4.5-4.9.
+
+- **Capabilities.** Posting needs `handover.post` (group administrators, material managers, warehouse operators), voiding `handover.void` (group administrators, material managers); `handover.view` is the read capability (404 outside it, 403 inside it without the right: a site manager posting, a warehouse operator or site manager voiding). A handover is a document of its branch (S5), the procurement branch of every request it serves (C8), so posting is authorized on those requests: each membership covers them exactly when it covers the handover (S6). Each service authorizes in full inside its transaction, with session MFA for privileged grants; a service-level matrix calls both operations as every actor of the shared fixture.
+- **Where material comes from (C7, S9).** An active warehouse of the handover's branch or of a branch it manages, never a worksite; the project must be `ACTIVE` and its branch, the requests' branch and their companies active. The project, branch and location are read again after the access lock.
+- **Quantities (I5).** Each line takes at most its request line's outstanding quantity A - D, on an open line only (approved request, live line, C10). The request's whole allocation component is locked (L2-L5) before anything is read, and direct handovers of site receipts lock the same rows, so D never passes A: threaded tests race two handovers for the last quantity, a handover against a site receipt both ways, two voids and a void against a new handover. Warehouse stock is not tracked in phase 1: what a warehouse received and has not handed over is a warning (`stock_warnings`, for `handover.post` holders of that warehouse), never a limit.
+- **Commitments.** D rising above R raises the commitment max(D, R) + P + Q, so the reconciliation cuts the pending above what is still needed, as audited trims; the freed quantity shows as *unallocated on order* for purchasing to decide.
+- **Receiver.** A user must be active, not offboarded and hold `project.view` on the handover's project; otherwise the handover names the person in free text. A user id that does not qualify gets the same refusal as one that does not exist.
+- **Reversal (I8, I11).** A `DIRECT_RECEIPT` handover is never voided on its own; a `FROM_WAREHOUSE` handover is voided with a reason, once, and the trigger of M6.1 keeps every other column and its lines frozen. A void reopens the requests it had closed (automatic closes only) and reconciles, so a trimmed commitment never revives.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |
