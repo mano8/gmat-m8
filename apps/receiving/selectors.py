@@ -26,6 +26,7 @@ from apps.material_requests.models import MaterialRequestLine
 from apps.projects.models import Project
 from apps.purchasing.ledger import book_for_order_lines
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder
+from apps.purchasing.waterfall import Book
 
 VIEW = Capability.RECEIPT_VIEW
 ZERO = Decimal("0")
@@ -48,6 +49,46 @@ class ExpectedDelivery:
     expected: Decimal
 
 
+def _expected(allocation: PurchaseAllocation, book: Book, flow: request_ledger.Flows) -> Decimal:
+    """What a site receipt could still attribute to ``allocation`` (module docstring)."""
+    order_line = book.order_lines[allocation.po_line_id]
+    approved = allocation.request_line.approved_qty or ZERO
+    return min(
+        book.allocations[allocation.pk].ceiling_remaining,
+        order_line.remaining if order_line.receivable else ZERO,
+        approved - flow.received,
+        approved - flow.delivered,
+    )
+
+
+def _row(allocation: PurchaseAllocation, expected: Decimal) -> ExpectedDelivery:
+    po_line = allocation.po_line
+    order = po_line.po
+    return ExpectedDelivery(
+        po_id=order.pk,
+        po_line_id=po_line.pk,
+        allocation_id=allocation.pk,
+        order_number=order.number or "",
+        supplier=str(order.supplier_snapshot.get("name", "")),
+        expected_date=order.expected_date,
+        material_reference=str(po_line.material_snapshot.get("reference", "")),
+        material_name=str(po_line.material_snapshot.get("name", "")),
+        unit=po_line.unit.code,
+        request_number=allocation.request_line.request.number or "",
+        expected=expected,
+    )
+
+
+def _soonest_first(row: ExpectedDelivery) -> tuple[object, ...]:
+    return (
+        row.expected_date is None,
+        row.expected_date or date.min,
+        row.order_number,
+        row.material_reference,
+        row.request_number,
+    )
+
+
 def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDelivery]:
     """What is still coming to this project, soonest first (404 outside ``receipt.view``)."""
     project = Project.objects.visible_to(ctx, VIEW).filter(pk=project_id).first()
@@ -67,42 +108,9 @@ def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDe
         return []
     book = book_for_order_lines({allocation.po_line_id for allocation in allocations})
     flows = request_ledger.flows({allocation.request_line_id for allocation in allocations})
-    rows = []
-    for allocation in allocations:
-        po_line, request_line = allocation.po_line, allocation.request_line
-        order_line = book.order_lines[po_line.pk]
-        flow, approved = flows[request_line.pk], request_line.approved_qty or ZERO
-        expected = min(
-            book.allocations[allocation.pk].ceiling_remaining,
-            order_line.remaining if order_line.receivable else ZERO,
-            approved - flow.received,
-            approved - flow.delivered,
-        )
-        if expected <= 0:
-            continue
-        order = po_line.po
-        rows.append(
-            ExpectedDelivery(
-                po_id=order.pk,
-                po_line_id=po_line.pk,
-                allocation_id=allocation.pk,
-                order_number=order.number or "",
-                supplier=str(order.supplier_snapshot.get("name", "")),
-                expected_date=order.expected_date,
-                material_reference=str(po_line.material_snapshot.get("reference", "")),
-                material_name=str(po_line.material_snapshot.get("name", "")),
-                unit=po_line.unit.code,
-                request_number=request_line.request.number or "",
-                expected=expected,
-            )
-        )
-    return sorted(
-        rows,
-        key=lambda row: (
-            row.expected_date is None,
-            row.expected_date or date.min,
-            row.order_number,
-            row.material_reference,
-            row.request_number,
-        ),
-    )
+    expected = {
+        allocation.pk: _expected(allocation, book, flows[allocation.request_line_id])
+        for allocation in allocations
+    }
+    rows = [_row(a, expected[a.pk]) for a in allocations if expected[a.pk] > 0]
+    return sorted(rows, key=_soonest_first)
