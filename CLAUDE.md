@@ -82,6 +82,7 @@ uv sync
 uv run ruff format . && uv run ruff check .
 uv run mypy .
 uv run djlint --check templates apps
+uv run --with lizard lizard -C 10 -a 8 -w apps config scripts tests   # Codacy's limits: no output for what you wrote or changed
 uv run python scripts/check_access_rules.py
 uv run python scripts/check_security_floors.py   # uv.lock vs. security floors
 uv run python scripts/check_trivyignore.py       # .trivyignore.yaml entries valid and unexpired
@@ -121,6 +122,8 @@ docker build -f docker/app/Dockerfile --target runtime -t gmat-m8:local .   # im
 ## Conventions
 
 - English code, comments and commits; UI strings via gettext; default language `es`, also `en`, `fr`.
+- **Function size (Codacy, lizard):** every function or method you write or change has a cyclomatic complexity of at most **10** and at most **8 parameters** (`self`/`cls` and keyword-only ones count). Split branches into small helpers or a lookup table, and group related arguments in a frozen dataclass (as `HeaderAmendment`, `LineAmendment`). Nested functions count on their own. Check with the lizard command above before pushing; existing functions over the limit are fixed when they are next changed.
+- Tests never compare a string translated at import time with one rendered during the test: the active language is per thread and requests change it. Translate inside the test (`gettext_lazy`, or `translation.override`).
 - Mobile-first templates (check at 360 px); page template + `{% partialdef %}` partials; shared pieces are includes under `templates/components/`. After editing templates rebuild the CSS (dev compose runs Tailwind in watch mode), and after adding strings run `makemessages -l es -l en -l fr` and `compilemessages`.
 - Migrations expand/contract and reversible (or flagged in PR and release notes); CI checks.
 - Windows dev machine, LF endings; `docker/` and `docker_compose/` scripts are bash for Linux.

@@ -136,7 +136,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - `django.contrib.postgres` is installed (array fields of the outbox).
 - The admin admits active superusers and group administrators (was: staff accounts); a staff account without superuser status no longer reaches it.
 - The outbox's `source_po` is a foreign key to the purchase order (same column; M5.1).
-- `amend` locks the order's dispatch rows after the order (L4 → L4b), like `cancel`; the worker's `DispatchSource` gains `record_attempt`, and `queue_dispatch` takes the message's `Message-ID` (M5.3).
+- `amend` locks the order's dispatch rows after the order (L4 → L4b), like `cancel`; the worker's `DispatchSource` gains `record_attempt`; `queue_dispatch` takes the message's `Message-ID` and no longer `from_email`/`using` (dispatches come from `DEFAULT_FROM_EMAIL`); `amend` takes the expected date, reference and notes as one `HeaderAmendment` (M5.3).
 - The quantity rule of request and order lines (at most the unit's decimals) is shared in `apps.catalog.quantities`.
 - Holders of a privileged role (`GROUP_ADMIN`, `MATERIAL_MANAGER`) now have 12-hour sessions, keep a second factor and need session MFA on every page, like platform operators. Granting a privileged role elevates at the grant time, including for a membership that starts later (was: at its start, which locked out an already privileged user until then).
 - Material managers hold `project.manage` within their branches; the project services check each project and branch. The password reset runs as a `TokenPrincipal`, and `OperatorCommand` commands as an `OperatorPrincipal` checked by the access engine.
