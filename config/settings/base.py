@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     "apps.suppliers",
     "apps.material_requests",
     "apps.purchasing",
+    "apps.receiving",
+    "apps.handovers",
     "apps.notifications",
 ]
 
@@ -124,9 +126,12 @@ IDEMPOTENCY_KEY_MAX_AGE = 24 * 3600
 IDEMPOTENCY_RECORD_RETENTION = 7 * 24 * 3600
 
 # Document number prefixes (plan §4.2): SOL-{company}-{branch}-{yyyy}-{00001} for requests,
-# PED-{company}-{yyyy}-{00001} for purchase orders (per buyer company).
+# PED-{company}-{yyyy}-{00001} for purchase orders (per buyer company), REC-… for goods
+# receipts and ENT-… for handovers (per branch, like requests).
 REQUEST_NUMBER_PREFIX = "SOL"
 PURCHASE_ORDER_NUMBER_PREFIX = "PED"
+RECEIPT_NUMBER_PREFIX = "REC"
+HANDOVER_NUMBER_PREFIX = "ENT"
 
 # --- allauth (plan §5, "Identity, sessions and MFA"; floor 65.20.1) ---------------------
 ACCOUNT_ADAPTER = "apps.accounts.adapters.AccountAdapter"

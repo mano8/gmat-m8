@@ -12,12 +12,13 @@ Each row also lists the sentinels (plan §8.1) its responses may contain; every 
 sentinel is checked absent from every response. A URL with an object adds one row per
 object position (``Route.position``).
 
-The account pages (allauth), the admin (purchase orders included, M5.1), the health checks,
-the token pages (invitations, email changes), the screens of M2.6 (projects, people,
-invitations), the master-data screens of M3 (catalog, suppliers), the request screens of M4
-and the purchasing screens of M5.2 and M5.3 have rows; later business screens add theirs
-with the steps that build them. The price is allowed only to its ``price.view`` holders
-(``Route.allowed_for``), so a warehouse operator reading an order is checked priceless.
+The account pages (allauth), the admin (purchase orders included, M5.1; receipts and
+handovers, M6.1), the health checks, the token pages (invitations, email changes), the
+screens of M2.6 (projects, people, invitations), the master-data screens of M3 (catalog,
+suppliers), the request screens of M4 and the purchasing screens of M5.2 and M5.3 have
+rows; later business screens add theirs with the steps that build them. The price is
+allowed only to its ``price.view`` holders (``Route.allowed_for``), so a warehouse
+operator reading an order is checked priceless.
 """
 
 import re
@@ -162,6 +163,8 @@ READ_ONLY_MODELS = {
     "catalog": ("unitofmeasure",),
     "material_requests": ("materialrequest", "materialrequestline"),
     "purchasing": ("purchaseorder", "purchaseorderline", "purchaseallocation"),
+    "receiving": ("goodsreceipt", "goodsreceiptline", "receiptattribution"),
+    "handovers": ("handover", "handoverline"),
 }
 MASTER_DATA_MODELS = {
     "organizations": ("company", "jointventuremember", "branch"),

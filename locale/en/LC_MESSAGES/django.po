@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 07:02+0000\n"
+"POT-Creation-Date: 2026-11-01 08:17+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -58,8 +58,9 @@ msgstr ""
 msgid "email"
 msgstr ""
 
-#: apps/accounts/models.py:108 apps/locations/models.py:34
-#: apps/organizations/models.py:32 apps/projects/models.py:95
+#: apps/accounts/models.py:108 apps/handovers/models.py:67
+#: apps/locations/models.py:34 apps/organizations/models.py:32
+#: apps/projects/models.py:95
 msgid "kind"
 msgstr ""
 
@@ -840,6 +841,116 @@ msgid ""
 "switched on."
 msgstr ""
 
+#: apps/handovers/models.py:59
+msgid "From a warehouse"
+msgstr ""
+
+#: apps/handovers/models.py:60
+msgid "Received on site"
+msgstr ""
+
+#: apps/handovers/models.py:63 apps/receiving/models.py:66
+msgid "Posted"
+msgstr ""
+
+#: apps/handovers/models.py:64 apps/receiving/models.py:67
+msgid "Voided"
+msgstr ""
+
+#: apps/handovers/models.py:66 apps/material_requests/models.py:99
+#: apps/purchasing/models.py:72 apps/receiving/models.py:69
+msgid "number"
+msgstr ""
+
+#: apps/handovers/models.py:69 apps/locations/models.py:36
+#: apps/organizations/models.py:146 apps/organizations/models.py:227
+#: apps/projects/models.py:37 apps/purchasing/models.py:76
+#: apps/receiving/models.py:74
+msgid "branch"
+msgstr ""
+
+#: apps/handovers/models.py:72
+msgid "from"
+msgstr ""
+
+#: apps/handovers/models.py:75 apps/handovers/models.py:157
+#: apps/locations/models.py:44 apps/material_requests/models.py:102
+#: apps/material_requests/models.py:195 apps/projects/models.py:52
+#: apps/projects/models.py:87
+msgid "project"
+msgstr ""
+
+#: apps/handovers/models.py:81
+msgid "handed over by"
+msgstr ""
+
+#: apps/handovers/models.py:89 apps/receiving/models.py:87
+msgid "received by"
+msgstr ""
+
+#: apps/handovers/models.py:91
+msgid "received by (name)"
+msgstr ""
+
+#: apps/handovers/models.py:92
+msgid "handed over at"
+msgstr ""
+
+#: apps/handovers/models.py:99 apps/receiving/models.py:106
+msgid "goods receipt"
+msgstr ""
+
+#: apps/handovers/models.py:101 apps/material_requests/models.py:120
+#: apps/projects/models.py:45 apps/purchasing/models.py:96
+#: apps/receiving/models.py:91
+msgid "status"
+msgstr ""
+
+#: apps/handovers/models.py:102 apps/receiving/models.py:92
+msgid "voided at"
+msgstr ""
+
+#: apps/handovers/models.py:109 apps/receiving/models.py:99
+msgid "voided by"
+msgstr ""
+
+#: apps/handovers/models.py:111 apps/receiving/models.py:101
+msgid "void reason"
+msgstr ""
+
+#: apps/handovers/models.py:116 apps/handovers/models.py:153
+msgid "handover"
+msgstr ""
+
+#: apps/handovers/models.py:117
+msgid "handovers"
+msgstr ""
+
+#: apps/handovers/models.py:163 apps/purchasing/models.py:236
+msgid "request line"
+msgstr ""
+
+#: apps/handovers/models.py:165 apps/receiving/models.py:205
+msgid "quantity"
+msgstr ""
+
+#: apps/handovers/models.py:173 apps/receiving/models.py:210
+msgid "receipt attribution"
+msgstr ""
+
+#: apps/handovers/models.py:179
+msgid "handover line"
+msgstr ""
+
+#: apps/handovers/models.py:180
+msgid "handover lines"
+msgstr ""
+
+#: apps/handovers/transitions.py:29
+#, python-format
+msgid "This handover is %(status)s; it cannot be changed this way."
+msgstr ""
+
 #: apps/locations/models.py:31
 msgid "Warehouse"
 msgstr ""
@@ -848,24 +959,12 @@ msgstr ""
 msgid "Worksite"
 msgstr ""
 
-#: apps/locations/models.py:36 apps/organizations/models.py:146
-#: apps/organizations/models.py:227 apps/projects/models.py:37
-#: apps/purchasing/models.py:76
-msgid "branch"
-msgstr ""
-
-#: apps/locations/models.py:44 apps/material_requests/models.py:102
-#: apps/material_requests/models.py:195 apps/projects/models.py:52
-#: apps/projects/models.py:87
-msgid "project"
-msgstr ""
-
 #: apps/locations/models.py:47 apps/organizations/models.py:123
 #: apps/projects/models.py:35 apps/suppliers/models.py:30
 msgid "address"
 msgstr ""
 
-#: apps/locations/models.py:53
+#: apps/locations/models.py:53 apps/receiving/models.py:80
 msgid "location"
 msgstr ""
 
@@ -984,8 +1083,9 @@ msgid "Approved quantity"
 msgstr ""
 
 #: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
-#: apps/material_requests/services/common.py:290 apps/purchasing/forms.py:354
+#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
 #: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
+#: apps/receiving/services.py:156
 msgid "Give a reason."
 msgstr ""
 
@@ -1064,10 +1164,6 @@ msgstr ""
 msgid "Manual"
 msgstr ""
 
-#: apps/material_requests/models.py:99 apps/purchasing/models.py:72
-msgid "number"
-msgstr ""
-
 #: apps/material_requests/models.py:108 apps/projects/models.py:43
 msgid "procurement branch"
 msgstr ""
@@ -1080,17 +1176,12 @@ msgstr ""
 msgid "needed by"
 msgstr ""
 
-#: apps/material_requests/models.py:120 apps/projects/models.py:45
-#: apps/purchasing/models.py:96
-msgid "status"
-msgstr ""
-
 #: apps/material_requests/models.py:121
 msgid "close mode"
 msgstr ""
 
 #: apps/material_requests/models.py:122 apps/purchasing/models.py:99
-#: apps/suppliers/models.py:31
+#: apps/receiving/models.py:90 apps/suppliers/models.py:31
 msgid "notes"
 msgstr ""
 
@@ -1302,21 +1393,21 @@ msgstr ""
 msgid "Choose a unit."
 msgstr ""
 
-#: apps/material_requests/services/common.py:257
+#: apps/material_requests/services/common.py:261
 msgid "Material has already been ordered or delivered for this request."
 msgstr ""
 
-#: apps/material_requests/services/common.py:280
+#: apps/material_requests/services/common.py:284
 #: apps/material_requests/transitions.py:52
 #, python-format
 msgid "This request is %(status)s; it cannot be changed this way."
 msgstr ""
 
-#: apps/material_requests/services/common.py:297
+#: apps/material_requests/services/common.py:301
 msgid "This line is closed short."
 msgstr ""
 
-#: apps/material_requests/services/common.py:299
+#: apps/material_requests/services/common.py:303
 msgid "This line has no approved quantity."
 msgstr ""
 
@@ -2660,7 +2751,8 @@ msgstr ""
 msgid "Draft order"
 msgstr ""
 
-#: apps/purchasing/models.py:158
+#: apps/purchasing/models.py:158 apps/receiving/models.py:71
+#: apps/receiving/models.py:143
 msgid "order"
 msgstr ""
 
@@ -2688,12 +2780,9 @@ msgstr ""
 msgid "purchase order lines"
 msgstr ""
 
-#: apps/purchasing/models.py:230
+#: apps/purchasing/models.py:230 apps/receiving/models.py:149
+#: apps/receiving/models.py:203
 msgid "order line"
-msgstr ""
-
-#: apps/purchasing/models.py:236
-msgid "request line"
 msgstr ""
 
 #: apps/purchasing/models.py:238
@@ -3431,6 +3520,142 @@ msgstr ""
 
 #: apps/purchasing/views/pages.py:368
 msgid "Issue the order to print it."
+msgstr ""
+
+#: apps/receiving/attribution.py:108
+#, python-format
+msgid "%(count)s of the chosen allocations cannot take goods from this line."
+msgstr ""
+
+#: apps/receiving/attribution.py:120
+#, python-format
+msgid "An allocation can take at most %(available)s of these goods."
+msgstr ""
+
+#: apps/receiving/attribution.py:128
+#, python-format
+msgid "The split attributes more than the %(accepted)s accepted."
+msgstr ""
+
+#: apps/receiving/models.py:82
+msgid "received at"
+msgstr ""
+
+#: apps/receiving/models.py:89
+msgid "delivery note"
+msgstr ""
+
+#: apps/receiving/models.py:107
+msgid "goods receipts"
+msgstr ""
+
+#: apps/receiving/models.py:132
+msgid "No incident"
+msgstr ""
+
+#: apps/receiving/models.py:133
+msgid "Short delivery"
+msgstr ""
+
+#: apps/receiving/models.py:134
+msgid "Wrong item"
+msgstr ""
+
+#: apps/receiving/models.py:135
+msgid "Damaged"
+msgstr ""
+
+#: apps/receiving/models.py:136
+msgid "Delivery note mismatch"
+msgstr ""
+
+#: apps/receiving/models.py:139
+msgid "receipt"
+msgstr ""
+
+#: apps/receiving/models.py:151
+msgid "accepted quantity"
+msgstr ""
+
+#: apps/receiving/models.py:152
+msgid "rejected quantity"
+msgstr ""
+
+#: apps/receiving/models.py:153
+msgid "incident"
+msgstr ""
+
+#: apps/receiving/models.py:154
+msgid "incident note"
+msgstr ""
+
+#: apps/receiving/models.py:155
+msgid "surplus"
+msgstr ""
+
+#: apps/receiving/models.py:160
+msgid "goods receipt line"
+msgstr ""
+
+#: apps/receiving/models.py:161
+msgid "goods receipt lines"
+msgstr ""
+
+#: apps/receiving/models.py:193
+msgid "receipt line"
+msgstr ""
+
+#: apps/receiving/models.py:199
+msgid "allocation"
+msgstr ""
+
+#: apps/receiving/models.py:211
+msgid "receipt attributions"
+msgstr ""
+
+#: apps/receiving/services.py:168
+#, python-format
+msgid "This purchase order is %(status)s; nothing can be received on it."
+msgstr ""
+
+#: apps/receiving/services.py:174
+msgid "The order's branch is inactive."
+msgstr ""
+
+#: apps/receiving/services.py:179
+msgid "Goods of this order cannot arrive here."
+msgstr ""
+
+#: apps/receiving/services.py:210
+#, python-format
+msgid "Line %(line)s: enter what was accepted or rejected."
+msgstr ""
+
+#: apps/receiving/services.py:215
+msgid "Choose an incident."
+msgstr ""
+
+#: apps/receiving/services.py:225
+#, python-format
+msgid "Line %(line)s has nothing left to receive."
+msgstr ""
+
+#: apps/receiving/services.py:231
+#, python-format
+msgid "Line %(line)s: only %(remaining)s remain to be received."
+msgstr ""
+
+#: apps/receiving/services.py:258
+msgid "A line is not on this order."
+msgstr ""
+
+#: apps/receiving/services.py:395
+msgid "Enter at least one line."
+msgstr ""
+
+#: apps/receiving/transitions.py:29
+#, python-format
+msgid "This goods receipt is %(status)s; it cannot be changed this way."
 msgstr ""
 
 #: apps/suppliers/forms.py:29 apps/suppliers/templates/suppliers/detail.html:41

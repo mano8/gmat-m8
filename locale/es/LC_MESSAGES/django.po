@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 07:02+0000\n"
+"POT-Creation-Date: 2026-11-01 08:17+0000\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -58,8 +58,9 @@ msgstr "Cuenta existente"
 msgid "email"
 msgstr "correo electrónico"
 
-#: apps/accounts/models.py:108 apps/locations/models.py:34
-#: apps/organizations/models.py:32 apps/projects/models.py:95
+#: apps/accounts/models.py:108 apps/handovers/models.py:67
+#: apps/locations/models.py:34 apps/organizations/models.py:32
+#: apps/projects/models.py:95
 msgid "kind"
 msgstr "tipo"
 
@@ -243,8 +244,8 @@ msgstr ""
 #: apps/accounts/templates/accounts/email/email_change_confirm.txt:7
 #, python-format
 msgid ""
-"The change takes effect %(cooling_off_hours)s hours after you confirm, "
-"unless it is cancelled from the current address."
+"The change takes effect %(cooling_off_hours)s hours after you confirm, unless"
+" it is cancelled from the current address."
 msgstr ""
 "El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, "
 "salvo que se cancele desde la dirección actual."
@@ -310,8 +311,8 @@ msgid ""
 "ends."
 msgstr ""
 "El cambio se aplica %(cooling_off_hours)s horas después de tu confirmación, "
-"salvo que se cancele desde la dirección actual. Entonces se cierran todas "
-"las sesiones de la cuenta."
+"salvo que se cancele desde la dirección actual. Entonces se cierran todas las"
+" sesiones de la cuenta."
 
 #: apps/accounts/templates/accounts/email_change.html:17
 msgid "Confirm"
@@ -326,8 +327,8 @@ msgid ""
 "An administrator asked to change the address of your account. Cancel it if "
 "you did not expect this."
 msgstr ""
-"Un administrador ha pedido cambiar la dirección de tu cuenta. Cancélalo si "
-"no lo esperabas."
+"Un administrador ha pedido cambiar la dirección de tu cuenta. Cancélalo si no"
+" lo esperabas."
 
 #: apps/accounts/templates/accounts/email_change.html:26
 msgid "Cancel the change"
@@ -344,8 +345,8 @@ msgid ""
 "managers then set up a second factor when they first sign in."
 msgstr ""
 "Elige una contraseña de al menos 12 caracteres. Los administradores y "
-"encargados de material configuran después un segundo factor al iniciar "
-"sesión por primera vez."
+"encargados de material configuran después un segundo factor al iniciar sesión"
+" por primera vez."
 
 #: apps/accounts/templates/accounts/invitation_accept.html:16
 msgid "Set password and accept"
@@ -353,8 +354,8 @@ msgstr "Guardar contraseña y aceptar"
 
 #: apps/accounts/templates/accounts/invitation_accept.html:18
 msgid ""
-"Your account receives the access in this invitation. Your password and "
-"second factor do not change."
+"Your account receives the access in this invitation. Your password and second"
+" factor do not change."
 msgstr ""
 "Tu cuenta recibe el acceso de esta invitación. Tu contraseña y tu segundo "
 "factor no cambian."
@@ -374,8 +375,8 @@ msgid ""
 "This invitation is for the existing account %(email)s. Sign in with it, then "
 "open the link again."
 msgstr ""
-"Esta invitación es para la cuenta existente %(email)s. Inicia sesión con "
-"ella y abre el enlace otra vez."
+"Esta invitación es para la cuenta existente %(email)s. Inicia sesión con ella"
+" y abre el enlace otra vez."
 
 #: apps/accounts/templates/accounts/invitation_account.html:13
 msgid "Sign in"
@@ -869,11 +870,121 @@ msgstr "Todavía no hay nada aquí"
 
 #: apps/core/templates/core/home.html:27
 msgid ""
-"Your requests and tasks will appear here once the first features are "
-"switched on."
+"Your requests and tasks will appear here once the first features are switched"
+" on."
 msgstr ""
 "Tus solicitudes y tareas aparecerán aquí cuando se activen las primeras "
 "funciones."
+
+#: apps/handovers/models.py:59
+msgid "From a warehouse"
+msgstr "Desde un almacén"
+
+#: apps/handovers/models.py:60
+msgid "Received on site"
+msgstr "Recibido en obra"
+
+#: apps/handovers/models.py:63 apps/receiving/models.py:66
+msgid "Posted"
+msgstr "Registrado"
+
+#: apps/handovers/models.py:64 apps/receiving/models.py:67
+msgid "Voided"
+msgstr "Anulado"
+
+#: apps/handovers/models.py:66 apps/material_requests/models.py:99
+#: apps/purchasing/models.py:72 apps/receiving/models.py:69
+msgid "number"
+msgstr "número"
+
+#: apps/handovers/models.py:69 apps/locations/models.py:36
+#: apps/organizations/models.py:146 apps/organizations/models.py:227
+#: apps/projects/models.py:37 apps/purchasing/models.py:76
+#: apps/receiving/models.py:74
+msgid "branch"
+msgstr "delegación"
+
+#: apps/handovers/models.py:72
+msgid "from"
+msgstr "desde"
+
+#: apps/handovers/models.py:75 apps/handovers/models.py:157
+#: apps/locations/models.py:44 apps/material_requests/models.py:102
+#: apps/material_requests/models.py:195 apps/projects/models.py:52
+#: apps/projects/models.py:87
+msgid "project"
+msgstr "obra"
+
+#: apps/handovers/models.py:81
+msgid "handed over by"
+msgstr "entregado por"
+
+#: apps/handovers/models.py:89 apps/receiving/models.py:87
+msgid "received by"
+msgstr "recibido por"
+
+#: apps/handovers/models.py:91
+msgid "received by (name)"
+msgstr "recibido por (nombre)"
+
+#: apps/handovers/models.py:92
+msgid "handed over at"
+msgstr "entregado el"
+
+#: apps/handovers/models.py:99 apps/receiving/models.py:106
+msgid "goods receipt"
+msgstr "recepción de mercancía"
+
+#: apps/handovers/models.py:101 apps/material_requests/models.py:120
+#: apps/projects/models.py:45 apps/purchasing/models.py:96
+#: apps/receiving/models.py:91
+msgid "status"
+msgstr "estado"
+
+#: apps/handovers/models.py:102 apps/receiving/models.py:92
+msgid "voided at"
+msgstr "anulado el"
+
+#: apps/handovers/models.py:109 apps/receiving/models.py:99
+msgid "voided by"
+msgstr "anulado por"
+
+#: apps/handovers/models.py:111 apps/receiving/models.py:101
+msgid "void reason"
+msgstr "motivo de la anulación"
+
+#: apps/handovers/models.py:116 apps/handovers/models.py:153
+msgid "handover"
+msgstr "entrega"
+
+#: apps/handovers/models.py:117
+msgid "handovers"
+msgstr "entregas"
+
+#: apps/handovers/models.py:163 apps/purchasing/models.py:236
+msgid "request line"
+msgstr "línea de solicitud"
+
+#: apps/handovers/models.py:165 apps/receiving/models.py:205
+msgid "quantity"
+msgstr "cantidad"
+
+#: apps/handovers/models.py:173 apps/receiving/models.py:210
+msgid "receipt attribution"
+msgstr "imputación de recepción"
+
+#: apps/handovers/models.py:179
+msgid "handover line"
+msgstr "línea de entrega"
+
+#: apps/handovers/models.py:180
+msgid "handover lines"
+msgstr "líneas de entrega"
+
+#: apps/handovers/transitions.py:29
+#, python-format
+msgid "This handover is %(status)s; it cannot be changed this way."
+msgstr "Esta entrega está en estado %(status)s; no se puede cambiar así."
 
 #: apps/locations/models.py:31
 msgid "Warehouse"
@@ -883,24 +994,12 @@ msgstr "Almacén"
 msgid "Worksite"
 msgstr "Obra"
 
-#: apps/locations/models.py:36 apps/organizations/models.py:146
-#: apps/organizations/models.py:227 apps/projects/models.py:37
-#: apps/purchasing/models.py:76
-msgid "branch"
-msgstr "delegación"
-
-#: apps/locations/models.py:44 apps/material_requests/models.py:102
-#: apps/material_requests/models.py:195 apps/projects/models.py:52
-#: apps/projects/models.py:87
-msgid "project"
-msgstr "obra"
-
 #: apps/locations/models.py:47 apps/organizations/models.py:123
 #: apps/projects/models.py:35 apps/suppliers/models.py:30
 msgid "address"
 msgstr "dirección"
 
-#: apps/locations/models.py:53
+#: apps/locations/models.py:53 apps/receiving/models.py:80
 msgid "location"
 msgstr "ubicación"
 
@@ -1019,8 +1118,9 @@ msgid "Approved quantity"
 msgstr "Cantidad aprobada"
 
 #: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
-#: apps/material_requests/services/common.py:290 apps/purchasing/forms.py:354
+#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
 #: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
+#: apps/receiving/services.py:156
 msgid "Give a reason."
 msgstr "Indica un motivo."
 
@@ -1099,10 +1199,6 @@ msgstr "Automático"
 msgid "Manual"
 msgstr "Manual"
 
-#: apps/material_requests/models.py:99 apps/purchasing/models.py:72
-msgid "number"
-msgstr "número"
-
 #: apps/material_requests/models.py:108 apps/projects/models.py:43
 msgid "procurement branch"
 msgstr "delegación de compras"
@@ -1115,17 +1211,12 @@ msgstr "prioridad"
 msgid "needed by"
 msgstr "necesario para"
 
-#: apps/material_requests/models.py:120 apps/projects/models.py:45
-#: apps/purchasing/models.py:96
-msgid "status"
-msgstr "estado"
-
 #: apps/material_requests/models.py:121
 msgid "close mode"
 msgstr "modo de cierre"
 
 #: apps/material_requests/models.py:122 apps/purchasing/models.py:99
-#: apps/suppliers/models.py:31
+#: apps/receiving/models.py:90 apps/suppliers/models.py:31
 msgid "notes"
 msgstr "notas"
 
@@ -1338,21 +1429,21 @@ msgstr "Describe el material o elige uno del catálogo."
 msgid "Choose a unit."
 msgstr "Elige una unidad."
 
-#: apps/material_requests/services/common.py:257
+#: apps/material_requests/services/common.py:261
 msgid "Material has already been ordered or delivered for this request."
 msgstr "Ya se ha pedido o entregado material para esta solicitud."
 
-#: apps/material_requests/services/common.py:280
+#: apps/material_requests/services/common.py:284
 #: apps/material_requests/transitions.py:52
 #, python-format
 msgid "This request is %(status)s; it cannot be changed this way."
 msgstr "Esta solicitud está en estado %(status)s; no se puede cambiar así."
 
-#: apps/material_requests/services/common.py:297
+#: apps/material_requests/services/common.py:301
 msgid "This line is closed short."
 msgstr "Esta línea está cerrada incompleta."
 
-#: apps/material_requests/services/common.py:299
+#: apps/material_requests/services/common.py:303
 msgid "This line has no approved quantity."
 msgstr "Esta línea no tiene cantidad aprobada."
 
@@ -2172,8 +2263,8 @@ msgstr "Invitar a alguien"
 
 #: apps/organizations/templates/organizations/invitation_form.html:9
 msgid ""
-"The address receives a link valid for 72 hours. A new person sets a "
-"password; an existing account accepts while signed in."
+"The address receives a link valid for 72 hours. A new person sets a password;"
+" an existing account accepts while signed in."
 msgstr ""
 "La dirección recibe un enlace válido durante 72 horas. Una persona nueva "
 "elige una contraseña; una cuenta existente acepta con la sesión iniciada."
@@ -2520,8 +2611,8 @@ msgstr "Acceso a la obra revocado."
 #: apps/purchasing/components.py:79
 #, python-format
 msgid ""
-"This change reaches more than %(limit)s linked order and request lines. "
-"Split the work across separate orders, or ask an administrator."
+"This change reaches more than %(limit)s linked order and request lines. Split"
+" the work across separate orders, or ask an administrator."
 msgstr ""
 "Este cambio afecta a más de %(limit)s líneas de pedido y de solicitud "
 "enlazadas. Reparte el trabajo en pedidos separados o consulta a un "
@@ -2529,8 +2620,8 @@ msgstr ""
 
 #: apps/purchasing/components.py:184
 msgid ""
-"The quantities of a request line are inconsistent (more delivered or "
-"received than approved); ask an administrator to check it."
+"The quantities of a request line are inconsistent (more delivered or received"
+" than approved); ask an administrator to check it."
 msgstr ""
 "Las cantidades de una línea de solicitud son incoherentes (más entregado o "
 "recibido que aprobado); pide a un administrador que la revise."
@@ -2720,7 +2811,8 @@ msgstr "pedidos de compra"
 msgid "Draft order"
 msgstr "Pedido en borrador"
 
-#: apps/purchasing/models.py:158
+#: apps/purchasing/models.py:158 apps/receiving/models.py:71
+#: apps/receiving/models.py:143
 msgid "order"
 msgstr "pedido"
 
@@ -2748,13 +2840,10 @@ msgstr "línea de pedido de compra"
 msgid "purchase order lines"
 msgstr "líneas de pedido de compra"
 
-#: apps/purchasing/models.py:230
+#: apps/purchasing/models.py:230 apps/receiving/models.py:149
+#: apps/receiving/models.py:203
 msgid "order line"
 msgstr "línea de pedido"
-
-#: apps/purchasing/models.py:236
-msgid "request line"
-msgstr "línea de solicitud"
 
 #: apps/purchasing/models.py:238
 msgid "allocated quantity"
@@ -3172,9 +3261,8 @@ msgstr ""
 
 #: apps/purchasing/templates/purchasing/dispatches.html:13
 msgid ""
-"The delivery of an email to the supplier is uncertain. It is never sent "
-"again automatically: check with the supplier, then confirm it or send it "
-"again."
+"The delivery of an email to the supplier is uncertain. It is never sent again"
+" automatically: check with the supplier, then confirm it or send it again."
 msgstr ""
 "La entrega de un correo al proveedor es incierta. Nunca se reenvía "
 "automáticamente: compruébalo con el proveedor y después confírmalo o envíalo "
@@ -3185,8 +3273,8 @@ msgid ""
 "The order was cancelled while it was being sent: if it reaches the supplier, "
 "a cancellation notice follows."
 msgstr ""
-"El pedido se anuló mientras se enviaba: si llega al proveedor, se le envía "
-"un aviso de anulación."
+"El pedido se anuló mientras se enviaba: si llega al proveedor, se le envía un"
+" aviso de anulación."
 
 #: apps/purchasing/templates/purchasing/dispatches.html:29
 msgid "Cancellation notice"
@@ -3216,8 +3304,8 @@ msgid ""
 "Not sent by email (the supplier had no email address when the order was "
 "issued). Print the order and send it."
 msgstr ""
-"No enviado por correo (el proveedor no tenía dirección de correo al emitir "
-"el pedido). Imprime el pedido y envíalo."
+"No enviado por correo (el proveedor no tenía dirección de correo al emitir el"
+" pedido). Imprime el pedido y envíalo."
 
 #: apps/purchasing/templates/purchasing/email/cancellation.html:9
 #: apps/purchasing/templates/purchasing/email/cancellation.txt:1
@@ -3319,11 +3407,11 @@ msgstr "Quitar la línea"
 
 #: apps/purchasing/templates/purchasing/line.html:162
 msgid ""
-"Give up what has not arrived (agreed with the supplier). Its allocations "
-"keep only what was received."
+"Give up what has not arrived (agreed with the supplier). Its allocations keep"
+" only what was received."
 msgstr ""
-"Renuncia a lo que no ha llegado (acordado con el proveedor). Sus "
-"asignaciones conservan solo lo recibido."
+"Renuncia a lo que no ha llegado (acordado con el proveedor). Sus asignaciones"
+" conservan solo lo recibido."
 
 #: apps/purchasing/templates/purchasing/new.html:4
 #: apps/purchasing/templates/purchasing/new.html:8
@@ -3342,8 +3430,8 @@ msgstr "Líneas de solicitud"
 msgid ""
 "Untick a line to leave it out; lower the quantity to buy only part of it."
 msgstr ""
-"Desmarca una línea para dejarla fuera; baja la cantidad para comprar solo "
-"una parte."
+"Desmarca una línea para dejarla fuera; baja la cantidad para comprar solo una"
+" parte."
 
 #: apps/purchasing/templates/purchasing/new.html:55
 msgid "Create the draft"
@@ -3426,8 +3514,8 @@ msgid ""
 "A cut or a closure freed this quantity: close the line short with the "
 "supplier, or keep the goods as stock."
 msgstr ""
-"Un recorte o un cierre liberó esta cantidad: cierra la línea con faltante "
-"con el proveedor, o conserva la mercancía como stock."
+"Un recorte o un cierre liberó esta cantidad: cierra la línea con faltante con"
+" el proveedor, o conserva la mercancía como stock."
 
 #: apps/purchasing/views/actions.py:78
 #, python-format
@@ -3520,6 +3608,147 @@ msgstr "Solo se modifica un pedido emitido."
 #: apps/purchasing/views/pages.py:368
 msgid "Issue the order to print it."
 msgstr "Emite el pedido para imprimirlo."
+
+#: apps/receiving/attribution.py:108
+#, python-format
+msgid "%(count)s of the chosen allocations cannot take goods from this line."
+msgstr ""
+"%(count)s de las asignaciones elegidas no pueden recibir mercancía de esta "
+"línea."
+
+#: apps/receiving/attribution.py:120
+#, python-format
+msgid "An allocation can take at most %(available)s of these goods."
+msgstr ""
+"Una asignación puede recibir como máximo %(available)s de esta mercancía."
+
+#: apps/receiving/attribution.py:128
+#, python-format
+msgid "The split attributes more than the %(accepted)s accepted."
+msgstr "El reparto imputa más de lo aceptado (%(accepted)s)."
+
+#: apps/receiving/models.py:82
+msgid "received at"
+msgstr "recibido el"
+
+#: apps/receiving/models.py:89
+msgid "delivery note"
+msgstr "albarán"
+
+#: apps/receiving/models.py:107
+msgid "goods receipts"
+msgstr "recepciones de mercancía"
+
+#: apps/receiving/models.py:132
+msgid "No incident"
+msgstr "Sin incidencia"
+
+#: apps/receiving/models.py:133
+msgid "Short delivery"
+msgstr "Entrega incompleta"
+
+#: apps/receiving/models.py:134
+msgid "Wrong item"
+msgstr "Artículo equivocado"
+
+#: apps/receiving/models.py:135
+msgid "Damaged"
+msgstr "Dañado"
+
+#: apps/receiving/models.py:136
+msgid "Delivery note mismatch"
+msgstr "No coincide con el albarán"
+
+#: apps/receiving/models.py:139
+msgid "receipt"
+msgstr "recepción"
+
+#: apps/receiving/models.py:151
+msgid "accepted quantity"
+msgstr "cantidad aceptada"
+
+#: apps/receiving/models.py:152
+msgid "rejected quantity"
+msgstr "cantidad rechazada"
+
+#: apps/receiving/models.py:153
+msgid "incident"
+msgstr "incidencia"
+
+#: apps/receiving/models.py:154
+msgid "incident note"
+msgstr "nota de la incidencia"
+
+#: apps/receiving/models.py:155
+msgid "surplus"
+msgstr "excedente"
+
+#: apps/receiving/models.py:160
+msgid "goods receipt line"
+msgstr "línea de recepción"
+
+#: apps/receiving/models.py:161
+msgid "goods receipt lines"
+msgstr "líneas de recepción"
+
+#: apps/receiving/models.py:193
+msgid "receipt line"
+msgstr "línea de recepción"
+
+#: apps/receiving/models.py:199
+msgid "allocation"
+msgstr "asignación"
+
+#: apps/receiving/models.py:211
+msgid "receipt attributions"
+msgstr "imputaciones de recepción"
+
+#: apps/receiving/services.py:168
+#, python-format
+msgid "This purchase order is %(status)s; nothing can be received on it."
+msgstr ""
+"Este pedido de compra está en estado %(status)s; no se puede recibir nada en "
+"él."
+
+#: apps/receiving/services.py:174
+msgid "The order's branch is inactive."
+msgstr "La delegación del pedido está inactiva."
+
+#: apps/receiving/services.py:179
+msgid "Goods of this order cannot arrive here."
+msgstr "La mercancía de este pedido no puede llegar aquí."
+
+#: apps/receiving/services.py:210
+#, python-format
+msgid "Line %(line)s: enter what was accepted or rejected."
+msgstr "Línea %(line)s: indique lo aceptado o lo rechazado."
+
+#: apps/receiving/services.py:215
+msgid "Choose an incident."
+msgstr "Elija una incidencia."
+
+#: apps/receiving/services.py:225
+#, python-format
+msgid "Line %(line)s has nothing left to receive."
+msgstr "La línea %(line)s no tiene nada pendiente de recibir."
+
+#: apps/receiving/services.py:231
+#, python-format
+msgid "Line %(line)s: only %(remaining)s remain to be received."
+msgstr "Línea %(line)s: solo quedan %(remaining)s por recibir."
+
+#: apps/receiving/services.py:258
+msgid "A line is not on this order."
+msgstr "Una línea no pertenece a este pedido."
+
+#: apps/receiving/services.py:395
+msgid "Enter at least one line."
+msgstr "Indique al menos una línea."
+
+#: apps/receiving/transitions.py:29
+#, python-format
+msgid "This goods receipt is %(status)s; it cannot be changed this way."
+msgstr "Esta recepción está en estado %(status)s; no se puede cambiar así."
 
 #: apps/suppliers/forms.py:29 apps/suppliers/templates/suppliers/detail.html:41
 #: apps/suppliers/templates/suppliers/list.html:24
@@ -3623,8 +3852,8 @@ msgstr "No tienes permiso para hacer eso"
 
 #: templates/403.html:11
 msgid ""
-"Your account does not have access to this action. If you think it should, "
-"ask your administrator."
+"Your account does not have access to this action. If you think it should, ask"
+" your administrator."
 msgstr ""
 "Tu cuenta no tiene acceso a esta acción. Si crees que debería tenerlo, "
 "pregunta a tu administrador."
@@ -3710,11 +3939,11 @@ msgstr "Iniciar sesión"
 
 #: templates/account/login.html:29
 msgid ""
-"Accounts are created by invitation. Ask your administrator if you do not "
-"have one."
+"Accounts are created by invitation. Ask your administrator if you do not have"
+" one."
 msgstr ""
-"Las cuentas se crean por invitación. Pregunta a tu administrador si no "
-"tienes una."
+"Las cuentas se crean por invitación. Pregunta a tu administrador si no tienes"
+" una."
 
 #: templates/base.html:32
 msgid "Skip to content"
@@ -3778,5 +4007,4 @@ msgstr "Seguridad"
 #~ msgid ""
 #~ "The supplier may have this order: a cancellation notice is sent to them."
 #~ msgstr ""
-#~ "Puede que el proveedor tenga este pedido: se le envía un aviso de "
-#~ "anulación."
+#~ "Puede que el proveedor tenga este pedido: se le envía un aviso de anulación."

@@ -248,11 +248,15 @@ def _reset_decisions(request: MaterialRequest) -> None:
 def _require_nothing_allocated_or_delivered(request: MaterialRequest) -> None:
     """Σ allocations = 0 on draft or issued orders and nothing delivered (plan §4.9).
 
-    For a cancellation or a return to draft of an approved request. The quantities come
-    from the purchasing (M5.1) and handover (M6.2) flow sources.
+    For a cancellation or a return to draft of an approved request. Nothing received
+    either: goods attributed on an order that has since closed leave no allocation on a
+    draft or issued order, and clearing the approval would leave R above A (I13). The
+    quantities come from the purchasing and handover flow sources.
     """
     found = ledger.flows(list(request.lines.values_list("pk", flat=True)))
-    if any(flow.allocated > 0 or flow.delivered > 0 for flow in found.values()):
+    if any(
+        flow.allocated > 0 or flow.received > 0 or flow.delivered > 0 for flow in found.values()
+    ):
         raise ValidationError(
             _("Material has already been ordered or delivered for this request."),
             code="in_progress",

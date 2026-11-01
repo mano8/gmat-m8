@@ -20,10 +20,12 @@ from apps.accounts.tokens import new_token
 from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
+from apps.handovers.models import Handover, HandoverLine
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.notifications.models import Status as MailStatus
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
+from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
 from tests.access.matrix import World, build_world
 from tests.orders import allocate, line, order
 from tests.org import build_sentinel_order
@@ -147,6 +149,50 @@ def _admin_rows(world: World) -> None:
     world.objects["draftline"] = draft_line = line(draft, material, "3")
     world.objects["draftallocation"] = allocate(
         draft_line, world.objects["approved_request_line"], "3"
+    )
+    # A receipt of 2 at the hospital's worksite on an order of its own, with the direct
+    # handover it made (M6.1): the receiving and handover admin pages.
+    reviewable("received_request", Status.APPROVED, 6, approved=True)
+    received_line = world.objects["received_request_line"]
+    received = order(
+        org, status="ISSUED", issued_by=people.mm_mad, ship_to=org.worksite(org.hospital)
+    )
+    received_po_line = line(received, material, "3")
+    two = Decimal("2.000")
+    world.objects["goodsreceipt"] = receipt = GoodsReceipt.objects.create(
+        number="REC-A-MAD-2026-00001",
+        po=received,
+        branch=org.a_mad,
+        location=org.worksite(org.hospital),
+        received_at=decided,
+        received_by=people.wo_mad,
+    )
+    world.objects["goodsreceiptline"] = receipt_line = GoodsReceiptLine.objects.create(
+        receipt=receipt, po=received, po_line=received_po_line, qty_received=two
+    )
+    world.objects["receiptattribution"] = attribution = ReceiptAttribution.objects.create(
+        receipt_line=receipt_line,
+        allocation=allocate(received_po_line, received_line, "3"),
+        po_line=received_po_line,
+        qty=two,
+    )
+    world.objects["handover"] = handover = Handover.objects.create(
+        number="ENT-A-MAD-2026-00001",
+        kind=Handover.Kind.DIRECT_RECEIPT,
+        branch=org.a_mad,
+        source_location=receipt.location,
+        project=org.hospital,
+        handed_by=people.wo_mad,
+        received_by=people.wo_mad,
+        handed_at=decided,
+        goods_receipt=receipt,
+    )
+    world.objects["handoverline"] = HandoverLine.objects.create(
+        handover=handover,
+        project=org.hospital,
+        request_line=received_line,
+        qty=two,
+        receipt_attribution=attribution,
     )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
