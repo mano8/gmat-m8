@@ -36,10 +36,11 @@ from apps.notifications.services import (
 from apps.notifications.worker import Worker
 from apps.purchasing import dispatch, selectors, services
 from apps.purchasing.models import PurchaseOrder
+from apps.purchasing.services import LineAmendment
 from tests.org import Org, People
 from tests.outbox import make_dispatch
 from tests.support import error_codes
-from tests.unit.purchasing.conftest import Buy, MakeLine, only_line
+from tests.unit.purchasing.conftest import Buy, FakeReceipts, MakeLine, allocation, only_line
 
 pytestmark = pytest.mark.django_db
 
@@ -318,6 +319,27 @@ class TestCancel:
         EmailOutbox.objects.filter(pk=message.pk).update(not_before=timezone.now() - timedelta(1))
         assert claim_next(system) == Settled(message.pk, Status.CANCELLED)  # ...meets the order
 
+    def test_a_dispatch_queued_again_after_an_ambiguous_attempt_owes_the_notice(
+        self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal
+    ) -> None:
+        """The supplier may have the first attempt: cancelling before the resend goes out
+        still owes them the notice (F53)."""
+        message = ended(system, Outcome.AMBIGUOUS)
+        services.resend_dispatch(mm, message.pk)
+        order = services.cancel(mm, issued.pk, reason="Not needed")
+        assert reload(message).status == Status.CANCELLED
+        assert order.cancellation_notice_required is True
+        (notice,) = notices(issued)
+        assert notice.recipient_address == message.recipient_address
+
+    def test_a_dispatch_retried_after_a_failure_owes_nothing(
+        self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal
+    ) -> None:
+        message = ended(system, Outcome.FAILED)
+        assert reload(message).status == Status.QUEUED  # the automatic retry
+        order = services.cancel(mm, issued.pk, reason="Not needed")
+        assert (order.cancellation_notice_required, notices(issued)) == (False, [])
+
     def test_an_abandoned_attempt_owes_the_notice_too(
         self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal
     ) -> None:
@@ -329,6 +351,28 @@ class TestCancel:
         assert reconcile_abandoned(system).abandoned == 1
         assert reload(dispatches(issued)[0]).status == Status.AMBIGUOUS
         assert len(notices(issued)) == 1
+
+
+class TestClosedShort:
+    def test_the_supplier_sees_what_a_closed_line_ends_up_ordering(
+        self,
+        dispatch_on: None,
+        mm: SessionPrincipal,
+        buy: Buy,
+        received: FakeReceipts,
+        breaker: Material,
+        make_line: MakeLine,
+    ) -> None:
+        cable_line = make_line("10")
+        order = buy((cable_line, "10"), (make_line("3", material=breaker), "3"))
+        line = order.lines.get(line_no=1)
+        received.receive(line, "4", {allocation(order, cable_line): "4"})
+        services.close_line_short(mm, line.pk, reason="Supplier out of stock")
+        services.amend(mm, order.pk, reason="Later", header=services.HeaderAmendment(notes="x"))
+        message = dispatches(order)[-1]
+        assert "CAB-25 Cable 2,5: 4 M (Cerrada con faltante)" in message.body
+        assert "10 M" not in message.body
+        assert "DIF-40 Diferencial 40A: 3 UD\n" in message.body
 
 
 class TestNotice:
@@ -372,13 +416,35 @@ class TestSource:
         PurchaseOrder.objects.filter(pk=issued.pk).update(revision=1)
         assert claim_next(system) == Settled(message.pk, Status.SUPERSEDED)
 
-    @pytest.mark.parametrize("status", [OrderStatus.CANCELLED, OrderStatus.CLOSED])
-    def test_an_order_no_longer_issued_is_not_sent(
-        self, issued: PurchaseOrder, system: SystemPrincipal, status: str
+    def test_a_cancelled_order_is_not_sent(
+        self, issued: PurchaseOrder, system: SystemPrincipal
     ) -> None:
         (message,) = dispatches(issued)
-        PurchaseOrder.objects.filter(pk=issued.pk).update(status=status)
+        PurchaseOrder.objects.filter(pk=issued.pk).update(status=OrderStatus.CANCELLED)
         assert claim_next(system) == Settled(message.pk, Status.CANCELLED)
+
+    def test_an_amendment_that_closes_the_order_still_goes_out(
+        self,
+        issued: PurchaseOrder,
+        mm: SessionPrincipal,
+        system: SystemPrincipal,
+        received: FakeReceipts,
+        make_line: MakeLine,
+    ) -> None:
+        """6 of 10 received; the buyer lowers the line to 6: the order closes, and the
+        supplier must still learn that the other 4 are no longer wanted."""
+        line = only_line(issued)
+        request_line = issued.lines.get().allocations.get().request_line
+        received.receive(line, "6", {allocation(issued, request_line): "6"})
+        ended(system, Outcome.SENT)
+        services.amend(
+            mm, issued.pk, reason="Rest not needed", lines=[LineAmendment(line.pk, D(6))]
+        )
+        assert PurchaseOrder.objects.get(pk=issued.pk).status == OrderStatus.CLOSED
+        claimed = claim(system)
+        message = EmailOutbox.objects.get(pk=claimed.message_id)
+        assert message.source_ref == f"PO:{issued.pk}:rev1"
+        assert "6 M" in message.body
 
     def test_a_notice_goes_only_for_a_cancelled_order(
         self, issued: PurchaseOrder, buy: Buy, make_line: MakeLine, system: SystemPrincipal

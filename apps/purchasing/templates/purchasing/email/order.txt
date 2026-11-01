@@ -11,7 +11,7 @@
 {% if order.expected_date %}{% translate "Expected date" %}: {{ order.expected_date|date:"SHORT_DATE_FORMAT" }}
 {% endif %}{% if order.supplier_ref %}{% translate "Supplier reference" %}: {{ order.supplier_ref }}
 {% endif %}
-{% for row in lines %}{{ row.line.line_no }}. {{ row.reference }} {{ row.name }}: {{ row.line.ordered_qty|quantity }} {{ row.line.unit.code }}{% if prices and row.line.unit_price is not None %} × {{ row.line.unit_price }}{% if row.line.discount_pct %} (−{{ row.line.discount_pct }} %){% endif %} = {{ row.total }} {{ order.currency }}{% endif %}
+{% for row in lines %}{{ row.line.line_no }}. {{ row.reference }} {{ row.name }}: {{ row.quantity|quantity }} {{ row.line.unit.code }}{% if row.line.closed_short_at %} ({% translate "Closed short" %}){% endif %}{% if prices and row.line.unit_price is not None %} × {{ row.line.unit_price }}{% if row.line.discount_pct %} (−{{ row.line.discount_pct }} %){% endif %} = {{ row.total }} {{ order.currency }}{% endif %}
 {% endfor %}{% if prices and order_total is not None %}
 {% translate "Total" %}: {{ order_total }} {{ order.currency }}
 {% endif %}{% if order.notes %}

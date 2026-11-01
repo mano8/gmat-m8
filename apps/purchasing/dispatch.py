@@ -10,27 +10,29 @@ L4b) by every path, so a cancellation, an amendment and a worker claim never dea
   changed. The new row has ``source_ref = PO:{id}:rev{n}`` and a ``Message-ID`` stable per
   revision, so the supplier can deduplicate.
 - ``cancel_dispatches``: every ``QUEUED`` ``PO_ORDER`` becomes ``CANCELLED`` (nothing unsent
-  goes out); if one is ``SENT`` or ``AMBIGUOUS`` the ``PO_CANCELLATION`` notice is queued at
-  once; if one is in flight, ``cancellation_notice_required`` is set, and the worker's
+  goes out); if the supplier may have one (``SENT``, ``AMBIGUOUS``, or queued again by a
+  human after an ambiguous attempt) the ``PO_CANCELLATION`` notice is queued at once; if one
+  is being sent, ``cancellation_notice_required`` is set, and the worker's
   outcome step (``OrderDispatches.after_outcome``) queues the notice when it ends ``SENT`` or
   ``AMBIGUOUS``. The notice is unique per order and goes out whatever ``PO_DISPATCH`` says.
 - ``OrderDispatches``: the worker's ``DispatchSource`` (registered in ``apps.py``): the order
-  ``FOR SHARE`` at L4, eligibility at the claim (a ``PO_ORDER`` while its order is issued at
-  that revision, a ``PO_CANCELLATION`` while its order is cancelled), the obligation, and an
-  audit event on the order for every attempt.
+  ``FOR SHARE`` at L4, eligibility at the claim (a ``PO_ORDER`` of the current revision of an
+  order that is not cancelled, so an amendment that closes the order still goes out; a
+  ``PO_CANCELLATION`` while its order is cancelled), the obligation, and an audit event on
+  the order for every attempt.
 """
 
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from email.utils import parseaddr
 from enum import StrEnum
 from typing import Any, cast
 from uuid import UUID
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q, QuerySet
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
@@ -44,14 +46,14 @@ from apps.notifications.models import (
     EmailAttempt,
     EmailOutbox,
     Kind,
+    Outcome,
     Status,
 )
-from apps.notifications.outbox import queue_dispatch
+from apps.notifications.outbox import queue_dispatch, sender_domain
+from apps.purchasing.ledger import book_for_order_lines
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
-from apps.purchasing.selectors import line_total
+from apps.purchasing.selectors import final_qty, line_total
 
-# A dispatch in these states may have reached the supplier.
-IN_FLIGHT = frozenset({Status.SENDING, Status.SENT, Status.AMBIGUOUS})
 # The supplier may have these: the cancellation notice is owed now.
 DELIVERED = frozenset({Status.SENT, Status.AMBIGUOUS})
 # A human decides on these (never resent automatically after AMBIGUOUS, plan §5).
@@ -77,13 +79,9 @@ def revision_of(message: EmailOutbox) -> int | None:
     return int(found["revision"]) if found else None
 
 
-def _domain() -> str:
-    _, at, domain = parseaddr(settings.DEFAULT_FROM_EMAIL)[1].rpartition("@")
-    return domain if at and domain else "localhost"
-
-
 def _message_id(order: PurchaseOrder, suffix: str) -> str:
-    return f"<po-{order.pk}-{suffix}@{_domain()}>"
+    domain = sender_domain(settings.DEFAULT_FROM_EMAIL) or "localhost"
+    return f"<po-{order.pk}-{suffix}@{domain}>"
 
 
 def lock_dispatches(po_id: UUID) -> Callable[[LockOrder], list[UUID]]:
@@ -104,20 +102,26 @@ class _Line:
     line: PurchaseOrderLine
     reference: str
     name: str
+    quantity: Decimal  # what it orders in the end: the received quantity once closed short
     total: Decimal | None
+
+
+def _line(line: PurchaseOrderLine, received: Decimal) -> _Line:
+    quantity = final_qty(line, received)
+    return _Line(
+        line=line,
+        reference=line.material_snapshot.get("reference", ""),
+        name=line.material_snapshot.get("name", ""),
+        quantity=quantity,
+        total=line_total(line, quantity),
+    )
 
 
 def _context(order: PurchaseOrder) -> dict[str, Any]:
     """The order as issued (its snapshots); prices as recorded, if any (the supplier's own)."""
-    rows = [
-        _Line(
-            line=line,
-            reference=line.material_snapshot.get("reference", ""),
-            name=line.material_snapshot.get("name", ""),
-            total=line_total(line),
-        )
-        for line in order.lines.select_related("unit").order_by("line_no")
-    ]
+    lines = list(order.lines.select_related("unit").order_by("line_no"))
+    book = book_for_order_lines([line.pk for line in lines])
+    rows = [_line(line, book.order_line_totals(line.pk).received) for line in lines]
     totals = [row.total for row in rows if row.total is not None]
     return {
         "order": order,
@@ -180,6 +184,15 @@ def queue_order(order: PurchaseOrder) -> Queued:
     return Queued.QUEUED
 
 
+def _may_have_reached(order: PurchaseOrder) -> QuerySet[EmailOutbox]:
+    """The order's ``PO_ORDER`` rows the supplier may have: sent or ambiguous, or queued
+    again by a human after an ambiguous attempt."""
+    ambiguous = EmailAttempt.objects.filter(outcome=Outcome.AMBIGUOUS).values("message_id")
+    return EmailOutbox.objects.filter(source_po=order, kind=Kind.PO_ORDER).filter(
+        Q(status__in=DELIVERED) | Q(pk__in=ambiguous)
+    )
+
+
 def queue_cancellation_notice(order: PurchaseOrder) -> EmailOutbox | None:
     """Queue the order's ``PO_CANCELLATION`` notice once, to the address its orders went to.
 
@@ -190,7 +203,7 @@ def queue_cancellation_notice(order: PurchaseOrder) -> EmailOutbox | None:
     if notices.exists():
         return None
     sent = (
-        EmailOutbox.objects.filter(source_po=order, kind=Kind.PO_ORDER, status__in=IN_FLIGHT)
+        _may_have_reached(order)
         .order_by("-created_at")
         .values_list("recipient_address", flat=True)
         .first()
@@ -228,14 +241,13 @@ def cancel_dispatches(order: PurchaseOrder) -> Cancelled:
     the order.
     """
     orders = EmailOutbox.objects.filter(source_po=order, kind=Kind.PO_ORDER)
+    reached = _may_have_reached(order).exists()  # before the queued ones are cancelled
+    if reached or orders.filter(status=Status.SENDING).exists():
+        order.cancellation_notice_required = True
+    notice = queue_cancellation_notice(order) if reached else None
     cancelled = orders.filter(status=Status.QUEUED).update(
         status=Status.CANCELLED, updated_at=timezone.now()
     )
-    if orders.filter(status__in=IN_FLIGHT).exists():
-        order.cancellation_notice_required = True
-    notice = None
-    if orders.filter(status__in=DELIVERED).exists():
-        notice = queue_cancellation_notice(order)
     return Cancelled(cancelled=cancelled, notice_queued=notice is not None)
 
 
@@ -248,9 +260,10 @@ def _order_of(message: EmailOutbox) -> PurchaseOrder:
 
 def refusal(order: PurchaseOrder, message: EmailOutbox) -> Status | None:
     """``None`` while ``message`` may be sent; else the terminal status it gets instead."""
+    cancelled = order.status == PurchaseOrder.Status.CANCELLED
     if message.kind == Kind.PO_CANCELLATION:
-        return None if order.status == PurchaseOrder.Status.CANCELLED else Status.CANCELLED
-    if order.status != PurchaseOrder.Status.ISSUED:
+        return None if cancelled else Status.CANCELLED
+    if cancelled:
         return Status.CANCELLED
     if revision_of(message) != order.revision:
         return Status.SUPERSEDED

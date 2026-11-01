@@ -2,7 +2,7 @@
 {% comment %}
   The order's supplier dispatches (M5.3): status, attempts and, for po.manage, the decision
   on a dispatch the worker left uncertain or failed. Parameters: order, dispatches (rows with
-  their note form), managing, dispatch_on, awaiting_decision.
+  their note form), managing, dispatch_on, awaiting_decision, notice_awaited.
 {% endcomment %}
 <section class="mb-4"
          aria-label="{% translate 'Sent to the supplier' %}"
@@ -13,9 +13,9 @@
       {% translate "The delivery of an email to the supplier is uncertain. It is never sent again automatically: check with the supplier, then confirm it or send it again." %}
     </p>
   {% endif %}
-  {% if order.cancellation_notice_required %}
+  {% if notice_awaited %}
     <p class="card mb-2" data-testid="dispatch-cancellation">
-      {% translate "The supplier may have this order: a cancellation notice is sent to them." %}
+      {% translate "The order was cancelled while it was being sent: if it reaches the supplier, a cancellation notice follows." %}
     </p>
   {% endif %}
   {% if dispatches %}

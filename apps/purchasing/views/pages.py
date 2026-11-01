@@ -105,7 +105,7 @@ def order_new(request: HttpRequest) -> HttpResponse:
     """Supplier, destination and the quantities of the lines ticked on the worklist."""
     ctx = access_for(request)
     ids = _uuids(request.GET.getlist("line"))
-    rows = selectors.to_purchase(ctx, line_ids=ids) if ids else []
+    rows = selectors.buyable(ctx, ids) if ids else []
     if ids and not rows:
         messages.error(request, _("Those lines have nothing left to purchase."))
         return redirect("purchasing:worklist")
@@ -281,6 +281,7 @@ def _dispatch_panel(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
         ],
         "dispatch_on": settings.PO_DISPATCH,
         "awaiting_decision": selectors.awaiting_decision(dispatches),
+        "notice_awaited": selectors.notice_awaited(found, dispatches),
     }
 
 

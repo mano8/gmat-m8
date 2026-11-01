@@ -50,7 +50,10 @@
             <td>{{ row.line.line_no }}</td>
             <td>{{ row.reference }}</td>
             <td>{{ row.name }}</td>
-            <td>{{ row.line.ordered_qty|quantity }} {{ row.line.unit.code }}</td>
+            <td>
+              {{ row.quantity|quantity }} {{ row.line.unit.code }}
+              {% if row.line.closed_short_at %}({% translate "Closed short" %}){% endif %}
+            </td>
             {% if prices %}
               <td>
                 {% if row.line.unit_price is not None %}

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 21:43+0000\n"
+"POT-Creation-Date: 2026-11-01 07:02+0000\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -965,9 +965,9 @@ msgstr "Quand le matériel doit être sur le chantier."
 #: apps/purchasing/forms.py:201 apps/purchasing/forms.py:265
 #: apps/purchasing/forms.py:402
 #: apps/purchasing/templates/purchasing/detail.html:80
-#: apps/purchasing/templates/purchasing/email/order.html:76
+#: apps/purchasing/templates/purchasing/email/order.html:79
 #: apps/purchasing/templates/purchasing/email/order.txt:18
-#: apps/purchasing/templates/purchasing/print.html:98
+#: apps/purchasing/templates/purchasing/print.html:103
 #: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
 msgid "Notes"
 msgstr "Notes"
@@ -1068,7 +1068,7 @@ msgstr "Refusée"
 
 #: apps/material_requests/models.py:84 apps/material_requests/selectors.py:298
 #: apps/notifications/models.py:39 apps/purchasing/forms.py:38
-#: apps/purchasing/models.py:68 apps/purchasing/selectors.py:455
+#: apps/purchasing/models.py:68 apps/purchasing/selectors.py:473
 #: apps/purchasing/templates/purchasing/print.html:22
 msgid "Cancelled"
 msgstr "Annulé"
@@ -1236,7 +1236,7 @@ msgstr "ligne de demande de matériel"
 msgid "material request lines"
 msgstr "lignes de demande de matériel"
 
-#: apps/material_requests/selectors.py:293 apps/purchasing/selectors.py:451
+#: apps/material_requests/selectors.py:293 apps/purchasing/selectors.py:469
 msgid "Draft created"
 msgstr "Brouillon créé"
 
@@ -1248,7 +1248,7 @@ msgstr "Demande modifiée"
 msgid "Withdrawn"
 msgstr "Retirée"
 
-#: apps/material_requests/selectors.py:297 apps/purchasing/selectors.py:456
+#: apps/material_requests/selectors.py:297 apps/purchasing/selectors.py:474
 msgid "Draft discarded"
 msgstr "Brouillon abandonné"
 
@@ -1260,7 +1260,7 @@ msgstr "Renvoyée pour modifications"
 msgid "Schedule changed"
 msgstr "Planning modifié"
 
-#: apps/material_requests/selectors.py:304 apps/purchasing/selectors.py:458
+#: apps/material_requests/selectors.py:304 apps/purchasing/selectors.py:476
 msgid "Reopened"
 msgstr "Rouverte"
 
@@ -1300,7 +1300,7 @@ msgstr "Approvisionnement défini"
 msgid "Linked to the catalog"
 msgstr "Reliée au catalogue"
 
-#: apps/material_requests/selectors.py:314 apps/purchasing/selectors.py:459
+#: apps/material_requests/selectors.py:314 apps/purchasing/selectors.py:477
 msgid "Line closed short"
 msgstr "Ligne clôturée avec manque"
 
@@ -1564,7 +1564,10 @@ msgstr "Hors catalogue"
 
 #: apps/material_requests/templates/material_requests/examine.html:102
 #: apps/material_requests/templates/material_requests/lines_table.html:37
+#: apps/purchasing/templates/purchasing/email/order.html:55
+#: apps/purchasing/templates/purchasing/email/order.txt:14
 #: apps/purchasing/templates/purchasing/line.html:17
+#: apps/purchasing/templates/purchasing/print.html:78
 msgid "Closed short"
 msgstr "Clôturée avec manque"
 
@@ -2544,24 +2547,24 @@ msgstr ""
 "Les quantités d'une ligne de demande sont incohérentes (plus livré ou reçu "
 "qu'approuvé) ; demandez à un administrateur de la vérifier."
 
-#: apps/purchasing/components.py:311
+#: apps/purchasing/components.py:315
 #, python-format
 msgid "%(attributed)s have already been received for this allocation."
 msgstr "%(attributed)s ont déjà été reçus pour cette affectation."
 
-#: apps/purchasing/dispatch.py:143
+#: apps/purchasing/dispatch.py:147
 #, python-format
 msgid "Cancellation of purchase order %(number)s"
 msgstr "Annulation du bon de commande %(number)s"
 
-#: apps/purchasing/dispatch.py:145
+#: apps/purchasing/dispatch.py:149
 #: apps/purchasing/templates/purchasing/email/order.html:9
 #: apps/purchasing/templates/purchasing/email/order.txt:1
 #, python-format
 msgid "Purchase order %(number)s, revision %(revision)s"
 msgstr "Bon de commande %(number)s, révision %(revision)s"
 
-#: apps/purchasing/dispatch.py:149
+#: apps/purchasing/dispatch.py:153
 #, python-format
 msgid "Purchase order %(number)s"
 msgstr "Bon de commande %(number)s"
@@ -2656,7 +2659,7 @@ msgstr "Note"
 msgid "Allocated"
 msgstr "Affecté"
 
-#: apps/purchasing/models.py:66 apps/purchasing/selectors.py:453
+#: apps/purchasing/models.py:66 apps/purchasing/selectors.py:471
 #: apps/purchasing/templates/purchasing/detail.html:72
 msgid "Issued"
 msgstr "Émis"
@@ -2790,81 +2793,81 @@ msgstr "Partiellement reçue"
 msgid "Received"
 msgstr "Reçue"
 
-#: apps/purchasing/selectors.py:452
+#: apps/purchasing/selectors.py:470
 msgid "Draft edited"
 msgstr "Brouillon modifié"
 
-#: apps/purchasing/selectors.py:454
+#: apps/purchasing/selectors.py:472
 msgid "Amended"
 msgstr "Modifiée"
 
-#: apps/purchasing/selectors.py:457
+#: apps/purchasing/selectors.py:475
 msgid "Closed: nothing left to receive"
 msgstr "Clôturée : plus rien à recevoir"
 
-#: apps/purchasing/selectors.py:460
+#: apps/purchasing/selectors.py:478
 msgid "Allocation trimmed"
 msgstr "Affectation réduite"
 
-#: apps/purchasing/selectors.py:461
+#: apps/purchasing/selectors.py:479
 msgid "Sending to the supplier"
 msgstr "Envoi au fournisseur en cours"
 
-#: apps/purchasing/selectors.py:462
+#: apps/purchasing/selectors.py:480
 #: apps/purchasing/templates/purchasing/dispatches.html:8
 #: apps/purchasing/templates/purchasing/dispatches.html:10
 msgid "Sent to the supplier"
 msgstr "Envoyé au fournisseur"
 
-#: apps/purchasing/selectors.py:463
+#: apps/purchasing/selectors.py:481
 msgid "Sending to the supplier failed"
 msgstr "L'envoi au fournisseur a échoué"
 
-#: apps/purchasing/selectors.py:464
+#: apps/purchasing/selectors.py:482
 msgid "Delivery to the supplier uncertain"
 msgstr "Livraison au fournisseur incertaine"
 
-#: apps/purchasing/selectors.py:465
+#: apps/purchasing/selectors.py:483
 msgid "Delivery to the supplier confirmed"
 msgstr "Livraison au fournisseur confirmée"
 
-#: apps/purchasing/selectors.py:466
+#: apps/purchasing/selectors.py:484
 msgid "Sent to the supplier again"
 msgstr "Renvoyé au fournisseur"
 
-#: apps/purchasing/selectors.py:469
+#: apps/purchasing/selectors.py:487
 msgid "the request line was already committed elsewhere"
 msgstr "la ligne de demande était déjà engagée ailleurs"
 
-#: apps/purchasing/selectors.py:470
+#: apps/purchasing/selectors.py:488
 msgid "the request line was closed short"
 msgstr "la ligne de demande a été clôturée avec manque"
 
-#: apps/purchasing/selectors.py:471
+#: apps/purchasing/selectors.py:489
 msgid "the request was closed"
 msgstr "la demande a été clôturée"
 
-#: apps/purchasing/selectors.py:472
+#: apps/purchasing/selectors.py:490
 msgid "the order line was closed short"
 msgstr "la ligne de commande a été clôturée avec manque"
 
-#: apps/purchasing/selectors.py:473
+#: apps/purchasing/selectors.py:491
 msgid "the order was cancelled"
 msgstr "la commande a été annulée"
 
-#: apps/purchasing/selectors.py:474
+#: apps/purchasing/selectors.py:492
 msgid "the draft was discarded"
 msgstr "le brouillon a été abandonné"
 
-#: apps/purchasing/selectors.py:475
+#: apps/purchasing/selectors.py:493
 msgid "the ordered quantity was lowered"
 msgstr "la quantité commandée a été réduite"
 
-#: apps/purchasing/selectors.py:476
+#: apps/purchasing/selectors.py:494
 msgid "unallocated"
 msgstr "désaffecté"
 
-#: apps/purchasing/selectors.py:500
+#: apps/purchasing/selectors.py:522
 msgid "cancellation notice"
 msgstr "avis d'annulation"
 
@@ -2926,7 +2929,7 @@ msgid "Only %(available)s are left to purchase for this line."
 msgstr "Il ne reste que %(available)s à acheter pour cette ligne."
 
 #: apps/purchasing/services/common.py:274
-#: apps/purchasing/services/orders.py:243
+#: apps/purchasing/services/orders.py:322
 msgid "This order line is closed short."
 msgstr "Cette ligne de commande est soldée."
 
@@ -2993,12 +2996,17 @@ msgstr "Pour réduire une affectation, libérez-la."
 msgid "An allocation can only be lowered here."
 msgstr "Ici, une affectation ne peut qu'être réduite."
 
-#: apps/purchasing/services/orders.py:75
+#: apps/purchasing/services/orders.py:77
+#, python-format
+msgid "Line %(line)s: its material is inactive."
+msgstr "Ligne %(line)s : son matériel est inactif."
+
+#: apps/purchasing/services/orders.py:98
 #, python-format
 msgid "Line %(line)s allocates more than it orders."
 msgstr "La ligne %(line)s affecte plus qu'elle ne commande."
 
-#: apps/purchasing/services/orders.py:91
+#: apps/purchasing/services/orders.py:114
 #, python-format
 msgid ""
 "%(request)s line %(line)s would be committed %(committed)s of %(approved)s."
@@ -3006,30 +3014,30 @@ msgstr ""
 "La ligne %(line)s de %(request)s serait engagée à %(committed)s sur "
 "%(approved)s approuvés."
 
-#: apps/purchasing/services/orders.py:125
+#: apps/purchasing/services/orders.py:148
 msgid "Add at least one line before issuing."
 msgstr "Ajoutez au moins une ligne avant d'émettre."
 
-#: apps/purchasing/services/orders.py:249
+#: apps/purchasing/services/orders.py:328
 #, python-format
 msgid "Line %(line)s has goods received: its price no longer changes."
 msgstr "La ligne %(line)s a des marchandises reçues : son prix ne change plus."
 
-#: apps/purchasing/services/orders.py:327
+#: apps/purchasing/services/orders.py:363
 msgid "A line or allocation is not on this order."
 msgstr "Une ligne ou une affectation n'appartient pas à cette commande."
 
-#: apps/purchasing/services/orders.py:395
+#: apps/purchasing/services/orders.py:513
 msgid "Goods have been received on this order; it can no longer be cancelled."
 msgstr ""
 "Des marchandises de cette commande ont été reçues ; elle ne peut plus être "
 "annulée."
 
-#: apps/purchasing/services/orders.py:435
+#: apps/purchasing/services/orders.py:568
 msgid "This order line is already closed short."
 msgstr "Cette ligne de commande est déjà soldée."
 
-#: apps/purchasing/services/orders.py:437
+#: apps/purchasing/services/orders.py:570
 msgid "This order line has been received in full."
 msgstr "Cette ligne de commande a été reçue en totalité."
 
@@ -3122,11 +3130,11 @@ msgstr "Acheteur"
 
 #: apps/purchasing/templates/purchasing/detail.html:88
 #: apps/purchasing/templates/purchasing/email/order.html:43
-#: apps/purchasing/templates/purchasing/email/order.html:68
+#: apps/purchasing/templates/purchasing/email/order.html:71
 #: apps/purchasing/templates/purchasing/email/order.txt:16
 #: apps/purchasing/templates/purchasing/line.html:73
 #: apps/purchasing/templates/purchasing/print.html:65
-#: apps/purchasing/templates/purchasing/print.html:90
+#: apps/purchasing/templates/purchasing/print.html:95
 msgid "Total"
 msgstr "Total"
 
@@ -3194,10 +3202,11 @@ msgstr ""
 
 #: apps/purchasing/templates/purchasing/dispatches.html:18
 msgid ""
-"The supplier may have this order: a cancellation notice is sent to them."
+"The order was cancelled while it was being sent: if it reaches the supplier, "
+"a cancellation notice follows."
 msgstr ""
-"Le fournisseur a peut-être cette commande : un avis d'annulation lui est "
-"envoyé."
+"La commande a été annulée pendant son envoi : si elle parvient au "
+"fournisseur, un avis d'annulation suit."
 
 #: apps/purchasing/templates/purchasing/dispatches.html:29
 msgid "Cancellation notice"
@@ -3264,7 +3273,7 @@ msgstr "N° fiscal"
 msgid "This revision replaces the previous ones."
 msgstr "Cette révision remplace les précédentes."
 
-#: apps/purchasing/templates/purchasing/email/order.html:81
+#: apps/purchasing/templates/purchasing/email/order.html:84
 #: apps/purchasing/templates/purchasing/email/order.txt:21
 msgid "Please quote the order number on the delivery note and the invoice."
 msgstr ""
@@ -3442,7 +3451,7 @@ msgstr ""
 "Une réduction ou une clôture a libéré cette quantité : clôturez la ligne "
 "avec manque auprès du fournisseur, ou gardez la marchandise en stock."
 
-#: apps/purchasing/views/actions.py:80
+#: apps/purchasing/views/actions.py:78
 #, python-format
 msgid "%(count)s ticked line had nothing left to purchase and was left out."
 msgid_plural ""
@@ -3452,74 +3461,74 @@ msgstr[0] ""
 msgstr[1] ""
 "%(count)s lignes cochées n'avaient plus rien à acheter et ont été écartées."
 
-#: apps/purchasing/views/actions.py:88
+#: apps/purchasing/views/actions.py:101
 msgid "Draft order created."
 msgstr "Commande en brouillon créée."
 
-#: apps/purchasing/views/actions.py:98
+#: apps/purchasing/views/actions.py:111
 #, python-format
 msgid "Draft order created with %(count)s request lines."
 msgstr "Commande en brouillon créée avec %(count)s lignes de demande."
 
-#: apps/purchasing/views/actions.py:117
+#: apps/purchasing/views/actions.py:130
 msgid "Draft saved."
 msgstr "Brouillon enregistré."
 
-#: apps/purchasing/views/actions.py:139
+#: apps/purchasing/views/actions.py:152
 msgid "Request lines added."
 msgstr "Lignes de demande ajoutées."
 
-#: apps/purchasing/views/actions.py:155
+#: apps/purchasing/views/actions.py:168
 #, python-format
 msgid "Line %(line)s saved."
 msgstr "Ligne %(line)s enregistrée."
 
-#: apps/purchasing/views/actions.py:167
+#: apps/purchasing/views/actions.py:180
 #, python-format
 msgid "Line %(line)s removed."
 msgstr "Ligne %(line)s retirée."
 
-#: apps/purchasing/views/actions.py:186
+#: apps/purchasing/views/actions.py:199
 msgid "Allocation raised."
 msgstr "Affectation augmentée."
 
-#: apps/purchasing/views/actions.py:192
+#: apps/purchasing/views/actions.py:205
 msgid "Allocation lowered."
 msgstr "Affectation réduite."
 
-#: apps/purchasing/views/actions.py:227
+#: apps/purchasing/views/actions.py:240
 #, python-format
 msgid "Order %(number)s issued."
 msgstr "Commande %(number)s émise."
 
-#: apps/purchasing/views/actions.py:242
+#: apps/purchasing/views/actions.py:255
 msgid "Order cancelled."
 msgstr "Commande annulée."
 
-#: apps/purchasing/views/actions.py:242
+#: apps/purchasing/views/actions.py:255
 msgid "Draft discarded."
 msgstr "Brouillon abandonné."
 
-#: apps/purchasing/views/actions.py:263
+#: apps/purchasing/views/actions.py:276
 #, python-format
 msgid "Line %(line)s closed short."
 msgstr "Ligne %(line)s clôturée avec manque."
 
-#: apps/purchasing/views/actions.py:297
+#: apps/purchasing/views/actions.py:310
 #, python-format
 msgid "Nothing changed: the order stays at revision %(n)s."
 msgstr "Rien n'a changé : la commande reste à la révision %(n)s."
 
-#: apps/purchasing/views/actions.py:300
+#: apps/purchasing/views/actions.py:313
 #, python-format
 msgid "Order amended: revision %(n)s."
 msgstr "Commande modifiée : révision %(n)s."
 
-#: apps/purchasing/views/actions.py:317
+#: apps/purchasing/views/actions.py:330
 msgid "Delivery to the supplier confirmed."
 msgstr "Livraison au fournisseur confirmée."
 
-#: apps/purchasing/views/actions.py:332
+#: apps/purchasing/views/actions.py:345
 msgid "The dispatch is queued to be sent again."
 msgstr "L'envoi est en file d'attente pour être renvoyé."
 
@@ -3527,11 +3536,11 @@ msgstr "L'envoi est en file d'attente pour être renvoyé."
 msgid "Those lines have nothing left to purchase."
 msgstr "Ces lignes n'ont plus rien à acheter."
 
-#: apps/purchasing/views/pages.py:336
+#: apps/purchasing/views/pages.py:353
 msgid "Only an issued order is amended."
 msgstr "Seule une commande émise se modifie."
 
-#: apps/purchasing/views/pages.py:351
+#: apps/purchasing/views/pages.py:368
 msgid "Issue the order to print it."
 msgstr "Émettez la commande pour l'imprimer."
 
@@ -3788,3 +3797,9 @@ msgstr "Boîte de réception"
 #: templates/partials/nav_items.html:80
 msgid "Security"
 msgstr "Sécurité"
+
+#~ msgid ""
+#~ "The supplier may have this order: a cancellation notice is sent to them."
+#~ msgstr ""
+#~ "Le fournisseur a peut-être cette commande : un avis d'annulation lui est "
+#~ "envoyé."

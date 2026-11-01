@@ -168,13 +168,24 @@ class LineRow:
         """Ordered and not (yet) allocated to any request line."""
         return max(ZERO, self.totals.ordered - self.totals.allocated)
 
+    @property
+    def final_qty(self) -> Decimal:
+        return final_qty(self.line, self.totals.received)
 
-def line_total(line: PurchaseOrderLine) -> Decimal | None:
-    """ordered * price * (1 - discount), to the cent; ``None`` without a price."""
+
+def final_qty(line: PurchaseOrderLine, received: Decimal) -> Decimal:
+    """What a line orders in the end: once closed short, what it received."""
+    return received if line.closed_short_at is not None else line.ordered_qty
+
+
+def line_total(line: PurchaseOrderLine, quantity: Decimal | None = None) -> Decimal | None:
+    """quantity (the ordered one by default) * price * (1 - discount), to the cent;
+    ``None`` without a price."""
     if line.unit_price is None:
         return None
     factor = 1 - (line.discount_pct or ZERO) / 100
-    total: Decimal = line.ordered_qty * line.unit_price * factor
+    ordered = line.ordered_qty if quantity is None else quantity
+    total: Decimal = ordered * line.unit_price * factor
     return total.quantize(Decimal("0.01"))
 
 
@@ -191,15 +202,16 @@ def lines(ctx: AccessContext, of: PurchaseOrder) -> list[LineRow]:
     rows = []
     for line in listed:
         snapshot = line.material_snapshot or {}
+        totals = book.order_line_totals(line.pk)
         rows.append(
             LineRow(
                 line=line,
                 reference=snapshot.get("reference", line.material.reference),
                 name=snapshot.get("name", line.material.name),
-                totals=book.order_line_totals(line.pk),
+                totals=totals,
                 unit_price=line.unit_price if prices else None,
                 discount_pct=line.discount_pct if prices else None,
-                total=line_total(line) if prices else None,
+                total=line_total(line, final_qty(line, totals.received)) if prices else None,
             )
         )
     return rows
@@ -419,6 +431,12 @@ def ship_to_choices(ctx: AccessContext, *, branch_id: UUID | None = None) -> Que
     )
 
 
+def buyable(ctx: AccessContext, line_ids: Iterable[UUID]) -> list[WorklistRow]:
+    """The builder's lines: ticked on the worklist and with something left to buy now (a
+    line another draft reserved in full meanwhile is left out)."""
+    return [row for row in to_purchase(ctx, line_ids=line_ids) if row.to_purchase > 0]
+
+
 def candidates(ctx: AccessContext, of: PurchaseOrder) -> list[WorklistRow]:
     """The lines a draft or issued order could still take: to buy now, bought for by its
     branch, for its project when it ships to a worksite, not yet allocated to it."""
@@ -583,6 +601,16 @@ def dispatches(ctx: AccessContext, of: PurchaseOrder) -> list[DispatchRow]:
 
 def awaiting_decision(rows: Iterable[DispatchRow]) -> bool:
     return any(row.confirmable for row in rows)
+
+
+def notice_awaited(of: PurchaseOrder, rows: list[DispatchRow]) -> bool:
+    """Cancelled while a dispatch was being sent: the notice follows if that one reaches the
+    supplier (it is listed once queued; nothing is owed if the attempt fails)."""
+    return (
+        of.cancellation_notice_required
+        and not any(row.notice for row in rows)
+        and any(row.dispatch.status == Dispatch.SENDING for row in rows)
+    )
 
 
 def can_see_history(ctx: AccessContext, of: PurchaseOrder) -> bool:

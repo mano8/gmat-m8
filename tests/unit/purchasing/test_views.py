@@ -16,13 +16,14 @@ from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.access.principals import SessionPrincipal
+from apps.access.principals import SessionPrincipal, SystemPrincipal
 from apps.audit.models import AuditEvent
 from apps.core.locking import RetryExhausted
 from apps.material_requests import services as request_services
 from apps.material_requests.models import MaterialRequestLine
-from apps.notifications.models import EmailOutbox
+from apps.notifications.models import EmailOutbox, Outcome
 from apps.notifications.models import Status as MailStatus
+from apps.notifications.services import Claim, claim_next, record_outcome
 from apps.purchasing import services
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from tests.org import Org, People
@@ -174,6 +175,22 @@ class TestBuilder:
         html = page(manager, "new", line=str(line.pk))
         assert 'data-testid="new-order-line"' in html
         assert f'name="pick_{line.pk}"' in html and "checked" in html
+
+    def test_a_line_another_draft_reserved_in_full_is_left_out(
+        self, manager: Client, org: Org, buy: Buy, make_line: MakeLine
+    ) -> None:
+        line, other = make_line("10"), make_line("10")
+        html = page(manager, "new", line=[str(line.pk), str(other.pk)])
+        buy((other, "10"), issue=False)  # meanwhile, another buyer reserves all of it
+        alone = manager.get(reverse("purchasing:new"), {"line": str(other.pk)})
+        assert alone.status_code == 302  # nothing left to purchase: back to the worklist
+        data = new_order_data(html, org, line)
+        data |= {f"pick_{other.pk}": "on", f"qty_{other.pk}": "4"}
+        response = manager.post(reverse("purchasing:create"), data, follow=True)
+        assert "1 ticked line had nothing left to purchase and was left out." in messages_of(
+            response
+        )
+        assert "Draft order created with 1 request lines." in messages_of(response)
 
     def test_an_empty_builder_has_no_lines(self, manager: Client) -> None:
         html = page(manager, "new")
@@ -741,6 +758,24 @@ class TestPrint:
         assert str(issued.number) in html and "data-print" in html
         assert 'data-testid="print-lines"' in html
 
+    def test_a_line_closed_short_prints_what_it_received(
+        self,
+        manager: Client,
+        mm: SessionPrincipal,
+        buy: Buy,
+        make_line: MakeLine,
+        breaker: Any,
+        received: FakeReceipts,
+    ) -> None:
+        cable_line = make_line("10")
+        order = buy((cable_line, "10"), (make_line("3", material=breaker), "3"))
+        line = order.lines.get(line_no=1)
+        received.receive(line, "4", {allocation(order, cable_line): "4"})
+        services.close_line_short(mm, line.pk, reason="Out of stock")
+        html = page(manager, "print", order.pk)
+        assert html.count('data-testid="print-closed-short"') == 1
+        assert re.search(r">\s*4 M\s*<span", html)
+
     def test_a_draft_is_not_printed(self, manager: Client, draft: PurchaseOrder) -> None:
         response = manager.get(reverse("purchasing:print", args=[draft.pk]), follow=True)
         assert response.redirect_chain[-1][0] == reverse("purchasing:detail", args=[draft.pk])
@@ -816,13 +851,26 @@ class TestDispatches:
         settings.PO_DISPATCH = True
         assert "Not sent by email" in page(manager, "detail", order.pk)
 
-    def test_a_cancellation_notice_owed_is_shown(
+    def test_a_cancellation_notice_owed_is_listed(
         self, manager: Client, mm: SessionPrincipal, ambiguous: EmailOutbox
     ) -> None:
         services.cancel(mm, ambiguous.source_po_id, reason="Stop")  # type: ignore[arg-type]
         html = page(manager, "detail", ambiguous.source_po_id)
-        assert 'data-testid="dispatch-cancellation"' in html
+        assert 'data-testid="dispatch-cancellation"' not in html  # queued, so listed
         assert "Cancellation notice" in html
+
+    def test_a_notice_that_waits_on_a_dispatch_being_sent_says_so_until_it_fails(
+        self, manager: Client, mm: SessionPrincipal, buy: Buy, make_line: MakeLine
+    ) -> None:
+        order = buy((make_line("10"), "10"))
+        sending = make_dispatch(order)
+        system = SystemPrincipal()
+        claimed = claim_next(system)
+        assert isinstance(claimed, Claim) and claimed.message_id == sending.pk
+        services.cancel(mm, order.pk, reason="Stop")
+        assert 'data-testid="dispatch-cancellation"' in page(manager, "detail", order.pk)
+        record_outcome(system, claimed.attempt_id, Outcome.FAILED, error="refused")
+        assert 'data-testid="dispatch-cancellation"' not in page(manager, "detail", order.pk)
 
 
 class TestScope:
