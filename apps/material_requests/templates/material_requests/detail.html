@@ -81,6 +81,10 @@
         {% include "components/button.html" with label=_("Withdraw") type="submit" block=True %}
       </form>
     {% endif %}
+    {% if request_obj.status != "DRAFT" %}
+      {% url 'requests:ledger' request_id=request_obj.pk as ledger_url %}
+      <p class="mb-4">{% include "components/button.html" with href=ledger_url label=_("Ledger") variant="link" %}</p>
+    {% endif %}
     {% if reviewable %}
       <p class="mb-4">
         <a class="btn btn-primary btn-block"

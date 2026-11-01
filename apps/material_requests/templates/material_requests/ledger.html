@@ -1,0 +1,127 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Ledger" %} · {{ request_obj.number|default:_("Request") }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1>{% translate "Ledger" %} · {{ request_obj.number|default:_("Request") }}</h1>
+      <p class="mt-1 text-soft">{{ request_obj.project.code }} · {{ request_obj.project.name }}</p>
+    </div>
+    {% include "material_requests/status.html" with obj=request_obj %}
+  </div>
+  {% for entry, trims in entries %}
+    {% with line=entry.line flows=entry.flows unit=entry.line.unit.code %}
+      <article class="card mb-3"
+               data-line="{{ line.line_no }}"
+               data-testid="ledger-line">
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <span class="font-semibold">{{ line.line_no }}. {{ line.description }}</span>
+            {% if line.material_id %}<span class="block text-sm text-soft">{{ line.material.reference }}</span>{% endif %}
+          </div>
+          {% if line.closed_short_at %}
+            {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
+          {% elif entry.is_open %}
+            {% include "components/status_chip.html" with label=_("Open") tone="ok" %}
+          {% endif %}
+        </div>
+        <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-5">
+          <div>
+            <dt class="text-soft">{% translate "Requested" %}</dt>
+            <dd data-field="requested">
+              {{ line.requested_qty|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Approved" %}</dt>
+            <dd data-field="approved">
+              {% if line.approved_qty is not None %}{{ line.approved_qty|quantity }} {{ unit }}{% else %}—{% endif %}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Allocated" %}</dt>
+            <dd data-field="allocated">
+              {{ flows.allocated|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Received" %}</dt>
+            <dd data-field="received">
+              {{ flows.received|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Pending receipt" %}</dt>
+            <dd data-field="pending">
+              {{ flows.pending|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Reserved in drafts" %}</dt>
+            <dd data-field="reserved">
+              {{ flows.reserved|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Delivered" %}</dt>
+            <dd data-field="delivered">
+              {{ flows.delivered|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Committed" %}</dt>
+            <dd data-field="committed">
+              {{ entry.committed|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Awaiting handover" %}</dt>
+            <dd data-field="awaiting">
+              {{ entry.awaiting_handover|quantity }} {{ unit }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-soft">{% translate "Outstanding" %}</dt>
+            <dd data-field="outstanding">
+              {{ entry.outstanding|quantity }} {{ unit }}
+            </dd>
+          </div>
+        </dl>
+        {% if line.closed_short_at %}
+          <p class="mt-2 text-sm text-soft" data-testid="line-closure">
+            {% if line.closed_short_source == "REQUEST" %}
+              {% translate "Closed with the request" %}
+            {% else %}
+              {% translate "Closed short" %}
+            {% endif %}
+            · {{ line.closed_short_at|date:"SHORT_DATETIME_FORMAT" }}
+            · {{ line.closed_short_by.full_name|default:line.closed_short_by.email }}
+            {% if line.close_reason %}· {{ line.close_reason }}{% endif %}
+          </p>
+        {% endif %}
+        {% if trims %}
+          <h3 class="mb-1 mt-3 text-sm font-semibold text-soft">{% translate "Reductions of the quantity on order" %}</h3>
+          <ul data-testid="trims">
+            {% for trim in trims %}
+              <li class="border-t border-line py-2 text-sm" data-testid="trim">
+                {{ trim.before|quantity }} → {{ trim.after|quantity }} {{ unit }}
+                · {{ trim.reason }}
+                <span class="block text-soft">{{ trim.occurred_at|date:"SHORT_DATETIME_FORMAT" }} · {{ trim.actor }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </article>
+    {% endwith %}
+  {% empty %}
+    {% include "components/empty_state.html" with title=_("This request has no lines.") %}
+  {% endfor %}
+  <p class="mt-4 flex flex-wrap gap-3">
+    {% url 'requests:detail' request_id=request_obj.pk as detail_url %}
+    {% include "components/button.html" with href=detail_url label=_("Back to the request") variant="link" %}
+    {% url 'requests:project_materials' project_id=request_obj.project_id as project_url %}
+    {% include "components/button.html" with href=project_url label=_("Materials of the project") variant="link" %}
+  </p>
+{% endblock content %}

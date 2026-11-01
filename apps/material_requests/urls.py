@@ -10,6 +10,10 @@ urlpatterns = [
     path("new/", views.request_new, name="new"),
     path("start/", views.request_start, name="start"),
     path("<uuid:request_id>/", views.request_detail, name="detail"),
+    path("<uuid:request_id>/ledger/", views.request_ledger, name="ledger"),
+    path(
+        "projects/<uuid:project_id>/materials/", views.project_materials, name="project_materials"
+    ),
     path("<uuid:request_id>/materials/", views.request_materials, name="materials"),
     path("<uuid:request_id>/review/", views.request_review, name="review"),
     path("<uuid:request_id>/lines/add/", views.line_add, name="add_line"),

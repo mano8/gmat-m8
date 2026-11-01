@@ -36,7 +36,8 @@ from apps.access.roles import Capability
 from apps.audit.models import AuditEvent
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
-from apps.material_requests.models import MaterialRequestLine
+from apps.material_requests import selectors as request_selectors
+from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.notifications.models import DISPATCH_KINDS, EmailOutbox, Kind
 from apps.notifications.models import Status as Dispatch
 from apps.organizations.models import Branch
@@ -636,3 +637,46 @@ def history(ctx: AccessContext, of: PurchaseOrder) -> list[HistoryEntry]:
         for event in events
         if event.action in ACTION_LABELS
     ]
+
+
+# --- a request's trims, for its ledger page ------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RequestTrim:
+    """A lowered allocation as the request side sees it: no order, no supplier."""
+
+    occurred_at: datetime
+    actor: str
+    line_no: int
+    before: Decimal
+    after: Decimal
+    reason: Any
+
+
+def request_trims(ctx: AccessContext, of: MaterialRequest) -> dict[int, list[RequestTrim]]:
+    """The trims of the request's allocations by request line number, oldest first.
+
+    Closures and reconciliation cuts (§4.5) explain why a line holds less than it did; they
+    reach who follows the request up (``request_selectors.can_see_history``), else nothing.
+    """
+    if not request_selectors.can_see_history(ctx, of):
+        return {}
+    events = AuditEvent.objects.filter(
+        action="purchase_allocation.trimmed", data__request_id=str(of.pk)
+    ).order_by("occurred_at", "id")
+    grouped: dict[int, list[RequestTrim]] = {}
+    for event in events:
+        data = event.data
+        reason = TrimReason(data["reason"]) if data.get("reason") in TrimReason else None
+        grouped.setdefault(int(data["request_line"]), []).append(
+            RequestTrim(
+                occurred_at=event.occurred_at,
+                actor=event.actor_label,
+                line_no=int(data["request_line"]),
+                before=Decimal(str(data["from"])),
+                after=Decimal(str(data["to"])),
+                reason=TRIM_LABELS.get(reason, "") if reason else "",
+            )
+        )
+    return grouped

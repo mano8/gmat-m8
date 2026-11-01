@@ -41,6 +41,7 @@ from apps.material_requests.views.reviewer import (
     request_return,
     request_schedule,
 )
+from apps.material_requests.views.trace import project_materials, request_ledger
 
 __all__ = [
     "inbox",
@@ -55,12 +56,14 @@ __all__ = [
     "line_resolve",
     "line_sourcing",
     "line_update",
+    "project_materials",
     "request_approve_all",
     "request_cancel",
     "request_cancel_any",
     "request_close",
     "request_detail",
     "request_examine",
+    "request_ledger",
     "request_list",
     "request_materials",
     "request_new",

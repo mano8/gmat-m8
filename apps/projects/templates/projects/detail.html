@@ -10,6 +10,10 @@
       <p class="mt-1">{% include "projects/status.html" %}</p>
     </div>
     <div class="flex flex-wrap gap-3">
+      {% can "request.view" project %}
+        {% url 'requests:project_materials' project_id=project.pk as materials_url %}
+        {% include "components/button.html" with href=materials_url label=_("Materials") %}
+      {% endcan %}
       {% can "receipt.view" project %}
         {% url 'receiving:expected' project_id=project.pk as expected_url %}
         {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}

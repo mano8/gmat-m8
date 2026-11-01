@@ -354,6 +354,18 @@ def _line_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.objects["materialrequestline"].pk])
 
 
+# Who sees the hospital project through request.view: A-MAD's buyers and the assigned users.
+HOSPITAL_REQUEST_VIEWERS = (
+    "group_admin",
+    "mm_mad",
+    "mixed",
+    "wo_mad",
+    "site_manager",
+    "tech_mad",
+    "partner",
+)
+
+
 def request_read(visible: tuple[str, ...]) -> dict[str, Expect]:
     """A request page: ``visible`` read it, other request viewers get 404."""
     return project_page(REQUEST_VIEWERS, visible, visible)
@@ -652,6 +664,30 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             request_read(()),
             position="unknown",
             path=_unknown_url("requests:detail"),
+        ),
+    ),
+    "requests:ledger": (
+        Route(
+            request_read(TECH_REQUEST_VIEWERS),
+            position="the technician's draft",
+            path=request_url("requests:ledger", "materialrequest"),
+        ),
+        Route(
+            request_read(PARTNER_REQUEST_VIEWERS),
+            position="the partner's draft",
+            path=request_url("requests:ledger", "partner_request"),
+        ),
+        Route(
+            request_read(()),
+            position="unknown",
+            path=_unknown_url("requests:ledger"),
+        ),
+    ),
+    "requests:project_materials": (
+        Route(
+            project_page(REQUEST_VIEWERS, HOSPITAL_REQUEST_VIEWERS, HOSPITAL_REQUEST_VIEWERS),
+            position="own scope",
+            path=_project_url("requests:project_materials", "hospital"),
         ),
     ),
     "requests:materials": (
