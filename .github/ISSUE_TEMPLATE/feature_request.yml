@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest a change or a new capability.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        gmat-m8 is built in planned phases, and business rules (who approves, how quantities are counted, what each role may see) are decided by the maintainer in the plan and the [ADRs](https://github.com/mano8/gmat-m8/tree/main/docs/adr). A request may be scheduled for a later phase or declined when it conflicts with a recorded decision.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or impossible today, and for whom (role, company or branch type)?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should happen instead. Screens, fields, rules.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: rules
+    attributes:
+      label: Access and data impact
+      description: Which roles would see or change what? Does it touch prices, suppliers, quantities or another company's data?
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues and the ADRs in `docs/adr/`.
+          required: true

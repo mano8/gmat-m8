@@ -1,0 +1,66 @@
+name: Accessibility problem
+description: Something is hard or impossible to use with a keyboard, screen reader, zoom or small screen.
+labels: ["accessibility", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. A barrier that keeps someone from finishing a task is treated as a bug. See [ACCESSIBILITY.md](https://github.com/mano8/gmat-m8/blob/main/ACCESSIBILITY.md) for what the application aims to support.
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: The page or screen, without tokens or query strings.
+      placeholder: e.g. /requests/inbox/ or "review page of a request"
+    validations:
+      required: true
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What is the barrier
+      description: What you tried to do, what happened, and what you expected.
+    validations:
+      required: true
+  - type: dropdown
+    id: technology
+    attributes:
+      label: Assistive technology or setting
+      multiple: true
+      options:
+        - Keyboard only
+        - Screen reader
+        - Screen magnifier or browser zoom
+        - Larger text size
+        - High contrast or forced colours
+        - Dark theme
+        - Voice control
+        - Small screen (phone)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: Assistive technology and version, browser, operating system, device and screen width.
+      placeholder: e.g. NVDA 2025.3, Firefox 140, Windows 11, 1280 px
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Interface language
+      options:
+        - Español
+        - English
+        - Français
+  - type: input
+    id: criterion
+    attributes:
+      label: WCAG success criterion (if known)
+      placeholder: e.g. 2.4.7 Focus Visible
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or recordings
+      description: Remove personal data first.
