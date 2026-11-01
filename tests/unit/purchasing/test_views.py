@@ -21,10 +21,13 @@ from apps.audit.models import AuditEvent
 from apps.core.locking import RetryExhausted
 from apps.material_requests import services as requests
 from apps.material_requests.models import MaterialRequestLine
+from apps.notifications.models import EmailOutbox
+from apps.notifications.models import Status as MailStatus
 from apps.purchasing import services
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from tests.org import Org, People
 from tests.org import client_for as signed_in
+from tests.outbox import make_dispatch
 from tests.unit.purchasing.conftest import Buy, FakeReceipts, MakeLine, allocation, only_line
 
 pytestmark = pytest.mark.django_db
@@ -745,6 +748,79 @@ class TestPrint:
 
 
 # --- scope ------------------------------------------------------------------------------------
+
+
+class TestDispatches:
+    """The supplier dispatches on the order page and a human's decision (M5.3)."""
+
+    @pytest.fixture
+    def ambiguous(self, buy: Buy, make_line: MakeLine) -> EmailOutbox:
+        order = buy((make_line("10"), "10"))
+        return make_dispatch(order, MailStatus.AMBIGUOUS)
+
+    def test_the_panel_shows_each_dispatch_and_the_decision_to_take(
+        self, manager: Client, ambiguous: EmailOutbox
+    ) -> None:
+        html = page(manager, "detail", ambiguous.source_po_id)
+        assert 'data-testid="order-dispatches"' in html
+        assert 'data-testid="dispatch-decision"' in html
+        assert "Ambiguous" in html
+        assert reverse("purchasing:confirm_dispatch", args=[ambiguous.pk]) in html
+        assert reverse("purchasing:resend_dispatch", args=[ambiguous.pk]) in html
+
+    def test_a_warehouse_operator_sees_the_status_without_the_decision(
+        self, people: People, ambiguous: EmailOutbox
+    ) -> None:
+        html = page(client_for(people.wo_mad), "detail", ambiguous.source_po_id)
+        assert "Ambiguous" in html
+        assert reverse("purchasing:confirm_dispatch", args=[ambiguous.pk]) not in html
+
+    def test_confirm(self, manager: Client, ambiguous: EmailOutbox) -> None:
+        response = post(manager, "confirm_dispatch", ambiguous.pk, data={"note": "By phone"})
+        assert messages_of(response) == ["Delivery to the supplier confirmed."]
+        assert response.redirect_chain[-1][0] == reverse(
+            "purchasing:detail", args=[ambiguous.source_po_id]
+        )
+        assert EmailOutbox.objects.get(pk=ambiguous.pk).status == MailStatus.SENT
+        event = AuditEvent.objects.get(action="purchase_order.dispatch_confirmed")
+        assert event.data["note"] == "By phone"
+
+    def test_resend(self, manager: Client, ambiguous: EmailOutbox) -> None:
+        response = post(manager, "resend_dispatch", ambiguous.pk)
+        assert messages_of(response) == ["The dispatch is queued to be sent again."]
+        assert EmailOutbox.objects.get(pk=ambiguous.pk).status == MailStatus.QUEUED
+
+    def test_a_refusal_is_flashed(self, manager: Client, ambiguous: EmailOutbox) -> None:
+        post(manager, "confirm_dispatch", ambiguous.pk)
+        response = post(manager, "confirm_dispatch", ambiguous.pk)
+        assert messages_of(response) == [
+            "Only a dispatch whose delivery is uncertain can be confirmed."
+        ]
+
+    def test_a_failed_dispatch_that_can_no_longer_go_offers_nothing(
+        self, manager: Client, mm: SessionPrincipal, ambiguous: EmailOutbox
+    ) -> None:
+        EmailOutbox.objects.filter(pk=ambiguous.pk).update(status=MailStatus.FAILED)
+        services.amend(mm, ambiguous.source_po_id, reason="More", notes="x")  # type: ignore[arg-type]
+        html = page(manager, "detail", ambiguous.source_po_id)
+        assert "Failed" in html
+        assert reverse("purchasing:resend_dispatch", args=[ambiguous.pk]) not in html
+
+    def test_with_the_switch_on_an_order_without_dispatch_says_so(
+        self, manager: Client, buy: Buy, make_line: MakeLine, settings: Any
+    ) -> None:
+        order = buy((make_line("10"), "10"))
+        assert 'data-testid="order-dispatches"' not in page(manager, "detail", order.pk)
+        settings.PO_DISPATCH = True
+        assert "Not sent by email" in page(manager, "detail", order.pk)
+
+    def test_a_cancellation_notice_owed_is_shown(
+        self, manager: Client, mm: SessionPrincipal, ambiguous: EmailOutbox
+    ) -> None:
+        services.cancel(mm, ambiguous.source_po_id, reason="Stop")  # type: ignore[arg-type]
+        html = page(manager, "detail", ambiguous.source_po_id)
+        assert 'data-testid="dispatch-cancellation"' in html
+        assert "Cancellation notice" in html
 
 
 class TestScope:

@@ -12,6 +12,8 @@ at the database clock (``apps.notifications.eligibility``).
   I/O; the returned ``Claim`` carries what the worker needs to send.
 - ``record_outcome``: in a new transaction (a dispatch: order, then row), conditional on
   ``current_attempt`` still being that attempt; applies the retry policy of the kind.
+- A dispatch's attempts are audited by its source (``record_attempt``) when they start and
+  when they end, abandoned and late outcomes included (M5.3).
 - ``reconcile_abandoned``: a ``SENDING`` message whose attempt started more than the send
   deadline + ``OUTBOX_ABANDON_GRACE`` ago becomes ``AMBIGUOUS`` (conditional on the attempt
   id, so a newer attempt is never touched). A late outcome of that attempt may still turn it
@@ -156,7 +158,9 @@ def _domain(from_email: str) -> str | None:
     return domain if at and domain else None
 
 
-def _prepare(message: EmailOutbox, source: DispatchSource | None, worker: str) -> Claim | Settled:
+def _prepare(
+    principal: SystemPrincipal, message: EmailOutbox, source: DispatchSource | None, worker: str
+) -> Claim | Settled:
     """Expiry and eligibility under the row lock; then the attempt, before any I/O."""
     if message.expires_at is not None and message.expires_at <= db_now():
         return _settle(message, Status.EXPIRED)
@@ -192,6 +196,8 @@ def _prepare(message: EmailOutbox, source: DispatchSource | None, worker: str) -
     if not message.message_id:
         message.message_id = make_msgid(domain=_domain(message.from_email))
     message.save(update_fields=["status", "current_attempt", "attempts", "message_id"])
+    if message.is_dispatch:
+        cast(DispatchSource, source).record_attempt(principal, message, attempt)
     return Claim(
         message_id=message.pk,
         attempt_id=attempt.pk,
@@ -235,7 +241,7 @@ def _claim(
         return None  # taken by another worker in the meantime
     try:
         with transaction.atomic():
-            return _prepare(message, source, worker)
+            return _prepare(principal, message, source, worker)
     except DatabaseError:
         raise
     except Exception:
@@ -251,6 +257,14 @@ def claim_next(principal: SystemPrincipal, *, worker: str = "") -> Claim | Settl
 
 
 # --- outcomes ------------------------------------------------------------------------------
+
+
+def _record_attempt(
+    principal: SystemPrincipal, message: EmailOutbox | None, attempt: EmailAttempt
+) -> None:
+    """Audit a dispatch attempt's outcome (``_lock_message`` refused one without a source)."""
+    if message is not None and message.is_dispatch:
+        cast(DispatchSource, dispatch_source()).record_attempt(principal, message, attempt)
 
 
 def _lock_message(locks: LockOrder, message_id: UUID) -> EmailOutbox | None:
@@ -325,6 +339,7 @@ def _record(principal: SystemPrincipal, attempt_id: UUID, outcome: Outcome, erro
     attempt.abandoned = False
     attempt.finished_at = Now()
     attempt.save(update_fields=["outcome", "error", "abandoned", "finished_at"])
+    _record_attempt(principal, message, attempt)
     current = message is not None and message.current_attempt_id == attempt.pk
     allowed = {Status.SENDING} | ({Status.AMBIGUOUS, Status.QUEUED} if late else set())
     if not current or message is None or message.status not in allowed:
@@ -370,6 +385,7 @@ def _abandon(principal: SystemPrincipal, message_id: UUID, attempt_id: UUID) -> 
     attempt.error = ABANDONED_ERROR
     attempt.finished_at = Now()
     attempt.save(update_fields=["outcome", "abandoned", "error", "finished_at"])
+    _record_attempt(principal, message, attempt)
     _apply(message, attempt, Outcome.AMBIGUOUS, locks)
     return True
 

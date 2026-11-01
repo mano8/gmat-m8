@@ -17,12 +17,16 @@ wrapper, in the order of CLAUDE.md "Writes":
 5. ``reconcile`` (§4.5): excess commitments in the component are cut and audited;
 6. the document number last (L9), so a rollback leaves no gap.
 
+Supplier dispatches (M5.3, ``dispatches``): a human confirms or resends a dispatch the
+worker left ``AMBIGUOUS`` or ``FAILED``; the order at L4, then its dispatch rows at L4b.
+
 Capabilities (plan §3.4): ``po.manage`` for every write (group administrators and material
 managers); ``price.view`` for prices. Prices are optional (Q10). A draft changes freely and
 each allocation reserves demand; an issued order changes only through ``amend``.
 """
 
 from apps.purchasing.services.common import RequestItem
+from apps.purchasing.services.dispatches import confirm_dispatch, resend_dispatch
 from apps.purchasing.services.drafts import (
     add_request_lines,
     allocate,
@@ -51,10 +55,12 @@ __all__ = [
     "amend",
     "cancel",
     "close_line_short",
+    "confirm_dispatch",
     "create_po",
     "increase_allocation",
     "issue",
     "remove_line",
+    "resend_dispatch",
     "unallocate",
     "update_line",
     "update_order",

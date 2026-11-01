@@ -1,5 +1,5 @@
 """The purchasing screens (plan ยง11 M5.2): worklist, builder, order lists, order page,
-amendment and printable page.
+amendment and printable page; M5.3 adds the supplier dispatches on the order page.
 
 Reads go through ``apps.purchasing.selectors``; writes through ``apps.purchasing.services``
 from POST-only views (``@mutating``), each on its own URL, with its GET page on another.
@@ -11,6 +11,8 @@ the order page and the printable page. Prices appear only with ``price.view`` (ย
 from apps.purchasing.views.actions import (
     allocation_increase,
     allocation_unallocate,
+    dispatch_confirm,
+    dispatch_resend,
     line_close_short,
     line_remove,
     line_update,
@@ -33,6 +35,8 @@ from apps.purchasing.views.pages import (
 __all__ = [
     "allocation_increase",
     "allocation_unallocate",
+    "dispatch_confirm",
+    "dispatch_resend",
     "line_close_short",
     "line_remove",
     "line_update",

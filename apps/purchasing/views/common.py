@@ -18,6 +18,7 @@ from apps.core.forms import error_text, form_error_text
 from apps.core.idempotency import IdempotencyError
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
+from apps.notifications.models import EmailOutbox
 from apps.purchasing import selectors
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.selectors import MANAGE, VIEW
@@ -50,8 +51,18 @@ def _on_allocation(request: HttpRequest, allocation_id: UUID) -> PurchaseAllocat
     return found
 
 
-def _detail_url(found: PurchaseOrder | PurchaseOrderLine | PurchaseAllocation) -> str:
-    if isinstance(found, PurchaseAllocation):
+def _on_dispatch(request: HttpRequest, dispatch_id: UUID) -> EmailOutbox:
+    found = selectors.dispatch(access_for(request), dispatch_id)
+    require(request, MANAGE, found.source_po, read=VIEW)
+    return found
+
+
+def _detail_url(
+    found: PurchaseOrder | PurchaseOrderLine | PurchaseAllocation | EmailOutbox,
+) -> str:
+    if isinstance(found, EmailOutbox):
+        po_id = found.source_po_id
+    elif isinstance(found, PurchaseAllocation):
         po_id = found.po_line.po_id
     elif isinstance(found, PurchaseOrderLine):
         po_id = found.po_id

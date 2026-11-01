@@ -192,6 +192,9 @@
       </details>
     </section>
   {% endif %}
+  {% if dispatches or dispatch_on and order.number %}
+    {% include "purchasing/dispatches.html" %}
+  {% endif %}
   {% if history %}
     <section class="mb-4" aria-label="{% translate 'History' %}">
       <h2 class="mb-2">{% translate "History" %}</h2>

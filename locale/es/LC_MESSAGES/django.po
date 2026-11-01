@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 22:18+0100\n"
+"POT-Creation-Date: 2026-10-31 21:43+0000\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -537,6 +537,7 @@ msgstr ""
 
 #: apps/catalog/forms.py:108 apps/catalog/templates/catalog/list.html:26
 #: apps/catalog/templates/catalog/list.html:36
+#: apps/purchasing/templates/purchasing/email/order.html:38
 #: apps/purchasing/templates/purchasing/print.html:60
 msgid "Reference"
 msgstr "Referencia"
@@ -921,6 +922,7 @@ msgstr "Es el almacén por defecto de la delegación; elige otro primero."
 #: apps/purchasing/forms.py:332
 #: apps/purchasing/templates/purchasing/amend.html:63
 #: apps/purchasing/templates/purchasing/detail.html:145
+#: apps/purchasing/templates/purchasing/email/order.html:40
 #: apps/purchasing/templates/purchasing/new.html:45
 #: apps/purchasing/templates/purchasing/print.html:62
 msgid "Quantity"
@@ -956,8 +958,10 @@ msgstr "Cuándo debe estar el material en la obra."
 #: apps/material_requests/templates/material_requests/detail.html:39
 #: apps/material_requests/templates/material_requests/examine.html:39
 #: apps/purchasing/forms.py:201 apps/purchasing/forms.py:265
-#: apps/purchasing/forms.py:396
+#: apps/purchasing/forms.py:402
 #: apps/purchasing/templates/purchasing/detail.html:80
+#: apps/purchasing/templates/purchasing/email/order.html:76
+#: apps/purchasing/templates/purchasing/email/order.txt:18
 #: apps/purchasing/templates/purchasing/print.html:98
 #: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
 msgid "Notes"
@@ -970,7 +974,7 @@ msgstr "La fecha no puede estar en el pasado."
 #: apps/material_requests/forms.py:176 apps/material_requests/forms.py:223
 #: apps/material_requests/forms.py:244 apps/material_requests/forms.py:285
 #: apps/organizations/forms.py:118 apps/purchasing/forms.py:347
-#: apps/purchasing/forms.py:354 apps/purchasing/forms.py:389
+#: apps/purchasing/forms.py:354 apps/purchasing/forms.py:395
 msgid "Reason"
 msgstr "Motivo"
 
@@ -1016,7 +1020,7 @@ msgstr "Cantidad aprobada"
 
 #: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
 #: apps/material_requests/services/common.py:290 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:389 apps/purchasing/services/common.py:126
+#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
 msgid "Give a reason."
 msgstr "Indica un motivo."
 
@@ -1059,7 +1063,7 @@ msgstr "Rechazada"
 
 #: apps/material_requests/models.py:84 apps/material_requests/selectors.py:298
 #: apps/notifications/models.py:39 apps/purchasing/forms.py:38
-#: apps/purchasing/models.py:68 apps/purchasing/selectors.py:450
+#: apps/purchasing/models.py:68 apps/purchasing/selectors.py:455
 #: apps/purchasing/templates/purchasing/print.html:22
 msgid "Cancelled"
 msgstr "Cancelado"
@@ -1227,7 +1231,7 @@ msgstr "línea de solicitud de material"
 msgid "material request lines"
 msgstr "líneas de solicitud de material"
 
-#: apps/material_requests/selectors.py:293 apps/purchasing/selectors.py:446
+#: apps/material_requests/selectors.py:293 apps/purchasing/selectors.py:451
 msgid "Draft created"
 msgstr "Borrador creado"
 
@@ -1239,7 +1243,7 @@ msgstr "Solicitud editada"
 msgid "Withdrawn"
 msgstr "Retirada"
 
-#: apps/material_requests/selectors.py:297 apps/purchasing/selectors.py:451
+#: apps/material_requests/selectors.py:297 apps/purchasing/selectors.py:456
 msgid "Draft discarded"
 msgstr "Borrador descartado"
 
@@ -1251,7 +1255,7 @@ msgstr "Devuelta para cambios"
 msgid "Schedule changed"
 msgstr "Planificación modificada"
 
-#: apps/material_requests/selectors.py:304 apps/purchasing/selectors.py:453
+#: apps/material_requests/selectors.py:304 apps/purchasing/selectors.py:458
 msgid "Reopened"
 msgstr "Reabierta"
 
@@ -1291,7 +1295,7 @@ msgstr "Abastecimiento definido"
 msgid "Linked to the catalog"
 msgstr "Vinculada al catálogo"
 
-#: apps/material_requests/selectors.py:314 apps/purchasing/selectors.py:454
+#: apps/material_requests/selectors.py:314 apps/purchasing/selectors.py:459
 msgid "Line closed short"
 msgstr "Línea cerrada con faltante"
 
@@ -1680,8 +1684,8 @@ msgstr "Cancelar solicitud"
 
 #: apps/material_requests/templates/material_requests/examine.html:296
 #: apps/material_requests/templates/material_requests/examine.html:297
-#: apps/purchasing/templates/purchasing/detail.html:196
-#: apps/purchasing/templates/purchasing/detail.html:197
+#: apps/purchasing/templates/purchasing/detail.html:199
+#: apps/purchasing/templates/purchasing/detail.html:200
 msgid "History"
 msgstr "Historial"
 
@@ -1708,6 +1712,7 @@ msgstr "Ninguna solicitud coincide con los filtros."
 
 #: apps/material_requests/templates/material_requests/lines_table.html:9
 #: apps/material_requests/templates/material_requests/lines_table.html:21
+#: apps/purchasing/templates/purchasing/email/order.html:39
 #: apps/purchasing/templates/purchasing/print.html:61
 msgid "Material"
 msgstr "Material"
@@ -1794,7 +1799,7 @@ msgid "Submit request"
 msgstr "Enviar la solicitud"
 
 #: apps/material_requests/views/common.py:104
-#: apps/purchasing/views/common.py:86
+#: apps/purchasing/views/common.py:97
 msgid "Check the form."
 msgstr "Revise el formulario."
 
@@ -2532,6 +2537,23 @@ msgstr ""
 msgid "%(attributed)s have already been received for this allocation."
 msgstr "Ya se han recibido %(attributed)s para esta asignación."
 
+#: apps/purchasing/dispatch.py:143
+#, python-format
+msgid "Cancellation of purchase order %(number)s"
+msgstr "Anulación del pedido de compra %(number)s"
+
+#: apps/purchasing/dispatch.py:145
+#: apps/purchasing/templates/purchasing/email/order.html:9
+#: apps/purchasing/templates/purchasing/email/order.txt:1
+#, python-format
+msgid "Purchase order %(number)s, revision %(revision)s"
+msgstr "Pedido de compra %(number)s, revisión %(revision)s"
+
+#: apps/purchasing/dispatch.py:149
+#, python-format
+msgid "Purchase order %(number)s"
+msgstr "Pedido de compra %(number)s"
+
 #: apps/purchasing/forms.py:56
 msgid "Discount (%)"
 msgstr "Descuento (%)"
@@ -2539,6 +2561,8 @@ msgstr "Descuento (%)"
 #: apps/purchasing/forms.py:88 apps/purchasing/forms.py:107
 #: apps/purchasing/forms.py:194 apps/purchasing/forms.py:258
 #: apps/purchasing/templates/purchasing/detail.html:45
+#: apps/purchasing/templates/purchasing/email/order.html:19
+#: apps/purchasing/templates/purchasing/email/order.txt:7
 #: apps/purchasing/templates/purchasing/orders.html:23
 #: apps/purchasing/templates/purchasing/orders.html:35
 #: apps/purchasing/templates/purchasing/print.html:34
@@ -2555,6 +2579,8 @@ msgstr "Delegación compradora"
 
 #: apps/purchasing/forms.py:195 apps/purchasing/forms.py:259
 #: apps/purchasing/templates/purchasing/detail.html:51
+#: apps/purchasing/templates/purchasing/email/order.html:23
+#: apps/purchasing/templates/purchasing/email/order.txt:9
 #: apps/purchasing/templates/purchasing/orders.html:24
 #: apps/purchasing/templates/purchasing/orders.html:36
 #: apps/purchasing/templates/purchasing/print.html:43
@@ -2562,15 +2588,21 @@ msgid "Ship to"
 msgstr "Entregar en"
 
 #: apps/purchasing/forms.py:197 apps/purchasing/forms.py:261
-#: apps/purchasing/forms.py:392
+#: apps/purchasing/forms.py:398
 #: apps/purchasing/templates/purchasing/detail.html:57
+#: apps/purchasing/templates/purchasing/email/order.html:29
+#: apps/purchasing/templates/purchasing/email/order.txt:11
 #: apps/purchasing/templates/purchasing/print.html:50
 msgid "Expected date"
 msgstr "Fecha prevista"
 
 #: apps/purchasing/forms.py:199 apps/purchasing/forms.py:263
-#: apps/purchasing/forms.py:394
+#: apps/purchasing/forms.py:400
 #: apps/purchasing/templates/purchasing/detail.html:64
+#: apps/purchasing/templates/purchasing/email/cancellation.html:19
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:7
+#: apps/purchasing/templates/purchasing/email/order.html:32
+#: apps/purchasing/templates/purchasing/email/order.txt:12
 #: apps/purchasing/templates/purchasing/print.html:52
 msgid "Supplier reference"
 msgstr "Referencia del proveedor"
@@ -2584,11 +2616,12 @@ msgstr "Elige un destino válido."
 msgid "Request %(number)s is bought for by another branch."
 msgstr "La solicitud %(number)s la compra otra delegación."
 
-#: apps/purchasing/forms.py:303 apps/purchasing/forms.py:417
+#: apps/purchasing/forms.py:303 apps/purchasing/forms.py:423
 msgid "Ordered quantity"
 msgstr "Cantidad pedida"
 
-#: apps/purchasing/forms.py:304 apps/purchasing/forms.py:420
+#: apps/purchasing/forms.py:304 apps/purchasing/forms.py:426
+#: apps/purchasing/templates/purchasing/email/order.html:42
 #: apps/purchasing/templates/purchasing/line.html:66
 #: apps/purchasing/templates/purchasing/print.html:64
 msgid "Unit price"
@@ -2602,12 +2635,16 @@ msgstr "He revisado las líneas, las cantidades y el destino."
 msgid "Tick the box to issue the order."
 msgstr "Marca la casilla para emitir el pedido."
 
-#: apps/purchasing/forms.py:425
+#: apps/purchasing/forms.py:361
+msgid "Note"
+msgstr "Nota"
+
+#: apps/purchasing/forms.py:431
 #: apps/purchasing/templates/purchasing/line.html:33
 msgid "Allocated"
 msgstr "Asignado"
 
-#: apps/purchasing/models.py:66 apps/purchasing/selectors.py:448
+#: apps/purchasing/models.py:66 apps/purchasing/selectors.py:453
 #: apps/purchasing/templates/purchasing/detail.html:72
 msgid "Issued"
 msgstr "Emitido"
@@ -2728,66 +2765,96 @@ msgstr "asignación de compra"
 msgid "purchase allocations"
 msgstr "asignaciones de compra"
 
-#: apps/purchasing/selectors.py:117
+#: apps/purchasing/selectors.py:122
 msgid "Not received"
 msgstr "Sin recibir"
 
-#: apps/purchasing/selectors.py:118
+#: apps/purchasing/selectors.py:123
 msgid "Partly received"
 msgstr "Recibido en parte"
 
-#: apps/purchasing/selectors.py:119
+#: apps/purchasing/selectors.py:124
 #: apps/purchasing/templates/purchasing/line.html:46
 msgid "Received"
 msgstr "Recibido"
 
-#: apps/purchasing/selectors.py:447
+#: apps/purchasing/selectors.py:452
 msgid "Draft edited"
 msgstr "Borrador editado"
 
-#: apps/purchasing/selectors.py:449
+#: apps/purchasing/selectors.py:454
 msgid "Amended"
 msgstr "Modificado"
 
-#: apps/purchasing/selectors.py:452
+#: apps/purchasing/selectors.py:457
 msgid "Closed: nothing left to receive"
 msgstr "Cerrado: no queda nada por recibir"
 
-#: apps/purchasing/selectors.py:455
+#: apps/purchasing/selectors.py:460
 msgid "Allocation trimmed"
 msgstr "Asignación recortada"
 
-#: apps/purchasing/selectors.py:458
+#: apps/purchasing/selectors.py:461
+msgid "Sending to the supplier"
+msgstr "Enviando al proveedor"
+
+#: apps/purchasing/selectors.py:462
+#: apps/purchasing/templates/purchasing/dispatches.html:8
+#: apps/purchasing/templates/purchasing/dispatches.html:10
+msgid "Sent to the supplier"
+msgstr "Enviado al proveedor"
+
+#: apps/purchasing/selectors.py:463
+msgid "Sending to the supplier failed"
+msgstr "El envío al proveedor ha fallado"
+
+#: apps/purchasing/selectors.py:464
+msgid "Delivery to the supplier uncertain"
+msgstr "Entrega al proveedor incierta"
+
+#: apps/purchasing/selectors.py:465
+msgid "Delivery to the supplier confirmed"
+msgstr "Entrega al proveedor confirmada"
+
+#: apps/purchasing/selectors.py:466
+msgid "Sent to the supplier again"
+msgstr "Enviado de nuevo al proveedor"
+
+#: apps/purchasing/selectors.py:469
 msgid "the request line was already committed elsewhere"
 msgstr "la línea de solicitud ya estaba comprometida en otro pedido"
 
-#: apps/purchasing/selectors.py:459
+#: apps/purchasing/selectors.py:470
 msgid "the request line was closed short"
 msgstr "la línea de solicitud se cerró con faltante"
 
-#: apps/purchasing/selectors.py:460
+#: apps/purchasing/selectors.py:471
 msgid "the request was closed"
 msgstr "la solicitud se cerró"
 
-#: apps/purchasing/selectors.py:461
+#: apps/purchasing/selectors.py:472
 msgid "the order line was closed short"
 msgstr "la línea del pedido se cerró con faltante"
 
-#: apps/purchasing/selectors.py:462
+#: apps/purchasing/selectors.py:473
 msgid "the order was cancelled"
 msgstr "el pedido se canceló"
 
-#: apps/purchasing/selectors.py:463
+#: apps/purchasing/selectors.py:474
 msgid "the draft was discarded"
 msgstr "el borrador se descartó"
 
-#: apps/purchasing/selectors.py:464
+#: apps/purchasing/selectors.py:475
 msgid "the ordered quantity was lowered"
 msgstr "se redujo la cantidad pedida"
 
-#: apps/purchasing/selectors.py:465
+#: apps/purchasing/selectors.py:476
 msgid "unallocated"
 msgstr "desasignado"
+
+#: apps/purchasing/selectors.py:500
+msgid "cancellation notice"
+msgstr "aviso de anulación"
 
 #: apps/purchasing/services/common.py:45
 msgid "This order already has a line for this material."
@@ -2844,7 +2911,7 @@ msgid "Only %(available)s are left to purchase for this line."
 msgstr "Solo quedan %(available)s por comprar para esta línea."
 
 #: apps/purchasing/services/common.py:274
-#: apps/purchasing/services/orders.py:239
+#: apps/purchasing/services/orders.py:243
 msgid "This order line is closed short."
 msgstr "Esta línea de pedido está cerrada incompleta."
 
@@ -2882,6 +2949,20 @@ msgstr "Indica un precio igual o mayor que cero."
 msgid "Enter a discount between 0 and 100 %."
 msgstr "Indica un descuento entre 0 y 100 %."
 
+#: apps/purchasing/services/dispatches.py:64
+msgid "Only a dispatch whose delivery is uncertain can be confirmed."
+msgstr "Solo se puede confirmar un envío cuya entrega es incierta."
+
+#: apps/purchasing/services/dispatches.py:80
+msgid ""
+"Only a dispatch that failed or whose delivery is uncertain can be sent again."
+msgstr ""
+"Solo se puede enviar de nuevo un envío fallido o cuya entrega es incierta."
+
+#: apps/purchasing/services/dispatches.py:85
+msgid "The order has changed since: this dispatch is no longer sent."
+msgstr "El pedido ha cambiado desde entonces: este envío ya no se manda."
+
 #: apps/purchasing/services/drafts.py:222
 msgid "This request line is already allocated here; change that allocation."
 msgstr "Esta línea de solicitud ya está asignada aquí; cambia esa asignación."
@@ -2894,12 +2975,12 @@ msgstr "Para reducir una asignación, libérala."
 msgid "An allocation can only be lowered here."
 msgstr "Aquí una asignación solo se puede reducir."
 
-#: apps/purchasing/services/orders.py:72
+#: apps/purchasing/services/orders.py:75
 #, python-format
 msgid "Line %(line)s allocates more than it orders."
 msgstr "La línea %(line)s asigna más de lo que pide."
 
-#: apps/purchasing/services/orders.py:88
+#: apps/purchasing/services/orders.py:91
 #, python-format
 msgid ""
 "%(request)s line %(line)s would be committed %(committed)s of %(approved)s."
@@ -2907,29 +2988,28 @@ msgstr ""
 "La línea %(line)s de %(request)s quedaría comprometida en %(committed)s de "
 "%(approved)s aprobados."
 
-#: apps/purchasing/services/orders.py:122
+#: apps/purchasing/services/orders.py:125
 msgid "Add at least one line before issuing."
 msgstr "Añade al menos una línea antes de emitir."
 
-#: apps/purchasing/services/orders.py:245
+#: apps/purchasing/services/orders.py:249
 #, python-format
 msgid "Line %(line)s has goods received: its price no longer changes."
 msgstr "La línea %(line)s tiene mercancía recibida: su precio ya no cambia."
 
-#: apps/purchasing/services/orders.py:318
+#: apps/purchasing/services/orders.py:327
 msgid "A line or allocation is not on this order."
 msgstr "Una línea o asignación no pertenece a este pedido."
 
-#: apps/purchasing/services/orders.py:385
+#: apps/purchasing/services/orders.py:395
 msgid "Goods have been received on this order; it can no longer be cancelled."
 msgstr "Se ha recibido mercancía de este pedido; ya no se puede anular."
 
-#: apps/purchasing/services/orders.py:424
+#: apps/purchasing/services/orders.py:435
 msgid "This order line is already closed short."
 msgstr "Esta línea de pedido ya está cerrada incompleta."
 
-#: apps/purchasing/services/orders.py:426
-#| msgid "This order line has nothing left to receive."
+#: apps/purchasing/services/orders.py:437
 msgid "This order line has been received in full."
 msgstr "Esta línea del pedido se ha recibido por completo."
 
@@ -2990,6 +3070,7 @@ msgid "Back to the order"
 msgstr "Volver al pedido"
 
 #: apps/purchasing/templates/purchasing/detail.html:16
+#: apps/purchasing/templates/purchasing/dispatches.html:31
 #: apps/purchasing/templates/purchasing/print.html:20
 msgid "Revision"
 msgstr "Revisión"
@@ -3012,10 +3093,17 @@ msgid "Order details"
 msgstr "Datos del pedido"
 
 #: apps/purchasing/templates/purchasing/detail.html:39
+#: apps/purchasing/templates/purchasing/email/cancellation.html:14
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:5
+#: apps/purchasing/templates/purchasing/email/order.html:14
+#: apps/purchasing/templates/purchasing/email/order.txt:4
 msgid "Buyer"
 msgstr "Comprador"
 
 #: apps/purchasing/templates/purchasing/detail.html:88
+#: apps/purchasing/templates/purchasing/email/order.html:43
+#: apps/purchasing/templates/purchasing/email/order.html:68
+#: apps/purchasing/templates/purchasing/email/order.txt:16
 #: apps/purchasing/templates/purchasing/line.html:73
 #: apps/purchasing/templates/purchasing/print.html:65
 #: apps/purchasing/templates/purchasing/print.html:90
@@ -3073,6 +3161,92 @@ msgid ""
 msgstr ""
 "Solo es posible mientras no se haya recibido mercancía. Se liberan todas las "
 "asignaciones."
+
+#: apps/purchasing/templates/purchasing/dispatches.html:13
+msgid ""
+"The delivery of an email to the supplier is uncertain. It is never sent "
+"again automatically: check with the supplier, then confirm it or send it "
+"again."
+msgstr ""
+"La entrega de un correo al proveedor es incierta. Nunca se reenvía "
+"automáticamente: compruébalo con el proveedor y después confírmalo o envíalo "
+"de nuevo."
+
+#: apps/purchasing/templates/purchasing/dispatches.html:18
+msgid ""
+"The supplier may have this order: a cancellation notice is sent to them."
+msgstr ""
+"Puede que el proveedor tenga este pedido: se le envía un aviso de anulación."
+
+#: apps/purchasing/templates/purchasing/dispatches.html:29
+msgid "Cancellation notice"
+msgstr "Aviso de anulación"
+
+#: apps/purchasing/templates/purchasing/dispatches.html:37
+#, python-format
+msgid "%(attempts)s attempt"
+msgid_plural "%(attempts)s attempts"
+msgstr[0] "%(attempts)s intento"
+msgstr[1] "%(attempts)s intentos"
+
+#: apps/purchasing/templates/purchasing/dispatches.html:43
+msgid "Decide"
+msgstr "Decidir"
+
+#: apps/purchasing/templates/purchasing/dispatches.html:52
+msgid "Send again"
+msgstr "Enviar de nuevo"
+
+#: apps/purchasing/templates/purchasing/dispatches.html:59
+msgid "The supplier has it"
+msgstr "El proveedor lo tiene"
+
+#: apps/purchasing/templates/purchasing/dispatches.html:70
+msgid ""
+"Not sent by email (the supplier had no email address when the order was "
+"issued). Print the order and send it."
+msgstr ""
+"No enviado por correo (el proveedor no tenía dirección de correo al emitir "
+"el pedido). Imprime el pedido y envíalo."
+
+#: apps/purchasing/templates/purchasing/email/cancellation.html:9
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:1
+#, python-format
+msgid "Purchase order %(number)s is cancelled."
+msgstr "El pedido de compra %(number)s queda anulado."
+
+#: apps/purchasing/templates/purchasing/email/cancellation.html:11
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:3
+msgid ""
+"Please do not deliver or invoice it. If goods are already on their way, "
+"contact us before delivering them."
+msgstr ""
+"No lo entreguen ni lo facturen. Si la mercancía ya está en camino, contacten "
+"con nosotros antes de entregarla."
+
+#: apps/purchasing/templates/purchasing/email/cancellation.html:14
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:5
+#: apps/purchasing/templates/purchasing/email/order.html:14
+#: apps/purchasing/templates/purchasing/email/order.html:20
+#: apps/purchasing/templates/purchasing/email/order.txt:4
+#: apps/purchasing/templates/purchasing/email/order.txt:7
+#: apps/purchasing/templates/purchasing/print.html:27
+#: apps/purchasing/templates/purchasing/print.html:36
+#: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
+#: apps/suppliers/templates/suppliers/list.html:23
+#: apps/suppliers/templates/suppliers/list.html:35
+msgid "Tax id"
+msgstr "NIF"
+
+#: apps/purchasing/templates/purchasing/email/order.html:11
+#: apps/purchasing/templates/purchasing/email/order.txt:2
+msgid "This revision replaces the previous ones."
+msgstr "Esta revisión sustituye a las anteriores."
+
+#: apps/purchasing/templates/purchasing/email/order.html:81
+#: apps/purchasing/templates/purchasing/email/order.txt:21
+msgid "Please quote the order number on the delivery note and the invoice."
+msgstr "Indiquen el número de pedido en el albarán y en la factura."
 
 #: apps/purchasing/templates/purchasing/line.html:20
 #: apps/purchasing/templates/purchasing/line.html:58
@@ -3187,14 +3361,6 @@ msgstr "Ningún pedido coincide con los filtros."
 msgid "Print"
 msgstr "Imprimir"
 
-#: apps/purchasing/templates/purchasing/print.html:27
-#: apps/purchasing/templates/purchasing/print.html:36
-#: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
-#: apps/suppliers/templates/suppliers/list.html:23
-#: apps/suppliers/templates/suppliers/list.html:35
-msgid "Tax id"
-msgstr "NIF"
-
 #: apps/purchasing/templates/purchasing/worklist.html:11
 msgid "New empty order"
 msgstr "Nuevo pedido vacío"
@@ -3253,9 +3419,8 @@ msgstr ""
 "Un recorte o un cierre liberó esta cantidad: cierra la línea con faltante "
 "con el proveedor, o conserva la mercancía como stock."
 
-#: apps/purchasing/views/actions.py:78
+#: apps/purchasing/views/actions.py:80
 #, python-format
-#| msgid "Those lines have nothing left to purchase."
 msgid "%(count)s ticked line had nothing left to purchase and was left out."
 msgid_plural ""
 "%(count)s ticked lines had nothing left to purchase and were left out."
@@ -3263,78 +3428,86 @@ msgstr[0] "%(count)s línea marcada no tenía nada por comprar y se dejó fuera.
 msgstr[1] ""
 "%(count)s líneas marcadas no tenían nada por comprar y se dejaron fuera."
 
-#: apps/purchasing/views/actions.py:86
+#: apps/purchasing/views/actions.py:88
 msgid "Draft order created."
 msgstr "Pedido en borrador creado."
 
-#: apps/purchasing/views/actions.py:96
+#: apps/purchasing/views/actions.py:98
 #, python-format
 msgid "Draft order created with %(count)s request lines."
 msgstr "Pedido en borrador creado con %(count)s líneas de solicitud."
 
-#: apps/purchasing/views/actions.py:115
+#: apps/purchasing/views/actions.py:117
 msgid "Draft saved."
 msgstr "Borrador guardado."
 
-#: apps/purchasing/views/actions.py:137
+#: apps/purchasing/views/actions.py:139
 msgid "Request lines added."
 msgstr "Líneas de solicitud añadidas."
 
-#: apps/purchasing/views/actions.py:153
+#: apps/purchasing/views/actions.py:155
 #, python-format
 msgid "Line %(line)s saved."
 msgstr "Línea %(line)s guardada."
 
-#: apps/purchasing/views/actions.py:165
+#: apps/purchasing/views/actions.py:167
 #, python-format
 msgid "Line %(line)s removed."
 msgstr "Línea %(line)s quitada."
 
-#: apps/purchasing/views/actions.py:184
+#: apps/purchasing/views/actions.py:186
 msgid "Allocation raised."
 msgstr "Asignación aumentada."
 
-#: apps/purchasing/views/actions.py:190
+#: apps/purchasing/views/actions.py:192
 msgid "Allocation lowered."
 msgstr "Asignación reducida."
 
-#: apps/purchasing/views/actions.py:225
+#: apps/purchasing/views/actions.py:227
 #, python-format
 msgid "Order %(number)s issued."
 msgstr "Pedido %(number)s emitido."
 
-#: apps/purchasing/views/actions.py:240
+#: apps/purchasing/views/actions.py:242
 msgid "Order cancelled."
 msgstr "Pedido cancelado."
 
-#: apps/purchasing/views/actions.py:240
+#: apps/purchasing/views/actions.py:242
 msgid "Draft discarded."
 msgstr "Borrador descartado."
 
-#: apps/purchasing/views/actions.py:261
+#: apps/purchasing/views/actions.py:263
 #, python-format
 msgid "Line %(line)s closed short."
 msgstr "Línea %(line)s cerrada con faltante."
 
-#: apps/purchasing/views/actions.py:295
+#: apps/purchasing/views/actions.py:297
 #, python-format
 msgid "Nothing changed: the order stays at revision %(n)s."
 msgstr "Nada cambió: el pedido sigue en la revisión %(n)s."
 
-#: apps/purchasing/views/actions.py:298
+#: apps/purchasing/views/actions.py:300
 #, python-format
 msgid "Order amended: revision %(n)s."
 msgstr "Pedido modificado: revisión %(n)s."
 
-#: apps/purchasing/views/pages.py:108
+#: apps/purchasing/views/actions.py:317
+msgid "Delivery to the supplier confirmed."
+msgstr "Entrega al proveedor confirmada."
+
+#: apps/purchasing/views/actions.py:332
+msgid "The dispatch is queued to be sent again."
+msgstr "El envío queda en cola para mandarse de nuevo."
+
+#: apps/purchasing/views/pages.py:110
 msgid "Those lines have nothing left to purchase."
 msgstr "Esas líneas no tienen nada más por comprar."
 
-#: apps/purchasing/views/pages.py:325
+#: apps/purchasing/views/pages.py:336
 msgid "Only an issued order is amended."
 msgstr "Solo se modifica un pedido emitido."
 
-#: apps/purchasing/views/pages.py:340
+#: apps/purchasing/views/pages.py:351
 msgid "Issue the order to print it."
 msgstr "Emite el pedido para imprimirlo."
 

@@ -24,6 +24,7 @@ from apps.core.responses import conflict, idempotency_failure
 from apps.purchasing import selectors, services
 from apps.purchasing.forms import (
     AllocationQuantityForm,
+    DispatchNoteForm,
     DraftHeaderForm,
     IssueForm,
     ItemsForm,
@@ -38,6 +39,7 @@ from apps.purchasing.views.common import (
     _detail_url,
     _invalid,
     _on_allocation,
+    _on_dispatch,
     _on_line,
     _on_order,
     _perform,
@@ -297,3 +299,36 @@ def order_amend(request: HttpRequest, po_id: UUID) -> HttpResponse:
     else:
         messages.success(request, _("Order amended: revision %(n)s.") % {"n": amended.revision})
     return redirect(_detail_url(found))
+
+
+# --- supplier dispatches (M5.3) -------------------------------------------------------------------
+
+
+@mutating(MANAGE)
+def dispatch_confirm(request: HttpRequest, dispatch_id: UUID) -> HttpResponse:
+    """The supplier has a dispatch whose delivery was uncertain."""
+    ctx = access_for(request)
+    found = _on_dispatch(request, dispatch_id)
+    form = DispatchNoteForm(request.POST)
+    note = form.cleaned_data["note"] if form.is_valid() else ""
+    return _perform(
+        request,
+        lambda: services.confirm_dispatch(ctx.principal, found.pk, note=note),
+        _("Delivery to the supplier confirmed."),
+        _detail_url(found),
+    )
+
+
+@mutating(MANAGE)
+def dispatch_resend(request: HttpRequest, dispatch_id: UUID) -> HttpResponse:
+    """Send a failed or uncertain dispatch again: the worker makes a new attempt."""
+    ctx = access_for(request)
+    found = _on_dispatch(request, dispatch_id)
+    form = DispatchNoteForm(request.POST)
+    note = form.cleaned_data["note"] if form.is_valid() else ""
+    return _perform(
+        request,
+        lambda: services.resend_dispatch(ctx.principal, found.pk, note=note),
+        _("The dispatch is queued to be sent again."),
+        _detail_url(found),
+    )

@@ -5,7 +5,7 @@ Every operation, called directly as every actor of the shared fixture, on orders
 material manager. Actors who see the order (``po.view``) without it get 403
 (``AccessDenied``): the warehouse operator, and a deactivated account before any scope;
 everyone else gets 404 (``NotInScope``). The screens of M5.2 add their URL rows to
-``tests/access/test_acceptance_matrix.py``.
+``tests/access/test_acceptance_matrix.py``; M5.3 adds the decisions on a dispatch.
 """
 
 from collections.abc import Callable
@@ -18,12 +18,15 @@ import pytest
 from apps.access.exceptions import AccessDenied, MFARequired, NotInScope
 from apps.catalog.models import Material
 from apps.material_requests.models import MaterialRequestLine
+from apps.notifications.models import EmailOutbox
+from apps.notifications.models import Status as MailStatus
 from apps.organizations.models import Branch
 from apps.purchasing import services
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.services import RequestItem
 from tests import orders
 from tests.org import Org, People
+from tests.outbox import make_dispatch
 from tests.support import principal_for
 from tests.unit.purchasing.conftest import MakeLine
 
@@ -46,6 +49,7 @@ class State:
     issued_line: PurchaseOrderLine
     spare: MaterialRequestLine
     free_line: PurchaseOrderLine  # on another draft, nothing allocated
+    dispatch: EmailOutbox  # the issued order's, left AMBIGUOUS by the worker (M5.3)
 
 
 def build(
@@ -63,7 +67,18 @@ def build(
     orders.allocate(issued_line, second, "10")
     orders.allocate(draft_line, spare, "5")  # spare: 5 reserved, 5 left
     free_line = orders.line(orders.order(org, branch=branch), cable, "5")
-    return State(branch, draft, draft_line, draft_allocation, issued, issued_line, spare, free_line)
+    dispatch = make_dispatch(issued, MailStatus.AMBIGUOUS)
+    return State(
+        branch,
+        draft,
+        draft_line,
+        draft_allocation,
+        issued,
+        issued_line,
+        spare,
+        free_line,
+        dispatch,
+    )
 
 
 type Operation = Callable[[Any, State, Org], Any]
@@ -97,6 +112,8 @@ OPERATIONS: dict[str, Operation] = {
     "close_line_short": lambda p, s, org: services.close_line_short(
         p, s.issued_line.pk, reason="Short"
     ),
+    "confirm_dispatch": lambda p, s, org: services.confirm_dispatch(p, s.dispatch.pk),
+    "resend_dispatch": lambda p, s, org: services.resend_dispatch(p, s.dispatch.pk),
 }
 
 ALLOWED = {"group_admin", "mm_mad"}
@@ -134,6 +151,7 @@ def snapshot(state: State) -> tuple[object, ...]:
         sorted(PurchaseOrder.objects.values_list("status", "revision", "notes")),
         sorted(PurchaseOrderLine.objects.values_list("ordered_qty", "unit_price")),
         sorted(PurchaseAllocation.objects.values_list("qty", flat=True)),
+        sorted(EmailOutbox.objects.values_list("status", flat=True)),
     )
 
 

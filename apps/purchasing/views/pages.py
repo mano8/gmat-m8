@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import quote
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
@@ -28,6 +29,7 @@ from apps.purchasing.forms import (
     AllocationEntry,
     AllocationQuantityForm,
     AmendForm,
+    DispatchNoteForm,
     DraftHeaderForm,
     IssueForm,
     ItemsForm,
@@ -254,6 +256,15 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
         }
     if managing and issued:
         context["cancel_form"] = RequiredReasonForm(auto_id=_fresh("cancel", 0))
+    dispatches = selectors.dispatches(ctx, found)
+    context |= {
+        "dispatches": [
+            (row, DispatchNoteForm(auto_id=_fresh("dispatch", index)))
+            for index, row in enumerate(dispatches)
+        ],
+        "dispatch_on": settings.PO_DISPATCH,
+        "awaiting_decision": selectors.awaiting_decision(dispatches),
+    }
     return render(request, "purchasing/detail.html", context)
 
 

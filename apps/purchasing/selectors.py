@@ -13,6 +13,9 @@ The **purchase worklist** (§4.5) is for ``po.manage`` holders:
   a reconciliation trim or a closure freed: close them short with the supplier or keep the
   goods as stock;
 - ``stale_drafts``: drafts older than 14 days still hold their reservations (Q24).
+
+An order's **supplier dispatches** (M5.3) reach ``po.view`` holders on it (they all hold
+``supplier.view``); confirming or resending one is for ``po.manage``.
 """
 
 from collections.abc import Iterable
@@ -34,6 +37,8 @@ from apps.audit.models import AuditEvent
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
 from apps.material_requests.models import MaterialRequestLine
+from apps.notifications.models import DISPATCH_KINDS, EmailOutbox, Kind
+from apps.notifications.models import Status as Dispatch
 from apps.organizations.models import Branch
 from apps.projects.models import Project
 from apps.purchasing.components import TrimReason
@@ -164,7 +169,7 @@ class LineRow:
         return max(ZERO, self.totals.ordered - self.totals.allocated)
 
 
-def _total(line: PurchaseOrderLine) -> Decimal | None:
+def line_total(line: PurchaseOrderLine) -> Decimal | None:
     """ordered * price * (1 - discount), to the cent; ``None`` without a price."""
     if line.unit_price is None:
         return None
@@ -194,7 +199,7 @@ def lines(ctx: AccessContext, of: PurchaseOrder) -> list[LineRow]:
                 totals=book.order_line_totals(line.pk),
                 unit_price=line.unit_price if prices else None,
                 discount_pct=line.discount_pct if prices else None,
-                total=_total(line) if prices else None,
+                total=line_total(line) if prices else None,
             )
         )
     return rows
@@ -453,6 +458,12 @@ ACTION_LABELS = {
     "purchase_order.auto_reopened": _("Reopened"),
     "purchase_order_line.closed_short": _("Line closed short"),
     "purchase_allocation.trimmed": _("Allocation trimmed"),
+    "purchase_order.dispatch_started": _("Sending to the supplier"),
+    "purchase_order.dispatch_sent": _("Sent to the supplier"),
+    "purchase_order.dispatch_failed": _("Sending to the supplier failed"),
+    "purchase_order.dispatch_ambiguous": _("Delivery to the supplier uncertain"),
+    "purchase_order.dispatch_confirmed": _("Delivery to the supplier confirmed"),
+    "purchase_order.dispatch_resent": _("Sent to the supplier again"),
 }
 TRIM_LABELS = {
     TrimReason.EXCESS_COMMITMENT: _("the request line was already committed elsewhere"),
@@ -483,9 +494,73 @@ def _detail(action: str, data: dict[str, Any]) -> str:
         ]
     elif action == "purchase_order_line.closed_short":
         parts = [f"#{data.get('line_no')}", str(data.get("reason", ""))]
+    elif action.startswith("purchase_order.dispatch_"):
+        notice = data.get("kind") == Kind.PO_CANCELLATION
+        parts = [
+            str(_("cancellation notice")) if notice else f"#{data.get('revision')}",
+            str(data.get("error") or data.get("note") or ""),
+        ]
     else:
         parts = [str(data.get("reason", ""))]
     return " · ".join(part for part in parts if part)
+
+
+# --- supplier dispatches (M5.3) ---------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DispatchRow:
+    """A supplier dispatch of an order; ``decidable`` ones wait for a human (plan §5)."""
+
+    dispatch: EmailOutbox
+    notice: bool  # the cancellation notice, not a revision of the order
+    revision: int | None
+    decidable: bool
+    resendable: bool
+
+    @property
+    def confirmable(self) -> bool:
+        return self.dispatch.status == Dispatch.AMBIGUOUS
+
+    @property
+    def actionable(self) -> bool:
+        return self.resendable or self.confirmable
+
+
+def _dispatches(ctx: AccessContext) -> QuerySet[EmailOutbox]:
+    return EmailOutbox.objects.filter(
+        kind__in=DISPATCH_KINDS, source_po__in=PurchaseOrder.objects.visible_to(ctx, VIEW)
+    )
+
+
+def dispatch(ctx: AccessContext, dispatch_id: UUID) -> EmailOutbox:
+    found = _dispatches(ctx).filter(pk=dispatch_id).select_related("source_po").first()
+    if found is None:
+        raise NotInScope(VIEW)
+    return found
+
+
+def dispatches(ctx: AccessContext, of: PurchaseOrder) -> list[DispatchRow]:
+    """The order's dispatches, newest first, with what a human may still do with each."""
+    from apps.purchasing.dispatch import DECIDABLE, refusal, revision_of
+
+    rows = []
+    for found in _dispatches(ctx).filter(source_po=of).order_by("-created_at"):
+        decidable = found.status in DECIDABLE
+        rows.append(
+            DispatchRow(
+                dispatch=found,
+                notice=found.kind == Kind.PO_CANCELLATION,
+                revision=revision_of(found),
+                decidable=decidable,
+                resendable=decidable and refusal(of, found) is None,
+            )
+        )
+    return rows
+
+
+def awaiting_decision(rows: Iterable[DispatchRow]) -> bool:
+    return any(row.confirmable for row in rows)
 
 
 def can_see_history(ctx: AccessContext, of: PurchaseOrder) -> bool:

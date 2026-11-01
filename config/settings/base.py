@@ -221,6 +221,10 @@ DEFAULT_FROM_EMAIL = env_str("DJANGO_DEFAULT_FROM_EMAIL", "gmat-m8 <no-reply@loc
 PUBLIC_BASE_URL = "http://localhost:8000"
 # Off unless switched on: with it off the worker never claims or opens an SMTP connection.
 OUTBOUND_EMAIL = env_bool("OUTBOUND_EMAIL", False)
+# Supplier dispatch (M5.3, Q7): with it on, issuing or amending an order queues it by email to
+# the supplier's address as issued. ADR-0010 keeps the MVP on the printable page, so it is off
+# unless switched on. Cancellation notices for orders already sent are queued either way.
+PO_DISPATCH = env_bool("PO_DISPATCH", False)
 # Seconds per SMTP socket operation (the plan's EMAIL_TIMEOUT; Django reserves that name).
 OUTBOX_SMTP_TIMEOUT = 10
 OUTBOX_SEND_DEADLINE = 60  # seconds per message, every stage included (SIGALRM)

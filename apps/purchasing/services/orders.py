@@ -2,10 +2,13 @@
 
 - ``issue``: number per buyer company, snapshots, revalidation (F38): a draft whose lines
   would leave a request line committed above its approved quantity is refused, with the
-  list of lines, before any trim;
-- ``amend``: an issued order's changes of §4.4, one revision per call;
+  list of lines, before any trim; with ``PO_DISPATCH`` on the order is queued to the
+  supplier (M5.3);
+- ``amend``: an issued order's changes of §4.4, one revision per call; the revision is
+  queued to the supplier and older queued revisions are superseded (M5.3);
 - ``cancel``: a draft is discarded, an issued order without posted receipts cancelled;
-  every allocation is trimmed to zero and unsent dispatches are cancelled (§5);
+  every allocation is trimmed to zero, unsent dispatches are cancelled and the supplier is
+  owed a cancellation notice for the others (§5);
 - ``close_line_short``: an order line gives up the rest; its allocations are trimmed to
   what is attributed and the order closes once no line has capacity (§4.9).
 """
@@ -29,7 +32,7 @@ from apps.core.locking import LockOrder, LockSetChanged, transactional
 from apps.material_requests.models import MaterialRequestLine
 from apps.purchasing import receipts
 from apps.purchasing.components import Component, TrimReason, over_committed
-from apps.purchasing.dispatch import cancel_dispatches, lock_dispatches
+from apps.purchasing.dispatch import cancel_dispatches, lock_dispatches, queue_order
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.services.common import (
     RequestItem,
@@ -132,7 +135,8 @@ def issue(
         locked.issued_at, locked.issued_by = db_now(), actor
         _assign_number(locked, locks)
         locked.save()
-        _record(principal, "purchase_order.issued", locked, lines=len(lines))
+        dispatch = queue_order(locked)
+        _record(principal, "purchase_order.issued", locked, lines=len(lines), dispatch=dispatch)
         return locked
 
     return execute_once(
@@ -305,7 +309,12 @@ def amend(
     _authorize(principal, order, locks, *_requests(request_lines), prices=prices)
 
     def execute() -> PurchaseOrder:
-        locked, component = _lock_order(locks, order, request_lines=request_lines)
+        locked, component = _lock_order(
+            locks,
+            order,
+            request_lines=request_lines,
+            between_orders_and_lines=lock_dispatches(order.pk),
+        )
         if locked.status != Status.ISSUED:
             raise _status_error(locked)
         known_lines = set(locked.lines.values_list("pk", flat=True))
@@ -344,6 +353,7 @@ def amend(
             revision=locked.revision,
             reason=reason,
             changes=changes,
+            dispatch=queue_order(locked),
         )
         _settle_order(principal, locked, component)
         component.reconcile(principal, "purchase_order.amend")
@@ -390,7 +400,7 @@ def cancel(principal: Principal, po_id: UUID, *, reason: str = "") -> PurchaseOr
     component.trim_to_attributed(
         principal, order_lines=order_lines, reason=trim, cause=f"purchase_order.{operation}"
     )
-    dispatches = cancel_dispatches(locked) if issued else 0
+    dispatches = cancel_dispatches(locked) if issued else None
     locked.save()
     action = "purchase_order.cancelled" if issued else "purchase_order.discarded"
     _record(
@@ -399,8 +409,9 @@ def cancel(principal: Principal, po_id: UUID, *, reason: str = "") -> PurchaseOr
         locked,
         from_status=left,
         reason=reason.strip(),
-        dispatches_cancelled=dispatches,
+        dispatches_cancelled=dispatches.cancelled if dispatches else 0,
         cancellation_notice_required=locked.cancellation_notice_required,
+        cancellation_notice_queued=bool(dispatches and dispatches.notice_queued),
     )
     component.reconcile(principal, f"purchase_order.{operation}")
     return locked

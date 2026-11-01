@@ -25,6 +25,8 @@ urlpatterns = [
         views.allocation_increase,
         name="increase_allocation",
     ),
+    path("dispatches/<uuid:dispatch_id>/confirm/", views.dispatch_confirm, name="confirm_dispatch"),
+    path("dispatches/<uuid:dispatch_id>/resend/", views.dispatch_resend, name="resend_dispatch"),
     path(
         "allocations/<uuid:allocation_id>/unallocate/",
         views.allocation_unallocate,

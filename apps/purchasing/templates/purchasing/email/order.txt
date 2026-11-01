@@ -1,0 +1,22 @@
+{% load i18n ui_tags %}{% autoescape off %}{% blocktranslate with number=order.number revision=order.revision %}Purchase order {{ number }}, revision {{ revision }}{% endblocktranslate %}
+{% if order.revision %}{% translate "This revision replaces the previous ones." %}
+{% endif %}
+{% translate "Buyer" %}: {{ order.buyer_snapshot.company.legal_name }} ({% translate "Tax id" %} {{ order.buyer_snapshot.company.tax_id }})
+{{ order.buyer_snapshot.branch.name }}, {{ order.buyer_snapshot.branch.address }} {{ order.buyer_snapshot.branch.city }}
+
+{% translate "Supplier" %}: {{ order.supplier_snapshot.name }}{% if order.supplier_snapshot.tax_id %} ({% translate "Tax id" %} {{ order.supplier_snapshot.tax_id }}){% endif %}
+
+{% translate "Ship to" %}: {{ order.ship_to_snapshot.name }}{% if order.ship_to_snapshot.project %} · {{ order.ship_to_snapshot.project.code }} {{ order.ship_to_snapshot.project.name }}{% endif %}
+{{ order.ship_to_snapshot.address }}
+{% if order.expected_date %}{% translate "Expected date" %}: {{ order.expected_date|date:"SHORT_DATE_FORMAT" }}
+{% endif %}{% if order.supplier_ref %}{% translate "Supplier reference" %}: {{ order.supplier_ref }}
+{% endif %}
+{% for row in lines %}{{ row.line.line_no }}. {{ row.reference }} {{ row.name }}: {{ row.line.ordered_qty|quantity }} {{ row.line.unit.code }}{% if prices and row.line.unit_price is not None %} × {{ row.line.unit_price }}{% if row.line.discount_pct %} (−{{ row.line.discount_pct }} %){% endif %} = {{ row.total }} {{ order.currency }}{% endif %}
+{% endfor %}{% if prices and order_total is not None %}
+{% translate "Total" %}: {{ order_total }} {{ order.currency }}
+{% endif %}{% if order.notes %}
+{% translate "Notes" %}:
+{{ order.notes }}
+{% endif %}
+{% translate "Please quote the order number on the delivery note and the invoice." %}
+{% endautoescape %}

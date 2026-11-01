@@ -17,7 +17,14 @@ from apps.projects.models import Project
 from apps.purchasing.models import PurchaseOrder
 from tests import orders as purchase_orders
 from tests.org import Org
-from tests.outbox import SECRET_BODY, FakeOrders
+from tests.outbox import SECRET_BODY, FakeOrders, no_dispatch_source
+
+
+@pytest.fixture(autouse=True)
+def _bare_outbox() -> Iterator[None]:
+    """These tests drive the outbox with ``FakeOrders``, not the purchasing app's source."""
+    with no_dispatch_source():
+        yield
 
 
 @pytest.fixture

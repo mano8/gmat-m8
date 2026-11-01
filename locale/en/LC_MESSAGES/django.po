@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-31 22:18+0100\n"
+"POT-Creation-Date: 2026-10-31 21:43+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -504,6 +504,7 @@ msgstr ""
 
 #: apps/catalog/forms.py:108 apps/catalog/templates/catalog/list.html:26
 #: apps/catalog/templates/catalog/list.html:36
+#: apps/purchasing/templates/purchasing/email/order.html:38
 #: apps/purchasing/templates/purchasing/print.html:60
 msgid "Reference"
 msgstr ""
@@ -886,6 +887,7 @@ msgstr ""
 #: apps/purchasing/forms.py:332
 #: apps/purchasing/templates/purchasing/amend.html:63
 #: apps/purchasing/templates/purchasing/detail.html:145
+#: apps/purchasing/templates/purchasing/email/order.html:40
 #: apps/purchasing/templates/purchasing/new.html:45
 #: apps/purchasing/templates/purchasing/print.html:62
 msgid "Quantity"
@@ -921,8 +923,10 @@ msgstr ""
 #: apps/material_requests/templates/material_requests/detail.html:39
 #: apps/material_requests/templates/material_requests/examine.html:39
 #: apps/purchasing/forms.py:201 apps/purchasing/forms.py:265
-#: apps/purchasing/forms.py:396
+#: apps/purchasing/forms.py:402
 #: apps/purchasing/templates/purchasing/detail.html:80
+#: apps/purchasing/templates/purchasing/email/order.html:76
+#: apps/purchasing/templates/purchasing/email/order.txt:18
 #: apps/purchasing/templates/purchasing/print.html:98
 #: apps/suppliers/forms.py:36 apps/suppliers/templates/suppliers/detail.html:65
 msgid "Notes"
@@ -935,7 +939,7 @@ msgstr ""
 #: apps/material_requests/forms.py:176 apps/material_requests/forms.py:223
 #: apps/material_requests/forms.py:244 apps/material_requests/forms.py:285
 #: apps/organizations/forms.py:118 apps/purchasing/forms.py:347
-#: apps/purchasing/forms.py:354 apps/purchasing/forms.py:389
+#: apps/purchasing/forms.py:354 apps/purchasing/forms.py:395
 msgid "Reason"
 msgstr ""
 
@@ -981,7 +985,7 @@ msgstr ""
 
 #: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
 #: apps/material_requests/services/common.py:290 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:389 apps/purchasing/services/common.py:126
+#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
 msgid "Give a reason."
 msgstr ""
 
@@ -1024,7 +1028,7 @@ msgstr ""
 
 #: apps/material_requests/models.py:84 apps/material_requests/selectors.py:298
 #: apps/notifications/models.py:39 apps/purchasing/forms.py:38
-#: apps/purchasing/models.py:68 apps/purchasing/selectors.py:450
+#: apps/purchasing/models.py:68 apps/purchasing/selectors.py:455
 #: apps/purchasing/templates/purchasing/print.html:22
 msgid "Cancelled"
 msgstr ""
@@ -1192,7 +1196,7 @@ msgstr ""
 msgid "material request lines"
 msgstr ""
 
-#: apps/material_requests/selectors.py:293 apps/purchasing/selectors.py:446
+#: apps/material_requests/selectors.py:293 apps/purchasing/selectors.py:451
 msgid "Draft created"
 msgstr ""
 
@@ -1204,7 +1208,7 @@ msgstr ""
 msgid "Withdrawn"
 msgstr ""
 
-#: apps/material_requests/selectors.py:297 apps/purchasing/selectors.py:451
+#: apps/material_requests/selectors.py:297 apps/purchasing/selectors.py:456
 msgid "Draft discarded"
 msgstr ""
 
@@ -1216,7 +1220,7 @@ msgstr ""
 msgid "Schedule changed"
 msgstr ""
 
-#: apps/material_requests/selectors.py:304 apps/purchasing/selectors.py:453
+#: apps/material_requests/selectors.py:304 apps/purchasing/selectors.py:458
 msgid "Reopened"
 msgstr ""
 
@@ -1256,7 +1260,7 @@ msgstr ""
 msgid "Linked to the catalog"
 msgstr ""
 
-#: apps/material_requests/selectors.py:314 apps/purchasing/selectors.py:454
+#: apps/material_requests/selectors.py:314 apps/purchasing/selectors.py:459
 msgid "Line closed short"
 msgstr ""
 
@@ -1636,8 +1640,8 @@ msgstr ""
 
 #: apps/material_requests/templates/material_requests/examine.html:296
 #: apps/material_requests/templates/material_requests/examine.html:297
-#: apps/purchasing/templates/purchasing/detail.html:196
-#: apps/purchasing/templates/purchasing/detail.html:197
+#: apps/purchasing/templates/purchasing/detail.html:199
+#: apps/purchasing/templates/purchasing/detail.html:200
 msgid "History"
 msgstr ""
 
@@ -1664,6 +1668,7 @@ msgstr ""
 
 #: apps/material_requests/templates/material_requests/lines_table.html:9
 #: apps/material_requests/templates/material_requests/lines_table.html:21
+#: apps/purchasing/templates/purchasing/email/order.html:39
 #: apps/purchasing/templates/purchasing/print.html:61
 msgid "Material"
 msgstr ""
@@ -1750,7 +1755,7 @@ msgid "Submit request"
 msgstr ""
 
 #: apps/material_requests/views/common.py:104
-#: apps/purchasing/views/common.py:86
+#: apps/purchasing/views/common.py:97
 msgid "Check the form."
 msgstr ""
 
@@ -2472,6 +2477,23 @@ msgstr ""
 msgid "%(attributed)s have already been received for this allocation."
 msgstr ""
 
+#: apps/purchasing/dispatch.py:143
+#, python-format
+msgid "Cancellation of purchase order %(number)s"
+msgstr ""
+
+#: apps/purchasing/dispatch.py:145
+#: apps/purchasing/templates/purchasing/email/order.html:9
+#: apps/purchasing/templates/purchasing/email/order.txt:1
+#, python-format
+msgid "Purchase order %(number)s, revision %(revision)s"
+msgstr ""
+
+#: apps/purchasing/dispatch.py:149
+#, python-format
+msgid "Purchase order %(number)s"
+msgstr ""
+
 #: apps/purchasing/forms.py:56
 msgid "Discount (%)"
 msgstr ""
@@ -2479,6 +2501,8 @@ msgstr ""
 #: apps/purchasing/forms.py:88 apps/purchasing/forms.py:107
 #: apps/purchasing/forms.py:194 apps/purchasing/forms.py:258
 #: apps/purchasing/templates/purchasing/detail.html:45
+#: apps/purchasing/templates/purchasing/email/order.html:19
+#: apps/purchasing/templates/purchasing/email/order.txt:7
 #: apps/purchasing/templates/purchasing/orders.html:23
 #: apps/purchasing/templates/purchasing/orders.html:35
 #: apps/purchasing/templates/purchasing/print.html:34
@@ -2495,6 +2519,8 @@ msgstr ""
 
 #: apps/purchasing/forms.py:195 apps/purchasing/forms.py:259
 #: apps/purchasing/templates/purchasing/detail.html:51
+#: apps/purchasing/templates/purchasing/email/order.html:23
+#: apps/purchasing/templates/purchasing/email/order.txt:9
 #: apps/purchasing/templates/purchasing/orders.html:24
 #: apps/purchasing/templates/purchasing/orders.html:36
 #: apps/purchasing/templates/purchasing/print.html:43
@@ -2502,15 +2528,21 @@ msgid "Ship to"
 msgstr ""
 
 #: apps/purchasing/forms.py:197 apps/purchasing/forms.py:261
-#: apps/purchasing/forms.py:392
+#: apps/purchasing/forms.py:398
 #: apps/purchasing/templates/purchasing/detail.html:57
+#: apps/purchasing/templates/purchasing/email/order.html:29
+#: apps/purchasing/templates/purchasing/email/order.txt:11
 #: apps/purchasing/templates/purchasing/print.html:50
 msgid "Expected date"
 msgstr ""
 
 #: apps/purchasing/forms.py:199 apps/purchasing/forms.py:263
-#: apps/purchasing/forms.py:394
+#: apps/purchasing/forms.py:400
 #: apps/purchasing/templates/purchasing/detail.html:64
+#: apps/purchasing/templates/purchasing/email/cancellation.html:19
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:7
+#: apps/purchasing/templates/purchasing/email/order.html:32
+#: apps/purchasing/templates/purchasing/email/order.txt:12
 #: apps/purchasing/templates/purchasing/print.html:52
 msgid "Supplier reference"
 msgstr ""
@@ -2524,11 +2556,12 @@ msgstr ""
 msgid "Request %(number)s is bought for by another branch."
 msgstr ""
 
-#: apps/purchasing/forms.py:303 apps/purchasing/forms.py:417
+#: apps/purchasing/forms.py:303 apps/purchasing/forms.py:423
 msgid "Ordered quantity"
 msgstr ""
 
-#: apps/purchasing/forms.py:304 apps/purchasing/forms.py:420
+#: apps/purchasing/forms.py:304 apps/purchasing/forms.py:426
+#: apps/purchasing/templates/purchasing/email/order.html:42
 #: apps/purchasing/templates/purchasing/line.html:66
 #: apps/purchasing/templates/purchasing/print.html:64
 msgid "Unit price"
@@ -2542,12 +2575,16 @@ msgstr ""
 msgid "Tick the box to issue the order."
 msgstr ""
 
-#: apps/purchasing/forms.py:425
+#: apps/purchasing/forms.py:361
+msgid "Note"
+msgstr ""
+
+#: apps/purchasing/forms.py:431
 #: apps/purchasing/templates/purchasing/line.html:33
 msgid "Allocated"
 msgstr ""
 
-#: apps/purchasing/models.py:66 apps/purchasing/selectors.py:448
+#: apps/purchasing/models.py:66 apps/purchasing/selectors.py:453
 #: apps/purchasing/templates/purchasing/detail.html:72
 msgid "Issued"
 msgstr ""
@@ -2668,65 +2705,95 @@ msgstr ""
 msgid "purchase allocations"
 msgstr ""
 
-#: apps/purchasing/selectors.py:117
+#: apps/purchasing/selectors.py:122
 msgid "Not received"
 msgstr ""
 
-#: apps/purchasing/selectors.py:118
+#: apps/purchasing/selectors.py:123
 msgid "Partly received"
 msgstr ""
 
-#: apps/purchasing/selectors.py:119
+#: apps/purchasing/selectors.py:124
 #: apps/purchasing/templates/purchasing/line.html:46
 msgid "Received"
 msgstr ""
 
-#: apps/purchasing/selectors.py:447
+#: apps/purchasing/selectors.py:452
 msgid "Draft edited"
 msgstr ""
 
-#: apps/purchasing/selectors.py:449
+#: apps/purchasing/selectors.py:454
 msgid "Amended"
 msgstr ""
 
-#: apps/purchasing/selectors.py:452
+#: apps/purchasing/selectors.py:457
 msgid "Closed: nothing left to receive"
 msgstr ""
 
-#: apps/purchasing/selectors.py:455
+#: apps/purchasing/selectors.py:460
 msgid "Allocation trimmed"
 msgstr ""
 
-#: apps/purchasing/selectors.py:458
-msgid "the request line was already committed elsewhere"
-msgstr ""
-
-#: apps/purchasing/selectors.py:459
-msgid "the request line was closed short"
-msgstr ""
-
-#: apps/purchasing/selectors.py:460
-msgid "the request was closed"
-msgstr ""
-
 #: apps/purchasing/selectors.py:461
-msgid "the order line was closed short"
+msgid "Sending to the supplier"
 msgstr ""
 
 #: apps/purchasing/selectors.py:462
-msgid "the order was cancelled"
+#: apps/purchasing/templates/purchasing/dispatches.html:8
+#: apps/purchasing/templates/purchasing/dispatches.html:10
+msgid "Sent to the supplier"
 msgstr ""
 
 #: apps/purchasing/selectors.py:463
-msgid "the draft was discarded"
+msgid "Sending to the supplier failed"
 msgstr ""
 
 #: apps/purchasing/selectors.py:464
-msgid "the ordered quantity was lowered"
+msgid "Delivery to the supplier uncertain"
 msgstr ""
 
 #: apps/purchasing/selectors.py:465
+msgid "Delivery to the supplier confirmed"
+msgstr ""
+
+#: apps/purchasing/selectors.py:466
+msgid "Sent to the supplier again"
+msgstr ""
+
+#: apps/purchasing/selectors.py:469
+msgid "the request line was already committed elsewhere"
+msgstr ""
+
+#: apps/purchasing/selectors.py:470
+msgid "the request line was closed short"
+msgstr ""
+
+#: apps/purchasing/selectors.py:471
+msgid "the request was closed"
+msgstr ""
+
+#: apps/purchasing/selectors.py:472
+msgid "the order line was closed short"
+msgstr ""
+
+#: apps/purchasing/selectors.py:473
+msgid "the order was cancelled"
+msgstr ""
+
+#: apps/purchasing/selectors.py:474
+msgid "the draft was discarded"
+msgstr ""
+
+#: apps/purchasing/selectors.py:475
+msgid "the ordered quantity was lowered"
+msgstr ""
+
+#: apps/purchasing/selectors.py:476
 msgid "unallocated"
+msgstr ""
+
+#: apps/purchasing/selectors.py:500
+msgid "cancellation notice"
 msgstr ""
 
 #: apps/purchasing/services/common.py:45
@@ -2783,7 +2850,7 @@ msgid "Only %(available)s are left to purchase for this line."
 msgstr ""
 
 #: apps/purchasing/services/common.py:274
-#: apps/purchasing/services/orders.py:239
+#: apps/purchasing/services/orders.py:243
 msgid "This order line is closed short."
 msgstr ""
 
@@ -2821,6 +2888,19 @@ msgstr ""
 msgid "Enter a discount between 0 and 100 %."
 msgstr ""
 
+#: apps/purchasing/services/dispatches.py:64
+msgid "Only a dispatch whose delivery is uncertain can be confirmed."
+msgstr ""
+
+#: apps/purchasing/services/dispatches.py:80
+msgid ""
+"Only a dispatch that failed or whose delivery is uncertain can be sent again."
+msgstr ""
+
+#: apps/purchasing/services/dispatches.py:85
+msgid "The order has changed since: this dispatch is no longer sent."
+msgstr ""
+
 #: apps/purchasing/services/drafts.py:222
 msgid "This request line is already allocated here; change that allocation."
 msgstr ""
@@ -2833,39 +2913,39 @@ msgstr ""
 msgid "An allocation can only be lowered here."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:72
+#: apps/purchasing/services/orders.py:75
 #, python-format
 msgid "Line %(line)s allocates more than it orders."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:88
+#: apps/purchasing/services/orders.py:91
 #, python-format
 msgid ""
 "%(request)s line %(line)s would be committed %(committed)s of %(approved)s."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:122
+#: apps/purchasing/services/orders.py:125
 msgid "Add at least one line before issuing."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:245
+#: apps/purchasing/services/orders.py:249
 #, python-format
 msgid "Line %(line)s has goods received: its price no longer changes."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:318
+#: apps/purchasing/services/orders.py:327
 msgid "A line or allocation is not on this order."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:385
+#: apps/purchasing/services/orders.py:395
 msgid "Goods have been received on this order; it can no longer be cancelled."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:424
+#: apps/purchasing/services/orders.py:435
 msgid "This order line is already closed short."
 msgstr ""
 
-#: apps/purchasing/services/orders.py:426
+#: apps/purchasing/services/orders.py:437
 msgid "This order line has been received in full."
 msgstr ""
 
@@ -2924,6 +3004,7 @@ msgid "Back to the order"
 msgstr ""
 
 #: apps/purchasing/templates/purchasing/detail.html:16
+#: apps/purchasing/templates/purchasing/dispatches.html:31
 #: apps/purchasing/templates/purchasing/print.html:20
 msgid "Revision"
 msgstr ""
@@ -2944,10 +3025,17 @@ msgid "Order details"
 msgstr ""
 
 #: apps/purchasing/templates/purchasing/detail.html:39
+#: apps/purchasing/templates/purchasing/email/cancellation.html:14
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:5
+#: apps/purchasing/templates/purchasing/email/order.html:14
+#: apps/purchasing/templates/purchasing/email/order.txt:4
 msgid "Buyer"
 msgstr ""
 
 #: apps/purchasing/templates/purchasing/detail.html:88
+#: apps/purchasing/templates/purchasing/email/order.html:43
+#: apps/purchasing/templates/purchasing/email/order.html:68
+#: apps/purchasing/templates/purchasing/email/order.txt:16
 #: apps/purchasing/templates/purchasing/line.html:73
 #: apps/purchasing/templates/purchasing/print.html:65
 #: apps/purchasing/templates/purchasing/print.html:90
@@ -3002,6 +3090,84 @@ msgstr ""
 msgid ""
 "Only possible while no goods have been received. Every allocation is "
 "released."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:13
+msgid ""
+"The delivery of an email to the supplier is uncertain. It is never sent "
+"again automatically: check with the supplier, then confirm it or send it "
+"again."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:18
+msgid ""
+"The supplier may have this order: a cancellation notice is sent to them."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:29
+msgid "Cancellation notice"
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:37
+#, python-format
+msgid "%(attempts)s attempt"
+msgid_plural "%(attempts)s attempts"
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:43
+msgid "Decide"
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:52
+msgid "Send again"
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:59
+msgid "The supplier has it"
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html:70
+msgid ""
+"Not sent by email (the supplier had no email address when the order was "
+"issued). Print the order and send it."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/email/cancellation.html:9
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:1
+#, python-format
+msgid "Purchase order %(number)s is cancelled."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/email/cancellation.html:11
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:3
+msgid ""
+"Please do not deliver or invoice it. If goods are already on their way, "
+"contact us before delivering them."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/email/cancellation.html:14
+#: apps/purchasing/templates/purchasing/email/cancellation.txt:5
+#: apps/purchasing/templates/purchasing/email/order.html:14
+#: apps/purchasing/templates/purchasing/email/order.html:20
+#: apps/purchasing/templates/purchasing/email/order.txt:4
+#: apps/purchasing/templates/purchasing/email/order.txt:7
+#: apps/purchasing/templates/purchasing/print.html:27
+#: apps/purchasing/templates/purchasing/print.html:36
+#: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
+#: apps/suppliers/templates/suppliers/list.html:23
+#: apps/suppliers/templates/suppliers/list.html:35
+msgid "Tax id"
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/email/order.html:11
+#: apps/purchasing/templates/purchasing/email/order.txt:2
+msgid "This revision replaces the previous ones."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/email/order.html:81
+#: apps/purchasing/templates/purchasing/email/order.txt:21
+msgid "Please quote the order number on the delivery note and the invoice."
 msgstr ""
 
 #: apps/purchasing/templates/purchasing/line.html:20
@@ -3113,14 +3279,6 @@ msgstr ""
 msgid "Print"
 msgstr ""
 
-#: apps/purchasing/templates/purchasing/print.html:27
-#: apps/purchasing/templates/purchasing/print.html:36
-#: apps/suppliers/forms.py:28 apps/suppliers/templates/suppliers/detail.html:35
-#: apps/suppliers/templates/suppliers/list.html:23
-#: apps/suppliers/templates/suppliers/list.html:35
-msgid "Tax id"
-msgstr ""
-
 #: apps/purchasing/templates/purchasing/worklist.html:11
 msgid "New empty order"
 msgstr ""
@@ -3175,7 +3333,7 @@ msgid ""
 "supplier, or keep the goods as stock."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:78
+#: apps/purchasing/views/actions.py:80
 #, python-format
 msgid "%(count)s ticked line had nothing left to purchase and was left out."
 msgid_plural ""
@@ -3183,78 +3341,86 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: apps/purchasing/views/actions.py:86
+#: apps/purchasing/views/actions.py:88
 msgid "Draft order created."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:96
+#: apps/purchasing/views/actions.py:98
 #, python-format
 msgid "Draft order created with %(count)s request lines."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:115
+#: apps/purchasing/views/actions.py:117
 msgid "Draft saved."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:137
+#: apps/purchasing/views/actions.py:139
 msgid "Request lines added."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:153
+#: apps/purchasing/views/actions.py:155
 #, python-format
 msgid "Line %(line)s saved."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:165
+#: apps/purchasing/views/actions.py:167
 #, python-format
 msgid "Line %(line)s removed."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:184
+#: apps/purchasing/views/actions.py:186
 msgid "Allocation raised."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:190
+#: apps/purchasing/views/actions.py:192
 msgid "Allocation lowered."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:225
+#: apps/purchasing/views/actions.py:227
 #, python-format
 msgid "Order %(number)s issued."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:240
+#: apps/purchasing/views/actions.py:242
 msgid "Order cancelled."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:240
+#: apps/purchasing/views/actions.py:242
 msgid "Draft discarded."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:261
+#: apps/purchasing/views/actions.py:263
 #, python-format
 msgid "Line %(line)s closed short."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:295
+#: apps/purchasing/views/actions.py:297
 #, python-format
 msgid "Nothing changed: the order stays at revision %(n)s."
 msgstr ""
 
-#: apps/purchasing/views/actions.py:298
+#: apps/purchasing/views/actions.py:300
 #, python-format
 msgid "Order amended: revision %(n)s."
 msgstr ""
 
-#: apps/purchasing/views/pages.py:108
+#: apps/purchasing/views/actions.py:317
+msgid "Delivery to the supplier confirmed."
+msgstr ""
+
+#: apps/purchasing/views/actions.py:332
+msgid "The dispatch is queued to be sent again."
+msgstr ""
+
+#: apps/purchasing/views/pages.py:110
 msgid "Those lines have nothing left to purchase."
 msgstr ""
 
-#: apps/purchasing/views/pages.py:325
+#: apps/purchasing/views/pages.py:336
 msgid "Only an issued order is amended."
 msgstr ""
 
-#: apps/purchasing/views/pages.py:340
+#: apps/purchasing/views/pages.py:351
 msgid "Issue the order to print it."
 msgstr ""
 

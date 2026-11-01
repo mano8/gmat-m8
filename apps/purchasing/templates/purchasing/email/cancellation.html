@@ -1,0 +1,22 @@
+{% load i18n %}
+{% get_current_language as language %}<!DOCTYPE html>
+<html lang="{{ language }}">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ order.number }}</title>
+  </head>
+  <body>
+    <h1>{% blocktranslate with number=order.number %}Purchase order {{ number }} is cancelled.{% endblocktranslate %}</h1>
+    <p>
+      {% blocktranslate %}Please do not deliver or invoice it. If goods are already on their way, contact us before delivering them.{% endblocktranslate %}
+    </p>
+    <p>
+      <strong>{% translate "Buyer" %}</strong>: {{ order.buyer_snapshot.company.legal_name }} ({% translate "Tax id" %} {{ order.buyer_snapshot.company.tax_id }})
+      <br>
+      {{ order.buyer_snapshot.branch.name }}, {{ order.buyer_snapshot.branch.address }} {{ order.buyer_snapshot.branch.city }}
+    </p>
+    {% if order.supplier_ref %}
+      <p>{% translate "Supplier reference" %}: {{ order.supplier_ref }}</p>
+    {% endif %}
+  </body>
+</html>

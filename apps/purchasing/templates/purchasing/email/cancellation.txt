@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate with number=order.number %}Purchase order {{ number }} is cancelled.{% endblocktranslate %}
+
+{% blocktranslate %}Please do not deliver or invoice it. If goods are already on their way, contact us before delivering them.{% endblocktranslate %}
+
+{% translate "Buyer" %}: {{ order.buyer_snapshot.company.legal_name }} ({% translate "Tax id" %} {{ order.buyer_snapshot.company.tax_id }})
+{{ order.buyer_snapshot.branch.name }}, {{ order.buyer_snapshot.branch.address }} {{ order.buyer_snapshot.branch.city }}
+{% if order.supplier_ref %}{% translate "Supplier reference" %}: {{ order.supplier_ref }}
+{% endif %}{% endautoescape %}

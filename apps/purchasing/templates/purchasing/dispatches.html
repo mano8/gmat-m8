@@ -1,0 +1,73 @@
+{% load i18n %}
+{% comment %}
+  The order's supplier dispatches (M5.3): status, attempts and, for po.manage, the decision
+  on a dispatch the worker left uncertain or failed. Parameters: order, dispatches (rows with
+  their note form), managing, dispatch_on, awaiting_decision.
+{% endcomment %}
+<section class="mb-4"
+         aria-label="{% translate 'Sent to the supplier' %}"
+         data-testid="order-dispatches">
+  <h2 class="mb-2">{% translate "Sent to the supplier" %}</h2>
+  {% if awaiting_decision %}
+    <p class="card mb-2" data-testid="dispatch-decision">
+      {% translate "The delivery of an email to the supplier is uncertain. It is never sent again automatically: check with the supplier, then confirm it or send it again." %}
+    </p>
+  {% endif %}
+  {% if order.cancellation_notice_required %}
+    <p class="card mb-2" data-testid="dispatch-cancellation">
+      {% translate "The supplier may have this order: a cancellation notice is sent to them." %}
+    </p>
+  {% endif %}
+  {% if dispatches %}
+    <ol class="card">
+      {% for row, form in dispatches %}
+        <li class="border-b border-line py-2 last:border-b-0"
+            data-testid="dispatch">
+          <p class="flex flex-wrap items-center gap-2">
+            <span class="font-medium">
+              {% if row.notice %}
+                {% translate "Cancellation notice" %}
+              {% else %}
+                {% translate "Revision" %} {{ row.revision }}
+              {% endif %}
+            </span>
+            <span class="chip" data-testid="dispatch-status">{{ row.dispatch.get_status_display }}</span>
+          </p>
+          <p class="text-sm text-soft">
+            {{ row.dispatch.recipient_address }} · {% blocktranslate count attempts=row.dispatch.attempts %}{{ attempts }} attempt{% plural %}{{ attempts }} attempts{% endblocktranslate %}
+            {% if row.dispatch.sent_at %}· {{ row.dispatch.sent_at|date:"SHORT_DATETIME_FORMAT" }}{% endif %}
+          </p>
+          {% if row.dispatch.last_error %}<p class="text-sm text-soft">{{ row.dispatch.last_error }}</p>{% endif %}
+          {% if managing and row.actionable %}
+            <details class="mt-2">
+              <summary class="min-h-11 cursor-pointer py-2 font-medium">{% translate "Decide" %}</summary>
+              <form method="post"
+                    class="mb-2"
+                    action="{% url 'purchasing:resend_dispatch' dispatch_id=row.dispatch.pk %}"
+                    data-testid="dispatch-resend-form">
+                {% csrf_token %}
+                {{ form.note.as_field_group }}
+                <div class="flex flex-wrap gap-3">
+                  {% if row.resendable %}
+                    {% include "components/button.html" with type="submit" label=_("Send again") %}
+                  {% endif %}
+                  {% if row.confirmable %}
+                    {% url 'purchasing:confirm_dispatch' dispatch_id=row.dispatch.pk as confirm_url %}
+                    <button type="submit"
+                            class="btn btn-primary"
+                            formaction="{{ confirm_url }}"
+                            data-testid="dispatch-confirm">{% translate "The supplier has it" %}</button>
+                  {% endif %}
+                </div>
+              </form>
+            </details>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  {% elif dispatch_on %}
+    <p class="card text-sm text-soft">
+      {% translate "Not sent by email (the supplier had no email address when the order was issued). Print the order and send it." %}
+    </p>
+  {% endif %}
+</section>

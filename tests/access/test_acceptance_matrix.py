@@ -15,8 +15,8 @@ object position (``Route.position``).
 The account pages (allauth), the admin (purchase orders included, M5.1), the health checks,
 the token pages (invitations, email changes), the screens of M2.6 (projects, people,
 invitations), the master-data screens of M3 (catalog, suppliers), the request screens of M4
-and the purchasing screens of M5.2 have rows; later business screens add theirs with the
-steps that build them. The price is allowed only to its ``price.view`` holders
+and the purchasing screens of M5.2 and M5.3 have rows; later business screens add theirs
+with the steps that build them. The price is allowed only to its ``price.view`` holders
 (``Route.allowed_for``), so a warehouse operator reading an order is checked priceless.
 """
 
@@ -988,6 +988,26 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         Route(
             order_action(),
             path=purchase_url("purchasing:unallocate", "draftallocation"),
+        ),
+    ),
+    # M5.3: the issued order's dispatch, left AMBIGUOUS by the worker.
+    "purchasing:confirm_dispatch": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:confirm_dispatch", "dispatch"),
+            note="the first allowed actor confirms it; the others are refused",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, PO_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("purchasing:confirm_dispatch"),
+        ),
+    ),
+    "purchasing:resend_dispatch": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:resend_dispatch", "dispatch"),
+            note="queued again, or refused once confirmed",
         ),
     ),
     # Group administrators only (org.manage); the target is the A-MAD technician.

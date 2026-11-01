@@ -1,0 +1,83 @@
+{% load i18n ui_tags %}
+{% get_current_language as language %}<!DOCTYPE html>
+<html lang="{{ language }}">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ order.number }}</title>
+  </head>
+  <body>
+    <h1>{% blocktranslate with number=order.number revision=order.revision %}Purchase order {{ number }}, revision {{ revision }}{% endblocktranslate %}</h1>
+    {% if order.revision %}
+      <p>{% translate "This revision replaces the previous ones." %}</p>
+    {% endif %}
+    <p>
+      <strong>{% translate "Buyer" %}</strong>: {{ order.buyer_snapshot.company.legal_name }} ({% translate "Tax id" %} {{ order.buyer_snapshot.company.tax_id }})
+      <br>
+      {{ order.buyer_snapshot.branch.name }}, {{ order.buyer_snapshot.branch.address }} {{ order.buyer_snapshot.branch.city }}
+    </p>
+    <p>
+      <strong>{% translate "Supplier" %}</strong>: {{ order.supplier_snapshot.name }}
+      {% if order.supplier_snapshot.tax_id %}({% translate "Tax id" %} {{ order.supplier_snapshot.tax_id }}){% endif %}
+    </p>
+    <p>
+      <strong>{% translate "Ship to" %}</strong>: {{ order.ship_to_snapshot.name }}
+      {% if order.ship_to_snapshot.project %}· {{ order.ship_to_snapshot.project.code }} {{ order.ship_to_snapshot.project.name }}{% endif %}
+      <br>
+      {{ order.ship_to_snapshot.address }}
+    </p>
+    {% if order.expected_date %}
+      <p>{% translate "Expected date" %}: {{ order.expected_date|date:"SHORT_DATE_FORMAT" }}</p>
+    {% endif %}
+    {% if order.supplier_ref %}
+      <p>{% translate "Supplier reference" %}: {{ order.supplier_ref }}</p>
+    {% endif %}
+    <table cellpadding="4" border="1">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">{% translate "Reference" %}</th>
+          <th scope="col">{% translate "Material" %}</th>
+          <th scope="col">{% translate "Quantity" %}</th>
+          {% if prices %}
+            <th scope="col">{% translate "Unit price" %}</th>
+            <th scope="col">{% translate "Total" %}</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in lines %}
+          <tr>
+            <td>{{ row.line.line_no }}</td>
+            <td>{{ row.reference }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.line.ordered_qty|quantity }} {{ row.line.unit.code }}</td>
+            {% if prices %}
+              <td>
+                {% if row.line.unit_price is not None %}
+                  {{ row.line.unit_price }}{% if row.line.discount_pct %} (−{{ row.line.discount_pct }} %){% endif %}
+                {% endif %}
+              </td>
+              <td>{{ row.total|default_if_none:"" }}</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+      {% if prices and order_total is not None %}
+        <tfoot>
+          <tr>
+            <th scope="row" colspan="5">{% translate "Total" %}</th>
+            <td>{{ order_total }} {{ order.currency }}</td>
+          </tr>
+        </tfoot>
+      {% endif %}
+    </table>
+    {% if order.notes %}
+      <p>
+        <strong>{% translate "Notes" %}</strong>:
+        <br>
+        {{ order.notes|linebreaksbr }}
+      </p>
+    {% endif %}
+    <p>{% translate "Please quote the order number on the delivery note and the invoice." %}</p>
+  </body>
+</html>

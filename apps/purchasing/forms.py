@@ -355,6 +355,12 @@ class RequiredReasonForm(forms.Form):
     )
 
 
+class DispatchNoteForm(forms.Form):
+    """Confirming or resending a supplier dispatch: what the supplier said, for the audit."""
+
+    note = forms.CharField(label=_("Note"), required=False, max_length=500)
+
+
 # --- the amendment of an issued order -----------------------------------------------------------
 
 

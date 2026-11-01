@@ -11,7 +11,9 @@ the order model, so it registers a ``DispatchSource`` (M5.3) that:
   revision is current). A ``PO_CANCELLATION`` is refused only if its order is not cancelled;
 - ``after_outcome``: runs in the outcome transaction once a dispatch ends ``SENT`` or
   ``AMBIGUOUS``; for a ``PO_ORDER`` of an order cancelled meanwhile it queues the order's
-  ``PO_CANCELLATION`` notice (the cancellation obligation, F53).
+  ``PO_CANCELLATION`` notice (the cancellation obligation, F53);
+- ``record_attempt``: audits an attempt when it starts (in the claim transaction) and when
+  it ends (with its outcome, abandoned or late ones included), under the same locks.
 
 Until a source is registered, dispatch rows are never claimed.
 """
@@ -20,8 +22,9 @@ from collections.abc import Callable
 from typing import Protocol
 from uuid import UUID
 
+from apps.access.principals import SystemPrincipal
 from apps.core.locking import LockOrder
-from apps.notifications.models import EmailOutbox, Status
+from apps.notifications.models import EmailAttempt, EmailOutbox, Status
 
 
 class DispatchSource(Protocol):
@@ -31,15 +34,24 @@ class DispatchSource(Protocol):
 
     def after_outcome(self, message: EmailOutbox, locks: LockOrder) -> None: ...
 
+    def record_attempt(
+        self, principal: SystemPrincipal, message: EmailOutbox, attempt: EmailAttempt
+    ) -> None: ...
+
 
 _source: list[DispatchSource] = []
 
 
 def register_dispatch_source(source: DispatchSource) -> Callable[[], None]:
-    """Install the purchasing app's source; return a function that removes it again."""
-    if _source:
+    """Install the purchasing app's source; return a function that removes it again.
+
+    Registering the same source again is harmless (``AppConfig.ready`` runs again when the
+    installed apps are overridden); a second, different source is refused.
+    """
+    if _source and _source[0] is not source:
         raise ValueError("A dispatch source is already registered")
-    _source.append(source)
+    if not _source:
+        _source.append(source)
 
     def unregister() -> None:
         if source in _source:
