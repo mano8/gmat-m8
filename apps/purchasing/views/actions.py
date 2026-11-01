@@ -88,7 +88,7 @@ def order_create(request: HttpRequest) -> HttpResponse:
     """Start the draft, then put the lines ticked on it (one idempotency key for each)."""
     ctx = access_for(request)
     posted = [key.removeprefix("pick_") for key in request.POST if key.startswith("pick_")]
-    rows = selectors.to_purchase(ctx, line_ids=_uuids(posted)) if posted else []
+    rows = selectors.buyable(ctx, _uuids(posted)) if posted else []
     form = NewOrderForm(request.POST, ctx=ctx, rows=rows)
     if not form.is_valid():
         return new_order_page(request, form)

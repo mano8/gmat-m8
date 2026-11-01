@@ -21,6 +21,7 @@ from apps.core.models import IdempotencyRecord
 from apps.notifications import housekeeping, services
 from apps.notifications.dispatch import dispatch_source, register_dispatch_source
 from apps.notifications.models import EmailAttempt, EmailOutbox, Outcome, Status
+from apps.notifications.outbox import sender_domain
 from apps.notifications.services import (
     Claim,
     Settled,
@@ -66,8 +67,8 @@ class TestPolicy:
         assert services.abandon_after().total_seconds() + 0.5 + 2 < 120
 
     def test_message_id_domain(self) -> None:
-        assert services._domain("gmat-m8 <no-reply@app.example.org>") == "app.example.org"
-        assert services._domain("no-address") is None
+        assert sender_domain("gmat-m8 <no-reply@app.example.org>") == "app.example.org"
+        assert sender_domain("no-address") is None
 
 
 class TestAuthorization:

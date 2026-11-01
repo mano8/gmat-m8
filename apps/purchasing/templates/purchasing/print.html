@@ -72,7 +72,12 @@
             <td class="py-2 pr-2">{{ row.line.line_no }}</td>
             <td class="py-2 pr-2">{{ row.reference }}</td>
             <td class="py-2 pr-2">{{ row.name }}</td>
-            <td class="py-2 pr-2 text-right">{{ row.line.ordered_qty|quantity }} {{ row.line.unit.code }}</td>
+            <td class="py-2 pr-2 text-right">
+              {{ row.final_qty|quantity }} {{ row.line.unit.code }}
+              {% if row.line.closed_short_at %}
+                <span class="block text-xs" data-testid="print-closed-short">{% translate "Closed short" %}</span>
+              {% endif %}
+            </td>
             {% if prices %}
               <td class="py-2 pr-2 text-right">
                 {% if row.unit_price is not None %}

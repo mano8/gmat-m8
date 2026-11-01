@@ -18,6 +18,7 @@ authorize nothing themselves: the service that calls them has already run
 from collections import defaultdict
 from collections.abc import Iterable
 from datetime import timedelta
+from email.utils import parseaddr
 from uuid import UUID
 
 from django.conf import settings
@@ -43,6 +44,12 @@ def _require_transaction(using: str) -> None:
 
 def _from(from_email: str | None) -> str:
     return from_email or settings.DEFAULT_FROM_EMAIL
+
+
+def sender_domain(from_email: str) -> str | None:
+    """The domain of a sender address (for ``Message-ID`` headers); ``None`` without one."""
+    _, at, domain = parseaddr(from_email)[1].rpartition("@")
+    return domain if at and domain else None
 
 
 def queue_notification(

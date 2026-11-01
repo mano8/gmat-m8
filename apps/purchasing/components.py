@@ -291,10 +291,13 @@ class Component:
         to: Decimal,
         reason: TrimReason,
         cause: str,
+        *,
+        attributed: Decimal | None = None,
     ) -> Trim | None:
         """Lower one allocation to ``to``, never below what is attributed; audited.
 
-        ``allocation`` is the row as read under the component's locks.
+        ``allocation`` is the row as read under the component's locks; ``attributed`` is
+        what is attributed to it, when the caller already read it under those locks.
         """
         if allocation.request_line_id not in self.nodes.request_line_ids or (
             allocation.po_line_id not in self.order_line_ids
@@ -303,7 +306,8 @@ class Component:
         before = allocation.qty
         if to >= before:
             return None
-        attributed = receipts.attributed([allocation.pk])[allocation.pk]
+        if attributed is None:
+            attributed = receipts.attributed([allocation.pk])[allocation.pk]
         if to < attributed:
             raise ValidationError(
                 {
@@ -338,7 +342,14 @@ class Component:
         listed = list(wanted.order_by("pk"))
         attributed = receipts.attributed([allocation.pk for allocation in listed])
         trims = [
-            self.trim(principal, allocation, attributed[allocation.pk], reason, cause)
+            self.trim(
+                principal,
+                allocation,
+                attributed[allocation.pk],
+                reason,
+                cause,
+                attributed=attributed[allocation.pk],
+            )
             for allocation in listed
         ]
         return [trim for trim in trims if trim is not None]

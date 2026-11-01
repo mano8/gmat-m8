@@ -424,6 +424,30 @@ class TestUpdateAndRemoveLine:
 
 
 class TestIssue:
+    def test_a_material_deactivated_while_a_draft_is_refused(
+        self, mm: SessionPrincipal, buy: Buy, make_line: MakeLine, cable: Material
+    ) -> None:
+        draft = buy((make_line("10"), "10"), issue=False)
+        Material.objects.filter(pk=cable.pk).update(is_active=False)
+        assert codes(services.issue, mm, draft.pk) == {"inactive_material"}
+        assert reload(draft).status == Status.DRAFT
+
+    def test_a_project_put_on_hold_while_a_draft_is_refused(
+        self, mm: SessionPrincipal, buy: Buy, make_line: MakeLine, org: Org
+    ) -> None:
+        draft = buy((make_line("10"), "10"), issue=False)
+        Project.objects.filter(pk=org.hospital.pk).update(status=Project.Status.ON_HOLD)
+        assert codes(services.issue, mm, draft.pk) == {"project_not_active"}
+
+    def test_a_line_unallocated_to_zero_is_not_rechecked(
+        self, mm: SessionPrincipal, buy: Buy, make_line: MakeLine, org: Org
+    ) -> None:
+        line = make_line("10")
+        draft = buy((line, "10"), issue=False)
+        services.unallocate(mm, allocation(draft, line).pk)
+        Project.objects.filter(pk=org.hospital.pk).update(status=Project.Status.ON_HOLD)
+        assert services.issue(mm, draft.pk).status == Status.ISSUED
+
     def test_number_snapshots_and_audit(
         self, org: Org, people: People, mm: SessionPrincipal, buy: Buy, make_line: MakeLine
     ) -> None:

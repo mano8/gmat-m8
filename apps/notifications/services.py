@@ -29,7 +29,7 @@ import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from email.utils import make_msgid, parseaddr
+from email.utils import make_msgid
 from types import MappingProxyType
 from typing import Any, cast
 from uuid import UUID
@@ -55,6 +55,7 @@ from apps.notifications.models import (
     Outcome,
     Status,
 )
+from apps.notifications.outbox import sender_domain
 
 logger = logging.getLogger(__name__)
 
@@ -153,11 +154,6 @@ def _settle(message: EmailOutbox, status: Status, error: str = "") -> Settled:
     return Settled(message.pk, status)
 
 
-def _domain(from_email: str) -> str | None:
-    _, at, domain = parseaddr(from_email)[1].rpartition("@")
-    return domain if at and domain else None
-
-
 @dataclass(frozen=True)
 class _Recipients:
     """Who a claimed message goes to: notification recipients by id, and the addresses."""
@@ -209,7 +205,7 @@ def _start_attempt(
     message.current_attempt = attempt
     message.attempts = attempt.number
     if not message.message_id:
-        message.message_id = make_msgid(domain=_domain(message.from_email))
+        message.message_id = make_msgid(domain=sender_domain(message.from_email))
     message.save(update_fields=["status", "current_attempt", "attempts", "message_id"])
     if message.is_dispatch:
         cast(DispatchSource, source).record_attempt(principal, message, attempt)

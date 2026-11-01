@@ -43,6 +43,7 @@ from apps.purchasing.services.common import (
     _assign_number,
     _authorize,
     _check_prices,
+    _check_purchasable,
     _check_ship_to,
     _check_worksite_projects,
     _increase_allocation,
@@ -62,14 +63,35 @@ from apps.purchasing.services.common import (
     _status_error,
 )
 from apps.purchasing.transitions import transition
-from apps.purchasing.waterfall import ISSUED
+from apps.purchasing.waterfall import ISSUED, Book
 
 # --- issue ----------------------------------------------------------------------------
 
 
+def _recheck_sources(order: PurchaseOrder, book: Book, lines: list[PurchaseOrderLine]) -> None:
+    """What may change while an order is a draft: its materials stay active, and every live
+    allocation still meets C5 (request side), C6 and S9."""
+    for line in lines:
+        if not line.material.is_active:
+            raise ValidationError(
+                _("Line %(line)s: its material is inactive."),
+                code="inactive_material",
+                params={"line": line.line_no},
+            )
+    allocated = PurchaseAllocation.objects.filter(po_line__in=lines, qty__gt=0).select_related(
+        "request_line__request",
+        "request_line__project__branch__company",
+        "request_line__project__procurement_branch__company",
+    )
+    for allocation in allocated:
+        _check_purchasable(order, allocation.request_line, book)
+
+
 def _revalidate(component: Component, order: PurchaseOrder, lines: list[PurchaseOrderLine]) -> None:
-    """I3 and C6 on every line, and I2 on the component as if the order were issued."""
+    """I3 and C6 on every line, C5/S9 again, and I2 on the component as if the order were
+    issued."""
     book = component.book()
+    _recheck_sources(order, book, lines)
     for line in lines:
         if book.order_line_totals(line.pk).allocated > line.ordered_qty:
             raise ValidationError(
