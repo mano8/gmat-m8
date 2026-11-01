@@ -122,6 +122,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - the amendment form of an issued order (reason, expected date, reference, notes, line quantities and prices, allocation ceilings, request lines to add; only what changed is sent) and the printable purchase-order page from the snapshots (print CSS, a `data-print` button);
   - warehouse operators read orders and the printable page without prices; the acceptance matrix has the 17 URLs and now allows the price sentinel per actor (`Route.allowed_for`);
   - "To purchase" and "Orders" navigation entries, a cart icon, selectors `by_material`, `drafts`, `ship_to_choices`, `candidates`, `progress`, `history`, es/fr strings.
+- Supplier dispatch of purchase orders (M5.3, Q7), off unless `PO_DISPATCH=on` (ADR-0010 keeps the MVP on the printable page):
+  - issuing and each amendment queue the order to the supplier's address as issued (`PO_ORDER`, `source_ref = PO:{id}:rev{n}`, a `Message-ID` stable per revision), its text and HTML frozen from the snapshots in the installation's language, no PDF; a newer revision supersedes still-queued older ones, never one that is sending, sent or ambiguous;
+  - cancelling an order cancels its queued dispatches and queues the `PO_CANCELLATION` notice at once if one was sent or ambiguous, or once the one being sent ends so (whatever the switch says; one per order);
+  - the purchasing app registers the worker's `DispatchSource`: the order locked `FOR SHARE` before the row (L4 → L4b), eligibility at the claim (the current revision of an issued order; a notice only for a cancelled order), and every attempt audited on the order (started, sent, failed, ambiguous, abandoned);
+  - an ambiguous dispatch is never resent automatically: on the order page a material manager confirms it (`confirm_dispatch`) or sends it again, a new audited attempt (`resend_dispatch`, also for a failed one); warehouse operators see the dispatches without the decision; two POST-only URLs under `/purchasing/dispatches/` in the acceptance matrix; es/fr strings.
 
 ### Changed
 
@@ -131,6 +136,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - `django.contrib.postgres` is installed (array fields of the outbox).
 - The admin admits active superusers and group administrators (was: staff accounts); a staff account without superuser status no longer reaches it.
 - The outbox's `source_po` is a foreign key to the purchase order (same column; M5.1).
+- `amend` locks the order's dispatch rows after the order (L4 → L4b), like `cancel`; the worker's `DispatchSource` gains `record_attempt`, and `queue_dispatch` takes the message's `Message-ID` (M5.3).
 - The quantity rule of request and order lines (at most the unit's decimals) is shared in `apps.catalog.quantities`.
 - Holders of a privileged role (`GROUP_ADMIN`, `MATERIAL_MANAGER`) now have 12-hour sessions, keep a second factor and need session MFA on every page, like platform operators. Granting a privileged role elevates at the grant time, including for a membership that starts later (was: at its start, which locked out an already privileged user until then).
 - Material managers hold `project.manage` within their branches; the project services check each project and branch. The password reset runs as a `TokenPrincipal`, and `OperatorCommand` commands as an `OperatorPrincipal` checked by the access engine.

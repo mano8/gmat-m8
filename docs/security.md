@@ -183,6 +183,17 @@ Code in `apps/purchasing/views/`, `forms.py`, `selectors.py` and `templates/purc
 - **Print.** The printable page renders the issued snapshots (buyer, supplier, destination, material), never the live master data; print CSS hides the navigation, and the print button is a `data-print` hook in `app.js` (no inline handler).
 - **Errors.** Service validation errors are flashed or shown on the form, a busy database answers 409, and nothing is written by a GET. Same browser rules as before: no inline script or style, CSRF in each form, `no-store, private`; the pages work without JavaScript.
 
+## Purchasing: supplier dispatch (step M5.3)
+
+Code in `apps/purchasing/dispatch.py`, `services/dispatches.py` and `templates/purchasing/email/`; plan §4.7 (L4b), §5, Q7.
+
+- **Off by default.** Nothing is sent to a supplier unless `PO_DISPATCH=on` (ADR-0010: the MVP prints the order). The switch gates new `PO_ORDER` dispatches only: the cancellation notice of an order the supplier may already have is always owed.
+- **Frozen content.** Recipients and content come from the order's snapshots at issue or amendment (the address the order was issued to, never the live supplier record) and are frozen by the outbox trigger, `Message-ID` included. The text body is plain text; the HTML body is autoescaped. Prices go to the supplier as recorded on its own order.
+- **Locks and races.** Every path locks the order before its dispatch rows (L4 → L4b): the worker's claim and outcome `FOR SHARE`, cancel, amend and the human decisions `FOR UPDATE`. Threaded tests show that two workers send one dispatch once and that claim and cancel wait for each other in either order without a deadlock.
+- **Eligibility at the claim.** A `PO_ORDER` goes only while its order is issued at that revision (else `CANCELLED` or `SUPERSEDED`); a `PO_CANCELLATION` only for a cancelled order; one notice per order (unique index).
+- **Ambiguity.** A dispatch that timed out or was cut after DATA, or whose worker died mid-send, ends `AMBIGUOUS` and is never resent automatically. A `po.manage` holder confirms it or sends it again (a new attempt), both audited with a note; nothing else changes a dispatch's status by hand.
+- **Audit.** Every attempt (start and outcome, abandoned and late ones) is an audit event on the order by `system:worker`, with the revision, attempt number and error stage, never the address or the content. Warehouse operators (`po.view`, who hold `supplier.view`) see the dispatches' status and address without the decision.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

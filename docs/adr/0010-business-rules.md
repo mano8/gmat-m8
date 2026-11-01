@@ -25,7 +25,7 @@ The plan lists open business questions (Q1-Q29). The maintainer answered the blo
 | # | Question | Assumption |
 | --- | --- | --- |
 | Q3 | Warehouses per branch | 0..n `WAREHOUSE` locations per branch, one default |
-| Q7 | Send purchase orders from the app | No in the MVP: a printable purchase-order page |
+| Q7 | Send purchase orders from the app | No in the MVP: a printable purchase-order page. The email dispatch of step M5.3 exists behind `PO_DISPATCH` (off by default; maintainer's choice, 2026-11-01) and sends no PDF; switching it on is the decision this row still awaits |
 | Q8 | Photos and attachments | Recommended; optional step M6.4 |
 | Q9 | Who confirms a direct-to-site receipt | Material manager or warehouse operator, or the project's site manager through the expected-deliveries view |
 | Q10 | Prices and discounts | Optional unit price and discount, visible only with `price.view` |
