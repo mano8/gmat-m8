@@ -11,9 +11,18 @@ A useful report says:
 
 - what is affected (URL, view, service, command, image or compose service) and the commit or image digest you tested;
 - how to reproduce it, with the role of the account used (technician, material manager, group administrator, partner, site manager, …);
-- the impact: which access control or secret the attack defeats. Typical cases are reading data of another company, branch or project; seeing prices or suppliers the role should not see; writing without the required capability; bypassing the session or multi-factor authentication (MFA) checks; leaking a token.
+- the impact: which access control or secret the attack defeats. Typical cases:
+  - reading data of another company, branch or project;
+  - seeing prices or suppliers the role should not see;
+  - writing without the required capability;
+  - bypassing the session or multi-factor authentication (MFA) checks;
+  - leaking a token.
 
-Test only on a local stack or a deployment you operate. If you found the problem on someone else's deployment, stop there and report what you observed. Leave real personal data and production data out of the report; describe them instead (for example "the email address of another branch's user").
+Test only on a local stack or on a deployment you operate.
+
+Found the problem on someone else's deployment? Stop there and report what you observed.
+
+Leave real personal data and production data out of the report. Describe them instead, for example "the email address of another branch's user".
 
 ## What happens next
 
