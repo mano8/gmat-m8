@@ -1,0 +1,87 @@
+name: Bug report
+description: Something does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **A security problem does not belong here**: follow [SECURITY.md](https://github.com/mano8/gmat-m8/blob/main/SECURITY.md) instead.
+        Do not paste real personal data, passwords, tokens, invitation or reset links, or `.env` contents.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Material requests (drafting, submitting, status)
+        - Review and approval
+        - Purchasing and supplier orders
+        - Catalog and units
+        - Suppliers
+        - Projects
+        - Organization, people and invitations
+        - Sign-in, MFA and accounts
+        - Email and notifications
+        - Imports and management commands
+        - Deployment (compose stack, images, backups)
+        - CI and tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including the error page or message.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Start from a known state, e.g. the `seed_demo` data.
+      placeholder: |
+        1. Sign in as a technician of branch A1
+        2. Open "My requests"
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Role of the account used
+      multiple: true
+      options:
+        - Group administrator
+        - Material manager
+        - Warehouse operator
+        - Technician
+        - Site manager
+        - Partner requester
+        - Not signed in
+        - Not applicable
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Commit SHA, branch or image digest.
+      placeholder: e.g. main @ 4daa80b
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: How it runs (local runserver, dev compose, production stack) and, for UI bugs, the browser, device and screen width.
+      placeholder: e.g. dev compose, Firefox 140 on Android, 360 px
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove tokens, query strings and personal data first.
+      render: text

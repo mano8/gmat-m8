@@ -87,7 +87,11 @@ Trivy exceptions live in `.trivyignore.yaml` (empty; the entry format is documen
 
 ## Contributing
 
-Work is organised in phases: one phase, one branch, one pull request. Read [CLAUDE.md](CLAUDE.md) for the working rules and architecture invariants. The release procedure is in [docs/release.md](docs/release.md).
+Work is organised in phases: one phase, one branch, one pull request. Start with [CONTRIBUTING.md](CONTRIBUTING.md); [CLAUDE.md](CLAUDE.md) has the working rules and architecture invariants, and the release procedure is in [docs/release.md](docs/release.md).
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md): report vulnerabilities privately, never in a public issue
+- [Accessibility](ACCESSIBILITY.md): what the interface supports and how to report a barrier
 
 ## License
 

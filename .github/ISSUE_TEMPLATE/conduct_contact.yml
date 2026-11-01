@@ -1,0 +1,15 @@
+name: Conduct contact request
+description: Ask the maintainer for a private channel to report a Code of Conduct concern.
+title: "Conduct contact request"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. **Do not describe the incident or name anyone here.** The maintainer will contact you privately, using a way to reach you shown on your GitHub profile, and then close this issue. See the [Code of Conduct](https://github.com/mano8/gmat-m8/blob/main/CODE_OF_CONDUCT.md#enforcement).
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: This issue contains no details of the incident, and my GitHub profile shows a way to contact me.
+          required: true
