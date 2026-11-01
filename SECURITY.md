@@ -11,13 +11,19 @@ A useful report says:
 
 - what is affected (URL, view, service, command, image or compose service) and the commit or image digest you tested;
 - how to reproduce it, with the role of the account used (technician, material manager, group administrator, partner, site manager, …);
-- what an attacker gains: data of another company, branch or project, prices or suppliers a role should not see, a write without the capability, a session or MFA bypass, a token leak, and so on.
+- the impact: which access control or secret the attack defeats. Typical cases are reading data of another company, branch or project; seeing prices or suppliers the role should not see; writing without the required capability; bypassing the session or multi-factor authentication (MFA) checks; leaking a token.
 
-Never test against a deployment you do not operate, and do not include real personal data or production data in the report.
+Test only on a local stack or a deployment you operate. If you found the problem on someone else's deployment, stop there and report what you observed. Leave real personal data and production data out of the report; describe them instead (for example "the email address of another branch's user").
 
 ## What happens next
 
-The project has one maintainer, so handling is best effort, with no fixed response time. The maintainer acknowledges the report in the advisory, works on the fix there (a private fork if needed), and publishes the advisory when a fixed version is available. Tell us in the report if you want to be credited.
+The project has one maintainer, so handling is best effort, with no fixed response time.
+
+1. The maintainer acknowledges the report in the advisory.
+2. The fix is prepared in the advisory's private fork.
+3. The advisory is published once a fixed version is available.
+
+Say in the report whether you want to be credited.
 
 ## Supported versions
 
