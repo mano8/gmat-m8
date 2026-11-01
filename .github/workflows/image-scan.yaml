@@ -94,7 +94,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Trivy report (all severities, exceptions not applied)
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        uses: aquasecurity/trivy-action@8f28faec26515256b6d22074d1d2a8986f4cbd87 # master
         env:
           TRIVY_IGNOREFILE: ""
           TRIVY_PLATFORM: ${{ matrix.platform }}
@@ -111,7 +111,7 @@ jobs:
       - name: Trivy gate (HIGH and CRITICAL, vulnerabilities and secrets)
         id: gate
         continue-on-error: true
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        uses: aquasecurity/trivy-action@8f28faec26515256b6d22074d1d2a8986f4cbd87 # master
         env:
           TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
