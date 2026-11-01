@@ -217,6 +217,17 @@ Code in `apps/handovers/services.py` and `selectors.py`; plan §2.3 (point 3), �
 - **Receiver.** A user must be active, not offboarded and hold `project.view` on the handover's project; otherwise the handover names the person in free text. A user id that does not qualify gets the same refusal as one that does not exist.
 - **Reversal (I8, I11).** A `DIRECT_RECEIPT` handover is never voided on its own; a `FROM_WAREHOUSE` handover is voided with a reason, once, and the trigger of M6.1 keeps every other column and its lines frozen. A void reopens the requests it had closed (automatic closes only) and reconciles, so a trimmed commitment never revives.
 
+## Receiving and handover screens (step M6.3)
+
+Code in `apps/receiving/views/`, `apps/handovers/views.py` and the two `forms.py`; plan §3.4, §8.2.
+
+- **Methods and capabilities.** Every action is its own POST-only URL (`@mutating`) with its GET page elsewhere; the checks run in S7's order (capability somewhere → 403, object in scope → 404, capability on it → 403) and the services authorize again. `receipt.view` reads receipts and the expected deliveries, `receipt.post` finds the order and posts, `receipt.void` voids; `handover.view` reads (a site manager reads their project's), `handover.post` posts, `handover.void` voids a warehouse handover. Every URL and method has rows in the acceptance matrix, with a warehouse and a worksite receipt and a warehouse and a site handover as positions.
+- **Choices.** Places, order lines, allocations, open request lines, warehouses and receivers come from selectors; the forms define fields only for what the selector offered, so no other id can be named, and a posted place or source outside the choices is refused. The services validate everything again under their locks (C7, C10, I4, I5, §4.5 caps).
+- **Site managers (§3.4).** They find an order through the live allocations of the request lines they see on issued or closed orders (never a draft), receive only at their project's worksite, and see on the expected deliveries, the receipt form and their receipts the order number, the supplier's display name, the expected date, the material, the unit and what their project can take; never the order's outstanding quantity, a price, the supplier's contact details or another project's quantity (matrix rows with the sentinels, for the page, the form and the receipt).
+- **Double tap.** The forms carry a signed, actor- and operation-bound key; a second post returns the document of the first (replay), another payload under the same key is a 409, and a form that is no longer valid because the first post used the order or the project up leads to that document (`recorded_result` verifies the key and re-authorizes the read).
+- **Stock warning.** The known stock of a warehouse (I9) is a warning that comes back once and is acknowledged with a box; it never limits a handover.
+- **Browser.** No inline script or style: the only script added is the `data-once` handler in `app.js`. Responses of these screens are `no-store, private` like every authenticated page; no token travels in a URL.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |
