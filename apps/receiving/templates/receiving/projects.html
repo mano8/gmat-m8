@@ -1,0 +1,28 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Expected on site" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% translate "Expected on site" %}</h1>
+    <p class="mt-1 text-soft">{% translate "Choose a project to see what is still coming to its worksite." %}</p>
+  </div>
+  <div data-testid="expected-projects">
+    {% for project in page_obj.object_list %}
+      <article class="card mb-3" data-testid="expected-project">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="font-semibold">{{ project.code }} · {{ project.name }}</p>
+            <p class="text-sm text-soft">{{ project.branch.company.code }} · {{ project.branch.name }}</p>
+          </div>
+          {% url 'receiving:expected' project_id=project.pk as expected_url %}
+          {% include "components/button.html" with href=expected_url label=_("Expected deliveries") variant="primary" %}
+        </div>
+      </article>
+    {% empty %}
+      {% include "components/empty_state.html" with title=_("No projects") text=_("No project with a worksite is assigned to you.") %}
+    {% endfor %}
+    {% include "components/pagination.html" %}
+  </div>
+{% endblock content %}

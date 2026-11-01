@@ -30,6 +30,7 @@ from apps.core.idempotency import (
     issue_key,
     payload_hash,
     purge_expired_records,
+    recorded_result,
     verify_key,
 )
 from apps.core.models import DocumentSequence, IdempotencyRecord
@@ -296,6 +297,35 @@ class TestIdempotent:
                 execute=Command().execute,
                 replay=Command().replay,
             )
+
+
+class TestRecordedResult:
+    def test_nothing_before_the_key_is_used(self, actor: User) -> None:
+        key = issue_key(actor.pk, OPERATION)
+        assert recorded_result(key, actor_id=actor.pk, operation=OPERATION) is None
+
+    def test_what_the_key_produced(self, actor: User) -> None:
+        key = issue_key(actor.pk, OPERATION)
+        result = Command().run(actor, key)
+        assert recorded_result(key, actor_id=actor.pk, operation=OPERATION) == (
+            "core.documentsequence",
+            result.value.pk,
+        )
+
+    def test_a_record_without_a_result_yet_is_nothing(self, actor: User) -> None:
+        key = issue_key(actor.pk, OPERATION)
+        key_id = verify_key(key, actor_id=actor.pk, operation=OPERATION)
+        IdempotencyRecord.objects.create(
+            actor_id=actor.pk, key_id=key_id, operation=OPERATION, payload_hash="x"
+        )
+        assert recorded_result(key, actor_id=actor.pk, operation=OPERATION) is None
+
+    def test_the_key_is_verified_like_any_other(self, actor: User, other: User) -> None:
+        key = issue_key(actor.pk, OPERATION)
+        with pytest.raises(IdempotencyKeyInvalid):
+            recorded_result(key, actor_id=other.pk, operation=OPERATION)
+        with pytest.raises(IdempotencyKeyInvalid):
+            recorded_result("nonsense", actor_id=actor.pk, operation=OPERATION)
 
 
 class TestExecuteOnce:

@@ -1,0 +1,51 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Handovers" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Handovers" %}</h1>
+    {% if can_post %}
+      {% url 'handovers:new' as new_url %}
+      {% include "components/button.html" with href=new_url label=_("New handover") variant="primary" %}
+    {% endif %}
+  </div>
+  {% url 'handovers:list' as list_url %}
+  {% include "components/filter_form.html" with form=filters target="#handover-results" action=list_url grid="sm:grid-cols-[1fr_1fr_1fr_1fr_auto]" %}
+  {% partialdef results inline %}
+    <div id="handover-results" data-testid="handovers">
+      {% if page_obj.object_list %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Handover" %}</th>
+              <th scope="col">{% translate "Project" %}</th>
+              <th scope="col">{% translate "Kind" %}</th>
+              <th scope="col">{% translate "Received by" %}</th>
+              <th scope="col">{% translate "Date" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for handover in page_obj.object_list %}
+              <tr data-testid="handover-row">
+                <td data-label="{% translate 'Handover' %}">
+                  <a href="{% url 'handovers:detail' handover_id=handover.pk %}">{{ handover.number }}</a>
+                </td>
+                <td data-label="{% translate 'Project' %}">{{ handover.project.code }}</td>
+                <td data-label="{% translate 'Kind' %}">{{ handover.get_kind_display }}</td>
+                <td data-label="{% translate 'Received by' %}">{{ handover.received_by.full_name|default:handover.received_by.email|default:handover.received_by_name }}</td>
+                <td data-label="{% translate 'Date' %}">{{ handover.handed_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                <td data-label="{% translate 'Status' %}">{% include "handovers/status.html" with obj=handover %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No handovers") text=_("No handover matches the filters.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

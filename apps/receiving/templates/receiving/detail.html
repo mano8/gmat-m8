@@ -1,0 +1,149 @@
+{% extends "layouts/app.html" %}
+{% load i18n access ui_tags %}
+{% block head_title %}
+  {{ receipt.number }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 data-testid="receipt-number">{{ receipt.number }}</h1>
+      <p class="mt-1 flex flex-wrap gap-2">{% include "receiving/status.html" with obj=receipt %}</p>
+    </div>
+    {% can "po.view" receipt.po %}
+      {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
+      {% include "components/button.html" with href=order_url label=_("Purchase order") %}
+    {% endcan %}
+  </div>
+  <section class="card mb-4" aria-label="{% translate 'Receipt details' %}">
+    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+      <div>
+        <dt class="text-sm text-soft">{% translate "Order" %}</dt>
+        <dd data-field="order">
+          {{ receipt.po.number }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Supplier" %}</dt>
+        <dd data-field="supplier">
+          {{ receipt.po.supplier_snapshot.name }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Where" %}</dt>
+        <dd data-field="location">
+          {{ receipt.location.name }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Received" %}</dt>
+        <dd>
+          {{ receipt.received_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.received_by.full_name|default:receipt.received_by.email }}
+        </dd>
+      </div>
+      {% if receipt.delivery_note_ref %}
+        <div>
+          <dt class="text-sm text-soft">{% translate "Delivery note" %}</dt>
+          <dd data-field="delivery-note">
+            {{ receipt.delivery_note_ref }}
+          </dd>
+        </div>
+      {% endif %}
+      {% if handover %}
+        <div>
+          <dt class="text-sm text-soft">{% translate "Handed over on site" %}</dt>
+          <dd>
+            <a href="{% url 'handovers:detail' handover_id=handover.pk %}">{{ handover.number }}</a>
+          </dd>
+        </div>
+      {% endif %}
+      {% if receipt.notes %}
+        <div class="sm:col-span-2">
+          <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
+          <dd class="whitespace-pre-line">
+            {{ receipt.notes }}
+          </dd>
+        </div>
+      {% endif %}
+      {% if receipt.status == "VOIDED" %}
+        <div class="sm:col-span-2" data-testid="void-reason">
+          <dt class="text-sm text-soft">{% translate "Voided" %}</dt>
+          <dd>
+            {{ receipt.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.voided_by.full_name|default:receipt.voided_by.email }}
+            <span class="block whitespace-pre-line">{{ receipt.void_reason }}</span>
+          </dd>
+        </div>
+      {% endif %}
+    </dl>
+  </section>
+  <section class="mb-4" aria-label="{% translate 'Lines' %}">
+    <h2 class="mb-2">{% translate "Lines" %}</h2>
+    <div data-testid="receipt-lines">
+      {% for row in lines %}
+        <article class="card mb-3" data-testid="receipt-line">
+          <p class="font-semibold">{{ row.line.po_line.line_no }}. {{ row.name }}</p>
+          <p class="text-sm text-soft">{{ row.reference }}</p>
+          <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+            <div>
+              <dt class="text-soft">{% translate "Accepted" %}</dt>
+              <dd data-field="accepted">
+                {{ row.line.qty_received|quantity }} {{ row.unit }}
+              </dd>
+            </div>
+            {% if row.line.qty_rejected %}
+              <div>
+                <dt class="text-soft">{% translate "Rejected" %}</dt>
+                <dd data-field="rejected">
+                  {{ row.line.qty_rejected|quantity }} {{ row.unit }}
+                </dd>
+              </div>
+            {% endif %}
+            {% if row.line.surplus_qty %}
+              <div>
+                <dt class="text-soft">{% translate "Surplus" %}</dt>
+                <dd data-field="surplus">
+                  {{ row.line.surplus_qty|quantity }} {{ row.unit }}
+                </dd>
+              </div>
+            {% endif %}
+            {% if row.line.issue != "NONE" %}
+              <div>
+                <dt class="text-soft">{% translate "Incident" %}</dt>
+                <dd data-field="incident">
+                  {{ row.line.get_issue_display }}
+                </dd>
+              </div>
+            {% endif %}
+          </dl>
+          {% if row.line.issue_note %}<p class="mt-2 whitespace-pre-line text-sm">{{ row.line.issue_note }}</p>{% endif %}
+          {% if row.attributions %}
+            <ul class="mt-2 text-sm">
+              {% for part in row.attributions %}
+                <li data-testid="receipt-attribution">
+                  {{ part.request_number }} · {{ part.project_code }}: {{ part.qty|quantity }} {{ row.unit }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% if can_void %}
+    <section class="card mb-4" aria-label="{% translate 'Void the receipt' %}">
+      <details>
+        <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Void the receipt" %}</summary>
+        <p class="mb-2 text-sm text-soft">
+          {% translate "A void takes the goods out of the receipts (and out of the handover made on site). Enter the receipt again if it was only wrong." %}
+        </p>
+        <form method="post"
+              action="{% url 'receiving:void' receipt_id=receipt.pk %}"
+              data-once
+              data-testid="void-form">
+          {% csrf_token %}
+          {{ void_form.reason.as_field_group }}
+          {% include "components/button.html" with type="submit" label=_("Void the receipt") variant="danger" %}
+        </form>
+      </details>
+    </section>
+  {% endif %}
+{% endblock content %}

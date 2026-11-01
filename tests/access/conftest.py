@@ -194,6 +194,39 @@ def _admin_rows(world: World) -> None:
         qty=two,
         receipt_attribution=attribution,
     )
+    # A receipt at the warehouse (all surplus) and a handover from it (M6.3): the receiving and
+    # handover screens' warehouse positions, which a site manager does not reach.
+    world.objects["warehousereceipt"] = warehouse_receipt = GoodsReceipt.objects.create(
+        number="REC-A-MAD-2026-00002",
+        po=received,
+        branch=org.a_mad,
+        location=org.warehouses["A Madrid"],
+        received_at=decided,
+        received_by=people.wo_mad,
+    )
+    GoodsReceiptLine.objects.create(
+        receipt=warehouse_receipt,
+        po=received,
+        po_line=received_po_line,
+        qty_received=Decimal("1.000"),
+        surplus_qty=Decimal("1.000"),
+    )
+    world.objects["warehousehandover"] = warehouse_handover = Handover.objects.create(
+        number="ENT-A-MAD-2026-00002",
+        kind=Handover.Kind.FROM_WAREHOUSE,
+        branch=org.a_mad,
+        source_location=org.warehouses["A Madrid"],
+        project=org.hospital,
+        handed_by=people.wo_mad,
+        received_by=people.partner,
+        handed_at=decided,
+    )
+    HandoverLine.objects.create(
+        handover=warehouse_handover,
+        project=org.hospital,
+        request_line=world.objects["approved_request_line"],
+        qty=Decimal("1.000"),
+    )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)

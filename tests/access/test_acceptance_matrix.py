@@ -417,6 +417,20 @@ PRICE_VIEWERS = {name: frozenset({Sentinel.PRICE}) for name in PO_ACTORS}
 PO_SENTINELS = SUPPLIER_SENTINELS | {Sentinel.OTHER_PROJECT_QUANTITY}
 
 
+# Receiving and handovers (M6.3). receipt.view / receipt.post / handover.view: group
+# administrators, material managers, warehouse operators and site managers (the mixed user is a
+# manager at A-SEV). The hospital is A-MAD's to buy for and B-MAD's to run, so its receipts and
+# handovers are read by the A-MAD staff and its site manager; receipt.void and handover.void are
+# the managers' (the first two of ``WHOLE_ORDER``); handover.post excludes site managers.
+RECEIPT_HOLDERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "site_manager", "mixed")
+RECEIPT_VOIDERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
+HANDOVER_POSTERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "mixed")
+WHOLE_ORDER = ("group_admin", "mm_mad", "wo_mad")
+HOSPITAL_RECEIVERS = ("group_admin", "mm_mad", "wo_mad", "site_manager")
+SUPPLIER_NAME = frozenset({Sentinel.SUPPLIER_NAME})
+OTHER_QUANTITY = frozenset({Sentinel.OTHER_PROJECT_QUANTITY})
+
+
 def order_page(
     capable: tuple[str, ...], readers: tuple[str, ...], ok: Outcome = OK
 ) -> dict[str, Expect]:
@@ -1011,6 +1025,166 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             order_action(),
             path=purchase_url("purchasing:resend_dispatch", "dispatch"),
             note="queued again, or refused once confirmed",
+        ),
+    ),
+    # Receiving (M6.3): receipt.view reads receipts at a warehouse (branch scope) or at a
+    # worksite (its project: the site manager too); receipt.post receives; receipt.void is the
+    # manager's. The site manager's pages hold the supplier's name and nothing else of the order.
+    "receiving:list": (Route(app_page(**_each(OK, RECEIPT_HOLDERS))),),
+    "receiving:orders": (Route(app_page(**_each(OK, RECEIPT_HOLDERS)), allowed=SUPPLIER_NAME),),
+    "receiving:projects": (Route(app_page(**_each(OK, RECEIPT_HOLDERS))),),
+    "receiving:expected": (
+        Route(
+            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            position="own scope",
+            path=_project_url("receiving:expected", "hospital"),
+            allowed=SUPPLIER_NAME,
+            note="the sentinel order: the supplier's name and the hospital's 10, never the "
+            "price, the contacts or the other project's quantity",
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, SEV_VIEWERS, SEV_VIEWERS),
+            position="foreign scope",
+            path=_project_url("receiving:expected", "sev_works"),
+        ),
+    ),
+    "receiving:receive": (
+        Route(
+            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            position="issued",
+            path=purchase_url("receiving:receive", "purchaseorder"),
+            allowed=SUPPLIER_NAME,
+            allowed_for=dict.fromkeys(WHOLE_ORDER, OTHER_QUANTITY),
+            note="the site manager gets their project's share only: not the order's outstanding "
+            "quantity nor the other project's allocation",
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, WHOLE_ORDER, WHOLE_ORDER),
+            position="draft",
+            path=purchase_url("receiving:receive", "draftorder"),
+            note="a draft is nobody's to receive: the page offers nothing, and a site "
+            "manager does not know it exists",
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, RECEIPT_HOLDERS)),
+            position="unknown",
+            path=_unknown_url("receiving:receive"),
+        ),
+    ),
+    "receiving:post": (
+        Route(
+            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS, REDIRECT),
+            path=purchase_url("receiving:post", "purchaseorder"),
+            note="no place chosen: back to the form",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, RECEIPT_HOLDERS)),
+            position="unknown",
+            path=_unknown_url("receiving:post"),
+        ),
+    ),
+    "receiving:detail": (
+        Route(
+            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            position="worksite",
+            path=_object_url("receiving:detail", "goodsreceipt"),
+            allowed=SUPPLIER_NAME,
+            note="the site manager reads the receipt of their worksite",
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, WHOLE_ORDER, WHOLE_ORDER),
+            position="warehouse",
+            path=_object_url("receiving:detail", "warehousereceipt"),
+            allowed=SUPPLIER_NAME,
+            note="a site manager has no warehouse receipt",
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, RECEIPT_HOLDERS)),
+            position="unknown",
+            path=_unknown_url("receiving:detail"),
+        ),
+    ),
+    "receiving:void": (
+        Route(
+            project_action(
+                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+            ),
+            position="worksite",
+            path=_object_url("receiving:void", "goodsreceipt"),
+            note="no reason: back to the receipt",
+        ),
+        Route(
+            project_action(
+                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+            ),
+            position="warehouse",
+            path=_object_url("receiving:void", "warehousereceipt"),
+        ),
+    ),
+    # Handovers (M6.3): handover.view also reaches an assigned project (the site manager reads,
+    # never posts); handover.post and handover.void are the branch's.
+    "handovers:list": (Route(app_page(**_each(OK, RECEIPT_HOLDERS))),),
+    "handovers:new": (
+        Route(app_page(**_each(OK, HANDOVER_POSTERS)), position="no project"),
+        Route(
+            project_page(HANDOVER_POSTERS, WHOLE_ORDER[:3], WHOLE_ORDER[:3]),
+            position="a project",
+            path=lambda world: f"{reverse('handovers:new')}?project={world.org.hospital.pk}",
+        ),
+        Route(
+            project_page(HANDOVER_POSTERS, WHOLE_ORDER[:3], WHOLE_ORDER[:3]),
+            position="a request",
+            path=lambda world: (
+                f"{reverse('handovers:new')}?request={world.objects['approved_request'].pk}"
+            ),
+        ),
+    ),
+    "handovers:create": (
+        Route(
+            app_action(**_each(REDIRECT, HANDOVER_POSTERS)),
+            position="no project",
+            note="back to the choice of a project",
+        ),
+        Route(
+            project_action(HANDOVER_POSTERS, WHOLE_ORDER[:3], WHOLE_ORDER[:3], OK),
+            position="a project",
+            data=lambda world: {"project": str(world.org.hospital.pk)},
+            note="an empty form: 200 with errors",
+        ),
+    ),
+    "handovers:detail": (
+        Route(
+            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            position="from a warehouse",
+            path=_object_url("handovers:detail", "warehousehandover"),
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            position="received on site",
+            path=_object_url("handovers:detail", "handover"),
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, RECEIPT_HOLDERS)),
+            position="unknown",
+            path=_unknown_url("handovers:detail"),
+        ),
+    ),
+    "handovers:void": (
+        Route(
+            project_action(
+                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+            ),
+            position="from a warehouse",
+            path=_object_url("handovers:void", "warehousehandover"),
+            note="no reason: back to the handover",
+        ),
+        Route(
+            project_action(
+                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+            ),
+            position="received on site",
+            path=_object_url("handovers:void", "handover"),
+            note="no reason: back to the handover (it goes with its receipt)",
         ),
     ),
     # Group administrators only (org.manage); the target is the A-MAD technician.

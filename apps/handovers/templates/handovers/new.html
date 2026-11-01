@@ -1,0 +1,71 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "New handover" %} · {{ project.code }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% translate "New handover" %}</h1>
+    <p class="mt-1 text-soft" data-testid="handover-project-name">
+      {{ project.code }} · {{ project.name }}
+      {% if asked %}· {{ asked.number }}{% endif %}
+    </p>
+  </div>
+  {% if not entries %}
+    {% include "components/empty_state.html" with title=_("Nothing left to hand over") text=_("Every approved line of this project has been handed over.") %}
+  {% else %}
+    <form method="post"
+          action="{% url 'handovers:create' %}"
+          data-once
+          data-testid="handover-form">
+      {% csrf_token %}
+      {{ form.idempotency_key }}
+      {{ form.project }}
+      {{ form.request }}
+      {% if form.non_field_errors %}<div role="alert" class="errorlist">{{ form.non_field_errors }}</div>{% endif %}
+      {{ form.project.errors }}
+      {% if warnings %}
+        <section class="card mb-4 border-warn"
+                 role="alert"
+                 data-testid="stock-warning">
+          <h2 class="mb-2">{% translate "The warehouse may not hold all of this" %}</h2>
+          <p class="mb-2 text-sm text-soft">
+            {% translate "The stock is not tracked: this is what the receipts of that warehouse suggest. If the material is there, tick the box and send again." %}
+          </p>
+          <ul class="mb-2">
+            {% for item in warnings %}
+              <li data-testid="stock-shortfall">
+                {{ item.reference }} · {{ item.name }}: {% translate "handing over" %} {{ item.wanted|quantity }} {{ item.unit }},
+                {% translate "known in stock" %} {{ item.available|quantity }} {{ item.unit }}
+              </li>
+            {% endfor %}
+          </ul>
+          {{ form.acknowledge.as_field_group }}
+        </section>
+      {% endif %}
+      <section class="card mb-4" aria-label="{% translate 'Who and from where' %}">
+        {{ form.source.as_field_group }}
+        {{ form.receiver_user.as_field_group }}
+        {{ form.receiver_name.as_field_group }}
+      </section>
+      <section class="mb-4" aria-label="{% translate 'Lines' %}">
+        <h2 class="mb-2">{% translate "Material to hand over" %}</h2>
+        {% for entry in entries %}
+          {% with line=entry.row.line %}
+            <article class="card mb-3" data-testid="handover-line">
+              <p class="font-semibold">{{ line.description }}</p>
+              <p class="text-sm text-soft">
+                {{ line.request.number }} · {% translate "Approved" %} {{ line.approved_qty|quantity }}
+                · {% translate "Handed over" %} {{ entry.row.delivered|quantity }}
+                · {% translate "Outstanding" %}
+                <span data-field="outstanding">{{ entry.row.outstanding|quantity }} {{ line.unit.code }}</span>
+              </p>
+              <div class="mt-2 max-w-48">{{ entry.qty.as_field_group }}</div>
+            </article>
+          {% endwith %}
+        {% endfor %}
+      </section>
+      {% include "components/button.html" with type="submit" label=_("Hand the material over") variant="primary" block=True %}
+    </form>
+  {% endif %}
+{% endblock content %}

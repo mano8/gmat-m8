@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% load i18n %}
+{% load i18n access %}
 {% block head_title %}
   {{ project.code }} · gmat-m8
 {% endblock head_title %}
@@ -9,10 +9,22 @@
       <h1>{{ project.code }} · {{ project.name }}</h1>
       <p class="mt-1">{% include "projects/status.html" %}</p>
     </div>
-    {% if manageable %}
-      {% url 'projects:edit' project_id=project.pk as edit_url %}
-      {% include "components/button.html" with href=edit_url label=_("Edit") %}
-    {% endif %}
+    <div class="flex flex-wrap gap-3">
+      {% can "receipt.view" project %}
+        {% url 'receiving:expected' project_id=project.pk as expected_url %}
+        {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}
+      {% endcan %}
+      {% if project.status == "ACTIVE" %}
+        {% can "handover.post" project %}
+          {% url 'handovers:new' as handover_url %}
+          <a class="btn" href="{{ handover_url }}?project={{ project.pk }}">{% translate "Hand material over" %}</a>
+        {% endcan %}
+      {% endif %}
+      {% if manageable %}
+        {% url 'projects:edit' project_id=project.pk as edit_url %}
+        {% include "components/button.html" with href=edit_url label=_("Edit") %}
+      {% endif %}
+    </div>
   </div>
   <section class="card mb-4">
     <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">

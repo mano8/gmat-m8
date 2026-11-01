@@ -32,6 +32,28 @@
     }
   });
 
+  // A form marked data-once disables its buttons once sent, so a double tap posts once. The
+  // idempotency key in the form is the real guard; this only spares the second request. A page
+  // restored from the back/forward cache enables them again.
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form.hasAttribute || !form.hasAttribute("data-once")) {
+      return;
+    }
+    window.setTimeout(function () {
+      form.querySelectorAll("button[type=submit]").forEach(function (button) {
+        button.disabled = true;
+      });
+    }, 0);
+  });
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted) {
+      document.querySelectorAll("form[data-once] button[type=submit]").forEach(function (button) {
+        button.disabled = false;
+      });
+    }
+  });
+
   // The language switcher submits when the selection changes (without JavaScript the form
   // still has its button).
   document.addEventListener("change", function (event) {

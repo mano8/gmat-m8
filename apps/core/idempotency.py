@@ -186,6 +186,26 @@ def idempotent[M: Model](
     return IdempotentResult(result, replayed=False)
 
 
+def recorded_result(
+    key: str, *, actor_id: UUID, operation: str, using: str = DEFAULT_DB_ALIAS
+) -> tuple[str, UUID] | None:
+    """What a key already produced, as ``(result_type, result_id)``; ``None`` if nothing yet.
+
+    For a view whose form is no longer valid because the first submission changed what the
+    form offers (a double tap on a receipt that used up the order): it can send the user to
+    the document that submission made. The key is verified like ``idempotent()`` does; the
+    caller re-authorizes the read of the result. Nothing is written.
+    """
+    key_id = verify_key(key, actor_id=actor_id, operation=operation)
+    record = IdempotencyRecord.objects.using(using).filter(
+        actor_id=actor_id, key_id=key_id, operation=operation, result_id__isnull=False
+    )
+    found = record.values_list("result_type", "result_id").first()
+    if found is None or found[1] is None:
+        return None
+    return found[0], found[1]
+
+
 def purge_expired_records(*, using: str = DEFAULT_DB_ALIAS) -> int:
     """Delete records older than ``IDEMPOTENCY_RECORD_RETENTION`` (database clock)."""
     cutoff = Now() - timedelta(seconds=int(settings.IDEMPOTENCY_RECORD_RETENTION))

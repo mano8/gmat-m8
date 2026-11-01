@@ -1,0 +1,6 @@
+{% comment %}The status chip of a receipt. Parameter: obj (the receipt).{% endcomment %}
+{% if obj.status == "POSTED" %}
+  {% include "components/status_chip.html" with label=obj.get_status_display tone="ok" %}
+{% else %}
+  {% include "components/status_chip.html" with label=obj.get_status_display tone="danger" %}
+{% endif %}

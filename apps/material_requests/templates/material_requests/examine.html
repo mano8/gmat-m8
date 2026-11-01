@@ -1,12 +1,20 @@
 {% extends "layouts/app.html" %}
-{% load i18n ui_tags %}
+{% load i18n access ui_tags %}
 {% block head_title %}
   {{ request_obj.number|default:_("Request") }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <h1 data-testid="examine-number">{{ request_obj.number|default:_("Request") }}</h1>
-    {% include "material_requests/status.html" with obj=request_obj %}
+    <div class="flex flex-wrap items-center gap-3">
+      {% include "material_requests/status.html" with obj=request_obj %}
+      {% if request_obj.status == "APPROVED" %}
+        {% can "handover.post" request_obj %}
+          {% url 'handovers:new' as handover_url %}
+          <a class="btn" href="{{ handover_url }}?request={{ request_obj.pk }}">{% translate "Hand material over" %}</a>
+        {% endcan %}
+      {% endif %}
+    </div>
   </div>
   <section class="card mb-4" aria-label="{% translate 'Request details' %}">
     <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">

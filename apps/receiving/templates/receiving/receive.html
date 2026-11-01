@@ -1,0 +1,115 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Receive goods" %} · {{ order.number }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% translate "Receive goods" %}</h1>
+    <p class="mt-1 text-soft">
+      <span data-field="order">{{ order.number }}</span>
+      · <span data-field="supplier">{{ order.supplier_snapshot.name }}</span>
+      {% if order.expected_date %}
+        · {% translate "Expected" %} {{ order.expected_date|date:"SHORT_DATE_FORMAT" }}
+      {% endif %}
+    </p>
+  </div>
+  {% if not places %}
+    {% include "components/empty_state.html" with title=_("Nowhere to receive") text=_("Goods of this order cannot be received at any place you can use.") %}
+  {% else %}
+    {% if places|length > 1 %}
+      <form method="get"
+            action="{% url 'receiving:receive' po_id=order.pk %}"
+            class="card mb-4 flex flex-wrap items-end gap-3"
+            data-testid="place-form">
+        <div class="field mb-0 flex-1">
+          <label for="id_place">{% translate "Where did the goods arrive?" %}</label>
+          <select name="location" id="id_place" data-autosubmit>
+            {% for found in places %}
+              <option value="{{ found.pk }}"
+                      {% if found.pk == place.pk %} selected{% endif %}>
+                {% if found.project_id %}{% translate "Worksite" %} · {{ found.project.code }}{% else %}{{ found.branch.name }} · {{ found.name }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn">{% translate "Change" %}</button>
+      </form>
+    {% else %}
+      <p class="mb-4 text-soft" data-testid="place-name">
+        {% translate "Arriving at" %}: <strong>{{ place.name }}</strong>
+      </p>
+    {% endif %}
+    {% if not rows %}
+      {% include "components/empty_state.html" with title=_("Nothing left to receive here") text=_("Every line is received, closed or not waiting for anyone at this place, or the order is not issued.") %}
+    {% else %}
+      <form method="post"
+            action="{% url 'receiving:post' po_id=order.pk %}"
+            data-once
+            data-testid="receipt-form">
+        {% csrf_token %}
+        {{ form.idempotency_key }}
+        {{ form.location }}
+        {% if form.non_field_errors %}<div role="alert" class="errorlist">{{ form.non_field_errors }}</div>{% endif %}
+        {{ form.location.errors }}
+        <section class="card mb-4" aria-label="{% translate 'Delivery' %}">
+          {{ form.delivery_note_ref.as_field_group }}
+        </section>
+        <section class="mb-4" aria-label="{% translate 'Lines' %}">
+          <h2 class="mb-2">{% translate "What arrived" %}</h2>
+          <p class="mb-2 text-sm text-soft">
+            {% translate "The quantities are prefilled with what is still to receive. Lower or clear a quantity for goods that did not arrive." %}
+          </p>
+          {% for entry in entries %}
+            {% with row=entry.row %}
+              <article class="card mb-3"
+                       data-line="{{ row.po_line.line_no }}"
+                       data-testid="receipt-line">
+                <div class="mb-2">
+                  <p class="font-semibold">{{ row.po_line.line_no }}. {{ row.name }}</p>
+                  <p class="text-sm text-soft">
+                    {{ row.reference }}
+                    {% if whole_order and row.remaining is not None %}
+                      · {% translate "Still to receive" %}
+                      <span data-field="remaining">{{ row.remaining|quantity }} {{ row.unit }}</span>
+                    {% endif %}
+                  </p>
+                </div>
+                <div class="max-w-48">{{ entry.qty.as_field_group }}</div>
+                <details class="mt-1"{% if entry.incident_open %} open{% endif %}>
+                  <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Rejected goods or an incident" %}</summary>
+                  <div class="max-w-48">{{ entry.rejected.as_field_group }}</div>
+                  {{ entry.issue.as_field_group }}
+                  {{ entry.note.as_field_group }}
+                </details>
+                {% if entry.splits %}
+                  <details class="mt-1"{% if entry.split_open %} open{% endif %}>
+                    <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Split between requests" %}</summary>
+                    <p class="mb-2 text-sm text-soft">
+                      {% translate "By default the goods go to the requests in order of priority and date. Tick the box to give each request its own share; what no request takes is kept as surplus." %}
+                    </p>
+                    {{ entry.manual.as_field_group }}
+                    {% for split, field in entry.splits %}
+                      <div class="field max-w-72" data-testid="receipt-split">
+                        <label for="{{ field.id_for_label }}">
+                          {{ split.request_number }} · {{ split.project_code }}
+                          <span class="text-soft">({% translate "up to" %} {{ split.cap|quantity }} {{ row.unit }})</span>
+                        </label>
+                        {{ field.errors }}
+                        {{ field }}
+                      </div>
+                    {% endfor %}
+                  </details>
+                {% endif %}
+              </article>
+            {% endwith %}
+          {% endfor %}
+        </section>
+        <section class="card mb-4" aria-label="{% translate 'Notes' %}">
+          {{ form.notes.as_field_group }}
+        </section>
+        {% include "components/button.html" with type="submit" label=_("Post the receipt") variant="primary" block=True %}
+      </form>
+    {% endif %}
+  {% endif %}
+{% endblock content %}
