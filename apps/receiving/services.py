@@ -59,6 +59,7 @@ from apps.core.idempotency import execute_once
 from apps.core.locking import LockLevel, LockOrder, transactional
 from apps.core.sequences import format_number, next_number
 from apps.handovers import direct
+from apps.handovers.common import owner_code
 from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services.common import _settle_closure
@@ -292,7 +293,7 @@ def _facts(component: Component, location: Location) -> _Facts:
 
 def _assign_number(receipt: GoodsReceipt, locks: LockOrder) -> None:
     """``REC-{company}-{branch}-{yyyy}-{00001}`` per branch (L9, last)."""
-    owner, year = direct.owner_code(receipt.branch), receipt.received_at.year
+    owner, year = owner_code(receipt.branch), receipt.received_at.year
     locks.enter(LockLevel.DOCUMENT_SEQUENCE)
     value = next_number(f"receipt:{owner}:{year}")
     receipt.number = format_number(settings.RECEIPT_NUMBER_PREFIX, owner, year, value)

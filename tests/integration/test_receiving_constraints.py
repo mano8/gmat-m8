@@ -207,6 +207,29 @@ class TestC3:
             "ho_line_handover_project_fk",
         )
 
+    @pytest.mark.parametrize("through", ["request_line", "handover"])
+    def test_a_warehouse_handover_line_of_another_project(
+        self, world: World, org: Org, people: People, through: str
+    ) -> None:
+        """The same keys hold a ``FROM_WAREHOUSE`` handover (M6.2) to its project."""
+        handover = Handover.objects.create(
+            number="ENT-I-00002",
+            kind=Handover.Kind.FROM_WAREHOUSE,
+            branch=org.a_mad,
+            source_location=org.warehouses["A Madrid"],
+            project=org.hospital,
+            handed_by=people.mm_mad,
+            received_by_name="Site crew",
+            handed_at=timezone.now(),
+        )
+        project = handover.project if through == "request_line" else world.sev_line.project
+        atomic(
+            lambda: HandoverLine.objects.create(
+                handover=handover, project=project, request_line=world.sev_line, qty=D(1)
+            ),
+            f"ho_line_{through}_project_fk",
+        )
+
 
 class TestI8:
     def test_an_attribution_is_handed_over_once(self, world: World) -> None:

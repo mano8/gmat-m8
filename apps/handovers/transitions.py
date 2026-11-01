@@ -2,7 +2,7 @@
 
 A handover is posted once and can only be voided (with a reason); a voided handover is
 final. A ``DIRECT_RECEIPT`` handover takes the edge only through its receipt's void
-(``with_receipt``); a ``FROM_WAREHOUSE`` one through its own (M6.2).
+(``with_receipt``); a ``FROM_WAREHOUSE`` one through its own (``services.void_handover``).
 """
 
 from types import MappingProxyType

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 08:17+0000\n"
+"POT-Creation-Date: 2026-11-01 10:12+0100\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -946,6 +946,75 @@ msgstr ""
 msgid "handover lines"
 msgstr ""
 
+#: apps/handovers/services.py:98 apps/material_requests/forms.py:228
+#: apps/material_requests/forms.py:285
+#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
+#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
+#: apps/receiving/services.py:157
+msgid "Give a reason."
+msgstr ""
+
+#: apps/handovers/services.py:111
+msgid "Choose a person or type a name, not both."
+msgstr ""
+
+#: apps/handovers/services.py:113
+msgid "Say who takes the material."
+msgstr ""
+
+#: apps/handovers/services.py:116
+#, python-format
+msgid "A name has at most %(limit)s characters."
+msgstr ""
+
+#: apps/handovers/services.py:132
+msgid "Choose a person who works on this project."
+msgstr ""
+
+#: apps/handovers/services.py:141
+msgid "A line is not of this project."
+msgstr ""
+
+#: apps/handovers/services.py:153
+msgid "This project accepts no handovers."
+msgstr ""
+
+#: apps/handovers/services.py:155 apps/material_requests/services/common.py:132
+msgid "The project's branch is inactive."
+msgstr ""
+
+#: apps/handovers/services.py:163
+msgid ""
+"These requests are handled by different branches; hand them over separately."
+msgstr ""
+
+#: apps/handovers/services.py:168
+msgid "The requests' branch is inactive."
+msgstr ""
+
+#: apps/handovers/services.py:184
+msgid "Material for these requests cannot be taken from here."
+msgstr ""
+
+#: apps/handovers/services.py:199
+#, python-format
+msgid "%(request)s, line %(line)s: nothing can be handed over on it."
+msgstr ""
+
+#: apps/handovers/services.py:207
+#, python-format
+msgid ""
+"%(request)s, line %(line)s: only %(outstanding)s remain to be handed over."
+msgstr ""
+
+#: apps/handovers/services.py:296 apps/receiving/services.py:396
+msgid "Enter at least one line."
+msgstr ""
+
+#: apps/handovers/services.py:362
+msgid "This material was received on site; void its goods receipt instead."
+msgstr ""
+
 #: apps/handovers/transitions.py:29
 #, python-format
 msgid "This handover is %(status)s; it cannot be changed this way."
@@ -1080,13 +1149,6 @@ msgstr ""
 
 #: apps/material_requests/forms.py:222
 msgid "Approved quantity"
-msgstr ""
-
-#: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
-#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
-#: apps/receiving/services.py:156
-msgid "Give a reason."
 msgstr ""
 
 #: apps/material_requests/forms.py:236
@@ -1366,10 +1428,6 @@ msgstr ""
 
 #: apps/material_requests/services/common.py:123
 msgid "This project accepts no new requests."
-msgstr ""
-
-#: apps/material_requests/services/common.py:132
-msgid "The project's branch is inactive."
 msgstr ""
 
 #: apps/material_requests/services/common.py:141
@@ -3613,44 +3671,40 @@ msgstr ""
 msgid "receipt attributions"
 msgstr ""
 
-#: apps/receiving/services.py:168
+#: apps/receiving/services.py:169
 #, python-format
 msgid "This purchase order is %(status)s; nothing can be received on it."
 msgstr ""
 
-#: apps/receiving/services.py:174
+#: apps/receiving/services.py:175
 msgid "The order's branch is inactive."
 msgstr ""
 
-#: apps/receiving/services.py:179
+#: apps/receiving/services.py:180
 msgid "Goods of this order cannot arrive here."
 msgstr ""
 
-#: apps/receiving/services.py:210
+#: apps/receiving/services.py:211
 #, python-format
 msgid "Line %(line)s: enter what was accepted or rejected."
 msgstr ""
 
-#: apps/receiving/services.py:215
+#: apps/receiving/services.py:216
 msgid "Choose an incident."
 msgstr ""
 
-#: apps/receiving/services.py:225
+#: apps/receiving/services.py:226
 #, python-format
 msgid "Line %(line)s has nothing left to receive."
 msgstr ""
 
-#: apps/receiving/services.py:231
+#: apps/receiving/services.py:232
 #, python-format
 msgid "Line %(line)s: only %(remaining)s remain to be received."
 msgstr ""
 
-#: apps/receiving/services.py:258
+#: apps/receiving/services.py:259
 msgid "A line is not on this order."
-msgstr ""
-
-#: apps/receiving/services.py:395
-msgid "Enter at least one line."
 msgstr ""
 
 #: apps/receiving/transitions.py:29

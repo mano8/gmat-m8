@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 08:17+0000\n"
+"POT-Creation-Date: 2026-11-01 10:12+0100\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -981,6 +981,77 @@ msgstr "línea de entrega"
 msgid "handover lines"
 msgstr "líneas de entrega"
 
+#: apps/handovers/services.py:98 apps/material_requests/forms.py:228
+#: apps/material_requests/forms.py:285
+#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
+#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
+#: apps/receiving/services.py:157
+msgid "Give a reason."
+msgstr "Indica un motivo."
+
+#: apps/handovers/services.py:111
+msgid "Choose a person or type a name, not both."
+msgstr "Elige una persona o escribe un nombre, no ambos."
+
+#: apps/handovers/services.py:113
+msgid "Say who takes the material."
+msgstr "Indica quién recoge el material."
+
+#: apps/handovers/services.py:116
+#, python-format
+msgid "A name has at most %(limit)s characters."
+msgstr "Un nombre tiene como máximo %(limit)s caracteres."
+
+#: apps/handovers/services.py:132
+msgid "Choose a person who works on this project."
+msgstr "Elige una persona que trabaje en esta obra."
+
+#: apps/handovers/services.py:141
+msgid "A line is not of this project."
+msgstr "Una línea no pertenece a esta obra."
+
+#: apps/handovers/services.py:153
+msgid "This project accepts no handovers."
+msgstr "Esta obra no admite entregas."
+
+#: apps/handovers/services.py:155 apps/material_requests/services/common.py:132
+msgid "The project's branch is inactive."
+msgstr "La delegación de la obra está inactiva."
+
+#: apps/handovers/services.py:163
+msgid ""
+"These requests are handled by different branches; hand them over separately."
+msgstr ""
+"Estas solicitudes las gestionan delegaciones distintas; entrégalas por "
+"separado."
+
+#: apps/handovers/services.py:168
+msgid "The requests' branch is inactive."
+msgstr "La delegación de las solicitudes está inactiva."
+
+#: apps/handovers/services.py:184
+msgid "Material for these requests cannot be taken from here."
+msgstr "El material de estas solicitudes no puede salir de aquí."
+
+#: apps/handovers/services.py:199
+#, python-format
+msgid "%(request)s, line %(line)s: nothing can be handed over on it."
+msgstr "%(request)s, línea %(line)s: no se puede entregar nada en ella."
+
+#: apps/handovers/services.py:207
+#, python-format
+msgid ""
+"%(request)s, line %(line)s: only %(outstanding)s remain to be handed over."
+msgstr "%(request)s, línea %(line)s: solo quedan %(outstanding)s por entregar."
+
+#: apps/handovers/services.py:296 apps/receiving/services.py:396
+msgid "Enter at least one line."
+msgstr "Indique al menos una línea."
+
+#: apps/handovers/services.py:362
+msgid "This material was received on site; void its goods receipt instead."
+msgstr "Este material se recibió en la obra; anula su recepción de mercancía."
+
 #: apps/handovers/transitions.py:29
 #, python-format
 msgid "This handover is %(status)s; it cannot be changed this way."
@@ -1116,13 +1187,6 @@ msgstr "Rechazar"
 #: apps/material_requests/forms.py:222
 msgid "Approved quantity"
 msgstr "Cantidad aprobada"
-
-#: apps/material_requests/forms.py:228 apps/material_requests/forms.py:285
-#: apps/material_requests/services/common.py:294 apps/purchasing/forms.py:354
-#: apps/purchasing/forms.py:395 apps/purchasing/services/common.py:126
-#: apps/receiving/services.py:156
-msgid "Give a reason."
-msgstr "Indica un motivo."
 
 #: apps/material_requests/forms.py:236
 msgid "What should change"
@@ -1403,10 +1467,6 @@ msgstr ""
 #: apps/material_requests/services/common.py:123
 msgid "This project accepts no new requests."
 msgstr "Esta obra no admite nuevas solicitudes."
-
-#: apps/material_requests/services/common.py:132
-msgid "The project's branch is inactive."
-msgstr "La delegación de la obra está inactiva."
 
 #: apps/material_requests/services/common.py:141
 msgid "Lines change only while the request is a draft."
@@ -3703,47 +3763,43 @@ msgstr "asignación"
 msgid "receipt attributions"
 msgstr "imputaciones de recepción"
 
-#: apps/receiving/services.py:168
+#: apps/receiving/services.py:169
 #, python-format
 msgid "This purchase order is %(status)s; nothing can be received on it."
 msgstr ""
 "Este pedido de compra está en estado %(status)s; no se puede recibir nada en "
 "él."
 
-#: apps/receiving/services.py:174
+#: apps/receiving/services.py:175
 msgid "The order's branch is inactive."
 msgstr "La delegación del pedido está inactiva."
 
-#: apps/receiving/services.py:179
+#: apps/receiving/services.py:180
 msgid "Goods of this order cannot arrive here."
 msgstr "La mercancía de este pedido no puede llegar aquí."
 
-#: apps/receiving/services.py:210
+#: apps/receiving/services.py:211
 #, python-format
 msgid "Line %(line)s: enter what was accepted or rejected."
 msgstr "Línea %(line)s: indique lo aceptado o lo rechazado."
 
-#: apps/receiving/services.py:215
+#: apps/receiving/services.py:216
 msgid "Choose an incident."
 msgstr "Elija una incidencia."
 
-#: apps/receiving/services.py:225
+#: apps/receiving/services.py:226
 #, python-format
 msgid "Line %(line)s has nothing left to receive."
 msgstr "La línea %(line)s no tiene nada pendiente de recibir."
 
-#: apps/receiving/services.py:231
+#: apps/receiving/services.py:232
 #, python-format
 msgid "Line %(line)s: only %(remaining)s remain to be received."
 msgstr "Línea %(line)s: solo quedan %(remaining)s por recibir."
 
-#: apps/receiving/services.py:258
+#: apps/receiving/services.py:259
 msgid "A line is not on this order."
 msgstr "Una línea no pertenece a este pedido."
-
-#: apps/receiving/services.py:395
-msgid "Enter at least one line."
-msgstr "Indique al menos una línea."
 
 #: apps/receiving/transitions.py:29
 #, python-format

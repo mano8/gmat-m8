@@ -7,7 +7,7 @@ Two kinds:
   each line carries exactly one receipt attribution, for the same request line and
   quantity (C4), and an attribution has at most one handover line (unique), so a site
   receipt can never be counted twice;
-- ``FROM_WAREHOUSE``: material taken from a warehouse for a project (M6.2).
+- ``FROM_WAREHOUSE``: material taken from a warehouse for a project (``services``).
 
 D of a request line is the sum of its lines on posted handovers of both kinds
 (``ledger``). Models hold data and constraints only. A handover is **immutable once

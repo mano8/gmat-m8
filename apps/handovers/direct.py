@@ -13,47 +13,16 @@ by the receipt's void, takes it to ``VOIDED``.
 from collections.abc import Sequence
 from datetime import datetime
 
-from django.conf import settings
-
 from apps.access.principals import Principal
 from apps.accounts.models import User
-from apps.audit.recorder import record
-from apps.core import events
 from apps.core.locking import LockLevel, LockOrder
-from apps.core.sequences import format_number, next_number
+from apps.handovers.common import assign_number, record_handover
 from apps.handovers.models import Handover, HandoverLine
 from apps.handovers.transitions import transition
-from apps.organizations.models import Branch
 from apps.projects.models import Project
 from apps.receiving.models import GoodsReceipt, ReceiptAttribution
 
 Kind, Status = Handover.Kind, Handover.Status
-
-
-def owner_code(branch: Branch) -> str:
-    """``A-MAD``: branch codes are unique per company only."""
-    return f"{branch.company.code}-{branch.code}"
-
-
-def _assign_number(handover: Handover, branch: Branch, locks: LockOrder) -> None:
-    """``ENT-{company}-{branch}-{yyyy}-{00001}`` per branch (L9, last)."""
-    owner, year = owner_code(branch), handover.handed_at.year
-    locks.enter(LockLevel.DOCUMENT_SEQUENCE)
-    value = next_number(f"handover:{owner}:{year}")
-    handover.number = format_number(settings.HANDOVER_NUMBER_PREFIX, owner, year, value)
-
-
-def _record(principal: Principal, action: str, handover: Handover, **data: object) -> None:
-    record(
-        principal.audit_identity,
-        action,
-        obj=handover,
-        branch_id=handover.branch_id,
-        data={"number": handover.number, "kind": handover.kind, **data},
-    )
-    events.publish(
-        action, handover_id=handover.pk, project_id=handover.project_id, kind=handover.kind
-    )
 
 
 def post_for_receipt(
@@ -80,7 +49,7 @@ def post_for_receipt(
         handed_at=receipt.received_at,
         goods_receipt=receipt,
     )
-    _assign_number(handover, receipt.branch, locks)
+    assign_number(handover, receipt.branch, locks)
     handover.save()
     lines = HandoverLine.objects.bulk_create(
         HandoverLine(
@@ -92,7 +61,7 @@ def post_for_receipt(
         )
         for attribution in attributions
     )
-    _record(
+    record_handover(
         principal,
         "handover.posted",
         handover,
@@ -125,7 +94,7 @@ def void_for_receipt(
     transition(handover, Status.VOIDED, "with_receipt")
     handover.voided_at, handover.voided_by, handover.void_reason = now, actor, reason
     handover.save()
-    _record(
+    record_handover(
         principal,
         "handover.voided",
         handover,
