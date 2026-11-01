@@ -13,7 +13,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from django.utils.translation import gettext
+from django.utils.translation import gettext_lazy
 
 from apps.catalog.models import Material, UnitOfMeasure
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
@@ -28,7 +28,7 @@ D = Decimal
 Status = PurchaseOrder.Status
 
 
-DRAFT_ORDER = gettext("Draft order")
+DRAFT_ORDER = gettext_lazy("Draft order")
 
 
 def refused(create: Any, **values: Any) -> None:
@@ -51,7 +51,7 @@ class TestOrder:
     def test_a_draft_has_no_number_and_shows_as_a_draft(self, org: Org) -> None:
         order = orders.order(org)
         assert (order.number, order.revision, order.currency) == (None, 0, "EUR")
-        assert str(order) == DRAFT_ORDER
+        assert str(order) == str(DRAFT_ORDER)
 
     def test_an_issued_order_shows_its_number(self, org: Org, people: People) -> None:
         order = orders.order(org, status=Status.ISSUED, issued_by=people.mm_mad)
