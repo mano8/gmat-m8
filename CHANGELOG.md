@@ -151,6 +151,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - permissions from the parent: view with its view capability, add by the requester on a draft or with `receipt.post`/`handover.post` on a posted document, remove by the uploader on a draft or by a manager with a reason (soft delete), all audited; the authorised download (attachment, `nosniff`, sandbox CSP);
   - the worker's housekeeping releases expired leases and purges removed files after 90 days in two phases, only while no backup holds `gmat:media-backup`; the backup manifest lists the stored attachments, the backup copies and checks exactly those, and `restore --verify` checks the copy;
   - an attachments panel on the request, review, receipt and handover pages (upload form, list, remove dialog); 5 URLs in the acceptance matrix with a position per parent type, and the four admin models; threaded tests for the quota, the slots, the processing bound and the lease expiry; live tests through Caddy and Gunicorn; system check `gmat.E020`; Pillow; es/fr strings.
+- Traceability views (M6.5, read-only):
+  - the request ledger at `/requests/<id>/ledger/`: requested, approved, allocated, received, pending receipt, reserved in drafts, delivered, committed, awaiting handover and outstanding per line, who closed a line short and why, and, for who reviews, sources or audits the request, the reductions of the quantity on order (closures and commitment reconciliation) without the order or supplier;
+  - the project's materials at `/requests/projects/<id>/materials/`: the open lines of the requests the user may see, summed per material (approved, received, pending, awaiting handover, delivered, outstanding), most outstanding first, linked from the project page;
+  - the order page's lines also show the remaining quantity and whether the line is receivable;
+  - 3 URLs in the acceptance matrix; es/fr strings.
 
 ### Changed
 

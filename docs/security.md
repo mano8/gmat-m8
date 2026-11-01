@@ -242,6 +242,14 @@ Code in `apps/attachments/`; plan §5 "Attachments", §4.7 (L8), §9, Q8, Q22.
 - **Purge and backups (F48).** The worker's `attachment_media` task runs only while it holds `gmat:media-backup` (`pg_try_advisory_xact_lock`): a backup holding the lock postpones it. It deletes the rows of attachments removed more than 90 days ago (`ATTACHMENT_RETENTION_DAYS`) and queues their files; a queued file is deleted, and its bytes returned to the quota, after `MEDIA_PURGE_GRACE` (24 h, longer than any backup copy). The backup's manifest lists the stored attachments of its snapshot (storage key, size, SHA-256), the backup copies exactly those under the lock and checks each copy, and `restore --verify` checks the media copy against the manifest.
 - **Containers.** `web` stores and the worker purges through the `media` volume; the backup mounts it read only; Caddy and the database never see it. The volume starts owned by uid 1000 and closed to others (the image's `/srv/media`). Caddy's body limit is 11 MiB. `web` gets 1.5 GiB for Gunicorn plus two decoders.
 
+## Traceability views (step M6.5)
+
+Code in `apps/material_requests/views/trace.py`, `selectors.project_materials` and `purchasing.selectors.request_trims`. Read-only; GET and HEAD only, no service is called.
+
+- **Scope.** `/requests/<id>/ledger/` needs `request.view` on the request, `/requests/projects/<id>/materials/` on the project; out of scope is 404, a role without the capability 403. The project overview sums only the lines of requests the user may see, so a partner or a technician never gets another person's quantities from it.
+- **Exposure.** The ledger shows quantities only: no price, order number, supplier or contact. The reductions of the quantity on order (allocation trims) come from the audit trail and reach only who reviews, sources or audits the request (`can_see_history`); they show the request line, the quantities, the reason, the time and the actor, never the order or its line.
+- **Tests.** Both URLs have rows in the acceptance matrix (every actor, the technician's and the partner's requests, an unknown id); the selectors are covered in `tests/unit/purchasing/test_traceability.py`.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |
