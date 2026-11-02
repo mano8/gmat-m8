@@ -1,0 +1,23 @@
+{% load i18n %}
+{% comment %}
+  The delivery status of one email (M7c.1). Parameters: status (a notifications.selectors.DeliveryStatus
+  or empty), object_id (the id of the invitation or change, for the element id); poll_url optional: while the message is queued or sending the badge reloads itself
+  from there every 5 s, and the fragment it gets back carries no trigger once the state is final.
+  The state is a chip and a word, never colour alone.
+{% endcomment %}
+{% if status %}
+  <span id="delivery-{{ object_id }}"
+        class="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+        data-testid="delivery-status"
+        data-state="{% if status.delayed %}delayed{% else %}{{ status.state|lower }}{% endif %}"
+        {% if poll_url and status.polling %}hx-get="{{ poll_url }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+    {% include "components/status_chip.html" with label=status.label tone=status.tone %}
+    <span class="text-soft">
+      {% if status.state == "SENT" %}
+        {{ status.at|date:"SHORT_DATETIME_FORMAT" }}
+      {% else %}
+        {{ status.hint }}
+      {% endif %}
+    </span>
+  </span>
+{% endif %}

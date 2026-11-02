@@ -307,6 +307,15 @@ Code in `apps/material_requests/views/editing.py`, `views/reviewer.py`, `forms.p
 - **What the requester reads.** The status page shows each edited line against the copy of its latest submit, and the edits since (editor, time, reason, before and after): material, description, unit, quantities, decision. It never shows a price, a supplier, an order or another project's quantity; the matrix world holds edited requests so the sentinel checks run on those pages, and a view test repeats it for the technician and the partner. A request the user cannot view has no history (404). Reviewer names are shown as the requester picked them (the picker lists them), the editors' as they signed their edits.
 - **"Assigned to me".** The filter and the chip use `assigned_to`, which applies the same grant rule as the assignment: a lapsed assignee's list is empty. The dashboard panel (submitted, approved and rejected requests sent to the user, through the same `assigned_to`) is offered to `request.edit` holders only (the roles that can be assigned), so a site manager sees no always-empty panel.
 
+## Delivery status of security mail (step M7c.1)
+
+Code in `apps/notifications/selectors.py` (`delivery_status`, `DeliveryStatus`), `apps/organizations/views.py` (`invitation_delivery`, `email_change_delivery`), `templates/components/delivery_badge.html`; plan Q37-Q38, issue #22.
+
+- **What is read.** The latest `SECURITY` outbox row about an invitation or an email change (`eligibility_object_type`/`eligibility_object_id`, and `source_ref` for the two mails of an email change), by `DISTINCT ON` in one query per list, through the partial index of `notifications.0005`. Only the status, `sent_at` and `created_at` are selected: never the body (sealed or not), `last_error`, the message id or the recipient address. The object types are an allowlist (`accounts.invitation`, `accounts.emailchangerequest`) and the selector checks `org.manage` again; the caller passes only objects it read through its own scoped selector.
+- **Who sees it.** `org.manage` in scope, where the invitation or email change is shown. The two fragment URLs are GET-only (405 otherwise), `Cache-Control: no-store, private`, 404 for an unknown object and 403 without the capability; they carry rows in the access matrix, with a queued, a sent and a failed message (the failed one holds an error text that no page may show).
+- **Delayed, not paused.** `web` does not read the worker's flags or `OUTBOUND_EMAIL`. A message still `QUEUED` more than ten minutes after it was queued reads "Delayed: tell the operator"; the worker's state stays the operator's concern.
+- **Polling.** Only a `QUEUED` or `SENDING` badge carries `hx-get` and `hx-trigger="every 5s"`; the fragment it fetches has none once the state is final, so the polling ends by itself. No inline script or handler is involved.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

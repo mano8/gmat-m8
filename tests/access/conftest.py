@@ -17,6 +17,11 @@ from django.utils import timezone
 from pytest_django import DjangoDbBlocker
 
 from apps.accounts.models import EmailChangeRequest, Invitation
+from apps.accounts.services import (
+    EMAIL_CHANGE_CANCELLABLE,
+    EMAIL_CHANGE_CONFIRMABLE,
+    INVITATION_PENDING,
+)
 from apps.accounts.tokens import new_token
 from apps.attachments import files
 from apps.attachments.models import (
@@ -38,7 +43,9 @@ from apps.material_requests.models import (
     MaterialRequestLine,
     MaterialRequestLineRevision,
 )
+from apps.notifications.models import EmailOutbox
 from apps.notifications.models import Status as MailStatus
+from apps.notifications.outbox import queue_security_email
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
 from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
@@ -307,7 +314,42 @@ def _admin_rows(world: World) -> None:
         cancel_token_hash=new_token()[1],
         expires_at=later,
     )
+    _security_mail(world)
     assert AuditEvent.objects.exists()
+
+
+def _security_mail(world: World) -> None:
+    """The queued mails the delivery fragments (M7c.1) report on: an invitation's and the
+    two of an email change, one of them failed with an error text no page may show."""
+    invitation = world.objects["invitation"]
+    change = world.objects["emailchangerequest"]
+    queue_security_email(
+        address=invitation.email,
+        target=invitation,
+        rule=INVITATION_PENDING,
+        subject="Invitation",
+        body="the link",
+        source_ref="invitation",
+    )
+    queue_security_email(
+        address=change.new_email,
+        target=change,
+        rule=EMAIL_CHANGE_CONFIRMABLE,
+        subject="Confirm",
+        body="the link",
+        source_ref="email_change.confirm",
+    )
+    failed = queue_security_email(
+        address=change.user.email,
+        target=change,
+        rule=EMAIL_CHANGE_CANCELLABLE,
+        subject="Notice",
+        body="the link",
+        source_ref="email_change.cancel",
+    )
+    EmailOutbox.objects.filter(pk=failed.pk).update(
+        status=MailStatus.FAILED, last_error="SMTP 550 at RCPT"
+    )
 
 
 def _attachments(world: World) -> None:
