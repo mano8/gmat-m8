@@ -287,6 +287,16 @@ Code in `apps/material_requests/reviewers.py`, `services/assignment.py`, `servic
 - **Nothing rewritten.** The assignment never restricts who decides. A stored assignee who no longer qualifies reads as unassigned in the selectors and gets an empty "Assigned to me" list.
 - **Email.** The assignee is told through the outbox with `request.review` on the request as the claim-time rule; at submit they get that message instead of the general "to review" one. Nobody is mailed for assigning a request to themselves.
 
+## Reviewer edits and the as-submitted copy (step M7b.3)
+
+Code in `apps/material_requests/services/editing.py`, `services/common.py`, `revisions.py`, `models.py`, `selectors.py` and migration `0004`; `apps/notifications/notices.py` and `outbox.py`; ADR-0014 §5-§6, plan Q32-Q34, Q36.
+
+- **Who edits.** Only `request.edit` holders (group administrators, material managers and engineers, all privileged: session MFA after the last elevation) in their scope, in `SUBMITTED` and `APPROVED`; every other state refuses. A decision in the same step also needs `request.review` on the request. The requester's own request follows the self-decision rule of M7b.1, checked against the grant that covers it.
+- **Write order.** Each edit runs `authorize_in_txn`, the idempotency record, then locks the request's whole allocation component (L2-L5) before any line, validates, writes, closes or reopens automatically and reconciles, like the other ledger services. Quantities never go below max(D, R) + P + Q; a material change is made in place only while the line has no live allocation (closed orders included) and nothing received or delivered, otherwise the line is closed short (allocations trimmed to what they received) and a new approved line takes the rest. Threaded tests in `tests/integration/test_edit_races.py`; a property test mixes edits with orders, receipts and handovers.
+- **History is append-only.** The as-submitted copies and the line revisions refuse every `UPDATE` and `DELETE` by trigger, whatever the client. They refer to a line by id without a foreign key, so a draft line its requester deletes after a return for changes does not erase the history. They are scoped through their request (`visible_to`) and hold only what the line shows: material, description, unit, quantities, decision, editor, time and reason. No price, supplier or order.
+- **Stale pages.** A decision or an edit may carry the `seen_version` of the page (submits plus edits, both append-only and written under the request's header lock); one older than the request is refused, so a reviewer cannot approve content they have not seen.
+- **Email.** The requester is told through the outbox with `request.view` as the claim-time rule, never for their own edits. The message only says the request changed and links to it (the edits are on the page). It is held back ten minutes; edits made while it waits find it (`FOR UPDATE SKIP LOCKED`, so neither the edit nor the worker ever waits for the other) and queue nothing more.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

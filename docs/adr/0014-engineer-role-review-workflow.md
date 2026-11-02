@@ -78,11 +78,26 @@ A new capability held in scope by `GROUP_ADMIN`, `MATERIAL_MANAGER` and `ENGINEE
   - Removing a line rejects it (`SUBMITTED`) or closes it short (`APPROVED`); it stays visible and is never deleted.
   - `CLOSED`, `REJECTED` and `CANCELLED` refuse edits (reopen first).
 
+- Details settled in M7b.3 (working assumptions, flagged in the pull request):
+  - lines have no notes field (M4.1 kept it out), so an edit changes material, description, unit or quantity; its required reason is the reviewer's note;
+  - `SUBMITTED`: an edit clears the line's decision whoever made it, the editor's own included; deciding in the same step takes `request.review`, and its note is the reason;
+  - `APPROVED`: only a live line is edited; a new quantity becomes the requested and the approved quantity at once; without one, both stay (a partial approval stays partial) and must suit a new unit;
+  - "nothing allocated" means no live allocation (a positive ceiling) on any order that is not cancelled, a closed order included: on a closed order a receipt void would revive pending of the old material;
+  - an in-place material or unit change clears the line's sourcing (it was decided for the old material); a new description of a catalog line is not a material change;
+  - `REPLACE`: the close reason is the edit's reason; the new line gets the edit's quantity or, in the same unit, A - max(D, R) (allocations are trimmed to what they received, so pending and reservations go); a line fully delivered is not replaced (add a line instead); the new line starts with sourcing undecided;
+  - a new line (`ADD`, `REPLACE`) needs an active project (S9, C10); a quantity change does not;
+  - a request submitted before M7b.3 has no copy: its first edit records one from the lines as they are then, marked `backfilled`;
+  - `self_approved` means the editor decided the edited line themselves: always in `APPROVED`, in `SUBMITTED` when they approved or rejected it in the same step (a removal included);
+  - a decision or an edit may carry the page's `seen_version` (submits plus edits); an older one is refused, so nobody approves a line they have not seen after another reviewer's edit;
+  - open for the maintainer: a replaced line is closed short with source `LINE`, so `reopen_line` can reopen it next to its replacement (both needs live again); nothing blocks it yet.
+
 ### 6. The as-submitted copy and revisions (Q34, M7b.3, M7b.4)
 
 - At every submit, each line's material, unit, description, quantity and notes are copied to an immutable, append-only row. A resubmit after a return to `DRAFT` starts a new baseline; earlier ones stay in the history.
 - Every edit is a `MaterialRequestLineRevision` (append-only): editor, time, reason, kind (`CHANGE`, `ADD`, `REMOVE`, `REPLACE`), before/after values and `self_approved`.
 - The requester's status page and the review page show, per line, the line as submitted, the current line and the edits. Technicians and partners see only fields they already see (no prices, suppliers or other projects). The requester is emailed for each batch of edits.
+- Settled in M7b.3: the copy is `MaterialRequestBaseline` (the request's notes and submit) with `MaterialRequestBaselineLine` rows (material with its reference and name of that day, description, unit, quantity); both and `MaterialRequestLineRevision` are append-only by trigger and name a line by its id, without a foreign key, so deleting a draft line after a return for changes keeps the history of earlier submits. `selectors.line_history` gives each line with its copy from the latest submit and the edits since.
+- A batch of edits is what happens while the requester's notice waits: the first edit queues one message, held back ten minutes, that only says the request changed and links to it; later edits find it waiting and queue nothing. Once the worker has claimed it, the next edit starts a new batch.
 
 ## What this changes
 
