@@ -116,7 +116,9 @@ class TestQuerysets:
             get("sort=-code"), UnitOfMeasure.objects.all(), default_per_page=10, sorts=SORTS
         )
         assert page.sort == "-code"
-        assert ordering(page) == ("-code", "pk")
+        first, tie_breaker = ordering(page)
+        assert (first.expression.name, first.descending, first.nulls_last) == ("code", True, True)
+        assert tie_breaker == "pk"  # rows without a value go last, as when ascending
         assert self.codes(page) == sorted(self.codes(page), reverse=True)
 
     @pytest.mark.parametrize("value", ["id", "-id", "name,code", "password", "--code", ""])
@@ -532,7 +534,8 @@ class TestCursorPage:
         assert len(page.rows) == 10 and reads.stretches[:3] == [44, 88, 176]
 
     @pytest.mark.parametrize(
-        "after", ["", "x", "-3", "99999.zzzz", "5.nomatch", "0", ".", "3.", " "]
+        "after",
+        ["", "x", "-3", "99999.zzzz", "5.nomatch", "0", ".", "3.", " ", "\u00b2", "\u2460.x"],
     )
     def test_a_bad_cursor_never_fails(self, after: str) -> None:
         assert isinstance(cursor(f"after={after}", 30).rows, list)

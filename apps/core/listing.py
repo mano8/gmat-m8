@@ -3,7 +3,7 @@
 A list view reads its filters with its own form, takes the narrowed, scoped queryset from a
 selector and hands it to :func:`paginate`; the template renders the page with
 ``components/list_toolbar.html``, ``components/list_summary.html`` and
-``components/pagination_legacy.html``. The three parameters live in the URL only (``page``,
+``components/pagination.html``. The three parameters live in the URL only (``page``,
 ``per_page``, ``sort``): bookmarkable, nothing stored per user. A value that is not valid
 falls back to the default, never to a 400, 404 or 500.
 """
@@ -185,10 +185,19 @@ def _sort_options(labels: Mapping[str, str | Promise] | None) -> tuple[tuple[str
     return tuple((value, str(text)) for value, text in options)
 
 
+def _nulls_last(field: str) -> Any:
+    """``field`` as an ordering that puts the rows without a value last either way (PostgreSQL
+    puts them first when descending, so the newest-first sort of a nullable date would open
+    with the drafts)."""
+    if field.startswith("-"):
+        return F(field[1:]).desc(nulls_last=True)
+    return field
+
+
 def _total_order(rows: QuerySet[Any], fields: tuple[str, ...]) -> QuerySet[Any]:
     """``rows`` in ``fields`` (or its own order) with the primary key as the last tie-breaker."""
     if fields:
-        return rows.order_by(*fields, _PK)
+        return rows.order_by(*(_nulls_last(field) for field in fields), _PK)
     if not rows.ordered:
         raise ImproperlyConfigured(
             "A list needs an order to be paged: order the queryset or give a default sort."
@@ -270,9 +279,9 @@ def render_list(
 
 CURSOR_START = "0"
 BACK_LIMIT = 10
+"""How many earlier pages a page remembers in its link (older ones lead back to the first)."""
 MAX_STRETCH = 1000
 """The most keys a stretch reads at once (the stretches double while a page is not full)."""
-"""How many earlier pages a page remembers in its link (older ones lead back to the first)."""
 _IDENT = 8
 
 
@@ -357,7 +366,7 @@ def _token(position: int, keys: Sequence[Hashable]) -> str:
 def _position(token: str, keys: Sequence[Hashable]) -> int:
     """Where ``token`` points in ``keys``; its key finds it again if the list moved."""
     head, _, ident = token.partition(".")
-    if not head.isdigit():
+    if not (head.isascii() and head.isdigit()):
         return 0
     position = min(int(head), len(keys))
     if not ident or (position < len(keys) and str(keys[position])[-_IDENT:] == ident):
@@ -433,7 +442,7 @@ def cursor_page(
 ACTIVE, REVOKED = "active", "revoked"
 REVOCATION_CHOICES = [
     ("", gettext_lazy("All")),
-    (ACTIVE, gettext_lazy("Active")),
+    (ACTIVE, gettext_lazy("Not revoked")),
     (REVOKED, gettext_lazy("Revoked")),
 ]
 """The state filter of a section listing grants that are revoked, never deleted."""

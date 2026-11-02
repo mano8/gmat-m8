@@ -31,6 +31,7 @@ def event_list(request: HttpRequest) -> HttpResponse:
         selectors.events(ctx, narrow),
         default_per_page=selectors.DEFAULT_PER_PAGE,
         sorts=selectors.EVENT_SORTS,
+        default_sort="-time",
         sort_labels=selectors.EVENT_SORT_LABELS,
     )
     return render_list(request, "audit/list.html", {"filters": filters, "listing": listing})

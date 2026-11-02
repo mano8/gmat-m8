@@ -5798,3 +5798,6 @@ msgstr "Ninguna entrega prevista coincide con los filtros."
 
 msgid "%(shown)s shown"
 msgstr "%(shown)s mostrados"
+
+msgid "Not revoked"
+msgstr "No revocado"

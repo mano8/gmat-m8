@@ -335,6 +335,24 @@ class TestOrderList:
         assert page(manager, "orders", status="DRAFT").count('data-testid="order-row"') == 1
         assert str(draft.pk) not in html
 
+    def test_a_sort_keeps_the_pending_default_and_says_so(
+        self, manager: Client, buy: Buy, make_line: MakeLine
+    ) -> None:
+        issued = buy((make_line("10"), "10"))
+        buy(issue=False)
+        html = page(manager, "orders", sort="number")
+        assert html.count('data-testid="order-row"') == 1 and str(issued.number) in html
+        assert re.search(r'<option value="ISSUED"[^>]*selected', html)  # not "All"
+
+    def test_the_newest_sort_does_not_open_with_the_drafts(
+        self, manager: Client, buy: Buy, make_line: MakeLine
+    ) -> None:
+        buy(issue=False)
+        issued = buy((make_line("10"), "10"))
+        html = page(manager, "orders", status="", sort="-issued")
+        first_row = html.split('data-testid="order-row"')[1]
+        assert str(issued.number) in first_row.split('data-testid="order-row"')[0]
+
     def test_shows_how_much_has_arrived(
         self, manager: Client, buy: Buy, make_line: MakeLine, received: FakeReceipts
     ) -> None:

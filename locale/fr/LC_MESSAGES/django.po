@@ -5836,3 +5836,6 @@ msgstr "Aucune livraison attendue ne correspond aux filtres."
 
 msgid "%(shown)s shown"
 msgstr "%(shown)s affichés"
+
+msgid "Not revoked"
+msgstr "Non révoqué"

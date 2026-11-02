@@ -58,6 +58,11 @@
   // (the count itself sits in the swapped results, which a screen reader would not announce).
   // A page with several lists wraps each one (toolbar and results) in a [data-list-section].
   document.addEventListener("htmx:afterSettle", function (event) {
+    // Only a swap that brings a result count (not a delivery badge polling every few seconds).
+    var swapped = event.target;
+    if (!(swapped.matches && (swapped.matches("[data-list-count]") || swapped.querySelector("[data-list-count]")))) {
+      return;
+    }
     var scope = (event.target.closest && event.target.closest("[data-list-section]")) || document;
     var status = scope.querySelector("[data-list-status]");
     var count = scope.querySelector("[data-list-count]");

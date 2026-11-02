@@ -145,7 +145,10 @@ def order_new(request: HttpRequest) -> HttpResponse:
 def order_list(request: HttpRequest) -> HttpResponse:
     """Orders to receive (issued) by default; any status and supplier by filter."""
     ctx = access_for(request)
-    filters = OrdersFilterForm(request.GET or None, ctx=ctx)
+    params = request.GET.copy()
+    if params and "status" not in params:
+        params["status"] = Status.ISSUED  # a sort or a page link keeps showing what is pending
+    filters = OrdersFilterForm(params or None, ctx=ctx)
     data = filters.cleaned_data if filters.is_valid() else {}
     status = Status.ISSUED if "status" not in request.GET else data.get("status", "")
     supplier, project = data.get("supplier"), data.get("project")

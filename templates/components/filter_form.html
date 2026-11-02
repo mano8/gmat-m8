@@ -7,7 +7,8 @@
   join the form with their form="…" attribute, as list_toolbar.html does). On a page with
   several lists: `scoped` limits what refreshes the form to the controls inside the closest
   `.list-scope` element (list_toolbar.html draws it) and `select` is the CSS selector of the
-  results to take out of the full page the server answers with (hx-select).
+  results to take out of the full page the server answers with (hx-select). A scoped form does not
+  push its URL: that URL would hold only its own fields and drop the state of the other sections.
 {% endcomment %}
 <form method="get"
       id="{{ form_id|default:'list-filter' }}"
@@ -18,7 +19,7 @@
       {% if select %}hx-select="{{ select }}"{% endif %}
       hx-swap="outerHTML"
       {% if scoped %}hx-trigger="input changed delay:300ms from:closest .list-scope, change from:closest .list-scope, submit"{% else %}hx-trigger="input changed delay:300ms from:input, change from:select, submit"{% endif %}
-      hx-push-url="true"
+      hx-push-url="{% if scoped %}false{% else %}true{% endif %}"
       role="search">
   {% for field in form %}{{ field.as_field_group }}{% endfor %}
   <div class="field">
