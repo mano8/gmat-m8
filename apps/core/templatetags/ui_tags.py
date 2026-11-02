@@ -20,10 +20,13 @@ def at(items: Sequence[Any], index: int) -> Any:
 
 
 @register.filter
-def quantity(value: Decimal | None) -> str:
-    """``10.000`` → ``10``, ``2.500`` → ``2,5`` (in Spanish): a quantity without trailing zeros."""
-    if value is None:
+def quantity(value: Decimal | str | None) -> str:
+    """``10.000`` → ``10``, ``2.500`` → ``2,5`` (in Spanish): a quantity without trailing zeros.
+
+    A string is a stored quantity (the JSON of a revision): ``"2.5"`` reads like ``2.500``.
+    """
+    if value is None or value == "":
         return ""
-    trimmed = value.normalize()
+    trimmed = Decimal(value).normalize()
     places = len(format(trimmed, "f").partition(".")[2])
     return number_format(trimmed, decimal_pos=places)

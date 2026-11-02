@@ -472,6 +472,7 @@ OTHER_QUANTITY = frozenset({Sentinel.OTHER_PROJECT_QUANTITY})
 PANEL_HOLDERS: dict[str, tuple[str, ...]] = {
     "my-requests": REQUEST_VIEWERS,
     "inbox": REVIEWERS,
+    "assigned": SOURCERS,
     "sourcing": SOURCERS,
     "to-purchase": PO_MANAGERS,
     "stale-drafts": PO_MANAGERS,
@@ -1001,6 +1002,55 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a submitted request",
             path=request_url("requests:cancel_any", "cancel_request"),
             note="the first reviewer cancels it, the others find it cancelled",
+        ),
+    ),
+    # Reviewer assignment and edits (M7b.4): assigning takes request.review (site managers
+    # included, the choices come from the selector); editing takes request.edit, which group
+    # administrators, material managers and engineers hold: the same readers as sourcing.
+    "requests:assign_reviewer": (
+        Route(
+            review_action(),
+            position="a submitted request",
+            path=request_url("requests:assign_reviewer", "review_request"),
+            note="an empty form: back to the page",
+        ),
+    ),
+    "requests:edit_line": (
+        Route(
+            source_page(),
+            position="a live line of an approved request",
+            path=line_of("requests:edit_line", "approved_request_line"),
+        ),
+    ),
+    "requests:apply_edit": (
+        Route(
+            source_action(),
+            position="a live line of an approved request",
+            path=line_of("requests:apply_edit", "approved_request_line"),
+            note="an empty form: back to the dialog",
+        ),
+    ),
+    "requests:new_line": (
+        Route(
+            source_page(),
+            position="an approved request",
+            path=request_url("requests:new_line", "approved_request"),
+        ),
+    ),
+    "requests:apply_add": (
+        Route(
+            source_action(),
+            position="an approved request",
+            path=request_url("requests:apply_add", "approved_request"),
+            note="an empty form: back to the dialog",
+        ),
+    ),
+    "requests:remove_reviewed_line": (
+        Route(
+            source_action(),
+            position="a live line of an approved request",
+            path=line_of("requests:remove_reviewed_line", "approved_request_line"),
+            note="no reason: back to the page",
         ),
     ),
     "requests:withdraw": (

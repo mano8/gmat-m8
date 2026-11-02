@@ -9,12 +9,14 @@ from django.utils import timezone, translation
 
 from apps.access.context import AccessContext
 from apps.dashboards import panels
+from apps.material_requests import services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.notifications.models import Kind, Status
 from apps.purchasing.models import PurchaseOrder
 from tests.orders import order as make_order
 from tests.org import Org, People
 from tests.outbox import make_dispatch
+from tests.support import principal_for
 from tests.unit.purchasing.conftest import Buy, MakeLine
 from tests.unit.receiving.conftest import Receive
 
@@ -104,6 +106,42 @@ class TestRequesterAndReviewer:
         assert content.count == 1
         assert content.rows[0].label == line.request.number
         assert panels.inbox(other).count == 0
+
+
+class TestAssigned:
+    def test_the_panel_counts_the_submitted_requests_sent_to_the_user(
+        self, people: People, make_line: MakeLine
+    ) -> None:
+        line = make_line("4", status=MaterialRequest.Status.SUBMITTED)
+        services.assign_reviewer(
+            principal_for(people.mm_mad),
+            line.request_id,
+            reviewer_id=people.engineer.pk,
+            note="Yours",
+        )
+        content = panels.assigned(AccessContext.for_user(people.engineer))
+        assert content.count == 1
+        assert content.rows[0].label == line.request.number
+        assert panels.assigned(AccessContext.for_user(people.mm_mad)).count == 0
+
+    def test_an_approved_request_is_not_waiting_for_a_decision(
+        self, people: People, make_line: MakeLine
+    ) -> None:
+        line = make_line("4")
+        services.assign_reviewer(
+            principal_for(people.mm_mad),
+            line.request_id,
+            reviewer_id=people.engineer.pk,
+            note="Follow it up",
+        )
+        assert panels.assigned(AccessContext.for_user(people.engineer)).count == 0
+
+    def test_only_who_can_be_assigned_gets_the_panel_and_it_links_to_the_filter(
+        self, people: People
+    ) -> None:
+        assert "assigned" in keys(AccessContext.for_user(people.engineer))
+        assert "assigned" not in keys(AccessContext.for_user(people.site_manager))
+        assert panels.BY_KEY["assigned"].query == "?assigned=1"
 
 
 class TestSourcingAndPurchasing:

@@ -236,14 +236,19 @@ def inbox(
     priority: str = "",
     project_id: UUID | None = None,
     needed_before: date | None = None,
+    assigned_to_me: bool = False,
 ) -> QuerySet[MaterialRequest]:
-    """Requests in the user's review scope in one status, the most pressing first."""
+    """Requests in the user's review scope in one status, the most pressing first.
+
+    ``assigned_to_me`` keeps the ones sent to the user (``assigned_to``, M7b.4).
+    """
     rows = (
-        MaterialRequest.objects.visible_to(ctx, REVIEW)
-        .filter(status=status if status in INBOX_STATUSES else Status.SUBMITTED)
+        assigned_to(ctx)
+        if assigned_to_me
+        else MaterialRequest.objects.visible_to(ctx, REVIEW)
         .select_related("project", "requested_by")
         .annotate(line_count=Count("lines"))
-    )
+    ).filter(status=status if status in INBOX_STATUSES else Status.SUBMITTED)
     if priority:
         rows = rows.filter(priority=priority)
     if project_id is not None:
@@ -295,6 +300,13 @@ def assigned_to(ctx: AccessContext) -> QuerySet[MaterialRequest]:
         .select_related("project", "requested_by")
         .annotate(line_count=Count("lines"))
         .order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+    )
+
+
+def assigned_ids(ctx: AccessContext, of: Sequence[MaterialRequest]) -> set[UUID]:
+    """Which of ``of`` are assigned to the user and still count (as in ``assigned_to``)."""
+    return set(
+        assigned_to(ctx).filter(pk__in=[found.pk for found in of]).values_list("pk", flat=True)
     )
 
 
@@ -406,6 +418,7 @@ ACTION_LABELS = {
     "request.approved": _("Approved"),
     "request.rejected": _("Rejected"),
     "request.rescheduled": _("Schedule changed"),
+    "request.reviewer_assigned": _("Sent to a reviewer"),
     "request.closed": _("Closed"),
     "request.reopened": _("Reopened"),
     "request.auto_closed": _("Closed automatically"),

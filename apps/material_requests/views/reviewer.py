@@ -21,8 +21,11 @@ from apps.attachments import selectors as attachment_selectors
 from apps.core.http import is_htmx
 from apps.material_requests import ledger, selectors, services
 from apps.material_requests.forms import (
+    ApproveAllForm,
+    AssignForm,
     DecisionForm,
     InboxFilterForm,
+    LineRemoveForm,
     MaterialSearchForm,
     ReasonForm,
     ReduceForm,
@@ -72,6 +75,7 @@ def inbox(request: HttpRequest) -> HttpResponse:
         priority=data.get("priority", ""),
         project_id=project.pk if project else None,
         needed_before=data.get("needed_before"),
+        assigned_to_me=bool(data.get("assigned")),
     )
     page = Paginator(rows, selectors.PAGE_SIZE).get_page(request.GET.get("page"))
     template = (
@@ -83,11 +87,13 @@ def inbox(request: HttpRequest) -> HttpResponse:
         "filters": filters,
         "page_obj": page,
         "status": status,
+        "mine": selectors.assigned_ids(ctx, list(page.object_list)),
         "extra_query": _query(
             status=request.GET.get("status", ""),
             priority=request.GET.get("priority", ""),
             project=request.GET.get("project", ""),
             needed_before=request.GET.get("needed_before", ""),
+            assigned=request.GET.get("assigned", ""),
         ),
     }
     return render(request, template, context)
@@ -104,6 +110,9 @@ class ReviewRow:
     close: RequiredReasonForm | None = None
     reopen: RequiredReasonForm | None = None
     link: bool = False
+    edit: bool = False  # the way in to the change dialog (M7b.4)
+    remove: LineRemoveForm | None = None
+    history: selectors.LineHistory | None = None
 
 
 def _form_for[F: Form](form_class: type[F], line: MaterialRequestLine, **kwargs: Any) -> F:
@@ -120,6 +129,8 @@ class RowAccess:
     approved: bool  # an approved request
     reviewing: bool
     sourcing: bool
+    editing: bool = False  # ``request.edit`` on a submitted or approved request
+    version: int = 0  # ``selectors.version``: sent back with every decision and edit
 
 
 def _decide_form(access: RowAccess, line: MaterialRequestLine) -> DecisionForm | None:
@@ -134,6 +145,7 @@ def _decide_form(access: RowAccess, line: MaterialRequestLine) -> DecisionForm |
         initial={
             "approved_qty": line.approved_qty or line.requested_qty,
             "note": line.decision_note,
+            "seen_version": access.version,
         },
     )
 
@@ -153,9 +165,31 @@ def _live_tools(row: ReviewRow, access: RowAccess) -> None:
         row.link = line.material_id is None
 
 
-def _review_row(access: RowAccess, entry: ledger.LineLedger) -> ReviewRow:
+def _edit_tools(row: ReviewRow, access: RowAccess) -> None:
+    """The change dialog and the removal of a line a reviewer may edit: any line of a
+    submitted request (a rejected one is already removed), a live line of an approved one
+    that is not fully delivered (the services check the floors)."""
+    line = row.entry.line
+    if access.approved:
+        editable = ledger.is_live(line)
+        removable = editable and not row.entry.fully_delivered
+    else:
+        editable, removable = True, line.decision != line.Decision.REJECTED
+    row.edit = editable
+    if removable:
+        row.remove = _form_for(
+            LineRemoveForm,
+            line,
+            actor_id=access.user_id,
+            initial={"seen_version": access.version},
+        )
+
+
+def _review_row(
+    access: RowAccess, entry: ledger.LineLedger, history: selectors.LineHistory | None
+) -> ReviewRow:
     line = entry.line
-    row = ReviewRow(entry, decide=_decide_form(access, line))
+    row = ReviewRow(entry, decide=_decide_form(access, line), history=history)
     if access.approved and ledger.is_live(line):
         _live_tools(row, access)
     if (
@@ -164,6 +198,8 @@ def _review_row(access: RowAccess, entry: ledger.LineLedger) -> ReviewRow:
         and line.closed_short_source == line.ClosedShortSource.LINE
     ):
         row.reopen = _form_for(RequiredReasonForm, line)
+    if access.editing:
+        _edit_tools(row, access)
     return row
 
 
@@ -176,8 +212,11 @@ def _review_rows(
         approved=found.status == Status.APPROVED,
         reviewing=selectors.can_review(ctx, found),
         sourcing=selectors.can_source(ctx, found),
+        editing=selectors.can_edit_lines(ctx, found),
+        version=selectors.version(found),
     )
-    return [_review_row(access, entry) for entry in entries]
+    history = {item.line.pk: item for item in selectors.line_history(ctx, found)}
+    return [_review_row(access, entry, history.get(entry.line.pk)) for entry in entries]
 
 
 @require_safe
@@ -189,9 +228,14 @@ def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
     found = _on_request(request, request_id, REVIEW)
     entries = selectors.lines(ctx, [found])[found.pk]
     sourcing = selectors.can_source(ctx, found)
+    reviewers = selectors.eligible_reviewers(ctx, found) if selectors.can_assign(ctx, found) else []
     context = {
         "request_obj": found,
         "rows": _review_rows(ctx, found, entries),
+        "assignee": selectors.assignee(found),
+        "assign_form": AssignForm(reviewers=reviewers) if reviewers else None,
+        "can_edit_lines": selectors.can_edit_lines(ctx, found),
+        "approve_all_form": ApproveAllForm(initial={"seen_version": selectors.version(found)}),
         "can_decide": selectors.can_decide(ctx, found),
         "can_source": sourcing,
         "can_cancel_any": selectors.can_cancel_any(ctx, found),
@@ -229,6 +273,7 @@ def line_decide(request: HttpRequest, line_id: UUID) -> HttpResponse:
             decision=data["decision"],
             approved_qty=data["approved_qty"],
             note=data["note"],
+            seen_version=data["seen_version"],
         ),
         _("Line %(line)s decided.") % {"line": line.line_no},
         to,
@@ -239,10 +284,34 @@ def line_decide(request: HttpRequest, line_id: UUID) -> HttpResponse:
 def request_approve_all(request: HttpRequest, request_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     found = _on_request(request, request_id, REVIEW)
+    form = ApproveAllForm(request.POST)
+    seen = form.cleaned_data["seen_version"] if form.is_valid() else None
     return _perform(
         request,
-        lambda: services.approve_all(ctx.principal, found.pk),
+        lambda: services.approve_all(ctx.principal, found.pk, seen_version=seen),
         _("Every pending line is approved."),
+        _examine_url(found),
+    )
+
+
+@mutating(REVIEW)
+def request_assign(request: HttpRequest, request_id: UUID) -> HttpResponse:
+    """Send the request to another reviewer, with a note (the choices come from the
+    selector, the service judges the assignee again)."""
+    ctx = access_for(request)
+    found = _on_request(request, request_id, REVIEW)
+    form = AssignForm(request.POST, reviewers=selectors.eligible_reviewers(ctx, found))
+    if not form.is_valid():
+        return _invalid(request, form, _examine_url(found))
+    return _perform(
+        request,
+        lambda: services.assign_reviewer(
+            ctx.principal,
+            found.pk,
+            reviewer_id=form.reviewer_id(),
+            note=form.cleaned_data["note"],
+        ),
+        _("Request sent to the reviewer."),
         _examine_url(found),
     )
 

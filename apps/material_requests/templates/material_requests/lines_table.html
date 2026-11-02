@@ -1,7 +1,7 @@
 {% load i18n ui_tags %}
 {% comment %}
   The lines of a submitted request with what was decided and delivered. Parameter: lines (the
-  ledgers of `selectors.lines`). Outstanding only counts on an approved request.
+  ledgers of `selectors.lines`) and optionally edited_lines (the ids of the lines a reviewer edited, M7b.4). Outstanding only counts on an approved request.
 {% endcomment %}
 <table class="table-responsive" data-testid="request-lines">
   <thead>
@@ -20,6 +20,9 @@
         <tr data-line="{{ line.line_no }}">
           <td data-label="{% translate 'Material' %}">
             {{ line.description }}
+            {% if line.pk in edited_lines %}
+              {% include "components/status_chip.html" with label=_("Edited") tone="brand" %}
+            {% endif %}
             {% if line.material_id %}<span class="block text-sm text-soft">{{ line.material.reference }}</span>{% endif %}
           </td>
           <td data-label="{% translate 'Requested' %}">{{ line.requested_qty|quantity }} {{ line.unit.code }}</td>

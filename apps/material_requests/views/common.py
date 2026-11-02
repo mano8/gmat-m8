@@ -17,8 +17,9 @@ from apps.access.middleware import access_for
 from apps.access.mixins import require
 from apps.access.roles import Capability
 from apps.core.forms import error_text, form_error_text
+from apps.core.idempotency import IdempotencyError
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict
+from apps.core.responses import conflict, idempotency_failure
 from apps.material_requests import selectors
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 
@@ -93,6 +94,8 @@ def _perform(
     except ValidationError as exc:
         messages.error(request, error_text(exc))
         return redirect(failed_to or to)
+    except IdempotencyError as exc:
+        return idempotency_failure(request, exc)
     except RetryExhausted:
         return conflict(request)
     else:

@@ -34,6 +34,14 @@
           {{ request_obj.requested_by.full_name|default:request_obj.requested_by.email }}
         </dd>
       </div>
+      {% if assignee %}
+        <div>
+          <dt class="text-sm text-soft">{% translate "Sent to" %}</dt>
+          <dd data-testid="detail-assignee">
+            {{ assignee.full_name|default:assignee.email }}
+          </dd>
+        </div>
+      {% endif %}
       {% if request_obj.notes %}
         <div class="sm:col-span-2">
           <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
@@ -72,6 +80,7 @@
       <h2 class="mb-2">{% translate "Lines" %}</h2>
       {% include "material_requests/lines_table.html" %}
     </section>
+    {% include "material_requests/line_changes.html" %}
     {% include "attachments/panel.html" with panel=attachments %}
     {% if withdrawable %}
       <form method="post"

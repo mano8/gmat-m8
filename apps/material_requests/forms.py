@@ -5,14 +5,17 @@ Quantities are entered in the user's language (``localize``: ``2,5`` in Spanish)
 service checks the unit's decimals.
 """
 
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 from django import forms
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
+from apps.accounts.models import User
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.forms import UnitChoiceField
 from apps.core.forms import IdempotentForm
@@ -32,6 +35,16 @@ class IdChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]
 
 
 QUANTITY = _("Quantity")
+
+
+def user_label(user: User) -> str:
+    return user.full_name or user.email
+
+
+def seen_version_field() -> forms.IntegerField:
+    """The version of the request the page showed (``selectors.version``): the services
+    refuse a decision or an edit made on a page older than the request (M7b.3)."""
+    return forms.IntegerField(required=False, min_value=0, widget=forms.HiddenInput)
 
 
 def quantity_field(label: Any = QUANTITY, *, required: bool = True) -> forms.DecimalField:
@@ -147,6 +160,22 @@ class SubmitForm(IdempotentForm):
         widget=forms.Textarea(attrs={"rows": 3}),
     )
 
+    reviewer = forms.ChoiceField(
+        label=_("Send to a reviewer"),
+        required=False,
+        help_text=_("Optional. Any reviewer of the branch can still decide the request."),
+    )
+
+    def __init__(self, *args: Any, reviewers: Sequence[User] = (), **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if reviewers:
+            self.fields["reviewer"].choices = [  # type: ignore[attr-defined]
+                ("", _("No one in particular")),
+                *((str(user.pk), user_label(user)) for user in reviewers),
+            ]
+        else:
+            del self.fields["reviewer"]
+
     def clean_needed_by(self) -> Any:
         value = self.cleaned_data["needed_by"]
         if value is not None and value < timezone.localdate():
@@ -159,6 +188,9 @@ class SubmitForm(IdempotentForm):
             "priority": request.priority,
             "needed_by": request.needed_by,
             "notes": request.notes,
+            "reviewer": ""
+            if request.assigned_reviewer_id is None
+            else request.assigned_reviewer_id,
         }
 
     def header(self) -> dict[str, Any]:
@@ -168,6 +200,11 @@ class SubmitForm(IdempotentForm):
             "needed_by": data["needed_by"],
             "notes": data["notes"],
         }
+
+    def reviewer_id(self) -> UUID | None:
+        """The reviewer picked, if the field was offered and one was chosen."""
+        value = self.cleaned_data.get("reviewer")
+        return UUID(value) if value else None
 
 
 class ReasonForm(forms.Form):
@@ -202,6 +239,11 @@ class InboxFilterForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date"}),
         help_text=_("On or before"),
     )
+    assigned = forms.ChoiceField(
+        label=_("Reviewer"),
+        required=False,
+        choices=[("", _("All")), ("1", _("Assigned to me"))],
+    )
 
     def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -221,12 +263,19 @@ class DecisionForm(forms.Form):
     )
     approved_qty = quantity_field(_("Approved quantity"), required=False)
     note = forms.CharField(label=_("Reason"), required=False, max_length=500)
+    seen_version = seen_version_field()
 
     def clean(self) -> dict[str, Any]:
         data: dict[str, Any] = super().clean() or {}
         if data.get("decision") == MaterialRequestLine.Decision.REJECTED and not data.get("note"):
             self.add_error("note", forms.ValidationError(_("Give a reason."), code="required"))
         return data
+
+
+class ApproveAllForm(forms.Form):
+    """Approve every pending line: only the version of the page, which the service checks."""
+
+    seen_version = seen_version_field()
 
 
 class ReturnForm(forms.Form):
@@ -284,3 +333,110 @@ class RequiredReasonForm(forms.Form):
     reason = forms.CharField(
         label=_("Reason"), max_length=500, error_messages={"required": _("Give a reason.")}
     )
+
+
+# --- reviewer assignment and edits (M7b.4) ---------------------------------------------
+
+REASON_REQUIRED = {"required": _("Give a reason.")}
+
+
+class AssignForm(forms.Form):
+    """Send the request to another reviewer; the choices are the ones the selector offers
+    and the note is required (the service judges the assignee again)."""
+
+    reviewer = forms.ChoiceField(label=_("Reviewer"))
+    note = forms.CharField(
+        label=_("Note for the reviewer"),
+        max_length=500,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        error_messages={"required": _("Give a note.")},
+    )
+
+    def __init__(self, *args: Any, reviewers: Sequence[User], **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["reviewer"].choices = [  # type: ignore[attr-defined]
+            (str(user.pk), user_label(user)) for user in reviewers
+        ]
+
+    def reviewer_id(self) -> UUID:
+        return UUID(self.cleaned_data["reviewer"])
+
+
+class LineChangeForm(IdempotentForm):
+    """A reviewer's change of a line, or the line they add: a catalog material (chosen on
+    the page, checked against the catalog selector) or a described one with its unit, the
+    quantity and the reason. ``decision`` is the "save and approve" button."""
+
+    operation = "request_line.edit"
+
+    material = IdChoiceField(queryset=None, required=False)
+    free_text = forms.CharField(label=_("Description"), required=False, max_length=300)
+    unit = UnitChoiceField(label=_("Unit"), queryset=None, required=False)
+    requested_qty = quantity_field(required=False)
+    reason = forms.CharField(
+        label=_("Reason for the change"), max_length=500, error_messages=REASON_REQUIRED
+    )
+    decision = forms.ChoiceField(
+        required=False, choices=[("", ""), (MaterialRequestLine.Decision.APPROVED, _("Approve"))]
+    )
+    seen_version = seen_version_field()
+
+    def __init__(
+        self, *args: Any, ctx: AccessContext, line: MaterialRequestLine | None = None, **kwargs: Any
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.line = line
+        self.fields["material"].queryset = catalog_selectors.materials(ctx)  # type: ignore[attr-defined]
+        self.fields["unit"].queryset = catalog_selectors.units(ctx)  # type: ignore[attr-defined]
+
+    def clean(self) -> dict[str, Any]:
+        data: dict[str, Any] = super().clean() or {}
+        if self.line is None and data.get("requested_qty") is None:
+            self.add_error(
+                "requested_qty", forms.ValidationError(_("Give a quantity."), code="required")
+            )
+        return data
+
+    def changes(self) -> dict[str, Any]:
+        """What differs from the line (all of it for a new line): the service takes only
+        the fields named."""
+        if self.cleaned_data.get("material") is not None:
+            found = self._material_change()
+        else:
+            found = self._description_changes()
+        quantity = self.cleaned_data.get("requested_qty")
+        if quantity is not None and self._differs(quantity, "requested_qty"):
+            found["requested_qty"] = quantity
+        return found
+
+    def _differs(self, value: Any, attribute: str) -> bool:
+        return self.line is None or value != getattr(self.line, attribute)
+
+    def _material_change(self) -> dict[str, Any]:
+        material = self.cleaned_data["material"]
+        return {"material_id": material.pk} if self._differs(material.pk, "material_id") else {}
+
+    def _description_changes(self) -> dict[str, Any]:
+        """A described material: its text and unit, as far as they differ."""
+        found: dict[str, Any] = {}
+        text, unit = self.cleaned_data.get("free_text", "").strip(), self.cleaned_data.get("unit")
+        if text and self._differs(text, "free_text"):
+            found["free_text"] = text
+        if unit is not None and self._differs(unit.pk, "unit_id"):
+            found["unit_id"] = unit.pk
+        return found
+
+
+class ReviewerLineAddForm(LineChangeForm):
+    """A line a reviewer adds to a submitted or approved request."""
+
+    operation = "request_line.add_as_reviewer"
+
+
+class LineRemoveForm(IdempotentForm):
+    """Removing a line (it stays, rejected or closed short): a reason."""
+
+    operation = "request_line.remove_as_reviewer"
+
+    reason = forms.CharField(label=_("Reason"), max_length=500, error_messages=REASON_REQUIRED)
+    seen_version = seen_version_field()

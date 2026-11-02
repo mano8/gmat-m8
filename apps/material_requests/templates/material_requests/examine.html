@@ -61,6 +61,33 @@
       {% endif %}
     </dl>
   </section>
+  {% if request_obj.status == "SUBMITTED" or request_obj.status == "APPROVED" %}
+    <section class="card mb-4"
+             aria-label="{% translate 'Assigned reviewer' %}"
+             data-testid="assignment">
+      <p data-testid="assignee">
+        <span class="text-sm text-soft">{% translate "Assigned reviewer" %}:</span>
+        {% if assignee %}
+          {{ assignee.full_name|default:assignee.email }}
+        {% else %}
+          {% translate "Nobody in particular: any reviewer of the branch can decide." %}
+        {% endif %}
+      </p>
+      {% if assign_form %}
+        <details class="mt-2">
+          <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Send to another reviewer" %}</summary>
+          <form method="post"
+                action="{% url 'requests:assign_reviewer' request_id=request_obj.pk %}"
+                data-testid="assign-form">
+            {% csrf_token %}
+            {{ assign_form.reviewer.as_field_group }}
+            {{ assign_form.note.as_field_group }}
+            <button type="submit" class="btn">{% translate "Send" %}</button>
+          </form>
+        </details>
+      {% endif %}
+    </section>
+  {% endif %}
   {% if request_obj.status == "SUBMITTED" %}
     {% if own_request and not can_decide %}
       <p class="card mb-4 text-soft" data-testid="self-approval-notice">
@@ -77,6 +104,7 @@
               action="{% url 'requests:approve_all' request_id=request_obj.pk %}"
               class="mb-3">
           {% csrf_token %}
+          {{ approve_all_form.seen_version }}
           <button type="submit"
                   class="btn btn-primary btn-block"
                   data-testid="approve-all">{% translate "Approve all pending lines" %}</button>
@@ -96,6 +124,13 @@
   {% endif %}
   <section class="mb-4" aria-label="{% translate 'Lines' %}">
     <h2 class="mb-2">{% translate "Lines" %}</h2>
+    {% if can_edit_lines %}
+      <p class="mb-3">
+        <a class="btn"
+           href="{% url 'requests:new_line' request_id=request_obj.pk %}"
+           data-testid="add-line">{% translate "Add a line" %}</a>
+      </p>
+    {% endif %}
     <div data-testid="review-lines">
       {% for row in rows %}
         {% with entry=row.entry line=row.entry.line %}
@@ -111,15 +146,20 @@
                   <span class="block text-sm text-soft">{% translate "Not in the catalog" %}</span>
                 {% endif %}
               </div>
-              {% if line.closed_short_at %}
-                {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
-              {% elif line.decision == "APPROVED" %}
-                {% include "components/status_chip.html" with label=_("Approved") tone="ok" %}
-              {% elif line.decision == "REJECTED" %}
-                {% include "components/status_chip.html" with label=_("Rejected") tone="danger" %}
-              {% else %}
-                {% include "components/status_chip.html" with label=_("Pending") %}
-              {% endif %}
+              <span class="flex flex-wrap gap-2">
+                {% if row.history.edited %}
+                  {% include "components/status_chip.html" with label=_("Edited") tone="brand" %}
+                {% endif %}
+                {% if line.closed_short_at %}
+                  {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
+                {% elif line.decision == "APPROVED" %}
+                  {% include "components/status_chip.html" with label=_("Approved") tone="ok" %}
+                {% elif line.decision == "REJECTED" %}
+                  {% include "components/status_chip.html" with label=_("Rejected") tone="danger" %}
+                {% else %}
+                  {% include "components/status_chip.html" with label=_("Pending") %}
+                {% endif %}
+              </span>
             </div>
             <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
               <div>
@@ -162,12 +202,16 @@
                 · {{ line.close_reason }}
               </p>
             {% endif %}
+            {% if row.history.edited %}
+              {% include "material_requests/line_edits.html" with item=row.history %}
+            {% endif %}
             {% if row.decide %}
               <form method="post"
                     action="{% url 'requests:decide_line' line_id=line.pk %}"
                     class="mt-3"
                     data-testid="decide-form">
                 {% csrf_token %}
+                {{ row.decide.seen_version }}
                 {{ row.decide.approved_qty.as_field_group }}
                 {{ row.decide.note.as_field_group }}
                 <div class="grid grid-cols-2 gap-2">
@@ -226,6 +270,34 @@
                   {% csrf_token %}
                   {{ row.close.reason.as_field_group }}
                   <button type="submit" class="btn btn-danger">{% translate "Close short" %}</button>
+                </form>
+              </details>
+            {% endif %}
+            {% if row.edit %}
+              <p class="mt-3">
+                <a class="btn"
+                   href="{% url 'requests:edit_line' line_id=line.pk %}"
+                   data-testid="edit-line">{% translate "Change the line" %}</a>
+              </p>
+            {% endif %}
+            {% if row.remove %}
+              <details class="mt-3">
+                <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Remove the line" %}</summary>
+                <p class="text-sm text-soft">
+                  {% if request_obj.status == "SUBMITTED" %}
+                    {% translate "The line stays on the request, rejected, with your reason." %}
+                  {% else %}
+                    {% translate "The line stays on the request, closed short, with your reason." %}
+                  {% endif %}
+                </p>
+                <form method="post"
+                      action="{% url 'requests:remove_reviewed_line' line_id=line.pk %}"
+                      data-testid="remove-line-form">
+                  {% csrf_token %}
+                  {{ row.remove.idempotency_key }}
+                  {{ row.remove.seen_version }}
+                  {{ row.remove.reason.as_field_group }}
+                  <button type="submit" class="btn btn-danger">{% translate "Remove" %}</button>
                 </form>
               </details>
             {% endif %}

@@ -30,7 +30,14 @@ from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
 from apps.handovers.models import Handover, HandoverLine
-from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.material_requests import revisions
+from apps.material_requests.models import (
+    MaterialRequest,
+    MaterialRequestBaseline,
+    MaterialRequestBaselineLine,
+    MaterialRequestLine,
+    MaterialRequestLineRevision,
+)
 from apps.notifications.models import Status as MailStatus
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
@@ -39,6 +46,39 @@ from tests.access.matrix import World, build_world
 from tests.orders import allocate, line, order
 from tests.org import build_sentinel_order
 from tests.outbox import make_dispatch
+
+
+def _edited(world: World, key: str) -> None:
+    """The request's first line as its requester submitted it (2) and a reviewer's edit of
+    it (to 3): the pages that show the edits (M7b.4) render with data in the matrix."""
+    request, line = world.objects[key], world.objects[f"{key}_line"]
+    baseline = MaterialRequestBaseline.objects.create(
+        request=request,
+        sequence=1,
+        submitted_at=request.submitted_at,
+        submitted_by=request.requested_by,
+    )
+    MaterialRequestBaselineLine.objects.create(
+        baseline=baseline,
+        line_id=line.pk,
+        line_no=line.line_no,
+        material=line.material,
+        material_snapshot={"reference": line.material.reference, "name": line.material.name},
+        unit=line.unit,
+        requested_qty=Decimal("2.000"),
+    )
+    after = revisions.values(line)
+    MaterialRequestLineRevision.objects.create(
+        request=request,
+        baseline=baseline,
+        line_id=line.pk,
+        line_no=line.line_no,
+        kind=MaterialRequestLineRevision.Kind.CHANGE,
+        editor=world.people.engineer,
+        reason="Measured on site",
+        before={**after, "requested_qty": "2"},
+        after=after,
+    )
 
 
 def _admin_rows(world: World) -> None:
@@ -139,6 +179,10 @@ def _admin_rows(world: World) -> None:
     reviewable("approve_request", Status.SUBMITTED, 3)
     reviewable("cancel_request", Status.SUBMITTED, 4)
     reviewable("approved_request", Status.APPROVED, 5, approved=True)
+    world.objects["submitted_request_line"] = submitted.lines.get()
+    _edited(world, "submitted_request")
+    _edited(world, "review_request")
+    _edited(world, "approved_request")
     world.objects["free_line"] = MaterialRequestLine.objects.create(
         request=world.objects["approved_request"],
         project=org.hospital,
