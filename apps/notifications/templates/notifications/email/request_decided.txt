@@ -1,0 +1,6 @@
+{% load i18n ui_tags %}{% autoescape off %}{% if approved %}{% blocktranslate with number=request_obj.number project=request_obj.project.name %}Your request {{ number }} for {{ project }} has been reviewed.{% endblocktranslate %}{% else %}{% blocktranslate with number=request_obj.number project=request_obj.project.name %}Your request {{ number }} for {{ project }} has been rejected.{% endblocktranslate %}{% endif %}
+
+{% for line in lines %}- {{ line.description }}: {{ line.get_decision_display }}{% if line.approved_qty is not None %} ({{ line.approved_qty|quantity }} {{ line.unit.code }}){% endif %}{% if line.decision_note %} - {{ line.decision_note }}{% endif %}
+{% endfor %}
+{{ link }}
+{% endautoescape %}

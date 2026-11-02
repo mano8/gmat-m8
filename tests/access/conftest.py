@@ -51,6 +51,13 @@ def _admin_rows(world: World) -> None:
         AuditIdentity(label=people.group_admin.email, user_id=people.group_admin.pk),
         "fixture.created",
     )
+    for key, branch in (("audit_mad", org.a_mad), ("audit_sev", org.a_sev)):
+        world.objects[key] = record(
+            AuditIdentity(label=people.group_admin.email, user_id=people.group_admin.pk),
+            "fixture.created",
+            obj=branch,
+            branch_id=branch.pk,
+        )
     world.objects["jointventuremember"] = JointVentureMember.objects.create(
         venture=org.b, member=org.a
     )

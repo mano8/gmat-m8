@@ -1,0 +1,21 @@
+{% load i18n ui_tags %}
+{% get_current_language as language %}<!DOCTYPE html>
+<html lang="{{ language }}">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ request_obj.number }}</title>
+  </head>
+  <body>
+    <h1>
+      {% if on_site %}{% blocktranslate with number=request_obj.number %}Request {{ number }}: goods received on site{% endblocktranslate %}{% else %}{% blocktranslate with number=request_obj.number %}Request {{ number }}: goods handed over{% endblocktranslate %}{% endif %}
+    </h1>
+    <p>{{ request_obj.project.name }}</p>
+    <ul>
+      {% for line, qty in lines %}
+        <li>{{ line.description }}: {{ qty|quantity }} {{ line.unit.code }}</li>
+      {% endfor %}
+    </ul>
+    <p>{% translate "Document" %}: {{ handover.number }}</p>
+    <p><a href="{{ link }}">{% translate "Open the request" %}</a></p>
+  </body>
+</html>

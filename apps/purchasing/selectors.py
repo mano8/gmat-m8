@@ -20,13 +20,13 @@ An order's **supplier dispatches** (M5.3) reach ``po.view`` holders on it (they 
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import F, Q, QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -51,6 +51,8 @@ VIEW, MANAGE, PRICE = Capability.PO_VIEW, Capability.PO_MANAGE, Capability.PRICE
 Status = PurchaseOrder.Status
 STALE_DRAFT_DAYS = 14  # Q24
 PAGE_SIZE = 25
+NEEDS_ATTENTION = (Dispatch.AMBIGUOUS, Dispatch.QUARANTINED)
+NOTICE_PENDING = (Dispatch.QUEUED, Dispatch.SENDING, Dispatch.FAILED)
 
 
 # --- orders -----------------------------------------------------------------------------
@@ -394,6 +396,35 @@ def stale_drafts(ctx: AccessContext, *, days: int = STALE_DRAFT_DAYS) -> QuerySe
     """Drafts older than ``days``: they reserve demand until a human discards them (Q24)."""
     cutoff = timezone.now() - timedelta(days=days)
     return drafts(ctx).filter(created_at__lt=cutoff)
+
+
+def awaiting_receipt(ctx: AccessContext) -> QuerySet[PurchaseOrder]:
+    """Issued orders still to receive, the earliest expected date first (none last)."""
+    return (
+        PurchaseOrder.objects.visible_to(ctx, VIEW)
+        .filter(status=Status.ISSUED)
+        .select_related("supplier")
+        .order_by(F("expected_date").asc(nulls_last=True), "number")
+    )
+
+
+def overdue(ctx: AccessContext, *, today: date | None = None) -> QuerySet[PurchaseOrder]:
+    """Issued orders whose expected date has passed."""
+    return awaiting_receipt(ctx).filter(expected_date__lt=today or timezone.localdate())
+
+
+def dispatches_needing_attention(ctx: AccessContext) -> QuerySet[EmailOutbox]:
+    """Supplier dispatches of the user's ``po.manage`` orders a human has to look at: left
+    ``AMBIGUOUS`` or ``QUARANTINED``, and cancellation notices not yet sent (M7.2)."""
+    return (
+        EmailOutbox.objects.filter(
+            Q(status__in=NEEDS_ATTENTION) | Q(kind=Kind.PO_CANCELLATION, status__in=NOTICE_PENDING),
+            kind__in=DISPATCH_KINDS,
+            source_po__in=PurchaseOrder.objects.visible_to(ctx, MANAGE),
+        )
+        .select_related("source_po")
+        .order_by("created_at")
+    )
 
 
 def worklist_projects(ctx: AccessContext) -> QuerySet[Project]:

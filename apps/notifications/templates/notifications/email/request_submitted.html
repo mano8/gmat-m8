@@ -1,0 +1,19 @@
+{% load i18n %}
+{% get_current_language as language %}<!DOCTYPE html>
+<html lang="{{ language }}">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ request_obj.number }}</title>
+  </head>
+  <body>
+    <h1>{% blocktranslate with number=request_obj.number %}Request {{ number }} to review{% endblocktranslate %}</h1>
+    <p>
+      {% blocktranslate with project=request_obj.project.name name=request_obj.requested_by.full_name|default:request_obj.requested_by.email count lines=lines %}From {{ name }} for {{ project }}: {{ lines }} line.{% plural %}From {{ name }} for {{ project }}: {{ lines }} lines.{% endblocktranslate %}
+    </p>
+    <p>
+      {% translate "Priority" %}: {{ request_obj.get_priority_display }}
+      {% if request_obj.needed_by %}<br>{% translate "Needed by" %}: {{ request_obj.needed_by|date:"SHORT_DATE_FORMAT" }}{% endif %}
+    </p>
+    <p><a href="{{ link }}">{% translate "Open the request" %}</a></p>
+  </body>
+</html>

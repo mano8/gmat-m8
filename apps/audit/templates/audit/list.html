@@ -1,0 +1,26 @@
+{% extends "layouts/app.html" %}
+{% load i18n access %}
+{% block head_title %}
+  {% translate "Audit" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h1>{% translate "Audit" %}</h1>
+    {% can "export.csv" %}
+      {% url 'exports:index' as exports_url %}
+      {% include "components/button.html" with href=exports_url label=_("Exports") %}
+    {% endcan %}
+  </div>
+  {% url 'audit:list' as list_url %}
+  {% include "components/filter_form.html" with form=filters target="#audit-results" action=list_url grid="sm:grid-cols-[1fr_12rem_9rem_9rem_auto]" %}
+  {% partialdef results inline %}
+    <div id="audit-results" data-testid="audit">
+      {% if page_obj.object_list %}
+        {% include "audit/rows.html" with events=page_obj.object_list %}
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No events") text=_("No event matches the filters.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

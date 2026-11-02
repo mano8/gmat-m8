@@ -6,6 +6,7 @@ urlpatterns = [
     path(f"{settings.ADMIN_URL_PATH}/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
     path("invite/", include("apps.accounts.invitation_urls")),
+    path("account/notifications/", include("apps.notifications.urls")),
     path("account/email-change/", include("apps.accounts.email_change_urls")),
     path("projects/", include("apps.projects.urls")),
     path("catalog/", include("apps.catalog.urls")),
@@ -16,6 +17,9 @@ urlpatterns = [
     path("handovers/", include("apps.handovers.urls")),
     path("attachments/", include("apps.attachments.urls")),
     path("org/", include("apps.organizations.urls")),
+    path("audit/", include("apps.audit.urls")),
+    path("exports/", include("apps.exports.urls")),
+    path("dashboard/", include("apps.dashboards.urls")),
     path("i18n/", include("django.conf.urls.i18n")),
     path("", include("apps.core.urls")),
 ]

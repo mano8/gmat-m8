@@ -10,12 +10,25 @@ their transaction): ownership, the state and, for a withdrawal, that no line is 
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from django.db.models import Case, Count, F, IntegerField, Max, Q, QuerySet, Value, When
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    Max,
+    OuterRef,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
@@ -33,6 +46,8 @@ PROJECT_PAGE_SIZE = 12
 RECENT_MATERIALS = 8
 # How many of the user's latest lines are looked at for the recent materials.
 RECENT_WINDOW = 60
+# How far back the dashboard looks for closed requests that need attention.
+CLOSED_WINDOW_DAYS = 30
 
 VIEW, CREATE, WITHDRAW = (
     Capability.REQUEST_VIEW,
@@ -227,6 +242,34 @@ def inbox(
     if needed_before is not None:
         rows = rows.filter(needed_by__lte=needed_before)
     return rows.order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+
+
+def sourcing_to_decide(ctx: AccessContext) -> QuerySet[MaterialRequestLine]:
+    """Open lines of the user's ``request.source`` scope whose sourcing is not decided yet
+    (stock or purchase), the longest waiting first (M7.2 dashboard)."""
+    return (
+        MaterialRequestLine.objects.visible_to(ctx, SOURCE)
+        .filter(ledger.open_q(), sourcing=MaterialRequestLine.Sourcing.UNDECIDED)
+        .select_related("request", "project", "material", "unit")
+        .order_by("request__submitted_at", "request__number", "line_no")
+    )
+
+
+def closed_needing_attention(
+    ctx: AccessContext, *, days: int = CLOSED_WINDOW_DAYS
+) -> QuerySet[MaterialRequest]:
+    """Requests closed in the last ``days`` days with a line closed short: something was
+    not delivered, and whoever follows the request up may want to look again (M7.2)."""
+    short = MaterialRequestLine.objects.filter(
+        request=OuterRef("pk"), closed_short_at__isnull=False
+    )
+    return (
+        MaterialRequest.objects.visible_to(ctx, SOURCE)
+        .filter(status=Status.CLOSED, closed_at__gte=timezone.now() - timedelta(days=days))
+        .filter(Exists(short))
+        .select_related("project")
+        .order_by("-closed_at")
+    )
 
 
 def inbox_projects(ctx: AccessContext) -> QuerySet[Project]:

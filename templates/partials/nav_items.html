@@ -89,6 +89,22 @@
     <span>{% translate "People" %}</span>
   </a>
 {% endcan %}
+{% can "audit.view" %}
+  <a href="{% url 'audit:list' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'audit' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="clipboard" %}
+    <span>{% translate "Audit" %}</span>
+  </a>
+{% endcan %}
+{% can "export.csv" %}
+  <a href="{% url 'exports:index' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'exports' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="inbox" %}
+    <span>{% translate "Exports" %}</span>
+  </a>
+{% endcan %}
 <a href="{% url 'mfa_index' %}"
    class="nav-link"
    {% if request.resolver_match.app_name == 'mfa' or request.resolver_match.url_name|slice:':4' == 'mfa_' %}aria-current="page"{% endif %}>

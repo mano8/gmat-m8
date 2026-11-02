@@ -1,0 +1,7 @@
+{% load i18n ui_tags %}{% autoescape off %}{% if on_site %}{% blocktranslate with number=request_obj.number project=request_obj.project.name %}Materials of your request {{ number }} arrived at {{ project }}.{% endblocktranslate %}{% else %}{% blocktranslate with number=request_obj.number project=request_obj.project.name %}Materials of your request {{ number }} were handed over for {{ project }}.{% endblocktranslate %}{% endif %}
+
+{% for line, qty in lines %}- {{ line.description }}: {{ qty|quantity }} {{ line.unit.code }}
+{% endfor %}
+{% translate "Document" %}: {{ handover.number }}
+{{ link }}
+{% endautoescape %}

@@ -250,6 +250,26 @@ Code in `apps/material_requests/views/trace.py`, `selectors.project_materials` a
 - **Exposure.** The ledger shows quantities only: no price, order number, supplier or contact. The reductions of the quantity on order (allocation trims) come from the audit trail and reach only who reviews, sources or audits the request (`can_see_history`); they show the request line, the quantities, the reason, the time and the actor, never the order or its line.
 - **Tests.** Both URLs have rows in the acceptance matrix (every actor, the technician's and the partner's requests, an unknown id); the selectors are covered in `tests/unit/purchasing/test_traceability.py`.
 
+## Email notifications (step M7.1)
+
+Code in `apps/notifications/notices.py`, `recipients.py`, `eligibility.py` and the settings screen under `/account/notifications/`.
+
+- **Events.** Subscribers of `request.submitted` (to the users who hold `request.review` on the request, its author excepted), `request.approved` / `request.rejected` and `handover.posted` (to the requester, once per request served; a `DIRECT_RECEIPT` handover is the receipt on site) run in the publishing service's transaction through `queue_notification`: a rolled-back change leaves no message, and a message holds at most 20 BCC recipients.
+- **Recipients and eligibility.** Recipients are stored as user ids with the capability (`request.review` / `request.view`) on the request. The worker re-checks at the claim, through each recipient's own `AccessContext`: a revoked, expired, deactivated or opted-out user receives nothing, and a message without anyone left is `SUPPRESSED`.
+- **Exposure.** Bodies are frozen in the installation's language from what the recipient already sees on the request: no prices, orders, suppliers, other requests or other people's lines (a handover mails each requester only their own lines). Links are absolute (`PUBLIC_BASE_URL`) and carry no token.
+- **Opt-out.** `NotificationPreference` (one row per user, default on) turns off business notifications only; security email and supplier dispatches are never optional. `set_email_opt_out` acts on the principal's own row (`catalog.view`, held by every role) and is audited as `notification_preference.changed`.
+- **Tests.** `tests/unit/notices/` (recipients of each event, privacy per projection, revocation before the claim, rollback), `tests/unit/notifications/test_preferences.py`, and the two URLs in the acceptance matrix.
+
+## Audit viewer and exports (step M7.3)
+
+Code in `apps/audit` (viewer) and `apps/exports`; plan M7.3, Q13, Q17.
+
+- **Scope.** An audit event belongs to the branch recorded with it: `AuditEvent.objects.visible_to(ctx, audit.view)` gives a material manager the events of their branches and a group administrator all of them, including the ones without a branch (installation-wide changes). Another branch's object history is a 404. Exports read the document tables through `visible_to(ctx, export.csv)`.
+- **What the screens do not show.** The event payload (`data`, which may hold prices) and the client address are not selected for display; the list shows time, actor, channel, action and object.
+- **Prices.** The order export has price columns only for who holds `price.view` somewhere, and a price only on the orders where that capability reaches (sentinel test in the acceptance matrix).
+- **Formula injection.** Every string written to a CSV goes through `apps.exports.cells.cell`: a value starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`. Numbers, dates and decimals are written in their plain form.
+- **Downloads** are attachments (`Content-Disposition`), streamed, `no-store` like every authenticated response. Drafts (requests and orders) are not exported. A download is a GET and is not audited: recording it would need a service on a read.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

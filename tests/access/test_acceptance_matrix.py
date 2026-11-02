@@ -49,6 +49,7 @@ from tests.access.matrix import (
     ACTOR_NAMES,
     ADMIN_LOGIN,
     DENIED,
+    GROUPS,
     HOME,
     LOGIN,
     NOT_ALLOWED,
@@ -447,6 +448,106 @@ SUPPLIER_NAME = frozenset({Sentinel.SUPPLIER_NAME})
 OTHER_QUANTITY = frozenset({Sentinel.OTHER_PROJECT_QUANTITY})
 
 
+# Dashboard panels (M7.2): a fragment per panel, for whoever holds its capability somewhere;
+# the rows inside come from scoped selectors (the unit tests check them per scope).
+PANEL_HOLDERS: dict[str, tuple[str, ...]] = {
+    "my-requests": REQUEST_VIEWERS,
+    "inbox": REVIEWERS,
+    "sourcing": SOURCERS,
+    "to-purchase": PO_MANAGERS,
+    "stale-drafts": PO_MANAGERS,
+    "unallocated": PO_MANAGERS,
+    "awaiting-receipt": PO_VIEWERS,
+    "overdue": PO_VIEWERS,
+    "to-hand-over": HANDOVER_POSTERS,
+    "site-surplus": RECEIPT_HOLDERS,
+    "closed-attention": SOURCERS,
+    "dispatches": PO_MANAGERS,
+    "overview": ("group_admin",),
+}
+# An unknown panel is a 404 for every signed-in session that passed the MFA guard.
+SESSION_ACTORS = tuple(
+    name for name in ACTOR_NAMES if name not in (*GROUPS["signed_out"], *GROUPS["no_mfa"])
+)
+
+
+def _panel_url(key: str) -> Callable[[World], str]:
+    return lambda world: reverse("dashboard:panel", kwargs={"key": key})
+
+
+def dashboard_routes() -> tuple[Route, ...]:
+    panels = tuple(
+        Route(
+            app_page(**_each(OK, holders)),
+            position=key,
+            path=_panel_url(key),
+            allowed=SUPPLIER_NAME | OTHER_QUANTITY,
+        )
+        for key, holders in PANEL_HOLDERS.items()
+    )
+    unknown = Route(
+        app_page(**_each(NOT_FOUND, SESSION_ACTORS)),
+        position="unknown panel",
+        path=_panel_url("no-such-panel"),
+    )
+    return (*panels, unknown)
+
+
+# Audit (M7.3): audit.view is the group administrators' and the material managers'; an event
+# belongs to its branch, so a manager gets 404 for another branch's object history.
+AUDIT_HOLDERS = PO_MANAGERS
+AUDIT_MAD_READERS = ("group_admin", "mm_mad")
+AUDIT_SEV_READERS = ("group_admin", "mm_sev", "mixed")
+EXPORT_KEYS = ("requests", "orders", "receipts")
+
+
+def _audit_url(key: str) -> Callable[[World], str]:
+    return lambda world: reverse(
+        "audit:object",
+        args=[world.objects[key].object_type, world.objects[key].object_id],
+    )
+
+
+def _export_url(key: str) -> Callable[[World], str]:
+    return lambda world: reverse("exports:download", kwargs={"key": key})
+
+
+def audit_routes() -> tuple[Route, ...]:
+    def history(readers: tuple[str, ...]) -> dict[str, Expect]:
+        return order_page(AUDIT_HOLDERS, readers)
+
+    return (
+        Route(history(AUDIT_MAD_READERS), position="own branch", path=_audit_url("audit_mad")),
+        Route(history(AUDIT_SEV_READERS), position="other branch", path=_audit_url("audit_sev")),
+        Route(
+            history(()),
+            position="unknown object",
+            path=lambda world: reverse("audit:object", args=["fixture.nothing", UNKNOWN_ID]),
+        ),
+    )
+
+
+def export_routes() -> tuple[Route, ...]:
+    downloads = [
+        Route(
+            app_page(**_each(OK, AUDIT_HOLDERS)),
+            position=key,
+            path=_export_url(key),
+            allowed=SUPPLIER_NAME,
+            allowed_for=PRICE_VIEWERS,
+        )
+        for key in EXPORT_KEYS
+    ]
+    return (
+        *downloads,
+        Route(
+            app_page(**_each(NOT_FOUND, AUDIT_HOLDERS)),
+            position="unknown export",
+            path=lambda world: "/exports/nothing.csv",
+        ),
+    )
+
+
 def order_page(
     capable: tuple[str, ...], readers: tuple[str, ...], ok: Outcome = OK
 ) -> dict[str, Expect]:
@@ -566,6 +667,14 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # site manager whose assignments are all revoked); managers change it.
     "catalog:list": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
     "catalog:search": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    # M7.1: every member (catalog.view) sets their own business-email choice.
+    "notifications:settings": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "notifications:save": (Route(app_action(**_each(REDIRECT, CATALOG_VIEWERS))),),
+    "dashboard:panel": dashboard_routes(),
+    "audit:list": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
+    "audit:object": audit_routes(),
+    "exports:index": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
+    "exports:download": export_routes(),
     "catalog:detail": (
         Route(
             app_page(**_each(OK, CATALOG_VIEWERS)),
