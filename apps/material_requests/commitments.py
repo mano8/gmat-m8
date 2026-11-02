@@ -5,7 +5,10 @@ priority or needed-by date change a reconciliation input: they may raise the pen
 other requests through the purchase orders they share (E10). Those services therefore
 lock the whole allocation component of their request **before** its lines (L2 for every
 request header, L3 for every request line, then L4/L5 for the orders), trim the
-allocations of the lines they close, and reconcile once their change is applied.
+allocations of the lines they close, and reconcile once their change is applied. A
+reviewer's edit (M7b.3) also asks which lines still have a live allocation (a positive
+ceiling on an order that is not cancelled, closed orders included): only a line without
+one may change its material in place.
 
 Purchasing owns allocations and refers to request lines, so this app cannot import it: it
 registers a ``ComponentLocker`` from its ``AppConfig.ready``. Without one (nothing can be
@@ -26,6 +29,8 @@ REQUEST_CLOSED = "REQUEST_CLOSED"
 
 
 class LockedComponent(Protocol):
+    def allocated_lines(self, line_ids: Collection[UUID]) -> set[UUID]: ...
+
     def trim_request_lines(
         self, principal: Principal, line_ids: Collection[UUID], *, reason: str, cause: str
     ) -> None: ...
@@ -58,6 +63,9 @@ def register_component_locker(locker: ComponentLocker) -> Callable[[], None]:
 
 class _Unallocated:
     """The component of a request when nothing can be allocated: its own rows only."""
+
+    def allocated_lines(self, line_ids: Collection[UUID]) -> set[UUID]:
+        return set()
 
     def trim_request_lines(
         self, principal: Principal, line_ids: Collection[UUID], *, reason: str, cause: str

@@ -39,8 +39,14 @@ from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
-from apps.material_requests import ledger, reviewers
-from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.material_requests import ledger, reviewers, revisions
+from apps.material_requests.models import (
+    MaterialRequest,
+    MaterialRequestBaseline,
+    MaterialRequestBaselineLine,
+    MaterialRequestLine,
+    MaterialRequestLineRevision,
+)
 from apps.projects.models import Project
 
 PAGE_SIZE = 10
@@ -61,6 +67,7 @@ REVIEW, SOURCE, CANCEL_ANY = (
     Capability.REQUEST_SOURCE,
     Capability.REQUEST_CANCEL_ANY,
 )
+EDIT = Capability.REQUEST_EDIT
 Status = MaterialRequest.Status
 Decision = MaterialRequestLine.Decision
 
@@ -347,6 +354,12 @@ def can_decide(ctx: AccessContext, of: MaterialRequest) -> bool:
     return object_in_scope(of, ctx.scope_for(REVIEW).of_roles(SELF_DECIDING_ROLES))
 
 
+def can_edit_lines(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """A reviewer's edits of the lines: submitted and approved requests (M7b.3; the
+    services check again, the line's state and the ledger floors included)."""
+    return of.status in {Status.SUBMITTED, Status.APPROVED} and ctx.can(EDIT, of)
+
+
 def can_source(ctx: AccessContext, of: MaterialRequest) -> bool:
     """Sourcing, schedule, resolution and closing (the services check again)."""
     return ctx.can(SOURCE, of)
@@ -406,6 +419,10 @@ ACTION_LABELS = {
     "request_line.resolved": _("Linked to the catalog"),
     "request_line.closed_short": _("Line closed short"),
     "request_line.reopened": _("Line reopened"),
+    "request_line.edited": _("Line changed by a reviewer"),
+    "request_line.added_by_reviewer": _("Line added by a reviewer"),
+    "request_line.removed_by_reviewer": _("Line removed by a reviewer"),
+    "request_line.replaced": _("Line replaced by a reviewer"),
     "attachment.added": _("File attached"),
     "attachment.removed": _("File removed"),
 }
@@ -496,6 +513,76 @@ def history(ctx: AccessContext, of: MaterialRequest) -> list[HistoryEntry]:
             detail=_detail(event.action, event.data),
         )
         for event in events
+    ]
+
+
+# --- reviewer edits: the as-submitted copy and the revisions (M7b.3, Q34) ---------------
+
+
+@dataclass(frozen=True)
+class LineHistory:
+    """A line of the request, as its requester submitted it, and the reviewers' edits.
+
+    ``submitted`` is ``None`` for a line a reviewer added (or that replaced another);
+    ``revisions`` are oldest first and include the one that created the line and the one
+    that replaced it. Nothing beyond what the line itself shows: material, description,
+    unit, quantities, decision, who edited it, when and why.
+    """
+
+    line: MaterialRequestLine
+    submitted: MaterialRequestBaselineLine | None
+    revisions: tuple[MaterialRequestLineRevision, ...]
+
+    @property
+    def edited(self) -> bool:
+        return bool(self.revisions)
+
+
+def version(of: MaterialRequest) -> int:
+    """What the page sends back as ``seen_version`` with a decision or an edit."""
+    return revisions.version(of.pk)
+
+
+def line_history(ctx: AccessContext, of: MaterialRequest) -> list[LineHistory]:
+    """Every line of the request (removed ones included: they are rejected or closed,
+    never deleted) against the copy of its latest submit, with the edits made since.
+
+    Empty for who may not view the request. A request submitted before copies existed has
+    one only once a reviewer edits it (``backfilled``).
+    """
+    if not ctx.can(VIEW, of):
+        return []
+    baseline = (
+        MaterialRequestBaseline.objects.visible_to(ctx, VIEW)
+        .filter(request=of)
+        .order_by("-sequence")
+        .first()
+    )
+    copies: dict[UUID, MaterialRequestBaselineLine] = {}
+    edits: list[MaterialRequestLineRevision] = []
+    if baseline is not None:
+        copies = {copy.line_id: copy for copy in baseline.lines.select_related("material", "unit")}
+        edits = list(
+            MaterialRequestLineRevision.objects.visible_to(ctx, VIEW)
+            .filter(baseline=baseline)
+            .select_related("editor")
+            .order_by("created_at", "id")
+        )
+    rows = (
+        MaterialRequestLine.objects.visible_to(ctx, VIEW)
+        .filter(request=of)
+        .select_related("material", "unit")
+        .order_by("line_no")
+    )
+    return [
+        LineHistory(
+            line=row,
+            submitted=copies.get(row.pk),
+            revisions=tuple(
+                edit for edit in edits if row.pk in {edit.line_id, edit.replacement_line_id}
+            ),
+        )
+        for row in rows
     ]
 
 

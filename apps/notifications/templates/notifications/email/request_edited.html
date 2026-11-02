@@ -1,0 +1,16 @@
+{% load i18n %}
+{% get_current_language as language %}<!DOCTYPE html>
+<html lang="{{ language }}">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ request_obj.number }}</title>
+  </head>
+  <body>
+    <h1>{% blocktranslate with number=request_obj.number %}Request {{ number }} changed by a reviewer{% endblocktranslate %}</h1>
+    <p>
+      {% blocktranslate with number=request_obj.number project=request_obj.project.name %}A reviewer changed your request {{ number }} for {{ project }}.{% endblocktranslate %}
+    </p>
+    <p>{% translate "Open the request to compare each line with what you submitted and to read the reasons for the changes." %}</p>
+    <p><a href="{{ link }}">{% translate "Open the request" %}</a></p>
+  </body>
+</html>

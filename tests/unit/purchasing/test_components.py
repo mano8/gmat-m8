@@ -370,6 +370,7 @@ class TestCommitments:
             locks = LockOrder()
             component = commitments.lock_component(locks, [line.request_id])
             assert locks.level == LockLevel.REQUEST_LINES
+            assert component.allocated_lines([line.pk]) == set()
             component.trim_request_lines(mm, [line.pk], reason="X", cause="y")
             assert component.reconcile(mm, "y") == []
         request_services.close_line_short(mm, line.pk, reason="Without purchasing")

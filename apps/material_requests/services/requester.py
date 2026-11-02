@@ -37,6 +37,7 @@ from apps.material_requests.services.common import (
     _lock_people,
     _project,
     _record,
+    _record_baseline,
     _require_draft,
     _require_nothing_allocated_or_delivered,
     _require_open_project,
@@ -272,6 +273,9 @@ def submit(
     flow: it is saved in the same transaction, so a double tap cannot leave a submitted
     request with half of the details.
 
+    Every submit records the as-submitted copy of the lines (a new baseline, M7b.3): the
+    reviewers' later edits are revisions against it.
+
     ``reviewer_id`` sends the request to a named reviewer (Q31, Q35: optional, any
     requester): one who can decide requests of the procurement branch just taken
     (``reviewers.covers``). Without it the request keeps the assignee it may already have
@@ -305,12 +309,14 @@ def submit(
         if locked.number is None:
             _assign_number(locked, locks)
         locked.save()
+        baseline = _record_baseline(locked, principal.user_id)
         _record(
             principal,
             "request.submitted",
             locked,
             procurement_branch_id=locked.procurement_branch_id,
             lines=locked.lines.count(),
+            baseline=baseline.sequence,
             **({"changes": diff} if diff else {}),
         )
         events.publish("request.submitted", request_id=locked.pk, number=locked.number)

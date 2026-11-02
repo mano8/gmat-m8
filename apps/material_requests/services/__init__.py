@@ -21,9 +21,12 @@ approved quantity; never on one's own request unless the procurement branch allo
 self-approval) and ``request.source`` (sourcing, non-catalog resolution, priority and
 needed-by, closing and reopening). A reviewer is assigned at submit by the requester or
 afterwards by any reviewer in scope (``assignment``, M7b.2); the assignee's ``User`` row is
-locked at L0 with the actor's, before ``authorize_in_txn``. Material, unit and quantity
-change only in ``DRAFT`` (§4.4); every request goes through review (Q4, ADR-0010), with no
-automatic approval.
+locked at L0 with the actor's, before ``authorize_in_txn``. A requester changes material,
+unit and quantity only in ``DRAFT`` (§4.4); ``request.edit`` holders edit the lines of
+submitted and approved requests (``editing``, M7b.3, ADR-0014 §5), each edit a revision
+against the as-submitted copy that every submit records. Every request goes through review
+(Q4, ADR-0010), with no automatic approval; a decision or an edit sent with the page's
+``seen_version`` is refused once the request was edited or resubmitted meanwhile.
 
 Ledger inputs (§4.5): closing or reopening a line or a request, reducing an approved
 quantity and changing the priority or needed-by date change the attribution order or the
@@ -42,6 +45,12 @@ line is refused (its quantity was meant in the old unit), never silently convert
 from apps.material_requests.services.assignment import assign_reviewer
 from apps.material_requests.services.common import _lock_header as _lock_header
 from apps.material_requests.services.common import _settle_closure as _settle_closure
+from apps.material_requests.services.editing import (
+    LineEdit,
+    add_line_as_reviewer,
+    edit_line,
+    remove_line_as_reviewer,
+)
 from apps.material_requests.services.requester import (
     add_line,
     cancel,
@@ -72,7 +81,9 @@ from apps.material_requests.services.review import (
 
 __all__ = [
     "LineDecision",
+    "LineEdit",
     "add_line",
+    "add_line_as_reviewer",
     "approve_all",
     "assign_reviewer",
     "cancel",
@@ -83,9 +94,11 @@ __all__ = [
     "create_draft",
     "decide_line",
     "decide_lines",
+    "edit_line",
     "manual_close",
     "reduce_approved_qty",
     "remove_line",
+    "remove_line_as_reviewer",
     "reopen",
     "reopen_line",
     "resolve_non_catalog_line",

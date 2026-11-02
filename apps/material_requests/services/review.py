@@ -43,6 +43,7 @@ from apps.material_requests.services.common import (
     _require_live,
     _require_nothing_allocated_or_delivered,
     _require_state,
+    _require_version,
     _reset_decisions,
     _save_line,
     _settle_closure,
@@ -131,6 +132,13 @@ def _decide(
         line.decided_by, line.decided_at = actor, now
         line.save()
         _record_line(principal, "request_line.decided", request, line, changes=diff, **marker)
+    _finalise(principal, request, marker, now)
+
+
+def _finalise(
+    principal: Principal, request: MaterialRequest, marker: dict[str, bool], now: Any
+) -> None:
+    """``SUBMITTED → APPROVED`` (a line approved) or ``REJECTED`` once every line is decided."""
     decided = {line.decision for line in request.lines.all()}
     if Decision.PENDING in decided:
         return
@@ -143,38 +151,49 @@ def _decide(
     events.publish(action, request_id=request.pk)
 
 
-def _require_may_decide(principal: Principal, actor: User, request: MaterialRequest) -> None:
+def _require_may_decide(
+    principal: Principal, actor: User, request: MaterialRequest, capability: str = REVIEW
+) -> None:
     """A requester decides their own request only where the procurement branch allows it,
-    or through a self-deciding role's grant on the request, with MFA (Q33, ADR-0014)."""
+    or through a self-deciding role's grant of ``capability`` on the request, with MFA
+    (Q33, ADR-0014); ``request.edit`` for a reviewer approving their own edit."""
     if actor.pk != request.requested_by_id:
         return
     branch = Branch.objects.get(pk=request.procurement_branch_id)
     if not branch.allow_self_approval:
-        authorize_self_decision(principal, actor, REVIEW, request)
+        authorize_self_decision(principal, actor, capability, request)
 
 
 def _review_lock(
-    principal: Principal, request_id: UUID, locks: LockOrder
+    principal: Principal, request_id: UUID, locks: LockOrder, seen_version: int | None
 ) -> tuple[User, MaterialRequest]:
-    """Authorize ``request.review``, lock the header, require ``SUBMITTED`` and refuse a
-    self-decision the requester may not make."""
+    """Authorize ``request.review``, lock the header, require ``SUBMITTED``, refuse a page
+    older than the last edit (``seen_version``) and a self-decision the requester may not
+    make."""
     request = MaterialRequest.objects.get(pk=request_id)
     actor = _authorize(principal, REVIEW, request, locks)
     locked = _lock_header(locks, request)
     _require_state(locked, Status.SUBMITTED)
+    _require_version(locked, seen_version)
     _require_may_decide(principal, actor, locked)
     return actor, locked
 
 
 @transactional
 def decide_lines(
-    principal: Principal, request_id: UUID, decisions: list[LineDecision]
+    principal: Principal,
+    request_id: UUID,
+    decisions: list[LineDecision],
+    *,
+    seen_version: int | None = None,
 ) -> MaterialRequest:
     """Decide some lines of a submitted request in one step (the review page).
 
     Approving takes at most the requested quantity (partial approval keeps both values);
     rejecting needs a note. When the last line is decided the request becomes ``APPROVED``
-    (at least one line approved) or ``REJECTED``.
+    (at least one line approved) or ``REJECTED``. ``seen_version`` (``revisions.version``
+    of the page) refuses the decisions once a reviewer edited the request meanwhile, so
+    nobody approves a line they have not seen (M7b.3).
     """
     ids = [decision.line_id for decision in decisions]
     if len(set(ids)) != len(ids):
@@ -182,7 +201,7 @@ def decide_lines(
     if not ids:
         raise ValidationError(_("Decide at least one line."), code="empty")
     locks = LockOrder()
-    actor, locked = _review_lock(principal, request_id, locks)
+    actor, locked = _review_lock(principal, request_id, locks, seen_version)
     if locked.lines.filter(pk__in=ids).count() != len(ids):
         raise ValidationError(_("A line does not belong to this request."), code="unknown_line")
     lines = _lock_lines(locks, locked, ids)
@@ -197,18 +216,26 @@ def decide_line(
     decision: str,
     approved_qty: Decimal | None = None,
     note: str = "",
+    seen_version: int | None = None,
 ) -> MaterialRequestLine:
     """Approve (at most the requested quantity) or reject (with a note) one line."""
     request = _line_request(line_id)
-    decide_lines(principal, request.pk, [LineDecision(line_id, decision, approved_qty, note)])
+    decide_lines(
+        principal,
+        request.pk,
+        [LineDecision(line_id, decision, approved_qty, note)],
+        seen_version=seen_version,
+    )
     return MaterialRequestLine.objects.get(pk=line_id)
 
 
 @transactional
-def approve_all(principal: Principal, request_id: UUID, *, note: str = "") -> MaterialRequest:
+def approve_all(
+    principal: Principal, request_id: UUID, *, note: str = "", seen_version: int | None = None
+) -> MaterialRequest:
     """Approve every undecided line at its requested quantity, then finalise."""
     locks = LockOrder()
-    actor, locked = _review_lock(principal, request_id, locks)
+    actor, locked = _review_lock(principal, request_id, locks, seen_version)
     lines = _lock_lines(locks, locked)
     pending = [line for line in lines if line.decision == Decision.PENDING]
     decisions = [LineDecision(line.pk, Decision.APPROVED, note=note) for line in pending]
