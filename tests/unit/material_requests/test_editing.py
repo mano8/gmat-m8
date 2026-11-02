@@ -535,6 +535,16 @@ class TestEditApproved:
         assert fresh(approved).status == Status.APPROVED
         assert len(edited_events) == 1
 
+    def test_an_edit_that_changes_nothing(
+        self, approved: MaterialRequest, people: People, edited_events: list[events.Event]
+    ) -> None:
+        first = lines_of(approved)[0]
+        with pytest.raises(ValidationError) as exc:
+            edit(people.engineer, first, requested_qty=D("10.00"))
+        assert error_codes(exc) == {"unchanged"}
+        assert not MaterialRequestLineRevision.objects.exists()
+        assert edited_events == []
+
     def test_a_partially_approved_line_keeps_its_approval_without_a_new_quantity(
         self, make_request: MakeRequest, people: People, breaker: Material
     ) -> None:
