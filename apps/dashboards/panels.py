@@ -63,6 +63,8 @@ class Panel:
     empty: str | Promise
     # Whether a count above zero asks for action (the chip turns amber).
     alert: bool = False
+    # A query string for the link ("?assigned=1": the same screen, filtered).
+    query: str = ""
 
 
 # --- formatting ---------------------------------------------------------------------------
@@ -121,6 +123,23 @@ def inbox(ctx: AccessContext) -> Content:
             Row(
                 found.number or "",
                 f"{found.project.code} · {found.get_priority_display()}",
+                _examine(found),
+            )
+            for found in rows[:LIMIT]
+        ),
+    )
+
+
+def assigned(ctx: AccessContext) -> Content:
+    """Submitted, approved and rejected requests sent to the user (M7b.4; maintainer,
+    2026-11-02). The inbox's "Assigned to me" filter lists each status."""
+    rows = request_selectors.assigned_to(ctx, statuses=request_selectors.ASSIGNED_STATUSES)
+    return _content(
+        rows.count(),
+        (
+            Row(
+                found.number or "",
+                f"{found.project.code} · {found.get_status_display()}",
                 _examine(found),
             )
             for found in rows[:LIMIT]
@@ -343,6 +362,17 @@ PANELS: tuple[Panel, ...] = (
         "requests:inbox",
         gettext_lazy("Nothing is waiting for your decision."),
         alert=True,
+    ),
+    Panel(
+        "assigned",
+        gettext_lazy("Assigned to me"),
+        # Only who can be assigned a request (group administrators, material managers and
+        # engineers, the holders of ``request.edit``) is offered the panel.
+        C.REQUEST_EDIT,
+        assigned,
+        "requests:inbox",
+        gettext_lazy("No request was sent to you."),
+        query="?assigned=1",
     ),
     Panel(
         "sourcing",

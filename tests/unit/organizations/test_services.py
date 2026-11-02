@@ -428,6 +428,8 @@ class TestMemberships:
         [
             (Role.GROUP_ADMIN, {"branch": True}),
             (Role.MATERIAL_MANAGER, {}),
+            (Role.ENGINEER, {}),
+            (Role.ENGINEER, {"branch": True, "company": True}),
             (Role.SITE_MANAGER, {"company": True}),
             (Role.PARTNER_REQUESTER, {"branch": True}),
         ],
@@ -464,8 +466,9 @@ class TestMemberships:
                 valid_until=now,
             )
 
+    @pytest.mark.parametrize("role", [Role.MATERIAL_MANAGER, Role.ENGINEER])
     def test_privileged_roles_elevate_at_the_grant(
-        self, admin_principal: SessionPrincipal, technician: User, branch: Branch
+        self, admin_principal: SessionPrincipal, technician: User, branch: Branch, role: Role
     ) -> None:
         """Even for a later start: MFA done after the grant counts once it starts."""
         later = timezone.now() + timedelta(days=2)
@@ -474,7 +477,7 @@ class TestMemberships:
             services.grant_membership(
                 admin_principal,
                 user_id=technician.pk,
-                role=Role.MATERIAL_MANAGER,
+                role=role,
                 branch_id=branch.pk,
                 valid_from=later,
             )
@@ -617,6 +620,22 @@ class TestMemberships:
         with pytest.raises(AccessDenied):
             services.grant_membership(
                 outsider, user_id=technician.pk, role=Role.TECHNICIAN, branch_id=branch.pk
+            )
+        assert not Membership.objects.filter(user=technician).exists()
+
+    def test_only_a_group_administrator_grants_an_engineer(
+        self, make_user: Callable[..., User], technician: User, branch: Branch
+    ) -> None:
+        """``org.manage`` is the group administrators' alone: a material manager of the branch
+        cannot make anyone an engineer (ADR-0014)."""
+        manager = make_user("mm@example.org")
+        grant(manager, Role.MATERIAL_MANAGER, branch=branch)
+        with pytest.raises(AccessDenied):
+            services.grant_membership(
+                principal_for(manager),
+                user_id=technician.pk,
+                role=Role.ENGINEER,
+                branch_id=branch.pk,
             )
         assert not Membership.objects.filter(user=technician).exists()
 

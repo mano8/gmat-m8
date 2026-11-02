@@ -1,0 +1,5 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate with number=request_obj.number project=request_obj.project.name %}A reviewer changed your request {{ number }} for {{ project }}.{% endblocktranslate %}
+{% translate "Open the request to compare each line with what you submitted and to read the reasons for the changes." %}
+
+{{ link }}
+{% endautoescape %}

@@ -6,8 +6,14 @@ change leaves none. Each one queues at most one message per request, with the re
 ids and a capability on the request (``request.review`` for reviewers, ``request.view``
 for the requester) that the worker checks again at the claim.
 
-- ``request.submitted``: the users who can review the request, except its author;
+- ``request.submitted``: the users who can review the request, except its author; its
+  assigned reviewer (M7b.2) gets a message of their own instead;
+- ``request.reviewer_assigned``: the new assignee, unless they assigned it to themselves;
 - ``request.approved`` / ``request.rejected``: the requester, with their own decisions;
+- ``request.edited``: the requester, when a reviewer edits their submitted or approved
+  request (M7b.3), unless they edited it themselves. One message per batch of edits: it
+  is held back ``EDIT_BATCH`` and says only that the request changed, so the edits made
+  while it waits are covered by it (``outbox.waiting``) and none is queued for them;
 - ``handover.posted``: the requester of each request served, with their own lines only
   (a ``DIRECT_RECEIPT`` handover is the receipt of goods on site).
 
@@ -16,6 +22,7 @@ recipient may already see on the request: no prices, suppliers, orders or other 
 """
 
 from collections import defaultdict
+from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
@@ -26,11 +33,17 @@ from django.utils.translation import gettext as _
 
 from apps.access.roles import Capability
 from apps.accounts.models import User
+from apps.core.db import db_now
 from apps.core.events import Event
 from apps.handovers.models import Handover
+from apps.material_requests import reviewers
 from apps.material_requests.models import MaterialRequest
-from apps.notifications import recipients
+from apps.notifications import outbox, recipients
+from apps.notifications.models import EmailOutbox
 from apps.notifications.outbox import queue_notification
+
+# How long the notice of a reviewer's edit waits for the edits that follow it.
+EDIT_BATCH = timedelta(minutes=10)
 
 
 def _absolute(path: str) -> str:
@@ -45,13 +58,13 @@ def _queue(
     subject: str,
     source_ref: str,
     context: dict[str, Any],
-) -> None:
+) -> list[EmailOutbox]:
     """Render ``template`` in the installation's language and queue it for ``users``."""
     if not users:
-        return
+        return []
     with translation.override(settings.LANGUAGE_CODE):
         context = {"request_obj": request, **context}
-        queue_notification(
+        return queue_notification(
             recipients=[user.pk for user in users],
             capability=capability,
             obj=request,
@@ -68,17 +81,50 @@ def _request(request_id: Any) -> MaterialRequest:
 
 def on_request_submitted(event: Event) -> None:
     request = _request(event.payload["request_id"])
+    assigned = reviewers.assignee(request)
     with translation.override(settings.LANGUAGE_CODE):
         subject = _("Request %(number)s to review") % {"number": request.number}
         link = _absolute(reverse("requests:examine", args=[request.pk]))
+    excluded = {request.requested_by_id} | ({assigned.pk} if assigned is not None else set())
     _queue(
-        recipients.holders(Capability.REQUEST_REVIEW, request, exclude=request.requested_by_id),
+        recipients.holders(Capability.REQUEST_REVIEW, request, exclude=excluded),
         Capability.REQUEST_REVIEW,
         request,
         "request_submitted",
         subject,
         f"request.submitted:{request.pk}",
         {"link": link, "lines": request.lines.count()},
+    )
+    if assigned is not None and assigned.pk != request.requested_by_id:
+        _assigned(request, assigned, request.requested_by, "", f"request.submitted:{request.pk}")
+
+
+def on_reviewer_assigned(event: Event) -> None:
+    request = _request(event.payload["request_id"])
+    reviewer = User.objects.get(pk=event.payload["reviewer_id"])
+    if reviewer.pk == event.payload["assigned_by"]:
+        return
+    by = User.objects.get(pk=event.payload["assigned_by"])
+    note = event.payload["note"]
+    _assigned(request, reviewer, by, note, f"request.reviewer_assigned:{request.pk}")
+
+
+def _assigned(
+    request: MaterialRequest, reviewer: User, by: User, note: str, source_ref: str
+) -> None:
+    """Tell ``reviewer`` that ``by`` sent them ``request`` (while they may review it), with
+    the note of a reassignment."""
+    with translation.override(settings.LANGUAGE_CODE):
+        subject = _("Request %(number)s assigned to you") % {"number": request.number}
+        link = _absolute(reverse("requests:examine", args=[request.pk]))
+    _queue(
+        recipients.user_with(Capability.REQUEST_REVIEW, request, reviewer),
+        Capability.REQUEST_REVIEW,
+        request,
+        "request_assigned",
+        subject,
+        source_ref,
+        {"link": link, "lines": request.lines.count(), "assigned_by": by, "note": note},
     )
 
 
@@ -100,6 +146,28 @@ def on_request_decided(event: Event) -> None:
         f"{event.name}:{request.pk}",
         {"link": link, "approved": approved, "lines": list(lines)},
     )
+
+
+def on_request_edited(event: Event) -> None:
+    request = _request(event.payload["request_id"])
+    if event.payload["editor_id"] == request.requested_by_id:
+        return
+    source_ref = f"request.edited:{request.pk}"
+    if outbox.waiting(source_ref):
+        return  # the notice already queued covers this edit too
+    with translation.override(settings.LANGUAGE_CODE):
+        subject = _("Request %(number)s changed by a reviewer") % {"number": request.number}
+        link = _absolute(reverse("requests:detail", args=[request.pk]))
+    messages = _queue(
+        recipients.user_with(Capability.REQUEST_VIEW, request, request.requested_by),
+        Capability.REQUEST_VIEW,
+        request,
+        "request_edited",
+        subject,
+        source_ref,
+        {"link": link},
+    )
+    outbox.defer(messages, db_now() + EDIT_BATCH)
 
 
 def on_handover_posted(event: Event) -> None:
@@ -148,6 +216,8 @@ def register() -> None:
     from apps.core.events import subscribe
 
     subscribe("request.submitted", on_request_submitted)
+    subscribe("request.reviewer_assigned", on_reviewer_assigned)
     subscribe("request.approved", on_request_decided)
     subscribe("request.rejected", on_request_decided)
+    subscribe("request.edited", on_request_edited)
     subscribe("handover.posted", on_handover_posted)

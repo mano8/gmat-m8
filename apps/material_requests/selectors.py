@@ -33,12 +33,20 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
-from apps.access.roles import Capability
+from apps.access.roles import SELF_DECIDING_ROLES, Capability
+from apps.access.scopes import object_in_scope
+from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
-from apps.material_requests import ledger
-from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.material_requests import ledger, reviewers, revisions
+from apps.material_requests.models import (
+    MaterialRequest,
+    MaterialRequestBaseline,
+    MaterialRequestBaselineLine,
+    MaterialRequestLine,
+    MaterialRequestLineRevision,
+)
 from apps.projects.models import Project
 
 PAGE_SIZE = 10
@@ -59,6 +67,7 @@ REVIEW, SOURCE, CANCEL_ANY = (
     Capability.REQUEST_SOURCE,
     Capability.REQUEST_CANCEL_ANY,
 )
+EDIT = Capability.REQUEST_EDIT
 Status = MaterialRequest.Status
 Decision = MaterialRequestLine.Decision
 
@@ -210,6 +219,9 @@ def can_withdraw(ctx: AccessContext, of: MaterialRequest) -> bool:
 
 # What the inbox lists: requests waiting for a decision, and approved ones to follow up.
 INBOX_STATUSES = (Status.SUBMITTED, Status.APPROVED)
+# What the inbox's status filter and "Assigned to me" can list (M7b.4, maintainer
+# 2026-11-02): rejected requests too, to look back at.
+ASSIGNED_STATUSES = (*INBOX_STATUSES, Status.REJECTED)
 # Most urgent first, then the earliest needed-by date (none last), then the oldest submit.
 PRIORITY_RANK = Case(
     When(priority="URGENT", then=Value(0)),
@@ -227,14 +239,20 @@ def inbox(
     priority: str = "",
     project_id: UUID | None = None,
     needed_before: date | None = None,
+    assigned_to_me: bool = False,
 ) -> QuerySet[MaterialRequest]:
-    """Requests in the user's review scope in one status, the most pressing first."""
+    """Requests in the user's review scope in one status (submitted unless another of
+    ``ASSIGNED_STATUSES`` is asked), the most pressing first.
+
+    ``assigned_to_me`` keeps the ones sent to the user (``assigned_to``, M7b.4).
+    """
     rows = (
-        MaterialRequest.objects.visible_to(ctx, REVIEW)
-        .filter(status=status if status in INBOX_STATUSES else Status.SUBMITTED)
+        assigned_to(ctx, statuses=ASSIGNED_STATUSES)
+        if assigned_to_me
+        else MaterialRequest.objects.visible_to(ctx, REVIEW)
         .select_related("project", "requested_by")
         .annotate(line_count=Count("lines"))
-    )
+    ).filter(status=status if status in ASSIGNED_STATUSES else Status.SUBMITTED)
     if priority:
         rows = rows.filter(priority=priority)
     if project_id is not None:
@@ -242,6 +260,63 @@ def inbox(
     if needed_before is not None:
         rows = rows.filter(needed_by__lte=needed_before)
     return rows.order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+
+
+# --- reviewer assignment (M7b.2) -------------------------------------------------------
+
+
+def can_assign(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """Sending a submitted or approved request to another reviewer (the service checks again)."""
+    return of.status in INBOX_STATUSES and ctx.can(REVIEW, of)
+
+
+def eligible_reviewers(ctx: AccessContext, of: MaterialRequest) -> list[User]:
+    """Who ``of`` can be sent to (the reviewer choices), by name.
+
+    For its requester while it is a draft (judged against the procurement branch its
+    submit will take) and for a reviewer who may reassign it; nobody for anyone else.
+    """
+    if not (can_edit(ctx, of) or can_assign(ctx, of)):
+        return []
+    return reviewers.candidates(reviewers.target_branch(of))
+
+
+def assignee(of: MaterialRequest) -> User | None:
+    """The request's assigned reviewer while they still qualify; ``None``: unassigned."""
+    return reviewers.assignee(of)
+
+
+def assigned_to(
+    ctx: AccessContext, *, statuses: Sequence[str] = INBOX_STATUSES
+) -> QuerySet[MaterialRequest]:
+    """ "Assigned to me": the user's requests in ``statuses`` (submitted and approved by
+    default), the most pressing first.
+
+    Only while a grant through which they may be assigned still covers the request's
+    procurement branch: a revoked or expired assignee's list is empty, and the requests
+    read as unassigned everywhere else.
+    """
+    scope = reviewers.assignable_scope(ctx)
+    return (
+        MaterialRequest.objects.visible_to(ctx, REVIEW)
+        .filter(
+            scope.branch_q("procurement_branch"),
+            assigned_reviewer_id=ctx.user_id,
+            status__in=statuses,
+        )
+        .select_related("project", "requested_by")
+        .annotate(line_count=Count("lines"))
+        .order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+    )
+
+
+def assigned_ids(ctx: AccessContext, of: Sequence[MaterialRequest]) -> set[UUID]:
+    """Which of ``of`` are assigned to the user and still count (as in ``assigned_to``)."""
+    return set(
+        assigned_to(ctx, statuses=ASSIGNED_STATUSES)
+        .filter(pk__in=[found.pk for found in of])
+        .values_list("pk", flat=True)
+    )
 
 
 def sourcing_to_decide(ctx: AccessContext) -> QuerySet[MaterialRequestLine]:
@@ -291,10 +366,19 @@ def can_review(ctx: AccessContext, of: MaterialRequest) -> bool:
 
 
 def can_decide(ctx: AccessContext, of: MaterialRequest) -> bool:
-    """Review that is not an approval of one's own request (unless the branch allows it)."""
-    return can_review(ctx, of) and (
-        of.requested_by_id != ctx.user_id or of.procurement_branch.allow_self_approval
-    )
+    """Review, of one's own request only where the procurement branch allows it or a
+    self-deciding role's grant covers the request (Q33; the services check again)."""
+    if not can_review(ctx, of):
+        return False
+    if of.requested_by_id != ctx.user_id or of.procurement_branch.allow_self_approval:
+        return True
+    return object_in_scope(of, ctx.scope_for(REVIEW).of_roles(SELF_DECIDING_ROLES))
+
+
+def can_edit_lines(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """A reviewer's edits of the lines: submitted and approved requests (M7b.3; the
+    services check again, the line's state and the ledger floors included)."""
+    return of.status in {Status.SUBMITTED, Status.APPROVED} and ctx.can(EDIT, of)
 
 
 def can_source(ctx: AccessContext, of: MaterialRequest) -> bool:
@@ -343,6 +427,7 @@ ACTION_LABELS = {
     "request.approved": _("Approved"),
     "request.rejected": _("Rejected"),
     "request.rescheduled": _("Schedule changed"),
+    "request.reviewer_assigned": _("Sent to a reviewer"),
     "request.closed": _("Closed"),
     "request.reopened": _("Reopened"),
     "request.auto_closed": _("Closed automatically"),
@@ -356,6 +441,10 @@ ACTION_LABELS = {
     "request_line.resolved": _("Linked to the catalog"),
     "request_line.closed_short": _("Line closed short"),
     "request_line.reopened": _("Line reopened"),
+    "request_line.edited": _("Line changed by a reviewer"),
+    "request_line.added_by_reviewer": _("Line added by a reviewer"),
+    "request_line.removed_by_reviewer": _("Line removed by a reviewer"),
+    "request_line.replaced": _("Line replaced by a reviewer"),
     "attachment.added": _("File attached"),
     "attachment.removed": _("File removed"),
 }
@@ -446,6 +535,76 @@ def history(ctx: AccessContext, of: MaterialRequest) -> list[HistoryEntry]:
             detail=_detail(event.action, event.data),
         )
         for event in events
+    ]
+
+
+# --- reviewer edits: the as-submitted copy and the revisions (M7b.3, Q34) ---------------
+
+
+@dataclass(frozen=True)
+class LineHistory:
+    """A line of the request, as its requester submitted it, and the reviewers' edits.
+
+    ``submitted`` is ``None`` for a line a reviewer added (or that replaced another);
+    ``revisions`` are oldest first and include the one that created the line and the one
+    that replaced it. Nothing beyond what the line itself shows: material, description,
+    unit, quantities, decision, who edited it, when and why.
+    """
+
+    line: MaterialRequestLine
+    submitted: MaterialRequestBaselineLine | None
+    revisions: tuple[MaterialRequestLineRevision, ...]
+
+    @property
+    def edited(self) -> bool:
+        return bool(self.revisions)
+
+
+def version(of: MaterialRequest) -> int:
+    """What the page sends back as ``seen_version`` with a decision or an edit."""
+    return revisions.version(of.pk)
+
+
+def line_history(ctx: AccessContext, of: MaterialRequest) -> list[LineHistory]:
+    """Every line of the request (removed ones included: they are rejected or closed,
+    never deleted) against the copy of its latest submit, with the edits made since.
+
+    Empty for who may not view the request. A request submitted before copies existed has
+    one only once a reviewer edits it (``backfilled``).
+    """
+    if not ctx.can(VIEW, of):
+        return []
+    baseline = (
+        MaterialRequestBaseline.objects.visible_to(ctx, VIEW)
+        .filter(request=of)
+        .order_by("-sequence")
+        .first()
+    )
+    copies: dict[UUID, MaterialRequestBaselineLine] = {}
+    edits: list[MaterialRequestLineRevision] = []
+    if baseline is not None:
+        copies = {copy.line_id: copy for copy in baseline.lines.select_related("material", "unit")}
+        edits = list(
+            MaterialRequestLineRevision.objects.visible_to(ctx, VIEW)
+            .filter(baseline=baseline)
+            .select_related("editor")
+            .order_by("created_at", "id")
+        )
+    rows = (
+        MaterialRequestLine.objects.visible_to(ctx, VIEW)
+        .filter(request=of)
+        .select_related("material", "unit")
+        .order_by("line_no")
+    )
+    return [
+        LineHistory(
+            line=row,
+            submitted=copies.get(row.pk),
+            revisions=tuple(
+                edit for edit in edits if row.pk in {edit.line_id, edit.replacement_line_id}
+            ),
+        )
+        for row in rows
     ]
 
 

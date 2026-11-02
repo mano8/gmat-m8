@@ -9,6 +9,13 @@ checks is S7's: the capability somewhere (403), the request in scope (404), the 
 on it (403). The services authorize again inside their transaction.
 """
 
+from apps.material_requests.views.editing import (
+    line_apply_add,
+    line_apply_edit,
+    line_edit,
+    line_new,
+    line_remove_reviewed,
+)
 from apps.material_requests.views.requester import (
     line_add,
     line_add_free,
@@ -34,6 +41,7 @@ from apps.material_requests.views.reviewer import (
     line_resolve,
     line_sourcing,
     request_approve_all,
+    request_assign,
     request_cancel_any,
     request_close,
     request_examine,
@@ -47,17 +55,23 @@ __all__ = [
     "inbox",
     "line_add",
     "line_add_free",
+    "line_apply_add",
+    "line_apply_edit",
     "line_close_short",
     "line_decide",
+    "line_edit",
     "line_link",
+    "line_new",
     "line_reduce",
     "line_remove",
+    "line_remove_reviewed",
     "line_reopen",
     "line_resolve",
     "line_sourcing",
     "line_update",
     "project_materials",
     "request_approve_all",
+    "request_assign",
     "request_cancel",
     "request_cancel_any",
     "request_close",

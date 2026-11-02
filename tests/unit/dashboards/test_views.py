@@ -47,6 +47,10 @@ class TestHome:
 
 
 class TestPanel:
+    def test_the_assigned_panel_links_to_the_filtered_inbox(self, people: People) -> None:
+        html = client_for(people.engineer).get(panel_url("assigned")).content.decode()
+        assert f'href="{reverse("requests:inbox")}?assigned=1"' in html
+
     def test_the_fragment_has_the_count_the_rows_and_the_link(
         self, people: People, make_line: MakeLine
     ) -> None:

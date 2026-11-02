@@ -1,4 +1,4 @@
-"""Shared access rules (apps.access.policy): privilege, MFA, staff accounts, self-approval."""
+"""Shared access rules (apps.access.policy): privilege, MFA, staff accounts."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -14,7 +14,6 @@ from apps.access.policy import (
     is_privileged,
     mfa_satisfied,
     require_may_manage_account,
-    require_not_self_approval,
 )
 from apps.access.roles import Role
 from apps.accounts.models import User
@@ -32,7 +31,11 @@ class TestPrivilege:
     ) -> None:
         assert is_privileged(make_user("ops@example.org", is_staff=True))
         assert is_privileged(make_user("root@example.org", is_superuser=True))
-        for role, at in ((Role.GROUP_ADMIN, None), (Role.MATERIAL_MANAGER, branch)):
+        for role, at in (
+            (Role.GROUP_ADMIN, None),
+            (Role.MATERIAL_MANAGER, branch),
+            (Role.ENGINEER, branch),
+        ):
             user = make_user(f"{role.lower()}@example.org")
             grant(user, role, branch=at)
             assert is_privileged(user) and holds_privileged_role(user.pk)
@@ -104,15 +107,3 @@ class TestStaffAccounts:
         self, group_admin: User, make_user: Callable[..., User]
     ) -> None:
         require_may_manage_account(group_admin, make_user())
-
-
-class TestSelfApproval:
-    def test_forbidden_unless_the_branch_allows_it(
-        self, make_user: Callable[..., User], branch: Branch
-    ) -> None:
-        reviewer, requester = make_user("mm@example.org"), make_user()
-        require_not_self_approval(reviewer.pk, requester.pk, branch)
-        with pytest.raises(AccessDenied, match="Self-approval"):
-            require_not_self_approval(reviewer.pk, reviewer.pk, branch)
-        branch.allow_self_approval = True
-        require_not_self_approval(reviewer.pk, reviewer.pk, branch)

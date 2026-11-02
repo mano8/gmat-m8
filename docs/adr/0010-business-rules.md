@@ -15,7 +15,7 @@ The plan lists open business questions (Q1-Q29). The maintainer answered the blo
 | --- | --- |
 | Q1 | Accepted: partners request only for projects shared with them through `ProjectAssignment(kind=PARTNER)`. |
 | Q2 | Accepted: the project's procurement branch buys, and its company is the buyer on the purchase order. |
-| Q4 | **Changed:** every request needs approval, partner requests included. There is no per-branch `requires_approval` switch. The self-approval rule (`allow_self_approval`) is unchanged. |
+| Q4 | **Changed:** every request needs approval, partner requests included. There is no per-branch `requires_approval` switch. The self-approval rule (`allow_self_approval`) is unchanged. **Amended by ADR-0014:** group administrators, material managers and engineers decide their own requests; the rule stays for the other reviewers. |
 | Q5 | Accepted: the assigned site manager or the procurement branch's material manager approves; one level. |
 | Q6 | Accepted: technicians request for any active project in their branch scope. |
 | Q20 | **Changed:** see ADR-0013 (interim single-account setup on a public repository). |

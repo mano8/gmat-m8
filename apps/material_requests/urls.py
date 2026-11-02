@@ -23,6 +23,9 @@ urlpatterns = [
     path("<uuid:request_id>/cancel/", views.request_cancel, name="cancel"),
     path("<uuid:request_id>/examine/", views.request_examine, name="examine"),
     path("<uuid:request_id>/approve-all/", views.request_approve_all, name="approve_all"),
+    path("<uuid:request_id>/assign/", views.request_assign, name="assign_reviewer"),
+    path("<uuid:request_id>/lines/new/", views.line_new, name="new_line"),
+    path("<uuid:request_id>/lines/apply-add/", views.line_apply_add, name="apply_add"),
     path("<uuid:request_id>/return/", views.request_return, name="return_to_draft"),
     path("<uuid:request_id>/schedule/", views.request_schedule, name="schedule"),
     path("<uuid:request_id>/close/", views.request_close, name="close"),
@@ -35,6 +38,13 @@ urlpatterns = [
     path("lines/<uuid:line_id>/resolve/", views.line_resolve, name="resolve_line"),
     path("lines/<uuid:line_id>/close-short/", views.line_close_short, name="close_line"),
     path("lines/<uuid:line_id>/reopen-line/", views.line_reopen, name="reopen_line"),
+    path("lines/<uuid:line_id>/edit/", views.line_edit, name="edit_line"),
+    path("lines/<uuid:line_id>/apply-edit/", views.line_apply_edit, name="apply_edit"),
+    path(
+        "lines/<uuid:line_id>/remove-reviewed/",
+        views.line_remove_reviewed,
+        name="remove_reviewed_line",
+    ),
     path("lines/<uuid:line_id>/update/", views.line_update, name="update_line"),
     path("lines/<uuid:line_id>/remove/", views.line_remove, name="remove_line"),
 ]

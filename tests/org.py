@@ -186,6 +186,7 @@ class People:
     operator: User  # platform operator: superuser and staff, no membership
     mm_mad: User  # MATERIAL_MANAGER of A-MAD: A-MAD and B-MAD
     mm_sev: User  # MATERIAL_MANAGER of A-SEV
+    engineer: User  # ENGINEER of A-MAD: A-MAD and B-MAD
     wo_mad: User  # WAREHOUSE_OPERATOR of A-MAD
     tech_mad: User  # TECHNICIAN of A-MAD
     site_manager: User  # SITE_MANAGER (home A-MAD), assigned to the hospital
@@ -216,6 +217,7 @@ def build_people(org: Org) -> People:
         operator=make_user("operator@example.org", is_staff=True, is_superuser=True),
         mm_mad=member(mm, email="mm-mad@example.org", branch=org.a_mad),
         mm_sev=member(mm, email="mm-sev@example.org", branch=org.a_sev),
+        engineer=member(Role.ENGINEER, email="engineer@example.org", branch=org.a_mad),
         wo_mad=member(Role.WAREHOUSE_OPERATOR, email="wo-mad@example.org", branch=org.a_mad),
         tech_mad=member(tm, email="tech-mad@example.org", branch=org.a_mad),
         site_manager=member(Role.SITE_MANAGER, email="site@example.org", branch=org.a_mad),

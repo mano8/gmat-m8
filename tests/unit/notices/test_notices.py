@@ -113,6 +113,128 @@ class TestSubmitted:
         assert sum(sizes) >= 27
 
 
+class TestAssigned:
+    """M7b.2: the assignee is told the request is theirs (Q31)."""
+
+    def test_at_submit_the_assignee_gets_their_own_message(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        draft = make_request(MaterialRequest.Status.DRAFT)
+        request_services.submit(
+            principal_for(people.tech_mad), draft.pk, reviewer_id=people.engineer.pk
+        )
+        (assigned,) = [m for m in notices() if recipients_of(m) == {people.engineer.pk}]
+        (general,) = [m for m in notices() if m is not assigned and m.pk != assigned.pk]
+        assert people.engineer.pk not in recipients_of(general)
+        assert people.mm_mad.pk in recipients_of(general)
+        assert recipients_of(assigned) == {people.engineer.pk}
+        assert assigned.eligibility_rule == Capability.REQUEST_REVIEW
+        assert assigned.eligibility_object_id == draft.pk
+        number = MaterialRequest.objects.get(pk=draft.pk).number or "-"
+        assert number in assigned.subject
+        assert people.tech_mad.email in assigned.body  # who sent it (no full name here)
+        assert "/requests/" in assigned.body
+        assert "<html" in assigned.html_body
+
+    def test_a_reassignment_mails_the_new_assignee_with_the_note(
+        self, people: People, submitted: MaterialRequest
+    ) -> None:
+        EmailOutbox.objects.all().delete()
+        request_services.assign_reviewer(
+            principal_for(people.mm_mad),
+            submitted.pk,
+            reviewer_id=people.engineer.pk,
+            note="Needs an engineer's eye",
+        )
+        (message,) = notices()
+        assert recipients_of(message) == {people.engineer.pk}
+        assert message.eligibility_rule == Capability.REQUEST_REVIEW
+        assert "Needs an engineer's eye" in message.body
+        assert "Needs an engineer&#x27;s eye" in message.html_body
+        assert people.mm_mad.email in message.body
+
+    def test_assigning_oneself_mails_nobody(
+        self, people: People, submitted: MaterialRequest
+    ) -> None:
+        EmailOutbox.objects.all().delete()
+        request_services.assign_reviewer(
+            principal_for(people.mm_mad), submitted.pk, reviewer_id=people.mm_mad.pk, note="Mine"
+        )
+        assert notices() == []
+
+    def test_an_engineer_sending_their_own_request_to_themselves_gets_no_mail(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        draft = make_request(MaterialRequest.Status.DRAFT, user=people.engineer)
+        request_services.submit(
+            principal_for(people.engineer), draft.pk, reviewer_id=people.engineer.pk
+        )
+        (general,) = notices()
+        assert people.engineer.pk not in recipients_of(general)
+
+    def test_an_opted_out_assignee_gets_nothing(
+        self, people: People, submitted: MaterialRequest
+    ) -> None:
+        EmailOutbox.objects.all().delete()
+        NotificationPreference.objects.create(user=people.engineer, email_opt_out=True)
+        request_services.assign_reviewer(
+            principal_for(people.mm_mad), submitted.pk, reviewer_id=people.engineer.pk, note="X"
+        )
+        assert notices() == []
+
+    def test_an_assignee_revoked_before_the_claim_receives_nothing(
+        self, people: People, submitted: MaterialRequest
+    ) -> None:
+        EmailOutbox.objects.all().delete()
+        request_services.assign_reviewer(
+            principal_for(people.mm_mad), submitted.pk, reviewer_id=people.engineer.pk, note="X"
+        )
+        (message,) = notices()
+        assert eligibility.eligible_recipients(message) == [people.engineer]
+        Membership.objects.filter(user=people.engineer).update(revoked_at=timezone.now())
+        assert eligibility.eligible_recipients(message) == []
+
+    def test_a_resubmit_tells_the_kept_assignee_again(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        tech = principal_for(people.tech_mad)
+        draft = make_request(MaterialRequest.Status.DRAFT)
+        request_services.submit(tech, draft.pk, reviewer_id=people.engineer.pk)
+        request_services.withdraw(tech, draft.pk)
+        EmailOutbox.objects.all().delete()
+        request_services.submit(tech, draft.pk)
+        assert {people.engineer.pk} in [recipients_of(message) for message in notices()]
+
+    def test_a_revoked_assignee_is_back_among_the_reviewers_at_a_resubmit(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        """The kept assignee no longer qualifies: the request is unassigned, nobody is left
+        out of the general message, and no assignment mail goes out."""
+        tech = principal_for(people.tech_mad)
+        draft = make_request(MaterialRequest.Status.DRAFT)
+        request_services.submit(tech, draft.pk, reviewer_id=people.engineer.pk)
+        request_services.withdraw(tech, draft.pk)
+        Membership.objects.filter(user=people.engineer).update(revoked_at=timezone.now())
+        EmailOutbox.objects.all().delete()
+        request_services.submit(tech, draft.pk)
+        (general,) = notices()
+        assert people.mm_mad.pk in recipients_of(general)
+
+    def test_a_rolled_back_reassignment_leaves_no_message(
+        self, people: People, submitted: MaterialRequest
+    ) -> None:
+        EmailOutbox.objects.all().delete()
+        with pytest.raises(RuntimeError), transaction.atomic():
+            request_services.assign_reviewer(
+                principal_for(people.mm_mad),
+                submitted.pk,
+                reviewer_id=people.engineer.pk,
+                note="X",
+            )
+            raise RuntimeError("the surrounding work fails")
+        assert notices() == []
+
+
 class TestDecided:
     def decide(self, people: People, submitted: MaterialRequest, **extra: Any) -> None:
         request_services.approve_all(principal_for(people.mm_mad), submitted.pk, **extra)

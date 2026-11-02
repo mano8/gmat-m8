@@ -34,13 +34,16 @@ from apps.material_requests.services.common import (
     _lock_header,
     _lock_line,
     _lock_lines,
+    _lock_people,
     _project,
     _record,
+    _record_baseline,
     _require_draft,
     _require_nothing_allocated_or_delivered,
     _require_open_project,
     _reset_decisions,
     _save_line,
+    _set_reviewer,
 )
 from apps.material_requests.transitions import transition
 
@@ -259,6 +262,7 @@ def submit(
     request_id: UUID,
     *,
     idempotency_key: str | None = None,
+    reviewer_id: UUID | None = None,
     **header: Any,
 ) -> MaterialRequest:
     """Send a draft for review: take the procurement-branch snapshot, assign the number.
@@ -268,12 +272,22 @@ def submit(
     ``header`` (``priority``, ``needed_by``, ``notes``) is the review step of the mobile
     flow: it is saved in the same transaction, so a double tap cannot leave a submitted
     request with half of the details.
+
+    Every submit records the as-submitted copy of the lines (a new baseline, M7b.3): the
+    reviewers' later edits are revisions against it.
+
+    ``reviewer_id`` sends the request to a named reviewer (Q31, Q35: optional, any
+    requester): one who can decide requests of the procurement branch just taken
+    (``reviewers.covers``). Without it the request keeps the assignee it may already have
+    from an earlier submit.
     """
     unknown = sorted(set(header) - SUBMIT_FIELDS)
     if unknown:
         raise ValueError(f"Request fields that cannot be set at submit: {unknown}")
     locks = LockOrder()
     request = MaterialRequest.objects.get(pk=request_id)
+    if reviewer_id is not None:
+        _lock_people(locks, principal, reviewer_id)
     _authorize(principal, CREATE, request, locks)
     project = _project(request.project_id)
     _require_open_project(project)
@@ -289,16 +303,20 @@ def submit(
         diff = apply_changes(locked, header, SUBMIT_FIELDS)
         locked.procurement_branch_id = project.procurement_branch_id
         locked.submitted_at = db_now()
+        if reviewer_id is not None:
+            diff |= _set_reviewer(locked, reviewer_id, principal.user_id)
         locked.full_clean(validate_constraints=False)
         if locked.number is None:
             _assign_number(locked, locks)
         locked.save()
+        baseline = _record_baseline(locked, principal.user_id)
         _record(
             principal,
             "request.submitted",
             locked,
             procurement_branch_id=locked.procurement_branch_id,
             lines=locked.lines.count(),
+            baseline=baseline.sequence,
             **({"changes": diff} if diff else {}),
         )
         events.publish("request.submitted", request_id=locked.pk, number=locked.number)
@@ -308,7 +326,7 @@ def submit(
         actor_id=principal.user_id,
         key=idempotency_key,
         operation="request.submit",
-        payload={"request_id": request_id, **header},
+        payload={"request_id": request_id, "reviewer_id": reviewer_id, **header},
         execute=execute,
         replay=lambda _type, pk: MaterialRequest.objects.get(pk=pk),
     )

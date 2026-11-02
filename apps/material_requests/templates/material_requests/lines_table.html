@@ -1,7 +1,7 @@
 {% load i18n ui_tags %}
 {% comment %}
   The lines of a submitted request with what was decided and delivered. Parameter: lines (the
-  ledgers of `selectors.lines`). Outstanding only counts on an approved request.
+  ledgers of `selectors.lines`) and optionally edited_lines (the ids of the lines a reviewer edited, M7b.4). Outstanding only counts on an approved request.
 {% endcomment %}
 <table class="table-responsive" data-testid="request-lines">
   <thead>
@@ -33,15 +33,20 @@
             {% if entry.is_open %}{{ entry.outstanding|quantity }} {{ line.unit.code }}{% else %}—{% endif %}
           </td>
           <td data-label="{% translate 'Status' %}">
-            {% if line.closed_short_at %}
-              {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
-            {% elif line.decision == "APPROVED" %}
-              {% include "components/status_chip.html" with label=_("Approved") tone="ok" %}
-            {% elif line.decision == "REJECTED" %}
-              {% include "components/status_chip.html" with label=_("Rejected") tone="danger" %}
-            {% else %}
-              {% include "components/status_chip.html" with label=_("Pending") %}
-            {% endif %}
+            <span class="flex flex-wrap justify-end gap-1 sm:justify-start">
+              {% if line.pk in edited_lines %}
+                {% include "components/status_chip.html" with label=_("Edited") tone="brand" %}
+              {% endif %}
+              {% if line.closed_short_at %}
+                {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
+              {% elif line.decision == "APPROVED" %}
+                {% include "components/status_chip.html" with label=_("Approved") tone="ok" %}
+              {% elif line.decision == "REJECTED" %}
+                {% include "components/status_chip.html" with label=_("Rejected") tone="danger" %}
+              {% else %}
+                {% include "components/status_chip.html" with label=_("Pending") %}
+              {% endif %}
+            </span>
             {% if line.decision_note %}<span class="mt-1 block text-sm text-soft">{{ line.decision_note }}</span>{% endif %}
             {% if line.closed_short_at and line.close_reason %}
               <span class="mt-1 block text-sm text-soft">{{ line.close_reason }}</span>

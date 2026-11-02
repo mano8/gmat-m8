@@ -322,6 +322,57 @@ def build(graph: Graph, now: datetime) -> Built:
     return Built(companies, branches, projects, users, warehouses, worksites)
 
 
+# The roles whose scope is a branch and the branches it manages (S1).
+BRANCH_SCOPED = {Role.MATERIAL_MANAGER, Role.ENGINEER, Role.WAREHOUSE_OPERATOR, Role.TECHNICIAN}
+
+
+def _branch_active(graph: Graph, index: int) -> bool:
+    """S9: an inactive company's branches are inactive."""
+    spec = graph.branches[index]
+    return spec.active and graph.companies[spec.company]
+
+
+def _grants(graph: Graph, membership: MembershipSpec, capability: Capability) -> bool:
+    """The membership is valid (S8), its organization active (S9, F50) and it grants it."""
+    role = membership.role
+    if not VALIDITY[membership.validity]:
+        return False
+    if role in BRANCH_ROLES and not _branch_active(graph, membership.target):
+        return False
+    if role in COMPANY_ROLES and not graph.companies[membership.target]:
+        return False
+    return capability in ROLE_CAPABILITIES[role]
+
+
+def _branch_reach(graph: Graph, role: Role, anchor: int) -> tuple[set[int], set[int]]:
+    """S1 from the anchor branch, then S3; technicians: active projects only (Q6)."""
+    scope = {anchor} | {
+        index
+        for index, spec in enumerate(graph.branches)
+        if spec.managed_by == anchor and _branch_active(graph, index)
+    }
+    projects = {
+        index
+        for index, spec in enumerate(graph.projects)
+        if (spec.branch in scope or spec.procurement in scope)
+        and (role not in TECHNICIAN_LIKE or spec.status == "ACTIVE")
+    }
+    return scope, projects
+
+
+def _assigned_reach(graph: Graph, user: UserSpec, role: Role) -> set[int]:
+    """S4: site managers and partners (partners: active projects only)."""
+    kind = "MANAGER" if role is Role.SITE_MANAGER else "PARTNER"
+    return {
+        assignment.project
+        for assignment in user.assignments
+        if assignment.kind == kind
+        and VALIDITY[assignment.validity]
+        and _branch_active(graph, graph.projects[assignment.project].branch)
+        and (role is Role.SITE_MANAGER or graph.projects[assignment.project].status == "ACTIVE")
+    }
+
+
 def reference(
     graph: Graph, user: UserSpec, capability: Capability
 ) -> tuple[set[int], set[int], bool]:
@@ -329,60 +380,25 @@ def reference(
 
     Returns ``(branches, projects, everything)``.
     """
-
-    def company_active(index: int) -> bool:
-        return graph.companies[index]
-
-    def branch_active(index: int) -> bool:  # S9: an inactive company's branches are inactive
-        spec = graph.branches[index]
-        return spec.active and company_active(spec.company)
-
     if not user.active:  # S8
         return set(), set(), False
     branches: set[int] = set()
     projects: set[int] = set()
     everything = False
     for membership in user.memberships:
-        if not VALIDITY[membership.validity]:  # S8
-            continue
         role = membership.role
-        if role in BRANCH_ROLES and not branch_active(membership.target):  # S9
-            continue
-        if role in COMPANY_ROLES and not company_active(membership.target):  # S9, F50
-            continue
-        if capability not in ROLE_CAPABILITIES[role]:
+        if not _grants(graph, membership, capability):
             continue
         if role is Role.GROUP_ADMIN:  # S2
             everything = True
         elif capability in INSTALLATION_CAPABILITIES:
             continue  # catalog and suppliers: no branch or project rows
-        elif role in {Role.MATERIAL_MANAGER, Role.WAREHOUSE_OPERATOR, Role.TECHNICIAN}:
-            anchor = membership.target
-            scope = {anchor} | {  # S1
-                index
-                for index, spec in enumerate(graph.branches)
-                if spec.managed_by == anchor and branch_active(index)
-            }
+        elif role in BRANCH_SCOPED:
+            scope, reached = _branch_reach(graph, role, membership.target)
             branches |= scope
-            projects |= {  # S3; technicians: active projects only (Q6)
-                index
-                for index, spec in enumerate(graph.projects)
-                if (spec.branch in scope or spec.procurement in scope)
-                and (role not in TECHNICIAN_LIKE or spec.status == "ACTIVE")
-            }
-        else:  # S4: site managers and partners
-            kind = "MANAGER" if role is Role.SITE_MANAGER else "PARTNER"
-            projects |= {
-                assignment.project
-                for assignment in user.assignments
-                if assignment.kind == kind
-                and VALIDITY[assignment.validity]
-                and branch_active(graph.projects[assignment.project].branch)
-                and (
-                    role is Role.SITE_MANAGER
-                    or graph.projects[assignment.project].status == "ACTIVE"
-                )
-            }
+            projects |= reached
+        else:
+            projects |= _assigned_reach(graph, user, role)
     return branches, projects, everything
 
 

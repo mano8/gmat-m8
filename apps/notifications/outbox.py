@@ -10,6 +10,9 @@ authorize nothing themselves: the service that calls them has already run
 - ``queue_security_email``: one address, a named rule on its target, the bodies sealed;
   expires after ``OUTBOX_SENSITIVE_TTL``. allauth's mail arrives here through
   ``apps.notifications.backends.OutboxEmailBackend``;
+- ``waiting`` and ``defer``: a notice that covers every change until it is sent (the
+  reviewer edits of a request, M7b.3) is queued once, held back for a while, and later
+  changes find it waiting instead of queueing another;
 - ``queue_dispatch``: a supplier dispatch of a purchase order (M5.3);
 - ``expire_security_email``: offboarding expires the unsent security emails of an account
   and of the tokens it revokes (plan §5).
@@ -17,7 +20,7 @@ authorize nothing themselves: the service that calls them has already run
 
 from collections import defaultdict
 from collections.abc import Iterable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from email.utils import parseaddr
 from uuid import UUID
 
@@ -93,6 +96,33 @@ def queue_notification(
         )
         for start in range(0, len(user_ids), MAX_RECIPIENTS)
     ]
+
+
+def waiting(source_ref: str) -> bool:
+    """Whether a notification with ``source_ref`` waits in the queue, unclaimed.
+
+    The row is locked ``FOR UPDATE SKIP LOCKED`` until the caller's transaction ends, so the
+    worker cannot send it before the change the caller is making commits. One the worker is
+    claiming at this moment is skipped (the claim also skips locked rows, so neither side
+    ever waits): the caller then queues a new one.
+    """
+    _require_transaction(DEFAULT_DB_ALIAS)
+    found = (
+        EmailOutbox.objects.filter(
+            kind=Kind.NOTIFICATION, status=Status.QUEUED, source_ref=source_ref
+        )
+        .select_for_update(skip_locked=True)
+        .first()
+    )
+    return found is not None
+
+
+def defer(messages: Iterable[EmailOutbox], until: datetime) -> None:
+    """Hold these queued messages back until ``until`` (inside the queueing transaction)."""
+    _require_transaction(DEFAULT_DB_ALIAS)
+    EmailOutbox.objects.filter(
+        pk__in=[message.pk for message in messages], status=Status.QUEUED
+    ).update(not_before=until)
 
 
 def queue_security_email(

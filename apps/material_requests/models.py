@@ -17,9 +17,17 @@ when the draft is created, taken again at submit) or, for assigned projects, of 
 project. Own-reach grants (technicians, partners, own drafts) reach only the user's own
 requests, on any project of their branches (S3), so a technician of a managed branch
 sees the requests it made for a project its managing branch buys for.
+
+History of reviewer edits (M7b.3, ADR-0014 §5-§6), append-only by trigger
+(``material_requests.0004``): every submit copies the lines to a ``MaterialRequestBaseline``
+(the as-submitted copy), and every edit by a ``request.edit`` holder is a
+``MaterialRequestLineRevision``. Both refer to a line by its id without a foreign key: a
+draft line is deleted when its requester removes it after a return for changes, and the
+history of earlier submits must survive that.
 """
 
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
@@ -124,6 +132,26 @@ class MaterialRequest(BaseModel):
     decided_at = models.DateTimeField(_("decided at"), null=True, blank=True)
     closed_at = models.DateTimeField(_("closed at"), null=True, blank=True)
     close_reason = models.TextField(_("close reason"), blank=True)
+    # The reviewer the request is sent to (M7b.2, Q31): never restricts who decides. A
+    # revoked or expired assignee reads as unassigned (``reviewers.assignee``); the row
+    # keeps them.
+    assigned_reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="assigned_requests",
+        verbose_name=_("assigned reviewer"),
+    )
+    assigned_at = models.DateTimeField(_("assigned at"), null=True, blank=True)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("assigned by"),
+    )
 
     objects = RequestQuerySet.as_manager()
 
@@ -155,11 +183,25 @@ class MaterialRequest(BaseModel):
                 | Q(status="CLOSED", closed_at__isnull=False, close_mode__in=["AUTO", "MANUAL"]),
                 name="mr_request_closure",
             ),
+            models.CheckConstraint(
+                condition=Q(
+                    assigned_reviewer__isnull=True,
+                    assigned_at__isnull=True,
+                    assigned_by__isnull=True,
+                )
+                | Q(
+                    assigned_reviewer__isnull=False,
+                    assigned_at__isnull=False,
+                    assigned_by__isnull=False,
+                ),
+                name="mr_request_assignment",
+            ),
         ]
         indexes = [
             models.Index(fields=["requested_by", "status"], name="mr_request_requester"),
             models.Index(fields=["procurement_branch", "status"], name="mr_request_branch"),
             models.Index(fields=["project", "status"], name="mr_request_project"),
+            models.Index(fields=["assigned_reviewer", "status"], name="mr_request_assignee"),
         ]
 
     def __str__(self) -> str:
@@ -310,3 +352,185 @@ class MaterialRequestLine(BaseModel):
     @property
     def description(self) -> str:
         return str(self.material) if self.material_id is not None else self.free_text
+
+
+class BaselineQuerySet(ScopedQuerySet["MaterialRequestBaseline"]):
+    def scope_q(self, scope: Scope) -> Q:
+        return request_q(scope, "request__")
+
+
+class BaselineLineQuerySet(ScopedQuerySet["MaterialRequestBaselineLine"]):
+    def scope_q(self, scope: Scope) -> Q:
+        return request_q(scope, "baseline__request__")
+
+
+class RevisionQuerySet(ScopedQuerySet["MaterialRequestLineRevision"]):
+    def scope_q(self, scope: Scope) -> Q:
+        return request_q(scope, "request__")
+
+
+class MaterialRequestBaseline(BaseModel):
+    """The request as its requester submitted it, once per submit (M7b.3, Q34).
+
+    ``sequence`` counts the submits of the request (1 for the first); a resubmit after a
+    return to draft starts a new baseline and the earlier ones stay. ``backfilled``: the
+    request was submitted before baselines existed, so its first reviewer edit copied the
+    lines as they were then. Append-only (trigger).
+    """
+
+    request = models.ForeignKey(
+        MaterialRequest,
+        on_delete=models.PROTECT,
+        related_name="baselines",
+        verbose_name=_("request"),
+    )
+    sequence = models.PositiveSmallIntegerField(_("submit"))
+    submitted_at = models.DateTimeField(_("submitted at"))
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name=_("submitted by"),
+    )
+    notes = models.TextField(_("notes"), blank=True)
+    backfilled = models.BooleanField(_("recorded at the first edit"), default=False)
+
+    objects = BaselineQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _("as-submitted copy")
+        verbose_name_plural = _("as-submitted copies")
+        ordering = ["request", "sequence"]
+        constraints = [
+            models.UniqueConstraint(fields=["request", "sequence"], name="mr_baseline_sequence"),
+            models.CheckConstraint(
+                condition=Q(sequence__gte=1), name="mr_baseline_sequence_positive"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.request} · {self.sequence}"
+
+
+class MaterialRequestBaselineLine(BaseModel):
+    """One line of a baseline: material, unit, description and quantity as submitted.
+
+    ``line_id`` and ``line_no`` name the request line (no foreign key, see the module
+    note). ``material_snapshot`` keeps the catalog reference and name of that day. The
+    unit is the material's (C9, ``material_requests.0004``).
+    """
+
+    baseline = models.ForeignKey(
+        MaterialRequestBaseline,
+        on_delete=models.PROTECT,
+        related_name="lines",
+        verbose_name=_("as-submitted copy"),
+    )
+    line_id = models.UUIDField(_("line id"))
+    line_no = models.PositiveSmallIntegerField(_("line"))
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("material"),
+    )
+    material_snapshot = models.JSONField(
+        _("material (as submitted)"), default=dict, blank=True, encoder=DjangoJSONEncoder
+    )
+    free_text = models.CharField(_("description"), max_length=300, blank=True)
+    unit = models.ForeignKey(
+        UnitOfMeasure, on_delete=models.PROTECT, related_name="+", verbose_name=_("unit")
+    )
+    requested_qty = QuantityField(_("requested quantity"))
+
+    objects = BaselineLineQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _("as-submitted line")
+        verbose_name_plural = _("as-submitted lines")
+        ordering = ["baseline", "line_no"]
+        constraints = [
+            models.UniqueConstraint(fields=["baseline", "line_id"], name="mr_baseline_line"),
+            models.CheckConstraint(
+                condition=Q(requested_qty__gt=0), name="mr_baseline_line_qty_positive"
+            ),
+            models.CheckConstraint(
+                condition=Q(material__isnull=False) | ~Q(free_text=""),
+                name="mr_baseline_line_material_or_text",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.baseline} #{self.line_no}"
+
+
+class MaterialRequestLineRevision(BaseModel):
+    """One edit of a request line by a ``request.edit`` holder (M7b.3, Q32-Q34, Q36).
+
+    ``before`` and ``after`` hold the line's values (``revisions.values``): ``before`` is
+    empty for an added line; a replacement's ``after`` is the new line, named by
+    ``replacement_line_id``. ``self_approved``: the editor decided the edited line
+    themselves (always in ``APPROVED``; in ``SUBMITTED`` when they approved or rejected it
+    in the same step, a removal included) instead of leaving it to another reviewer.
+    Append-only (trigger).
+    """
+
+    class Kind(models.TextChoices):
+        CHANGE = "CHANGE", _("Changed")
+        ADD = "ADD", _("Added")
+        REMOVE = "REMOVE", _("Removed")
+        REPLACE = "REPLACE", _("Replaced")
+
+    request = models.ForeignKey(
+        MaterialRequest,
+        on_delete=models.PROTECT,
+        related_name="revisions",
+        verbose_name=_("request"),
+    )
+    baseline = models.ForeignKey(
+        MaterialRequestBaseline,
+        on_delete=models.PROTECT,
+        related_name="revisions",
+        verbose_name=_("as-submitted copy"),
+    )
+    line_id = models.UUIDField(_("line id"))
+    line_no = models.PositiveSmallIntegerField(_("line"))
+    kind = models.CharField(_("kind"), max_length=10, choices=Kind)
+    editor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name=_("edited by"),
+    )
+    reason = models.TextField(_("reason"))
+    before = models.JSONField(_("before"), default=dict, blank=True, encoder=DjangoJSONEncoder)
+    after = models.JSONField(_("after"), default=dict, blank=True, encoder=DjangoJSONEncoder)
+    self_approved = models.BooleanField(_("approved by the editor"), default=False)
+    replacement_line_id = models.UUIDField(_("replacement line id"), null=True, blank=True)
+
+    objects = RevisionQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _("line revision")
+        verbose_name_plural = _("line revisions")
+        ordering = ["request", "created_at", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(kind__in=["CHANGE", "ADD", "REMOVE", "REPLACE"]),
+                name="mr_revision_kind_valid",
+            ),
+            models.CheckConstraint(condition=~Q(reason=""), name="mr_revision_reason"),
+            models.CheckConstraint(
+                condition=Q(kind="REPLACE", replacement_line_id__isnull=False)
+                | (~Q(kind="REPLACE") & Q(replacement_line_id__isnull=True)),
+                name="mr_revision_replacement",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["request", "created_at"], name="mr_revision_request"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.request} #{self.line_no} · {self.get_kind_display()}"

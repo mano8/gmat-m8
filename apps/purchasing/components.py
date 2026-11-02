@@ -354,6 +354,15 @@ class Component:
         ]
         return [trim for trim in trims if trim is not None]
 
+    def allocated_lines(self, line_ids: Collection[UUID]) -> set[UUID]:
+        """For the request services: which of these lines have a live allocation."""
+        wanted = set(line_ids)
+        return {
+            allocation.request_line_id
+            for allocation in self.book().allocations.values()
+            if allocation.request_line_id in wanted
+        }
+
     def trim_request_lines(
         self, principal: Principal, line_ids: Collection[UUID], *, reason: str, cause: str
     ) -> None:

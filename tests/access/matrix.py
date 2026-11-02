@@ -95,6 +95,8 @@ ACTORS: tuple[Actor, ...] = (
     Actor("mm_mad", "mm_mad"),
     Actor("mm_mad_no_mfa", "mm_mad", mfa=False),
     Actor("mm_sev", "mm_sev"),
+    Actor("engineer", "engineer"),
+    Actor("engineer_no_mfa", "engineer", mfa=False),
     Actor("wo_mad", "wo_mad"),
     Actor("tech_mad", "tech_mad", mfa=False),
     Actor("site_manager", "site_manager", mfa=False),
@@ -224,9 +226,9 @@ GROUPS: dict[str, tuple[str, ...]] = {
     # The admin site's users (an active superuser, a valid GROUP_ADMIN), with session MFA.
     "admitted": ("group_admin", "operator"),
     # Privileged users whose session has not passed MFA: step-up on every page.
-    "no_mfa": ("group_admin_no_mfa", "mm_mad_no_mfa"),
+    "no_mfa": ("group_admin_no_mfa", "mm_mad_no_mfa", "engineer_no_mfa"),
     # Sessions that passed MFA but are not admitted to the admin.
-    "mfa_not_admitted": ("mm_mad", "mm_sev", "wo_mad", "mixed"),
+    "mfa_not_admitted": ("mm_mad", "mm_sev", "engineer", "wo_mad", "mixed"),
 }
 
 

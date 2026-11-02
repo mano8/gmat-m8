@@ -1,0 +1,20 @@
+{% load i18n %}
+{% comment %}
+  The edited lines of a request, each against its as-submitted copy (M7b.4). Parameter: changes
+  (the edited `selectors.LineHistory` items); nothing is drawn without any.
+{% endcomment %}
+{% if changes %}
+  <section class="mb-4" aria-label="{% translate 'Changes by reviewers' %}">
+    <h2 class="mb-2">{% translate "Changes by reviewers" %}</h2>
+    <div data-testid="request-changes">
+      {% for item in changes %}
+        <article class="card mb-3"
+                 data-line="{{ item.line.line_no }}"
+                 data-testid="changed-line">
+          <p class="font-semibold">{{ item.line.line_no }}. {{ item.line.description }}</p>
+          {% include "material_requests/line_edits.html" %}
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}

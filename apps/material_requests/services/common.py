@@ -1,14 +1,17 @@
 """Shared rules of the material request services: authorization, locks, editing rules."""
 
 from collections.abc import Mapping
-from typing import Any
+from datetime import datetime
+from typing import Any, cast
 from uuid import UUID
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db.models import Max
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
+from apps.access.generations import lock_access_state, lock_users
 from apps.access.principals import Principal
 from apps.access.roles import Capability
 from apps.accounts.models import User
@@ -16,12 +19,18 @@ from apps.audit.recorder import record
 from apps.catalog.models import Material, UnitOfMeasure
 from apps.catalog.quantities import check_quantity
 from apps.core import events
+from apps.core.changes import apply_changes
 from apps.core.db import constraint_errors, db_now
 from apps.core.locking import LockLevel, LockOrder, LockSetChanged
 from apps.core.sequences import format_number, next_number
-from apps.material_requests import commitments, ledger
+from apps.material_requests import commitments, ledger, reviewers, revisions
 from apps.material_requests.commitments import LockedComponent
-from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.material_requests.models import (
+    MaterialRequest,
+    MaterialRequestBaseline,
+    MaterialRequestBaselineLine,
+    MaterialRequestLine,
+)
 from apps.material_requests.transitions import transition
 from apps.organizations.models import Branch
 from apps.projects.models import Project
@@ -34,6 +43,7 @@ Closure = MaterialRequestLine.ClosedShortSource
 CREATE, WITHDRAW = Capability.REQUEST_CREATE, Capability.REQUEST_WITHDRAW
 CANCEL_ANY, VIEW = Capability.REQUEST_CANCEL_ANY, Capability.REQUEST_VIEW
 REVIEW, SOURCE = Capability.REQUEST_REVIEW, Capability.REQUEST_SOURCE
+EDIT = Capability.REQUEST_EDIT
 
 # Header fields the requester changes, per state (plan §4.4).
 EDITABLE_FIELDS: Mapping[str, frozenset[str]] = {
@@ -73,6 +83,18 @@ def _authorize(
 def _authorize_project(principal: Principal, project: Project, locks: LockOrder) -> None:
     """``request.create`` on the project itself: new requests only where the actor may."""
     authorize_in_txn(principal, CREATE, project, locks=locks, read=Capability.PROJECT_VIEW)
+
+
+def _lock_people(locks: LockOrder, principal: Principal, reviewer_id: UUID) -> None:
+    """L0 before the authorization: the access state, then the actor's and the assignee's
+    ``User`` rows ``FOR SHARE`` in one statement (id order).
+
+    A change to the assignee's authority locks their row first (``FOR NO KEY UPDATE``) and
+    a change to an organization the access state (``FOR UPDATE``), so either is serialized
+    with the eligibility check (S8, S9).
+    """
+    lock_access_state(locks)
+    lock_users(locks, {principal.user_id, reviewer_id})
 
 
 def _verified(request: MaterialRequest) -> tuple[Any, ...]:
@@ -146,6 +168,57 @@ def _decided(request: MaterialRequest) -> bool:
     return request.lines.exclude(decision=Decision.PENDING).exists()
 
 
+def _line_content(
+    *, material_id: UUID | None, free_text: str, unit_id: UUID | None, new_material: bool = True
+) -> tuple[dict[str, Any], UnitOfMeasure]:
+    """Validated material, description and unit of a line; a catalog line takes its
+    material's unit (C9). Returns them with the unit, for the quantity's check.
+
+    ``new_material``: the material is being chosen now, so it must be active; a line
+    keeps a material deactivated after it was added.
+    """
+    free_text = free_text.strip()
+    if material_id is None:
+        return {"material_id": None, "free_text": free_text, "unit_id": unit_id}, _free_unit(
+            free_text, unit_id
+        )
+    material = Material.objects.select_related("unit").filter(pk=material_id).first()
+    if material is None or (new_material and not material.is_active):
+        raise ValidationError(
+            {"material": ValidationError(_("Choose an active material."), code="inactive")}
+        )
+    if unit_id is not None and unit_id != material.unit_id:
+        raise ValidationError(
+            {
+                "unit": ValidationError(
+                    _("A catalog material is requested in its own unit."), code="unit_mismatch"
+                )
+            }
+        )
+    return {
+        "material_id": material_id,
+        "free_text": free_text,
+        "unit_id": material.unit_id,
+    }, material.unit
+
+
+def _free_unit(free_text: str, unit_id: UUID | None) -> UnitOfMeasure:
+    """The unit of a non-catalog line, which must be described."""
+    if not free_text:
+        raise ValidationError(
+            {
+                "free_text": ValidationError(
+                    _("Describe the material, or choose one from the catalog."),
+                    code="required",
+                )
+            }
+        )
+    found = UnitOfMeasure.objects.filter(pk=unit_id).first() if unit_id is not None else None
+    if found is None:
+        raise ValidationError({"unit": ValidationError(_("Choose a unit."), code="required")})
+    return found
+
+
 def _line_values(
     *,
     material_id: UUID | None,
@@ -154,48 +227,12 @@ def _line_values(
     requested_qty: Any,
     new_material: bool = True,
 ) -> dict[str, Any]:
-    """Validated line content. A catalog line takes its material's unit (C9).
-
-    ``new_material``: the material is being chosen now, so it must be active; a line
-    keeps a material deactivated after it was added.
-    """
-    free_text = free_text.strip()
-    if material_id is not None:
-        material = Material.objects.select_related("unit").filter(pk=material_id).first()
-        if material is None or (new_material and not material.is_active):
-            raise ValidationError(
-                {"material": ValidationError(_("Choose an active material."), code="inactive")}
-            )
-        if unit_id is not None and unit_id != material.unit_id:
-            raise ValidationError(
-                {
-                    "unit": ValidationError(
-                        _("A catalog material is requested in its own unit."), code="unit_mismatch"
-                    )
-                }
-            )
-        unit = material.unit
-    else:
-        if not free_text:
-            raise ValidationError(
-                {
-                    "free_text": ValidationError(
-                        _("Describe the material, or choose one from the catalog."),
-                        code="required",
-                    )
-                }
-            )
-        found = UnitOfMeasure.objects.filter(pk=unit_id).first() if unit_id is not None else None
-        if found is None:
-            raise ValidationError({"unit": ValidationError(_("Choose a unit."), code="required")})
-        unit = found
+    """Validated line content (``_line_content``) and its quantity in that unit."""
+    content, unit = _line_content(
+        material_id=material_id, free_text=free_text, unit_id=unit_id, new_material=new_material
+    )
     check_quantity(requested_qty, unit, "requested_qty")
-    return {
-        "material_id": material_id,
-        "free_text": free_text,
-        "unit_id": unit.pk,
-        "requested_qty": requested_qty,
-    }
+    return {**content, "requested_qty": requested_qty}
 
 
 def _save_line(line: MaterialRequestLine) -> None:
@@ -260,6 +297,74 @@ def _require_nothing_allocated_or_delivered(request: MaterialRequest) -> None:
         raise ValidationError(
             _("Material has already been ordered or delivered for this request."),
             code="in_progress",
+        )
+
+
+def _set_reviewer(request: MaterialRequest, reviewer_id: UUID, actor_id: UUID) -> dict[str, Any]:
+    """Assign ``reviewer_id`` (locked by ``_lock_people``) once they qualify; return the
+    audit diff, empty when they already are the assignee.
+
+    The request's procurement branch must be final: the assignee has to cover it
+    (``reviewers.covers``). An unknown user is refused like an ineligible one.
+    """
+    reviewer = User.objects.filter(pk=reviewer_id).first()
+    if reviewer is None or not reviewers.covers(reviewer, request.procurement_branch_id):
+        raise ValidationError(
+            {
+                "reviewer": ValidationError(
+                    _("Choose a reviewer who can decide this request."), code="ineligible_reviewer"
+                )
+            }
+        )
+    diff = apply_changes(request, {"assigned_reviewer_id": reviewer_id}, {"assigned_reviewer_id"})
+    if diff:
+        request.assigned_at, request.assigned_by_id = db_now(), actor_id
+    return diff
+
+
+def _record_baseline(
+    request: MaterialRequest, submitted_by_id: UUID, *, backfilled: bool = False
+) -> MaterialRequestBaseline:
+    """Copy the locked request's lines as they are now (M7b.3, Q34): the as-submitted copy
+    of the submit just made, or (``backfilled``) the first copy of a request submitted
+    before copies existed, taken by its first reviewer edit."""
+    last = request.baselines.aggregate(last=Max("sequence"))["last"] or 0
+    baseline = MaterialRequestBaseline.objects.create(
+        request=request,
+        sequence=last + 1,
+        # Set at every submit (CHECK ``mr_request_submitted_has_number``).
+        submitted_at=cast(datetime, request.submitted_at),
+        submitted_by_id=submitted_by_id,
+        notes=request.notes,
+        backfilled=backfilled,
+    )
+    MaterialRequestBaselineLine.objects.bulk_create(
+        MaterialRequestBaselineLine(
+            baseline=baseline,
+            line_id=line.pk,
+            line_no=line.line_no,
+            material_id=line.material_id,
+            material_snapshot=(
+                {}
+                if line.material is None
+                else {"reference": line.material.reference, "name": line.material.name}
+            ),
+            free_text=line.free_text,
+            unit_id=line.unit_id,
+            requested_qty=line.requested_qty,
+        )
+        for line in request.lines.select_related("material").order_by("line_no")
+    )
+    return baseline
+
+
+def _require_version(request: MaterialRequest, seen: int | None) -> None:
+    """Refuse a decision or an edit made on a page older than the request's last submit or
+    edit (``revisions.version``); ``None``: the caller showed no version."""
+    if seen is not None and seen != revisions.version(request.pk):
+        raise ValidationError(
+            _("This request was changed after you opened it. Check it again."),
+            code="edited",
         )
 
 

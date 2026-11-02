@@ -169,6 +169,10 @@ def request_detail(request: HttpRequest, request_id: UUID) -> HttpResponse:
     context["withdrawable"] = selectors.can_withdraw(ctx, found)
     context["reviewable"] = found.status != Status.DRAFT and selectors.can_review(ctx, found)
     context["attachments"] = attachment_selectors.panel(ctx, found)
+    changes = selectors.line_history(ctx, found) if found.status != Status.DRAFT else []
+    context["changes"] = [item for item in changes if item.edited]
+    context["edited_lines"] = {item.line.pk for item in changes if item.edited}
+    context["assignee"] = None if found.status == Status.DRAFT else selectors.assignee(found)
     return render(request, "material_requests/detail.html", context)
 
 
@@ -195,7 +199,12 @@ def request_materials(request: HttpRequest, request_id: UUID) -> HttpResponse:
 def request_review(request: HttpRequest, request_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     found = _own_draft(request, request_id)
-    form = SubmitForm(initial=SubmitForm.initial_for(found), actor_id=ctx.user_id)
+    form = SubmitForm(
+        initial=SubmitForm.initial_for(found),
+        actor_id=ctx.user_id,
+        reviewers=selectors.eligible_reviewers(ctx, found),
+        current=found.assigned_reviewer_id,
+    )
     return _review(request, found, form)
 
 
@@ -329,13 +338,19 @@ def request_submit(request: HttpRequest, request_id: UUID) -> HttpResponse:
     """Review step and submit in one transaction; a double tap replays the same key."""
     ctx = access_for(request)
     found = _own_draft(request, request_id)
-    form = SubmitForm(request.POST, actor_id=ctx.user_id)
+    form = SubmitForm(
+        request.POST,
+        actor_id=ctx.user_id,
+        reviewers=selectors.eligible_reviewers(ctx, found),
+        current=found.assigned_reviewer_id,
+    )
     if form.is_valid():
         try:
             submitted = services.submit(
                 ctx.principal,
                 found.pk,
                 idempotency_key=form.cleaned_data["idempotency_key"],
+                reviewer_id=form.reviewer_id(),
                 **form.header(),
             )
         except ValidationError as exc:

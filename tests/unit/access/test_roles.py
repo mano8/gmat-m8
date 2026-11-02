@@ -12,6 +12,7 @@ from apps.access.roles import (
     ROLE_ASSIGNMENT_KIND,
     ROLE_CAPABILITIES,
     ROLE_SCOPE_BASIS,
+    SELF_DECIDING_ROLES,
     Capability,
     Reach,
     Role,
@@ -19,32 +20,33 @@ from apps.access.roles import (
 )
 from apps.projects.models import ProjectAssignment
 
-# Copied from plan §3.4 (columns: GA, MM, WO, SM, TECH, PARTNER).
+# Copied from plan §3.4 as amended by ADR-0014 (columns: GA, MM, WO, SM, TECH, PARTNER, ENG).
 PLAN_TABLE = """
-org.manage          | ● | — | — | — | — | —
-project.view        | ● | ● | ● | ○ | ● | ○
-project.manage      | ● | ● | — | — | — | —
-catalog.view        | ● | ● | ● | ● | ● | ●
-catalog.manage      | ● | ● | — | — | — | —
-supplier.view       | ● | ● | ● | — | — | —
-supplier.manage     | ● | ● | — | — | — | —
-request.create      | ○ | ○ | — | ○ | ○ | ○
-request.withdraw    | ○ | ○ | — | ○ | ○ | ○
-request.view        | ● | ● | ● | ○ | ○ own | ○ own
-request.review      | ● | ● | — | ○ | — | —
-request.source      | ● | ● | — | — | — | —
-request.cancel_any  | ● | ● | — | — | — | —
-po.view             | ● | ● | ● | — | — | —
-po.manage           | ● | ● | — | — | — | —
-price.view          | ● | ● | — | — | — | —
-receipt.view        | ● | ● | ● | ○ site | — | —
-receipt.post        | ● | ● | ● | ○ site (Q9) | — | —
-receipt.void        | ● | ● | — | — | — | —
-handover.view       | ● | ● | ● | ○ | — | —
-handover.post       | ● | ● | ● | — | — | —
-handover.void       | ● | ● | — | — | — | —
-audit.view          | ● | ● | — | — | — | —
-export.csv          | ● | ● | — | — | — | —
+org.manage          | ● | — | — | — | — | — | —
+project.view        | ● | ● | ● | ○ | ● | ○ | ●
+project.manage      | ● | ● | — | — | — | — | ●
+catalog.view        | ● | ● | ● | ● | ● | ● | ●
+catalog.manage      | ● | ● | — | — | — | — | ●
+supplier.view       | ● | ● | ● | — | — | — | ●
+supplier.manage     | ● | ● | — | — | — | — | ●
+request.create      | ○ | ○ | — | ○ | ○ | ○ | ○
+request.withdraw    | ○ | ○ | — | ○ | ○ | ○ | ○
+request.view        | ● | ● | ● | ○ | ○ own | ○ own | ●
+request.review      | ● | ● | — | ○ | — | — | ●
+request.edit        | ● | ● | — | — | — | — | ●
+request.source      | ● | ● | — | — | — | — | ●
+request.cancel_any  | ● | ● | — | — | — | — | ●
+po.view             | ● | ● | ● | — | — | — | ●
+po.manage           | ● | ● | — | — | — | — | ●
+price.view          | ● | ● | — | — | — | — | ●
+receipt.view        | ● | ● | ● | ○ site | — | — | ●
+receipt.post        | ● | ● | ● | ○ site (Q9) | — | — | ●
+receipt.void        | ● | ● | — | — | — | — | ●
+handover.view       | ● | ● | ● | ○ | — | — | ●
+handover.post       | ● | ● | ● | — | — | — | ●
+handover.void       | ● | ● | — | — | — | — | ●
+audit.view          | ● | ● | — | — | — | — | ●
+export.csv          | ● | ● | — | — | — | — | ●
 """
 # "○" on one's own drafts is ownership; on anything else it is the assigned projects.
 OWN_DRAFTS = {"request.create", "request.withdraw"}
@@ -122,7 +124,28 @@ class TestConsistency:
                     assert capability in INSTALLATION_CAPABILITIES, (role, capability)
 
     def test_privileged_roles(self) -> None:
-        assert {Role.GROUP_ADMIN, Role.MATERIAL_MANAGER} == PRIVILEGED_ROLES
+        assert {Role.GROUP_ADMIN, Role.MATERIAL_MANAGER, Role.ENGINEER} == PRIVILEGED_ROLES
+
+    def test_self_deciding_roles_are_privileged(self) -> None:
+        """A self-decision always needs session MFA (Q33, ADR-0014)."""
+        assert {Role.GROUP_ADMIN, Role.MATERIAL_MANAGER, Role.ENGINEER} == SELF_DECIDING_ROLES
+        assert SELF_DECIDING_ROLES <= PRIVILEGED_ROLES
+
+    def test_engineers_rank_between_group_administrators_and_everyone_else(self) -> None:
+        """Every capability of every non-admin role is an engineer's too, at least as far
+        (maintainer, 2026-11-02); only ``org.manage`` stays the group administrators'."""
+        engineer = ROLE_CAPABILITIES[Role.ENGINEER]
+        assert dict(engineer) == dict(ROLE_CAPABILITIES[Role.MATERIAL_MANAGER])
+        assert set(ROLE_CAPABILITIES[Role.GROUP_ADMIN]) - set(engineer) == {Capability.ORG_MANAGE}
+        for role in set(Role) - {Role.GROUP_ADMIN, Role.ENGINEER}:
+            assert set(ROLE_CAPABILITIES[role]) <= set(engineer), role
+        assert ROLE_SCOPE_BASIS[Role.ENGINEER] is ScopeBasis.BRANCH
+
+    def test_request_edit_holders(self) -> None:
+        holders = {
+            role for role, caps in ROLE_CAPABILITIES.items() if Capability.REQUEST_EDIT in caps
+        }
+        assert holders == {Role.GROUP_ADMIN, Role.MATERIAL_MANAGER, Role.ENGINEER}
 
     def test_only_group_admins_manage_the_organization(self) -> None:
         holders = {

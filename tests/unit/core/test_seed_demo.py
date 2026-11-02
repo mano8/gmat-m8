@@ -81,6 +81,7 @@ def test_one_user_per_role_and_a_mixed_one(group_admin: User) -> None:
     roles = set(Membership.objects.exclude(user=group_admin).values_list("role", flat=True))
     assert roles == {
         Role.MATERIAL_MANAGER,
+        Role.ENGINEER,
         Role.WAREHOUSE_OPERATOR,
         Role.TECHNICIAN,
         Role.SITE_MANAGER,

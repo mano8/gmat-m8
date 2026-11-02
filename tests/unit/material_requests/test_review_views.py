@@ -13,12 +13,14 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.access.context import AccessContext
+from apps.access.roles import Role
 from apps.audit.models import AuditEvent
 from apps.catalog.models import Material, UnitOfMeasure
 from apps.core.locking import RetryExhausted
 from apps.material_requests import ledger, selectors, services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
-from tests.org import Org, People
+from apps.organizations.models import Branch
+from tests.org import Org, People, also
 from tests.org import client_for as signed_in
 from tests.support import principal_for
 from tests.unit.material_requests.conftest import MakeRequest
@@ -39,8 +41,16 @@ def page(client: Client, request: MaterialRequest) -> str:
     return str(response.content.decode())
 
 
+# The actions whose form carries the version of the page (M7b.4), as the page sends it.
+VERSIONED = {"decide_line", "approve_all"}
+
+
 def post(client: Client, name: str, target: Any, data: dict[str, Any] | None = None) -> Any:
-    return client.post(reverse(f"requests:{name}", args=[target.pk]), data or {}, follow=True)
+    data = dict(data or {})
+    if name in VERSIONED:
+        request = target.request if isinstance(target, MaterialRequestLine) else target
+        data.setdefault("seen_version", str(selectors.version(request)))
+    return client.post(reverse(f"requests:{name}", args=[target.pk]), data, follow=True)
 
 
 def messages_of(response: Any) -> list[str]:
@@ -149,14 +159,44 @@ class TestExaminePage:
             assert f'data-testid="{selector}"' in html
         assert 'data-line="1"' in html and "Urgent for Monday" in html
 
-    def test_a_reviewer_cannot_decide_their_own_request(
+    def test_a_site_manager_cannot_decide_their_own_request(
         self, make_request: MakeRequest, people: People
     ) -> None:
-        own = make_request(Status.SUBMITTED, user=people.mm_mad)
-        html = page(client_for(people.mm_mad), own)
+        own = make_request(Status.SUBMITTED, user=people.site_manager)
+        html = page(client_for(people.site_manager), own)
         assert 'data-testid="self-approval-notice"' in html
+        assert 'data-testid="self-decision-notice"' not in html
         assert 'data-testid="approve-all"' not in html
         assert 'data-testid="approve-line"' not in html
+
+    @pytest.mark.parametrize("person", ["group_admin", "mm_mad", "engineer"])
+    def test_self_deciding_roles_get_the_controls_and_a_notice(
+        self, make_request: MakeRequest, people: People, person: str
+    ) -> None:
+        user = getattr(people, person)
+        own = make_request(Status.SUBMITTED, user=user)
+        html = page(client_for(user), own)
+        assert 'data-testid="self-decision-notice"' in html
+        assert 'data-testid="self-approval-notice"' not in html
+        assert 'data-testid="approve-all"' in html and 'data-testid="approve-line"' in html
+        assert selectors.can_decide(AccessContext.for_user(user), own)
+
+    def test_who_does_not_review_decides_nothing(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        own = make_request(Status.SUBMITTED, user=people.tech_mad)
+        assert not selectors.can_decide(AccessContext.for_user(people.tech_mad), own)
+
+    def test_the_controls_follow_the_membership_that_covers_the_request(
+        self, make_request: MakeRequest, org: Org, people: People
+    ) -> None:
+        """S6: a material manager of A-SEV who reviews the hospital as its site manager."""
+        user = people.site_manager
+        also(user, Role.MATERIAL_MANAGER, branch=org.a_sev)
+        own = make_request(Status.SUBMITTED, user=user)
+        assert not selectors.can_decide(AccessContext.for_user(user), own)
+        Branch.objects.filter(pk=org.a_mad.pk).update(allow_self_approval=True)
+        assert selectors.can_decide(AccessContext.for_user(user), refreshed(own))
 
     def test_the_tools_of_an_approved_request(
         self, approved: MaterialRequest, people: People
@@ -336,10 +376,23 @@ class TestDecisions:
     def test_self_approval_is_refused_by_the_service(
         self, make_request: MakeRequest, people: People
     ) -> None:
-        own = make_request(Status.SUBMITTED, user=people.mm_mad)
-        response = client_for(people.mm_mad).post(reverse("requests:approve_all", args=[own.pk]))
+        own = make_request(Status.SUBMITTED, user=people.site_manager)
+        client = client_for(people.site_manager)
+        response = client.post(
+            reverse("requests:approve_all", args=[own.pk]),
+            {"seen_version": str(selectors.version(own))},
+        )
         assert response.status_code == 403
         assert refreshed(own).status == Status.SUBMITTED
+
+    def test_an_engineer_approves_their_own_request(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        own = make_request(Status.SUBMITTED, user=people.engineer)
+        response = post(client_for(people.engineer), "approve_all", own)
+        assert response.status_code == 200
+        assert refreshed(own).status == Status.APPROVED
+        assert AuditEvent.objects.filter(action="request.approved", data__self_decided=True)
 
     def test_another_reviewers_decision_is_kept(
         self, make_request: MakeRequest, people: People
@@ -612,6 +665,6 @@ class TestBusyDatabase:
         monkeypatch.setattr(services, service, give_up)
         submitted = make_request(Status.SUBMITTED)
         response = client_for(people.mm_mad).post(
-            reverse(f"requests:{name}", args=[submitted.pk]), {"reason": "x"}
+            reverse(f"requests:{name}", args=[submitted.pk]), {"reason": "x", "seen_version": "0"}
         )
         assert response.status_code == 409

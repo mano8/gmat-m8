@@ -1,0 +1,38 @@
+{% load i18n ui_tags %}
+{% comment %}
+  One line against its as-submitted copy and the reviewers' edits since (M7b.4, Q34). Parameter:
+  item (a selectors.LineHistory). Only what the line itself shows: material, description, unit,
+  quantities and decision, and who changed it, when and why.
+{% endcomment %}
+<div class="mt-3 rounded-lg border border-line p-3 text-sm"
+     data-testid="line-edits">
+  <p data-field="submitted">
+    <span class="text-soft">{% translate "As submitted" %}:</span>
+    {% if item.submitted %}
+      {% firstof item.submitted.material_snapshot.name item.submitted.free_text %}
+      {% if item.submitted.material_snapshot.reference %}({{ item.submitted.material_snapshot.reference }}){% endif %}
+      · {{ item.submitted.requested_qty|quantity }} {{ item.submitted.unit.code }}
+    {% else %}
+      {% translate "Added by a reviewer" %}
+    {% endif %}
+  </p>
+  <ol class="mt-2 grid gap-2">
+    {% for edit in item.revisions %}
+      <li data-kind="{{ edit.kind }}" data-testid="line-edit">
+        <span class="font-medium">{{ edit.get_kind_display }}</span>
+        · {{ edit.editor.full_name|default:edit.editor.email }}
+        · <span class="text-soft">{{ edit.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
+        <span class="block text-soft" data-field="reason">{{ edit.reason }}</span>
+        <span class="block" data-field="change">
+          {% if edit.before %}
+            {% firstof edit.before.name edit.before.free_text %}
+            · {{ edit.before.requested_qty|quantity }} {{ edit.before.unit }}
+            →
+          {% endif %}
+          {% firstof edit.after.name edit.after.free_text %}
+          · {{ edit.after.requested_qty|quantity }} {{ edit.after.unit }}
+        </span>
+      </li>
+    {% endfor %}
+  </ol>
+</div>

@@ -127,6 +127,12 @@ class Scope:
         grants = tuple(grant for grant in self.grants if grant.privileged is privileged)
         return Scope(self.capability, grants, self.user_id)
 
+    def of_roles(self, roles: Iterable[Role]) -> Scope:
+        """The grants of the memberships of ``roles`` only (S6: never a role held elsewhere)."""
+        wanted = frozenset(roles)
+        grants = tuple(grant for grant in self.grants if grant.role in wanted)
+        return Scope(self.capability, grants, self.user_id)
+
     def branch_q(self, field_name: str = "pk") -> Q:
         """Branch rows in scope (S1, S2), through ``field_name`` (``pk`` for ``Branch``)."""
         if self.everything:

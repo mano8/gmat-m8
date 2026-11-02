@@ -28,6 +28,9 @@ rows in id order, lets the token's own check lock and verify the token row, then
 that the initiator still holds ``org.manage`` (a superuser for a staff target, F71).
 
 **System principal**: only its closed capability set; never a business capability.
+
+**Self-decisions** (Q33, ADR-0014): ``authorize_self_decision`` lets a requester decide
+their own request only through a grant of a self-deciding role on that request, with MFA.
 """
 
 from typing import cast, overload
@@ -53,7 +56,7 @@ from apps.access.principals import (
     SystemPrincipal,
     TokenPrincipal,
 )
-from apps.access.roles import Capability
+from apps.access.roles import SELF_DECIDING_ROLES, Capability
 from apps.access.scopes import Scope, object_in_scope
 from apps.accounts.models import User
 from apps.core.locking import LockMode, LockOrder, LockOutsideTransaction
@@ -130,22 +133,49 @@ def _authorize_user(
         visible = ctx.scope_for(read)
         if not all(object_in_scope(obj, visible) for obj in objects):
             raise NotInScope(read)
-    scope = ctx.scope_for(capability)
+    _require_scope(principal, user, ctx.scope_for(capability), objects)
+    return user
+
+
+def _require_scope(
+    principal: SessionPrincipal | OperatorPrincipal,
+    user: User,
+    scope: Scope,
+    objects: tuple[Model, ...],
+) -> None:
+    """Steps 4-5: one grant covers each object; MFA when only privileged grants do."""
     ordinary, privileged = scope.only(privileged=False), scope.only(privileged=True)
     needs_mfa = False
     for obj in objects or (None,):
         if _covers(ordinary, obj):
             continue
         if not _covers(privileged, obj):
-            raise AccessDenied(capability)
+            raise AccessDenied(scope.capability)
         needs_mfa = True
     if (
         needs_mfa
         and isinstance(principal, SessionPrincipal)
         and not mfa_satisfied(principal.mfa_at, user.privilege_elevated_at)
     ):
-        raise MFARequired(capability)
-    return user
+        raise MFARequired(scope.capability)
+
+
+def authorize_self_decision(
+    principal: SessionPrincipal | OperatorPrincipal, user: User, capability: str, obj: Model
+) -> None:
+    """``user`` decides their own ``obj`` where the branch forbids self-approval (Q33).
+
+    Allowed only when a membership of a self-deciding role (``SELF_DECIDING_ROLES``:
+    group administrators, material managers, engineers) grants ``capability`` on ``obj``
+    itself: a role held through another membership counts for nothing (S6), and neither
+    does ``is_superuser``. Those roles are privileged, so the session must have passed MFA
+    after ``privilege_elevated_at`` even when an ordinary grant (a site manager's) let
+    ``authorize_in_txn`` through. Runs after ``authorize_in_txn`` in the same transaction,
+    which already holds the access state and the user's row; the memberships are read
+    again at the transaction's clock (S8, S9).
+    """
+    scope = AccessContext.for_user(user).scope_for(capability).of_roles(SELF_DECIDING_ROLES)
+    _require_scope(principal, user, scope, (obj,))
 
 
 def _authorize_token(principal: TokenPrincipal, capability: str, locks: LockOrder) -> User | None:
