@@ -297,6 +297,16 @@ Code in `apps/material_requests/services/editing.py`, `services/common.py`, `rev
 - **Stale pages.** A decision or an edit may carry the `seen_version` of the page (submits plus edits, both append-only and written under the request's header lock); one older than the request is refused, so a reviewer cannot approve content they have not seen.
 - **Email.** The requester is told through the outbox with `request.view` as the claim-time rule, never for their own edits. The message only says the request changed and links to it (the edits are on the page). It is held back ten minutes; edits made while it waits find it (`FOR UPDATE SKIP LOCKED`, so neither the edit nor the worker ever waits for the other) and queue nothing more.
 
+## Review workflow screens (step M7b.4)
+
+Code in `apps/material_requests/views/editing.py`, `views/reviewer.py`, `forms.py`, `selectors.py`, `templates/material_requests/` and `apps/dashboards/panels.py`; ADR-0014 §7, plan Q31-Q34.
+
+- **Every action is its own POST-only URL** (`assign/`, `lines/<id>/apply-edit/`, `<id>/lines/apply-add/`, `lines/<id>/remove-reviewed/`); the dialogs that prepare them are GET-only pages (`lines/<id>/edit/`, `<id>/lines/new/`) that call no service. The order of the checks is the other reviewer screens': capability somewhere (403), request in scope (404), capability on it (403); the services authorize again. Assigning takes `request.review`, editing `request.edit`; the matrix has a row for each of the six URLs and every actor, including the revoked ones.
+- **Choices come from selectors.** The reviewer picker and the reassign dialog offer `eligible_reviewers` and nothing else (a forged id is an invalid choice); the material of an edit is checked against `catalog.selectors.materials`, its unit against `units`; the service judges the assignee, the material and the unit again.
+- **Double taps and stale pages.** The edit, add and remove forms carry a signed, actor- and operation-bound idempotency key; a repeated edit finds its key already used (`recorded_result`) and leads back to the page instead of failing on a diff against the already changed line. The decision, approve-all and edit forms carry `seen_version`; a page older than another reviewer's edit or a resubmit is refused with "This request was changed after you opened it".
+- **What the requester reads.** The status page shows each edited line against the copy of its latest submit, and the edits since (editor, time, reason, before and after): material, description, unit, quantities, decision. It never shows a price, a supplier, an order or another project's quantity; the matrix world holds edited requests so the sentinel checks run on those pages, and a view test repeats it for the technician and the partner. A request the user cannot view has no history (404). Reviewer names are shown as the requester picked them (the picker lists them), the editors' as they signed their edits.
+- **"Assigned to me".** The filter and the chip use `assigned_to`, which applies the same grant rule as the assignment: a lapsed assignee's list is empty. The dashboard panel is offered to `request.edit` holders only (the roles that can be assigned), so a site manager sees no always-empty panel.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

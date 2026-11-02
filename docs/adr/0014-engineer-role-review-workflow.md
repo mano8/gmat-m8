@@ -99,6 +99,15 @@ A new capability held in scope by `GROUP_ADMIN`, `MATERIAL_MANAGER` and `ENGINEE
 - Settled in M7b.3: the copy is `MaterialRequestBaseline` (the request's notes and submit) with `MaterialRequestBaselineLine` rows (material with its reference and name of that day, description, unit, quantity); both and `MaterialRequestLineRevision` are append-only by trigger and name a line by its id, without a foreign key, so deleting a draft line after a return for changes keeps the history of earlier submits. `selectors.line_history` gives each line with its copy from the latest submit and the edits since.
 - A batch of edits is what happens while the requester's notice waits: the first edit queues one message, held back ten minutes, that only says the request changed and links to it; later edits find it waiting and queue nothing. Once the worker has claimed it, the next edit starts a new batch.
 
+### 7. The screens (M7b.4)
+
+- **Submit.** The review step has an optional "Send to a reviewer" choice (the reviewers `eligible_reviewers` lists for the branch the submit will take; no choice at all when none qualifies). A resubmit preselects the earlier assignee.
+- **Review page.** It names the assigned reviewer (or says that any reviewer of the branch can decide) and offers "Send to another reviewer" with a required note, to who may review the request. Per line: "Change the line" (a dialog: the material is searched with a GET form and chosen with a link, so it works without JavaScript; the description and unit of a described line; the quantity; a required reason), "Save and approve" next to "Save" in a submitted request for who may decide it (in an approved request the edit is approved with it), "Remove the line" with a reason, and "Add a line" for the request. There is no separate "replace" tool: the service decides whether a material or unit change is made in place or becomes a replacement (Q36), and the dialog says so in an approved request.
+- **Stale pages and double taps.** The decision, approve-all and edit forms send the page's `seen_version`; the edit, add and remove forms carry an idempotency key.
+- **History.** The review page and the requester's status page show, for each edited line, the line as submitted, the edits (who, when, why, before and after) and an "Edited" marker; removed and replaced lines stay on the page. Only fields the line already shows.
+- **Inbox and dashboard.** The inbox filters on "Assigned to me" (submitted or approved requests sent to the user) and marks those rows; the home page gets an "Assigned to me" panel of the submitted requests sent to the user, offered to group administrators, material managers and engineers.
+- Working assumptions to flag in the PR: a rejected line of a submitted request offers a change but not a removal; an approved line that is fully delivered offers a change but not a removal; the panel counts submitted requests only (an approved request has nothing left to decide).
+
 ## What this changes
 
 - **ADR-0010 Q4:** "The self-approval rule (`allow_self_approval`) is unchanged" now applies to reviewers outside `SELF_DECIDING_ROLES` only; §3 above governs the others.
