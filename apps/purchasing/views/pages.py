@@ -7,6 +7,7 @@ an issued order, each only to who holds ``po.manage`` on it; a warehouse operato
 same page without prices (§8.2). Every action is its own POST-only URL (``actions``).
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -140,6 +141,19 @@ def order_new(request: HttpRequest) -> HttpResponse:
 # --- order lists -------------------------------------------------------------------------------
 
 
+def _with_progress(
+    orders: Sequence[PurchaseOrder], progress: Mapping[UUID, Any]
+) -> list[tuple[PurchaseOrder, Any]]:
+    """Each order with its receipt progress; a draft or a cancelled order has none."""
+    return [
+        (
+            found,
+            progress.get(found.pk) if found.number and found.status != Status.CANCELLED else None,
+        )
+        for found in orders
+    ]
+
+
 @require_safe
 @require_capability(VIEW)
 def order_list(request: HttpRequest) -> HttpResponse:
@@ -150,7 +164,7 @@ def order_list(request: HttpRequest) -> HttpResponse:
         params["status"] = Status.ISSUED  # a sort or a page link keeps showing what is pending
     filters = OrdersFilterForm(params or None, ctx=ctx)
     data = filters.cleaned_data if filters.is_valid() else {}
-    status = Status.ISSUED if "status" not in request.GET else data.get("status", "")
+    status = data.get("status", "") if params else Status.ISSUED
     supplier, project = data.get("supplier"), data.get("project")
     rows = selectors.orders(
         ctx,
@@ -170,15 +184,7 @@ def order_list(request: HttpRequest) -> HttpResponse:
     context = {
         "filters": filters,
         "listing": listing,
-        "entries": [
-            (
-                found,
-                progress.get(found.pk)
-                if found.number and found.status != Status.CANCELLED
-                else None,
-            )
-            for found in listing.rows
-        ],
+        "entries": _with_progress(listing.rows, progress),
         "can_manage": selectors.can_manage(ctx),
     }
     return render_list(request, "purchasing/orders.html", context)
