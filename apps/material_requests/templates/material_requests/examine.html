@@ -67,6 +67,11 @@
         {% translate "This is your own request: another reviewer must decide it." %}
       </p>
     {% elif can_decide %}
+      {% if own_request %}
+        <p class="card mb-4 text-soft" data-testid="self-decision-notice">
+          {% translate "This is your own request: your decisions are recorded as self-decisions." %}
+        </p>
+      {% endif %}
       <section class="card mb-4" aria-label="{% translate 'Decide the request' %}">
         <form method="post"
               action="{% url 'requests:approve_all' request_id=request_obj.pk %}"

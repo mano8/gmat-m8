@@ -10,7 +10,7 @@ from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from apps.access.policy import require_not_self_approval
+from apps.access.authorization import authorize_self_decision
 from apps.access.principals import Principal
 from apps.accounts.models import User
 from apps.catalog.models import Material
@@ -96,6 +96,11 @@ def _decision_values(decision: LineDecision, line: MaterialRequestLine) -> dict[
 DECISION_FIELDS = frozenset({"decision", "approved_qty", "decision_note"})
 
 
+def _self_decided(actor: User, request: MaterialRequest) -> dict[str, bool]:
+    """The audit marker of a decision on one's own request (Q33): none on someone else's."""
+    return {"self_decided": True} if actor.pk == request.requested_by_id else {}
+
+
 def _decide(
     principal: Principal,
     actor: User,
@@ -106,8 +111,10 @@ def _decide(
     """Apply the decisions to the locked lines, then finalise the request if all are decided.
 
     A reviewer changes only their own decisions (§4.4); a line someone else decided stays
-    theirs until the request returns to draft.
+    theirs until the request returns to draft. The requester's own decisions are marked
+    ``self_decided`` in the audit (Q33).
     """
+    marker = _self_decided(actor, request)
     by_id = {line.pk: line for line in lines}
     now = db_now()
     for decision in decisions:
@@ -123,7 +130,7 @@ def _decide(
             continue
         line.decided_by, line.decided_at = actor, now
         line.save()
-        _record_line(principal, "request_line.decided", request, line, changes=diff)
+        _record_line(principal, "request_line.decided", request, line, changes=diff, **marker)
     decided = {line.decision for line in request.lines.all()}
     if Decision.PENDING in decided:
         return
@@ -132,21 +139,30 @@ def _decide(
     request.decided_at = now
     request.save()
     action = "request.approved" if approved else "request.rejected"
-    _record(principal, action, request)
+    _record(principal, action, request, **marker)
     events.publish(action, request_id=request.pk)
+
+
+def _require_may_decide(principal: Principal, actor: User, request: MaterialRequest) -> None:
+    """A requester decides their own request only where the procurement branch allows it,
+    or through a self-deciding role's grant on the request, with MFA (Q33, ADR-0014)."""
+    if actor.pk != request.requested_by_id:
+        return
+    branch = Branch.objects.get(pk=request.procurement_branch_id)
+    if not branch.allow_self_approval:
+        authorize_self_decision(principal, actor, REVIEW, request)
 
 
 def _review_lock(
     principal: Principal, request_id: UUID, locks: LockOrder
 ) -> tuple[User, MaterialRequest]:
-    """Authorize ``request.review``, lock the header, require ``SUBMITTED`` and no
-    self-approval (the procurement branch decides whether its members may)."""
+    """Authorize ``request.review``, lock the header, require ``SUBMITTED`` and refuse a
+    self-decision the requester may not make."""
     request = MaterialRequest.objects.get(pk=request_id)
     actor = _authorize(principal, REVIEW, request, locks)
     locked = _lock_header(locks, request)
     _require_state(locked, Status.SUBMITTED)
-    branch = Branch.objects.get(pk=locked.procurement_branch_id)
-    require_not_self_approval(actor.pk, locked.requested_by_id, branch)
+    _require_may_decide(principal, actor, locked)
     return actor, locked
 
 

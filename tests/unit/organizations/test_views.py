@@ -86,6 +86,25 @@ class TestMemberships:
         again = client.post(reverse("org:revoke_membership", args=[membership.pk]), follow=True)
         assert again.status_code == 200 and messages_of(again)
 
+    def test_an_engineer_is_granted_on_a_branch_and_elevates(
+        self, org: Org, people: People
+    ) -> None:
+        """ADR-0014: the role picker offers ``ENGINEER``; it is a privileged branch role."""
+        client = client_for(people.group_admin)
+        target = people.nobody
+        page = client.get(reverse("org:person", args=[target.pk])).content.decode()
+        assert f'value="{Role.ENGINEER}"' in page
+        key = issue_key(people.group_admin.pk, "membership.grant")
+        granted = client.post(
+            reverse("org:grant_membership", args=[target.pk]),
+            {"role": Role.ENGINEER, "branch": org.a_mad.pk, "idempotency_key": key},
+        )
+        assert granted.status_code == 302
+        membership = Membership.objects.get(user=target)
+        assert (membership.role, membership.branch) == (Role.ENGINEER, org.a_mad)
+        target.refresh_from_db()
+        assert target.privilege_elevated_at is not None
+
     @pytest.mark.parametrize(
         "data",
         [
@@ -192,6 +211,7 @@ class TestInvitations:
             },
         )
         assert created.status_code == 302 and created["Location"] == reverse("org:invitations")
+        assert f'value="{Role.ENGINEER}"' in form.content.decode()
         invitation = Invitation.objects.get()
         assert invitation.grants["assignments"][0]["kind"] == "MANAGER"
         listed = client.get(reverse("org:invitations"))

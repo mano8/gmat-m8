@@ -62,7 +62,7 @@ def test_every_role_has_exactly_one_shape() -> None:
     shapes = (INSTALLATION_ROLES, BRANCH_ROLES, COMPANY_ROLES)
     assert set().union(*shapes) == set(Role)
     assert sum(len(shape) for shape in shapes) == len(Role)
-    assert {Role.GROUP_ADMIN, Role.MATERIAL_MANAGER} == PRIVILEGED_ROLES
+    assert {Role.GROUP_ADMIN, Role.MATERIAL_MANAGER, Role.ENGINEER} == PRIVILEGED_ROLES
 
 
 def test_access_state_admin_is_read_only() -> None:

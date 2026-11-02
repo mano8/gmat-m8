@@ -147,6 +147,7 @@ class TestBranch:
 SHAPES: dict[Role, list[dict[str, bool]]] = {
     Role.GROUP_ADMIN: [{"branch": True}, {"company": True}],
     Role.MATERIAL_MANAGER: [{}, {"branch": True, "company": True}, {"company": True}],
+    Role.ENGINEER: [{}, {"branch": True, "company": True}, {"company": True}],
     Role.WAREHOUSE_OPERATOR: [{}, {"company": True}],
     Role.TECHNICIAN: [{}, {"company": True}],
     Role.SITE_MANAGER: [{}, {"company": True}],
@@ -155,6 +156,7 @@ SHAPES: dict[Role, list[dict[str, bool]]] = {
 VALID: dict[Role, dict[str, bool]] = {
     Role.GROUP_ADMIN: {},
     Role.MATERIAL_MANAGER: {"branch": True},
+    Role.ENGINEER: {"branch": True},
     Role.WAREHOUSE_OPERATOR: {"branch": True},
     Role.TECHNICIAN: {"branch": True},
     Role.SITE_MANAGER: {"branch": True},

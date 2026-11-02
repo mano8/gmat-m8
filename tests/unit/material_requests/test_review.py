@@ -6,7 +6,7 @@ handovers will contribute (D, R, P, Q, allocated) come from the ``flows_of`` sta
 """
 
 from collections.abc import Callable, Iterator
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -14,10 +14,13 @@ from uuid import UUID
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from apps.access.exceptions import AccessDenied
+from apps.access.exceptions import AccessDenied, MFARequired, NotInScope
+from apps.access.roles import Role
+from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.catalog.models import Material, UnitOfMeasure
 from apps.core import events
@@ -27,8 +30,8 @@ from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services import LineDecision
 from apps.material_requests.services import common as common_services
 from apps.material_requests.services import review as review_services
-from apps.organizations.models import Branch
-from tests.org import Org, People
+from apps.organizations.models import Branch, Membership
+from tests.org import Org, People, also
 from tests.support import error_codes, principal_for
 from tests.unit.material_requests.conftest import MakeRequest
 
@@ -246,11 +249,38 @@ class TestDecide:
 
 
 class TestSelfApproval:
-    @pytest.mark.parametrize("person", ["mm_mad", "site_manager", "group_admin"])
-    def test_nobody_decides_their_own_request(
+    """Q33 (ADR-0014): group administrators, material managers and engineers decide their own
+    requests; every other reviewer only where the procurement branch allows it."""
+
+    @pytest.mark.parametrize("person", ["group_admin", "mm_mad", "engineer"])
+    def test_self_deciding_roles_decide_their_own_request(
         self, make_request: MakeRequest, people: People, person: str
     ) -> None:
         user = getattr(people, person)
+        request = make_request(Status.SUBMITTED, user=user, lines=2)
+        first, second = lines_of(request)
+        services.decide_line(principal_for(user), first.pk, decision="REJECTED", note="x")
+        assert services.approve_all(principal_for(user), request.pk).status == Status.APPROVED
+        assert fresh(second).decided_by == user
+        marked = AuditEvent.objects.filter(data__self_decided=True)
+        assert sorted(marked.values_list("action", flat=True)) == [
+            "request.approved",
+            "request_line.decided",
+            "request_line.decided",
+        ]
+
+    def test_a_decision_on_someone_elses_request_is_not_marked(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        request = make_request(Status.SUBMITTED)
+        services.approve_all(principal_for(people.engineer), request.pk)
+        assert actions() == ["request_line.decided", "request.approved"]
+        assert not AuditEvent.objects.filter(data__has_key="self_decided").exists()
+
+    def test_a_site_manager_does_not_decide_their_own_request(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        user = people.site_manager
         request = make_request(Status.SUBMITTED, user=user)
         line = request.lines.get()
         with pytest.raises(AccessDenied):
@@ -260,16 +290,93 @@ class TestSelfApproval:
         with pytest.raises(AccessDenied):
             services.approve_all(principal_for(user), request.pk)
         assert fresh(line).decision == Decision.PENDING
+        assert actions() == []
 
     def test_unless_the_procurement_branch_allows_it(
         self, make_request: MakeRequest, org: Org, people: People
     ) -> None:
-        request = make_request(Status.SUBMITTED, user=people.mm_mad)
+        user = people.site_manager
+        request = make_request(Status.SUBMITTED, user=user)
         Branch.objects.filter(pk=org.b_mad.pk).update(allow_self_approval=True)  # project's
         with pytest.raises(AccessDenied):
-            services.approve_all(mm(people), request.pk)
+            services.approve_all(principal_for(user), request.pk)
         Branch.objects.filter(pk=org.a_mad.pk).update(allow_self_approval=True)  # procurement
-        assert services.approve_all(mm(people), request.pk).status == Status.APPROVED
+        assert services.approve_all(principal_for(user), request.pk).status == Status.APPROVED
+        assert AuditEvent.objects.filter(data__self_decided=True).count() == 2
+
+    def test_a_role_held_through_another_membership_counts_for_nothing(
+        self, make_request: MakeRequest, org: Org, people: People
+    ) -> None:
+        """S6: a material manager of A-SEV who reviews the hospital as its site manager."""
+        user = people.site_manager
+        also(user, Role.MATERIAL_MANAGER, branch=org.a_sev)
+        request = make_request(Status.SUBMITTED, user=user)
+        with pytest.raises(AccessDenied):
+            services.approve_all(principal_for(user), request.pk)
+        also(user, Role.ENGINEER, branch=org.a_mad)  # A-MAD buys for the hospital
+        assert services.approve_all(principal_for(user), request.pk).status == Status.APPROVED
+
+    def test_a_revoked_or_expired_self_deciding_role_counts_for_nothing(
+        self, make_request: MakeRequest, org: Org, people: People
+    ) -> None:
+        user = people.site_manager
+        now = timezone.now()
+        also(user, Role.ENGINEER, branch=org.a_mad, revoked_at=now - timedelta(minutes=5))
+        also(
+            user,
+            Role.ENGINEER,
+            branch=org.a_mad,
+            valid_from=now - timedelta(hours=2),
+            valid_until=now - timedelta(minutes=5),
+        )
+        request = make_request(Status.SUBMITTED, user=user)
+        with pytest.raises(AccessDenied):
+            services.approve_all(principal_for(user), request.pk)
+        assert fresh(request).status == Status.SUBMITTED
+
+    def test_a_revoked_engineer_decides_nothing(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        engineer = people.engineer
+        request = make_request(Status.SUBMITTED, user=engineer)
+        Membership.objects.filter(user=engineer).update(revoked_at=timezone.now())
+        with pytest.raises(NotInScope):
+            services.approve_all(principal_for(engineer), request.pk)
+
+    def test_an_engineer_without_session_mfa_decides_nothing(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        """``authorize_in_txn`` refuses the privileged grant, own request or not."""
+        engineer = people.engineer
+        own, other = make_request(Status.SUBMITTED, user=engineer), make_request(Status.SUBMITTED)
+        for request in (own, other):
+            with pytest.raises(MFARequired):
+                services.approve_all(principal_for(engineer, mfa_at=None), request.pk)
+            assert fresh(request).status == Status.SUBMITTED
+
+    def test_even_when_an_ordinary_grant_lets_the_review_through(
+        self, make_request: MakeRequest, org: Org, people: People
+    ) -> None:
+        """The site manager's grant needs no MFA; the engineer's exemption does."""
+        user = people.site_manager
+        also(user, Role.ENGINEER, branch=org.a_mad)
+        request = make_request(Status.SUBMITTED, user=user)
+        other = make_request(Status.SUBMITTED)
+        no_mfa = principal_for(user, mfa_at=None)
+        with pytest.raises(MFARequired):
+            services.approve_all(no_mfa, request.pk)
+        assert fresh(request).status == Status.SUBMITTED
+        assert services.approve_all(no_mfa, other.pk).status == Status.APPROVED
+
+    def test_a_superuser_gets_nothing_from_is_superuser(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        user = people.site_manager
+        User.objects.filter(pk=user.pk).update(is_superuser=True, is_staff=True)
+        request = make_request(Status.SUBMITTED, user=user)
+        with pytest.raises(AccessDenied):
+            services.approve_all(principal_for(user), request.pk)
+        assert fresh(request).status == Status.SUBMITTED
 
 
 class TestApproveAll:

@@ -15,7 +15,7 @@ from django.db.models.functions import Now
 from apps.access.exceptions import AccessDenied
 from apps.access.roles import PRIVILEGED_ROLES
 from apps.accounts.models import User
-from apps.organizations.models import Branch, Membership
+from apps.organizations.models import Membership
 
 
 def valid_now() -> Q:
@@ -29,7 +29,7 @@ def valid_now() -> Q:
 
 
 def holds_privileged_role(user_id: UUID) -> bool:
-    """A valid membership of a role that requires MFA (``GROUP_ADMIN``, ``MATERIAL_MANAGER``).
+    """A valid membership of a role that requires MFA (``PRIVILEGED_ROLES``).
 
     Organization state (S9) is ignored on purpose: an MFA requirement or a shorter session
     for a role on an inactive branch only ever errs on the strict side.
@@ -83,12 +83,3 @@ def may_manage_account(actor: Any, target: Any) -> bool:
 def require_may_manage_account(actor: Any, target: Any) -> None:
     if not may_manage_account(actor, target):
         raise AccessDenied("Only a platform operator can manage a staff account")
-
-
-def require_not_self_approval(actor_id: UUID, requester_id: UUID, branch: Branch) -> None:
-    """Nobody approves their own request unless ``branch.allow_self_approval`` (plan §3.4).
-
-    ``branch`` is the branch that reviews the request (its procurement branch, M4.2).
-    """
-    if actor_id == requester_id and not branch.allow_self_approval:
-        raise AccessDenied("Self-approval is not allowed on this branch")

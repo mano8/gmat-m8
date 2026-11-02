@@ -230,6 +230,7 @@ PROJECT_VIEWERS = (
     "group_admin",
     "mm_mad",
     "mm_sev",
+    "engineer",
     "wo_mad",
     "tech_mad",
     "site_manager",
@@ -242,6 +243,7 @@ PROJECT_MANAGERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
 HOSPITAL_VIEWERS = (
     "group_admin",
     "mm_mad",
+    "engineer",
     "wo_mad",
     "tech_mad",
     "site_manager",
@@ -249,7 +251,7 @@ HOSPITAL_VIEWERS = (
     "mixed",
 )
 SEV_VIEWERS = ("group_admin", "mm_sev", "mixed")
-ON_HOLD_VIEWERS = ("group_admin", "mm_mad", "wo_mad")
+ON_HOLD_VIEWERS = ("group_admin", "mm_mad", "engineer", "wo_mad")
 HOSPITAL_MANAGERS = ("group_admin", "mm_mad")
 
 
@@ -347,8 +349,22 @@ def _unknown_url(name: str) -> Callable[[World], str]:
 REQUEST_VIEWERS = PROJECT_VIEWERS
 REQUEST_CREATORS = tuple(name for name in PROJECT_VIEWERS if name != "wo_mad")
 # Who sees the technician's request (A-MAD buys for the hospital), and the partner's.
-TECH_REQUEST_VIEWERS = ("group_admin", "mm_mad", "wo_mad", "site_manager", "tech_mad")
-PARTNER_REQUEST_VIEWERS = ("group_admin", "mm_mad", "wo_mad", "site_manager", "partner")
+TECH_REQUEST_VIEWERS = (
+    "group_admin",
+    "mm_mad",
+    "engineer",
+    "wo_mad",
+    "site_manager",
+    "tech_mad",
+)
+PARTNER_REQUEST_VIEWERS = (
+    "group_admin",
+    "mm_mad",
+    "engineer",
+    "wo_mad",
+    "site_manager",
+    "partner",
+)
 
 
 def _line_url(name: str) -> Callable[[World], str]:
@@ -359,6 +375,7 @@ def _line_url(name: str) -> Callable[[World], str]:
 HOSPITAL_REQUEST_VIEWERS = (
     "group_admin",
     "mm_mad",
+    "engineer",
     "mixed",
     "wo_mad",
     "site_manager",
@@ -391,13 +408,14 @@ def request_url(name: str, key: str) -> Callable[[World], str]:
 
 
 # The reviewer's screens (M4.4). request.review is held somewhere by group administrators,
-# material managers and site managers; request.source (and cancel_any) not by site managers.
+# material managers, engineers (M7b.1, an A-MAD one) and site managers; request.source (and
+# cancel_any) not by site managers or engineers.
 # On the technician's request at the hospital (bought for by A-MAD) the readers are those
 # whose scope or assignment reaches it; the material manager of A-SEV holds the capability
 # elsewhere and gets 404, a warehouse operator or the technician none (403).
-REVIEWERS = ("group_admin", "mm_mad", "mm_sev", "site_manager", "mixed")
+REVIEWERS = ("group_admin", "mm_mad", "mm_sev", "engineer", "site_manager", "mixed")
 SOURCERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
-REVIEW_READERS = ("group_admin", "mm_mad", "site_manager")
+REVIEW_READERS = ("group_admin", "mm_mad", "engineer", "site_manager")
 SOURCE_READERS = ("group_admin", "mm_mad")
 
 

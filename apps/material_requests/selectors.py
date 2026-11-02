@@ -33,7 +33,8 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
-from apps.access.roles import Capability
+from apps.access.roles import SELF_DECIDING_ROLES, Capability
+from apps.access.scopes import object_in_scope
 from apps.audit.models import AuditEvent
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
@@ -291,10 +292,13 @@ def can_review(ctx: AccessContext, of: MaterialRequest) -> bool:
 
 
 def can_decide(ctx: AccessContext, of: MaterialRequest) -> bool:
-    """Review that is not an approval of one's own request (unless the branch allows it)."""
-    return can_review(ctx, of) and (
-        of.requested_by_id != ctx.user_id or of.procurement_branch.allow_self_approval
-    )
+    """Review, of one's own request only where the procurement branch allows it or a
+    self-deciding role's grant covers the request (Q33; the services check again)."""
+    if not can_review(ctx, of):
+        return False
+    if of.requested_by_id != ctx.user_id or of.procurement_branch.allow_self_approval:
+        return True
+    return object_in_scope(of, ctx.scope_for(REVIEW).of_roles(SELF_DECIDING_ROLES))
 
 
 def can_source(ctx: AccessContext, of: MaterialRequest) -> bool:

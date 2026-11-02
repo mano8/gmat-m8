@@ -44,6 +44,7 @@ WAREHOUSES = (("A-MAD", "Almacén Madrid"), ("A-SEV", "Almacén Sevilla"), ("B-M
 USERS = (
     DemoUser("mm-mad", "Marta Molina", "A", ((Role.MATERIAL_MANAGER, "A-MAD"),)),
     DemoUser("mm-sev", "Mateo Soler", "A", ((Role.MATERIAL_MANAGER, "A-SEV"),)),
+    DemoUser("eng-mad", "Elena Navarro", "A", ((Role.ENGINEER, "A-MAD"),)),
     DemoUser("wo-mad", "Waldo Ortega", "A", ((Role.WAREHOUSE_OPERATOR, "A-MAD"),)),
     DemoUser("tech-mad", "Tomás Herrero", "A", ((Role.TECHNICIAN, "A-MAD"),)),
     DemoUser("site-manager", "Sara Gil", "A", ((Role.SITE_MANAGER, "A-MAD"),)),
