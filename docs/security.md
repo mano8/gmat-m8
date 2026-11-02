@@ -277,6 +277,16 @@ Code in `apps/access/roles.py`, `apps/access/authorization.py`, `apps/material_r
 - **`ENGINEER`.** A branch-level role scoped like a material manager (S1), ranked below the group administrator and above every other role: it holds every material-manager capability in its scope (requests incl. `request.edit`, used from M7b.3, sourcing, purchasing, prices, suppliers, receipts, handovers, projects, catalog, audit, exports). Only `org.manage` stays the group administrators'; a test keeps every non-admin role's capabilities a subset of the engineer's. It is privileged: session MFA on every page and in every write, the 12-hour session, and `privilege_elevated_at` moved at the grant. Only `org.manage` (group administrators) grants it.
 - **Self-decisions.** Group administrators, material managers and engineers (`SELF_DECIDING_ROLES`) decide their own requests whatever `allow_self_approval` says. The check uses the role of the membership whose `request.review` grant covers that request, never a role held through another membership (S6). `is_superuser` adds nothing. The session must have passed MFA after the last elevation, even when an ordinary grant (a site manager's) let the review itself through. Other reviewers keep the procurement branch's `allow_self_approval`. Each self-decided line and the final approval or rejection carry `self_decided: true` in the audit.
 
+## Reviewer assignment (step M7b.2)
+
+Code in `apps/material_requests/reviewers.py`, `services/assignment.py`, `services/requester.py` (`submit`) and `selectors.py`; `apps/notifications/notices.py`; ADR-0014 §4, plan Q31, Q35.
+
+- **Who can be assigned.** Only a user holding `request.review` through a group administrator's, material manager's or engineer's membership whose scope covers the request's procurement branch (S6: a role held elsewhere counts for nothing). Validity and organization state are evaluated at the database clock (S8, S9): a revoked or expired membership, a deactivated account or an inactive branch or company qualifies nobody. An unknown user id is refused with the same error as an ineligible one.
+- **Who assigns.** The requester at submit (`request.create`), then any reviewer in scope (`request.review`, with session MFA where only a privileged grant covers the request), in `SUBMITTED` and `APPROVED`, with a required note. Every reassignment is audited (`request.reviewer_assigned`: previous and new assignee, note).
+- **Locks.** The actor's and the assignee's `User` rows are locked `FOR SHARE` in one L0 statement, after `AccessState` and before `authorize_in_txn`. A membership change locks the assignee's row first, so it serializes with the check (threaded test in `tests/integration/test_assignment_races.py`).
+- **Nothing rewritten.** The assignment never restricts who decides. A stored assignee who no longer qualifies reads as unassigned in the selectors and gets an empty "Assigned to me" list.
+- **Email.** The assignee is told through the outbox with `request.review` on the request as the claim-time rule; at submit they get that message instead of the general "to review" one. Nobody is mailed for assigning a request to themselves.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

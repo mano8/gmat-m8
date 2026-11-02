@@ -58,6 +58,12 @@ A new capability held in scope by `GROUP_ADMIN`, `MATERIAL_MANAGER` and `ENGINEE
 - The assignment **never restricts who decides**: any reviewer in scope still can. One level only; sequential approvals stay backlog item B10.
 - Q35 (working assumption): every requester may pick a reviewer (optional). An unassigned request stays in every in-scope reviewer's inbox.
 - The assignee is emailed through the outbox (M7.1), with eligibility checked again at the claim.
+- Details settled in M7b.2 (working assumptions, flagged in the pull request):
+  - every assignment after the submit needs a note, the first one of an unassigned request included;
+  - there is no "unassign": a reviewer reassigns, and a lapsed assignee falls back to unassigned on their own;
+  - a resubmit after a return to `DRAFT` keeps the earlier assignee unless the requester picks another;
+  - a requester who qualifies (an engineer, say) may pick themselves; nobody is mailed for assigning themselves;
+  - at submit the assignee gets an "assigned to you" message instead of the general "to review" one.
 
 ### 5. Reviewer edits (Q32, Q36, M7b.3)
 
