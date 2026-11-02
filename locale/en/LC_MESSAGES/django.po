@@ -5613,3 +5613,6 @@ msgstr ""
 
 msgid "No expected delivery matches the filters."
 msgstr ""
+
+msgid "%(shown)s shown"
+msgstr "%(shown)s shown"

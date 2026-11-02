@@ -84,7 +84,7 @@
           </div>
         {% endif %}
       </form>
-      {% include "components/pagination.html" with listing=listing %}
+      {% include "components/cursor_pagination.html" with listing=listing %}
       {% if draft_rows %}
         <section class="my-6"
                  id="draft-orders"
@@ -130,7 +130,7 @@
               <p class="text-sm text-soft">{{ row.line.material.reference }} · {{ row.line.material.name }}</p>
             </article>
           {% endfor %}
-          {% include "components/pagination.html" with listing=unallocated %}
+          {% include "components/cursor_pagination.html" with listing=unallocated %}
         </section>
       {% endif %}
     </div>

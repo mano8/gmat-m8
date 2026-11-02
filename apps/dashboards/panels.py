@@ -26,6 +26,7 @@ from django.utils.translation import gettext_lazy
 
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
+from apps.core.listing import head
 from apps.handovers import selectors as handover_selectors
 from apps.material_requests import selectors as request_selectors
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
@@ -36,6 +37,7 @@ from apps.purchasing.models import PurchaseOrder
 from apps.receiving import selectors as receiving_selectors
 
 LIMIT = 5  # rows a panel lists; the link beside it leads to the full screen
+COUNT_CAP = 99  # a count worked out line by line stops here and reads "99+" (M7d.4)
 Status = MaterialRequest.Status
 
 
@@ -50,6 +52,11 @@ class Row:
 class Content:
     count: int
     rows: tuple[Row, ...] = ()
+    more: bool = False  # the count stopped at the cap: there are more
+
+    @property
+    def label(self) -> str:
+        return f"{self.count}+" if self.more else str(self.count)
 
 
 @dataclass(frozen=True)
@@ -82,8 +89,8 @@ def _day(value: Any) -> str:
     return date_format(value, "SHORT_DATE_FORMAT")
 
 
-def _content(total: int, rows: Iterable[Row]) -> Content:
-    return Content(total, tuple(rows)[:LIMIT])
+def _content(total: int, rows: Iterable[Row], *, more: bool = False) -> Content:
+    return Content(total, tuple(rows)[:LIMIT], more)
 
 
 def _line_quantity(line: MaterialRequestLine, value: Decimal) -> str:
@@ -166,7 +173,8 @@ def sourcing(ctx: AccessContext) -> Content:
 
 
 def to_purchase(ctx: AccessContext) -> Content:
-    rows = purchasing_selectors.to_purchase(ctx)
+    worklist = purchasing_selectors.Worklist(ctx)
+    rows, more = head(worklist.keys, worklist.line_window, limit=COUNT_CAP)
     return _content(
         len(rows),
         (
@@ -177,6 +185,7 @@ def to_purchase(ctx: AccessContext) -> Content:
             )
             for row in rows[:LIMIT]
         ),
+        more=more,
     )
 
 
@@ -196,7 +205,8 @@ def stale_drafts(ctx: AccessContext) -> Content:
 
 
 def unallocated(ctx: AccessContext) -> Content:
-    rows = purchasing_selectors.unallocated_on_order(ctx)
+    nobody = purchasing_selectors.Unallocated(ctx)
+    rows, more = head(nobody.keys, nobody.window, limit=COUNT_CAP)
     return _content(
         len(rows),
         (
@@ -207,6 +217,7 @@ def unallocated(ctx: AccessContext) -> Content:
             )
             for row in rows[:LIMIT]
         ),
+        more=more,
     )
 
 
@@ -249,7 +260,8 @@ def dispatches(ctx: AccessContext) -> Content:
 
 
 def to_hand_over(ctx: AccessContext) -> Content:
-    rows = handover_selectors.awaiting_handover(ctx)
+    awaiting = handover_selectors.AwaitingHandover(ctx)
+    rows, more = head(awaiting.keys, awaiting.window, limit=COUNT_CAP)
     return _content(
         len(rows),
         (
@@ -260,6 +272,7 @@ def to_hand_over(ctx: AccessContext) -> Content:
             )
             for entry in rows[:LIMIT]
         ),
+        more=more,
     )
 
 

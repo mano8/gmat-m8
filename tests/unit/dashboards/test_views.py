@@ -64,6 +64,19 @@ class TestPanel:
         assert f'href="{reverse("requests:list")}"' in html
         assert "no-store" in response["Cache-Control"]
 
+    def test_a_capped_count_reads_with_a_plus(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        org: Org,
+        people: People,
+        make_line: MakeLine,
+    ) -> None:
+        monkeypatch.setattr(panels, "COUNT_CAP", 2)
+        for _ in range(3):
+            make_line("4")
+        html = client_for(people.mm_mad).get(reverse("dashboard:panel", args=["to-purchase"]))
+        assert ">2+<" in html.content.decode().replace(" ", "").replace("\n", "")
+
     def test_an_empty_panel_says_so(self, people: People) -> None:
         html = client_for(people.mm_mad).get(panel_url("to-purchase")).content.decode()
         assert str(panels.BY_KEY["to-purchase"].empty) in html

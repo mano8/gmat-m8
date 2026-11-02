@@ -22,7 +22,7 @@ The screens (M6.3) read the rest from here, every row through ``visible_to``:
   user who holds ``project.view`` on the project, as the service checks).
 """
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -299,16 +299,39 @@ def open_lines(
     return [row for row in rows if row.outstanding > 0]
 
 
+def _awaiting_handover_lines(ctx: AccessContext) -> QuerySet[MaterialRequestLine]:
+    return (
+        MaterialRequestLine.objects.visible_to(ctx, POST)
+        .filter(request_ledger.open_q())
+        .order_by("request__number", "line_no", "pk")
+    )
+
+
 def awaiting_handover(ctx: AccessContext) -> list[request_ledger.LineLedger]:
     """Open lines with goods received and not yet handed over (the ledger's *awaiting
     handover*), within ``handover.post`` scope, ordered by request (M7.2 dashboard)."""
-    lines = (
-        MaterialRequestLine.objects.visible_to(ctx, POST)
-        .filter(request_ledger.open_q())
-        .select_related("request", "project", "material", "unit")
-        .order_by("request__number", "line_no")
-    )
+    lines = _awaiting_handover_lines(ctx).select_related("request", "project", "material", "unit")
     return [entry for entry in request_ledger.line_ledgers(lines) if entry.awaiting_handover > 0]
+
+
+class AwaitingHandover:
+    """``awaiting_handover`` a stretch at a time, for a count that stops at a cap (M7d.4):
+    ``keys`` are the open lines in order, ``window`` works out the ledgers of a stretch."""
+
+    def __init__(self, ctx: AccessContext) -> None:
+        self._lines = _awaiting_handover_lines(ctx)
+        self.keys: list[UUID] = list(self._lines.values_list("pk", flat=True))
+
+    def window(self, chunk: Sequence[UUID]) -> list[tuple[int, request_ledger.LineLedger]]:
+        lines = self._lines.filter(pk__in=list(chunk)).select_related(
+            "request", "project", "material", "unit"
+        )
+        found = {
+            entry.line.pk: entry
+            for entry in request_ledger.line_ledgers(lines)
+            if entry.awaiting_handover > 0
+        }
+        return [(index, found[pk]) for index, pk in enumerate(chunk) if pk in found]
 
 
 def sources(ctx: AccessContext, branch_id: UUID) -> QuerySet[Location]:

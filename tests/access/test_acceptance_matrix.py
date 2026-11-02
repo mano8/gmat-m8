@@ -1719,7 +1719,9 @@ for _key in PAGED_LISTS:
 # M7d.3: the screens that render a page of sections answer the same to every actor with the
 # paging and filter parameters of each section, for every object position they have.
 PAGED_SECTIONS = {
-    "purchasing:worklist": "per_page=100&page=2&drafts_page=2&unallocated_page=2&priority=URGENT",
+    "purchasing:worklist": (
+        "per_page=100&after=5.abcdef12&back=0,&drafts_page=2&unallocated_after=3.abcdef12&priority=URGENT"
+    ),
     "receiving:expected": "per_page=100&page=2&supplier=x&expected_by=2030-01-01",
     "requests:project_materials": "per_page=100&page=2&q=x&outstanding=on",
     "projects:detail": "assignments_per_page=100&assignments_page=2&assignments-state=revoked",

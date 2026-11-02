@@ -18,7 +18,7 @@ An order's **supplier dispatches** (M5.3) reach ``po.view`` holders on it (they 
 ``supplier.view``); confirming or resending one is for ``po.manage``.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -304,13 +304,63 @@ class WorklistRow:
     to_purchase: Decimal
 
 
-def _attribution_key(line: MaterialRequestLine) -> tuple[object, ...]:
+def _order_key(
+    line_id: UUID, request_id: UUID, priority: str, needed_by: date | None, submitted_at: Any
+) -> tuple[object, ...]:
     """The attribution order of ``waterfall`` (only the request's fields count)."""
+    facts = RequestLineFacts(line_id, request_id, ZERO, True, priority, needed_by, submitted_at)
+    return (*facts.order_key, line_id)
+
+
+def _attribution_key(line: MaterialRequestLine) -> tuple[object, ...]:
     request = line.request
-    facts = RequestLineFacts(
-        line.pk, request.pk, ZERO, True, request.priority, request.needed_by, request.submitted_at
+    return _order_key(
+        line.pk, request.pk, request.priority, request.needed_by, request.submitted_at
     )
-    return (*facts.order_key, line.pk)
+
+
+def _worklist_lines(
+    ctx: AccessContext,
+    *,
+    project_id: UUID | None = None,
+    priority: str = "",
+    material_id: UUID | None = None,
+    branch_id: UUID | None = None,
+    line_ids: Iterable[UUID] | None = None,
+) -> QuerySet[MaterialRequestLine]:
+    """Open ``PURCHASE`` lines in ``po.manage`` scope, narrowed by the worklist's filters."""
+    rows = MaterialRequestLine.objects.visible_to(ctx, MANAGE).filter(
+        request_ledger.open_q(), sourcing=MaterialRequestLine.Sourcing.PURCHASE
+    )
+    if project_id is not None:
+        rows = rows.filter(project_id=project_id)
+    if priority:
+        rows = rows.filter(request__priority=priority)
+    if material_id is not None:
+        rows = rows.filter(material_id=material_id)
+    if branch_id is not None:
+        rows = rows.filter(request__procurement_branch_id=branch_id)
+    if line_ids is not None:
+        rows = rows.filter(pk__in=list(line_ids))
+    return rows
+
+
+def _worklist_rows(rows: QuerySet[MaterialRequestLine]) -> list[WorklistRow]:
+    """The lines of ``rows`` with something to buy or reserved in drafts, most urgent first."""
+    found = [
+        WorklistRow(
+            line=entry.line,
+            approved=entry.approved,
+            committed=entry.committed,
+            reserved=entry.flows.reserved,
+            to_purchase=entry.to_purchase,
+        )
+        for entry in request_ledger.line_ledgers(
+            rows.select_related("request", "project", "material", "unit")
+        )
+        if entry.to_purchase > 0 or entry.flows.reserved > 0
+    ]
+    return sorted(found, key=lambda row: _attribution_key(row.line))
 
 
 def to_purchase(
@@ -326,35 +376,19 @@ def to_purchase(
     drafts, most urgent first (the attribution order).
 
     ``branch_id`` keeps the lines a branch buys for (their procurement branch, C5);
-    ``line_ids`` the chosen ones.
+    ``line_ids`` the chosen ones. All of them are worked out: the worklist screen reads
+    ``Worklist`` instead.
     """
-    rows = (
-        MaterialRequestLine.objects.visible_to(ctx, MANAGE)
-        .filter(request_ledger.open_q(), sourcing=MaterialRequestLine.Sourcing.PURCHASE)
-        .select_related("request", "project", "material", "unit")
-    )
-    if project_id is not None:
-        rows = rows.filter(project_id=project_id)
-    if priority:
-        rows = rows.filter(request__priority=priority)
-    if material_id is not None:
-        rows = rows.filter(material_id=material_id)
-    if branch_id is not None:
-        rows = rows.filter(request__procurement_branch_id=branch_id)
-    if line_ids is not None:
-        rows = rows.filter(pk__in=list(line_ids))
-    found = [
-        WorklistRow(
-            line=entry.line,
-            approved=entry.approved,
-            committed=entry.committed,
-            reserved=entry.flows.reserved,
-            to_purchase=entry.to_purchase,
+    return _worklist_rows(
+        _worklist_lines(
+            ctx,
+            project_id=project_id,
+            priority=priority,
+            material_id=material_id,
+            branch_id=branch_id,
+            line_ids=line_ids,
         )
-        for entry in request_ledger.line_ledgers(rows)
-        if entry.to_purchase > 0 or entry.flows.reserved > 0
-    ]
-    return sorted(found, key=lambda row: _attribution_key(row.line))
+    )
 
 
 @dataclass(frozen=True)
@@ -388,6 +422,62 @@ def by_material(rows: Iterable[WorklistRow]) -> list[MaterialGroup]:
     return list(groups.values())
 
 
+class Worklist:
+    """The worklist screen's view of ``to_purchase``, worked out a page at a time.
+
+    ``keys`` lists the candidate lines in attribution order from one light query (ids and the
+    request's ordering fields); ``window`` works out the ledgers of the materials in a stretch
+    of them and yields each material group at its most urgent line that still needs buying,
+    exactly where ``by_material(to_purchase(...))`` puts it. A page costs the groups it
+    shows, however long the backlog is (M7d.4).
+    """
+
+    def __init__(
+        self, ctx: AccessContext, *, project_id: UUID | None = None, priority: str = ""
+    ) -> None:
+        self._lines = _worklist_lines(ctx, project_id=project_id, priority=priority)
+        light = self._lines.values_list(
+            "pk",
+            "request_id",
+            "material_id",
+            "request__priority",
+            "request__needed_by",
+            "request__submitted_at",
+        )
+        candidates = sorted(
+            (_order_key(pk, request_id, rank, needed_by, submitted_at), material_id)
+            for pk, request_id, material_id, rank, needed_by, submitted_at in light
+        )
+        self.keys: list[UUID] = [key[-1] for key, _ in candidates]  # type: ignore[misc]
+        self._material = {key[-1]: material_id for key, material_id in candidates}
+        self._groups: dict[UUID, MaterialGroup | None] = {}
+
+    def _work_out(self, material_ids: set[UUID]) -> None:
+        rows = _worklist_rows(self._lines.filter(material_id__in=material_ids))
+        found: dict[UUID, list[WorklistRow]] = {}
+        for row in rows:
+            found.setdefault(row.line.material_id, []).append(row)  # type: ignore[arg-type]
+        for material_id in material_ids:
+            self._groups[material_id] = (
+                by_material(found[material_id])[0] if material_id in found else None
+            )
+
+    def line_window(self, chunk: Sequence[UUID]) -> list[tuple[int, WorklistRow]]:
+        """The lines of a stretch that still need buying or are reserved, one by one (the
+        dashboard counts lines, not materials)."""
+        rows = {row.line.pk: row for row in _worklist_rows(self._lines.filter(pk__in=list(chunk)))}
+        return [(index, rows[pk]) for index, pk in enumerate(chunk) if pk in rows]
+
+    def window(self, chunk: Sequence[UUID]) -> list[tuple[int, MaterialGroup]]:
+        self._work_out({self._material[pk] for pk in chunk} - self._groups.keys())
+        shown = []
+        for index, pk in enumerate(chunk):
+            group = self._groups[self._material[pk]]
+            if group is not None and group.rows[0].line.pk == pk:
+                shown.append((index, group))
+        return shown
+
+
 @dataclass(frozen=True)
 class UnallocatedRow:
     line: PurchaseOrderLine
@@ -407,6 +497,40 @@ def unallocated_on_order(
     book = book_for_order_lines([line.pk for line in listed])
     rows = [UnallocatedRow(line, book.order_line_totals(line.pk).unallocated) for line in listed]
     return [row for row in rows if row.unallocated > 0]
+
+
+class Unallocated:
+    """``unallocated_on_order`` a page at a time (as :class:`Worklist`): the receivable order
+    lines in number order, worked out in stretches until the page is full."""
+
+    def __init__(self, ctx: AccessContext, *, supplier_id: UUID | None = None) -> None:
+        lines = PurchaseOrderLine.objects.visible_to(ctx, MANAGE).filter(
+            po__status=Status.ISSUED, closed_short_at__isnull=True
+        )
+        if supplier_id is not None:
+            lines = lines.filter(po__supplier_id=supplier_id)
+        self.keys: list[UUID] = list(
+            lines.order_by("po__number", "line_no", "pk").values_list("pk", flat=True)
+        )
+
+    def window(self, chunk: Sequence[UUID]) -> list[tuple[int, UnallocatedRow]]:
+        book = book_for_order_lines(chunk)
+        free = {
+            pk: book.order_line_totals(pk).unallocated if pk in book.order_lines else ZERO
+            for pk in chunk
+        }
+        shown = [pk for pk in chunk if free[pk] > 0]
+        listed = {
+            line.pk: line
+            for line in PurchaseOrderLine.objects.filter(pk__in=shown).select_related(
+                "po", "material", "unit"
+            )
+        }
+        return [
+            (index, UnallocatedRow(listed[pk], free[pk]))
+            for index, pk in enumerate(chunk)
+            if pk in listed
+        ]
 
 
 def drafts(ctx: AccessContext, *, supplier_id: UUID | None = None) -> QuerySet[PurchaseOrder]:

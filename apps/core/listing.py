@@ -8,7 +8,7 @@ selector and hands it to :func:`paginate`; the template renders the page with
 falls back to the default, never to a 400, 404 or 500.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,6 +29,7 @@ PAGE_SIZES = (10, 25, 50, 100)
 """The page sizes a user may pick (Q39); the largest is the maximum."""
 
 _PAGE, _PER_PAGE, _SORT = "page", "per_page", "sort"
+_AFTER, _BACK = "after", "back"
 
 SortKeys = Mapping[str, tuple[str, ...]]
 """Sort key (the value of ``?sort=``) → the ``order_by`` fields it stands for, ascending."""
@@ -71,6 +72,14 @@ class ListScope:
     def sort_param(self) -> str:
         return f"{self.prefix}{_SORT}"
 
+    @property
+    def after_param(self) -> str:
+        return f"{self.prefix}{_AFTER}"
+
+    @property
+    def back_param(self) -> str:
+        return f"{self.prefix}{_BACK}"
+
 
 WHOLE_PAGE = ListScope()
 """The scope of the one list of a page: ``page``, ``per_page`` and ``sort``."""
@@ -88,6 +97,9 @@ class ListPage:
     sort_options: tuple[tuple[str, str], ...] = ()
     """``(value, label)`` for the phone-size "sort by" select; empty when the list has no sort."""
 
+    counted = True
+    """The list knows how many rows it has (a :class:`CursorPage` does not)."""
+
     @property
     def sizes(self) -> tuple[int, ...]:
         """The page sizes offered; none when the size of this list is fixed."""
@@ -96,6 +108,11 @@ class ListPage:
     @property
     def page_param(self) -> str:
         return self.scope.page_param
+
+    @property
+    def reset_params(self) -> tuple[str, ...]:
+        """The parameters that say where in the list the reader is."""
+        return (self.scope.page_param,)
 
     @property
     def per_page_param(self) -> str:
@@ -247,6 +264,170 @@ def render_list(
     response = render(request, name, context)
     patch_vary_headers(response, ["HX-Request"])
     return response
+
+
+# --- lists read from a cursor (Q40) -----------------------------------------------------------
+
+CURSOR_START = "0"
+BACK_LIMIT = 10
+MAX_STRETCH = 1000
+"""The most keys a stretch reads at once (the stretches double while a page is not full)."""
+"""How many earlier pages a page remembers in its link (older ones lead back to the first)."""
+_IDENT = 8
+
+
+@dataclass(frozen=True)
+class CursorPage:
+    """One page of a list that is read from a cursor instead of counted (plan M7d.4, Q40).
+
+    For a list whose rows are worked out one by one (a ledger per request line), counting
+    them means working out all of them. This page knows only where it starts, where the next
+    page starts and where the ones before it did, so reading it costs the page, not the list:
+    ``First`` / ``Previous`` / ``Next``, no total. A cursor is ``<position>.<end of the key>``:
+    when rows came or went in between, the key finds the place again.
+    """
+
+    rows: list[Any]
+    per_page: int
+    start: str
+    """The cursor of this page (``CURSOR_START`` for the first)."""
+    next: str
+    """The cursor of the next page; empty when this is the last."""
+    back: tuple[str, ...]
+    """The cursors of the pages before this one, the nearest first."""
+    scope: ListScope = WHOLE_PAGE
+
+    counted = False
+    sort = ""
+    sort_options: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def sizes(self) -> tuple[int, ...]:
+        return PAGE_SIZES if self.scope.sized else ()
+
+    @property
+    def page_param(self) -> str:
+        return self.scope.after_param
+
+    @property
+    def per_page_param(self) -> str:
+        return self.scope.per_page_param
+
+    @property
+    def sort_param(self) -> str:
+        return self.scope.sort_param
+
+    @property
+    def anchor(self) -> str:
+        return self.scope.anchor
+
+    @property
+    def reset_params(self) -> tuple[str, ...]:
+        return (self.scope.after_param, self.scope.back_param)
+
+    @property
+    def shown(self) -> int:
+        return len(self.rows)
+
+    @property
+    def has_other_pages(self) -> bool:
+        return bool(self.next) or self.start != CURSOR_START
+
+    @property
+    def has_previous(self) -> bool:
+        return self.start != CURSOR_START
+
+    @property
+    def previous(self) -> tuple[str, tuple[str, ...]]:
+        """The cursor of the page before this one and what that page remembers."""
+        return (self.back[0], self.back[1:]) if self.back else (CURSOR_START, ())
+
+    @property
+    def following(self) -> tuple[str, ...]:
+        """What the next page remembers: this page and the ones before it."""
+        return (self.start, *self.back)[:BACK_LIMIT]
+
+
+def _token(position: int, keys: Sequence[Hashable]) -> str:
+    if position <= 0 or position >= len(keys):
+        return CURSOR_START
+    return f"{position}.{str(keys[position])[-_IDENT:]}"
+
+
+def _position(token: str, keys: Sequence[Hashable]) -> int:
+    """Where ``token`` points in ``keys``; its key finds it again if the list moved."""
+    head, _, ident = token.partition(".")
+    if not head.isdigit():
+        return 0
+    position = min(int(head), len(keys))
+    if not ident or (position < len(keys) and str(keys[position])[-_IDENT:] == ident):
+        return position
+    for index, key in enumerate(keys):
+        if str(key)[-_IDENT:] == ident:
+            return index
+    return position
+
+
+type Window = Callable[[Sequence[Any]], list[tuple[int, Any]]]
+"""Takes the keys of a stretch of the list and returns ``(index in the stretch, row)`` of the
+rows that stretch yields, in order."""
+
+
+def _collect(
+    keys: Sequence[Hashable], window: Window, start: int, wanted: int
+) -> list[tuple[int, Any]]:
+    """Up to ``wanted`` ``(position, row)`` from ``start`` on, reading stretches of ``keys``.
+
+    A stretch is four times what is wanted and doubles each time the page is still not full,
+    so a list with few rows to show costs a handful of queries, not one set per stretch.
+    """
+    found: list[tuple[int, Any]] = []
+    position, step = start, max(wanted * 4, 20)
+    while position < len(keys) and len(found) < wanted:
+        stretch = keys[position : position + step]
+        found.extend((position + index, row) for index, row in window(stretch))
+        position += len(stretch)
+        step = min(step * 2, MAX_STRETCH)
+    return found
+
+
+def head(keys: Sequence[Hashable], window: Window, *, limit: int) -> tuple[list[Any], bool]:
+    """The first ``limit`` rows of a list, and whether more follow: a count that stops at
+    ``limit`` (a dashboard's "99+") without working out the rest."""
+    found = _collect(keys, window, 0, limit + 1)
+    return [row for _, row in found[:limit]], len(found) > limit
+
+
+def cursor_page(
+    request: HttpRequest,
+    keys: Sequence[Hashable],
+    window: Window,
+    *,
+    default_per_page: int,
+    scope: ListScope = WHOLE_PAGE,
+) -> CursorPage:
+    """The page of a list that ``?after=`` asks for, working out only what the page needs.
+
+    ``keys`` are the candidates in the list's order (cheap to list: ids), ``window`` works out
+    the rows of a stretch of them. Stretches are read until the page is full and one row is
+    known to follow it, so the work is the page plus at most a stretch.
+    """
+    if default_per_page not in PAGE_SIZES:
+        raise ImproperlyConfigured(f"default_per_page must be one of {PAGE_SIZES}.")
+    params = ListParams(_scoped_query(request, scope))
+    params.is_valid()
+    size = (params.cleaned_data.get("per_page") if scope.sized else None) or default_per_page
+    start = _position(request.GET.get(scope.after_param, ""), keys)
+    found = _collect(keys, window, start, size + 1)
+    back = tuple(t for t in request.GET.get(scope.back_param, "").split(",") if t)[:BACK_LIMIT]
+    return CursorPage(
+        rows=[row for _, row in found[:size]],
+        per_page=size,
+        start=_token(start, keys),
+        next=_token(found[size - 1][0] + 1, keys) if len(found) > size else "",
+        back=back,
+        scope=scope,
+    )
 
 
 ACTIVE, REVOKED = "active", "revoked"

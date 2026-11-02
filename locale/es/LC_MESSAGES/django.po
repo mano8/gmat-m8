@@ -5795,3 +5795,6 @@ msgstr "Previsto para el"
 
 msgid "No expected delivery matches the filters."
 msgstr "Ninguna entrega prevista coincide con los filtros."
+
+msgid "%(shown)s shown"
+msgstr "%(shown)s mostrados"

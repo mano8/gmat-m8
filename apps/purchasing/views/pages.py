@@ -21,7 +21,7 @@ from django.views.decorators.http import require_safe
 
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
-from apps.core.listing import paginate, render_list
+from apps.core.listing import cursor_page, paginate, render_list
 from apps.purchasing import selectors
 from apps.purchasing.forms import (
     AllocationEntry,
@@ -73,25 +73,30 @@ def worklist(request: HttpRequest) -> HttpResponse:
     data = filters.cleaned_data if filters.is_valid() else {}
     project, supplier = data.get("project"), data.get("supplier")
     supplier_id = supplier.pk if supplier else None
-    rows = selectors.to_purchase(
+    worklist = selectors.Worklist(
         ctx, project_id=project.pk if project else None, priority=data.get("priority", "")
     )
+    nobody = selectors.Unallocated(ctx, supplier_id=supplier_id)
     drafts = paginate(
         request,
         selectors.drafts(ctx, supplier_id=supplier_id),
         default_per_page=selectors.SECTION_PER_PAGE,
         scope=selectors.DRAFTS_SCOPE,
     )
-    unallocated = paginate(
+    unallocated = cursor_page(
         request,
-        selectors.unallocated_on_order(ctx, supplier_id=supplier_id),
+        nobody.keys,
+        nobody.window,
         default_per_page=selectors.SECTION_PER_PAGE,
         scope=selectors.UNALLOCATED_SCOPE,
     )
     context = {
         "filters": filters,
-        "listing": paginate(
-            request, selectors.by_material(rows), default_per_page=selectors.WORKLIST_PER_PAGE
+        "listing": cursor_page(
+            request,
+            worklist.keys,
+            worklist.window,
+            default_per_page=selectors.WORKLIST_PER_PAGE,
         ),
         "drafts": drafts,
         "draft_rows": [(draft, selectors.is_stale(draft)) for draft in drafts.rows],

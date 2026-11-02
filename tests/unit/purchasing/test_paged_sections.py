@@ -17,7 +17,7 @@ from apps.purchasing.models import PurchaseOrder
 from apps.purchasing.selectors import UnallocatedRow
 from tests.org import Org, People
 from tests.org import client_for as signed_in
-from tests.unit.purchasing.conftest import Buy, FakeReceipts, MakeLine, allocation, only_line
+from tests.unit.purchasing.conftest import Buy, MakeLine, only_line
 
 pytestmark = pytest.mark.django_db
 
@@ -30,6 +30,19 @@ def client_for(user: Any) -> Client:
 
 def get(client: Client, name: str, *args: Any, **query: Any) -> str:
     response = client.get(reverse(name, args=args), query)
+    assert response.status_code == 200
+    return str(response.content.decode())
+
+
+def link(html: str, rel: str) -> str:
+    """The URL of the pager link with ``rel`` (``next`` or ``prev``), as the page writes it."""
+    found = re.search(rf'href="([^"]*)"[^>]*rel="{rel}"', html)
+    assert found, f"no {rel} link"
+    return found[1].replace("&amp;", "&")
+
+
+def follow(client: Client, html: str, rel: str) -> str:
+    response = client.get(reverse("purchasing:worklist") + link(html, rel))
     assert response.status_code == 200
     return str(response.content.decode())
 
@@ -48,20 +61,36 @@ class TestWorklistMaterials:
     def lines(self, make_line: MakeLine, count: int = SIZE + 1) -> list[Any]:
         return [make_line("3", material=material) for material in materials(count)]
 
-    def test_pages_by_material_and_the_size_is_chosen(
+    def test_pages_by_material_from_a_cursor_and_the_size_is_chosen(
         self, people: People, make_line: MakeLine
     ) -> None:
         self.lines(make_line)
         manager = client_for(people.mm_mad)
         first = get(manager, "purchasing:worklist", per_page=SIZE)
         assert first.count('data-testid="worklist-material"') == SIZE
-        assert "Showing 1\u201310 of 11" in first
+        assert "10 shown" in first and 'rel="prev"' not in first
         assert "Ticks count for this page only" in first
-        second = get(manager, "purchasing:worklist", per_page=SIZE, page=2)
+        second = follow(manager, first, "next")
         assert second.count('data-testid="worklist-material"') == 1
+        assert 'rel="next"' not in second  # the last page: nothing follows
+        assert follow(manager, second, "prev").count('data-testid="worklist-material"') == SIZE
         everything = get(manager, "purchasing:worklist")
         assert everything.count('data-testid="worklist-material"') == SIZE + 1
         assert "Ticks count for this page only" not in everything
+
+    def test_the_pages_walk_the_whole_backlog_once(
+        self, people: People, make_line: MakeLine
+    ) -> None:
+        wanted = {line.pk for line in self.lines(make_line, 23)}
+        manager = client_for(people.mm_mad)
+        seen: list[str] = []
+        html = get(manager, "purchasing:worklist", per_page=SIZE)
+        while True:
+            seen += re.findall(r'name="line"\s+value="([^"]+)"', html)
+            if 'rel="next"' not in html:
+                break
+            html = follow(manager, html, "next")
+        assert sorted(seen) == sorted(str(pk) for pk in wanted)
 
     def test_the_default_is_fifty_materials_a_page(
         self, people: People, make_line: MakeLine
@@ -76,7 +105,7 @@ class TestWorklistMaterials:
     ) -> None:
         lines = self.lines(make_line)
         manager = client_for(people.mm_mad)
-        html = get(manager, "purchasing:worklist", per_page=SIZE, page=2)
+        html = follow(manager, get(manager, "purchasing:worklist", per_page=SIZE), "next")
         (shown,) = [line for line in lines if f'value="{line.pk}"' in html]
         builder = get(manager, "purchasing:new", line=str(shown.pk))
         assert f'name="pick_{shown.pk}"' in builder and "checked" in builder
@@ -105,7 +134,15 @@ class TestWorklistMaterials:
     def test_bad_paging_parameters_fall_back(self, people: People, make_line: MakeLine) -> None:
         self.lines(make_line, 2)
         manager = client_for(people.mm_mad)
-        for query in ({"page": "0"}, {"page": "99"}, {"per_page": "7"}, {"drafts_page": "x"}):
+        for query in (
+            {"after": "x"},
+            {"after": "99.abcdefgh"},
+            {"after": "1.nomatch"},
+            {"back": ",,x"},
+            {"per_page": "7"},
+            {"drafts_page": "x"},
+            {"unallocated_after": "-3"},
+        ):
             assert get(manager, "purchasing:worklist", **query)
 
     def test_htmx_answers_the_results_with_the_sections(
@@ -142,27 +179,33 @@ class TestWorklistSections:
         assert html.count('data-testid="worklist-material"') == 3
         assert html.count('data-testid="draft-order"') == 3
 
-    def test_ordered_for_nobody_pages_on_its_own_parameter(
+    def test_ordered_for_nobody_pages_on_its_own_cursor(
         self,
         monkeypatch: pytest.MonkeyPatch,
         people: People,
         buy: Buy,
         make_line: MakeLine,
-        received: FakeReceipts,
     ) -> None:
-        line = make_line("10")
-        order = buy((line, "10"))
-        received.receive(only_line(order), "6", {allocation(order, line): "6"})
-        row = UnallocatedRow(only_line(order), Decimal("4"))
-        monkeypatch.setattr(
-            purchasing_selectors, "unallocated_on_order", lambda ctx, **_: [row] * (SIZE + 1)
-        )
+        po_line = only_line(buy((make_line("10"), "10")))
+
+        class Many:
+            """SIZE + 1 order lines, each with four units on order for nobody."""
+
+            def __init__(self, ctx: Any, **_: Any) -> None:
+                self.keys = [f"line-{number:03d}" for number in range(SIZE + 1)]
+
+            def window(self, chunk: Any) -> list[tuple[int, UnallocatedRow]]:
+                return [(index, UnallocatedRow(po_line, Decimal(4))) for index in range(len(chunk))]
+
+        monkeypatch.setattr(purchasing_selectors, "Unallocated", Many)
         manager = client_for(people.mm_mad)
         first = get(manager, "purchasing:worklist")
         assert first.count('data-testid="unallocated-line"') == SIZE
-        assert 'href="?unallocated_page=2#ordered-for-nobody"' in first
-        second = get(manager, "purchasing:worklist", unallocated_page=2)
+        assert "unallocated_after=" in link(first, "next")
+        assert "#ordered-for-nobody" in link(first, "next")
+        second = follow(manager, first, "next")
         assert second.count('data-testid="unallocated-line"') == 1
+        assert "unallocated_per_page" not in second  # the size of a section is fixed
 
     def test_the_supplier_filter_still_narrows_the_drafts(
         self, org: Org, people: People, buy: Buy

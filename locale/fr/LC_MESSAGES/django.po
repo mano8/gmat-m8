@@ -5833,3 +5833,6 @@ msgstr "Attendu avant le"
 
 msgid "No expected delivery matches the filters."
 msgstr "Aucune livraison attendue ne correspond aux filtres."
+
+msgid "%(shown)s shown"
+msgstr "%(shown)s affichés"
