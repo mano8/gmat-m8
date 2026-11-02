@@ -196,6 +196,21 @@ def receipts(ctx: AccessContext, *, status: str = "", q: str = "") -> QuerySet[G
     return rows
 
 
+def site_surplus(ctx: AccessContext) -> QuerySet[GoodsReceiptLine]:
+    """Receipt lines with a surplus that arrived at a worksite (nobody could take it),
+    newest first: it stays on the site until somebody decides what to do with it."""
+    return (
+        GoodsReceiptLine.objects.visible_to(ctx, VIEW)
+        .filter(
+            receipt__status=GoodsReceipt.Status.POSTED,
+            receipt__location__kind=Location.Kind.WORKSITE,
+            surplus_qty__gt=0,
+        )
+        .select_related("receipt__location__project", "po_line__material", "po_line__unit")
+        .order_by("-receipt__received_at", "-id")
+    )
+
+
 def receipt(ctx: AccessContext, receipt_id: UUID) -> GoodsReceipt:
     found = (
         GoodsReceipt.objects.visible_to(ctx, VIEW)

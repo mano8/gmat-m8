@@ -287,6 +287,18 @@ def open_lines(
     return [row for row in rows if row.outstanding > 0]
 
 
+def awaiting_handover(ctx: AccessContext) -> list[request_ledger.LineLedger]:
+    """Open lines with goods received and not yet handed over (the ledger's *awaiting
+    handover*), within ``handover.post`` scope, ordered by request (M7.2 dashboard)."""
+    lines = (
+        MaterialRequestLine.objects.visible_to(ctx, POST)
+        .filter(request_ledger.open_q())
+        .select_related("request", "project", "material", "unit")
+        .order_by("request__number", "line_no")
+    )
+    return [entry for entry in request_ledger.line_ledgers(lines) if entry.awaiting_handover > 0]
+
+
 def sources(ctx: AccessContext, branch_id: UUID) -> QuerySet[Location]:
     """The warehouses material for ``branch_id``'s requests may come from (C7): active ones
     of that branch or of a branch it manages, the user's scope permitting."""

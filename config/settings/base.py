@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.handovers",
     "apps.attachments",
     "apps.notifications",
+    "apps.dashboards",
 ]
 
 # Order matters (plan §3.6): session auth → session epoch → MFA enforcement → access context.

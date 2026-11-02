@@ -1,0 +1,35 @@
+{% load i18n %}
+{% comment %}One dashboard panel, the fragment that replaces its placeholder. Context: panel, content.{% endcomment %}
+<section class="card" data-testid="panel-{{ panel.key }}">
+  <div class="flex items-center justify-between gap-2">
+    <h2 class="card-title mb-0">{{ panel.title }}</h2>
+    {% if panel.alert and content.count %}
+      {% include "components/status_chip.html" with label=content.count tone="warn" %}
+    {% else %}
+      {% include "components/status_chip.html" with label=content.count %}
+    {% endif %}
+  </div>
+  {% if content.rows %}
+    <ul class="mt-3 divide-y divide-line">
+      {% for row in content.rows %}
+        <li class="py-2">
+          {% if row.href %}
+            <a href="{{ row.href }}" class="block min-h-11">
+              <span class="block font-medium">{{ row.label }}</span>
+              {% if row.detail %}<span class="block text-sm text-soft">{{ row.detail }}</span>{% endif %}
+            </a>
+          {% else %}
+            <span class="block font-medium">{{ row.label }}</span>
+            {% if row.detail %}<span class="block text-sm text-soft">{{ row.detail }}</span>{% endif %}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="mt-3 text-soft">{{ panel.empty }}</p>
+  {% endif %}
+  <p class="mt-3">
+    <a href="{% url panel.link %}"
+       class="inline-flex min-h-11 items-center text-sm">{% translate "See all" %}</a>
+  </p>
+</section>
