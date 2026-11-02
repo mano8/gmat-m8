@@ -58,7 +58,7 @@ A new capability held in scope by `GROUP_ADMIN`, `MATERIAL_MANAGER` and `ENGINEE
 - The assignment **never restricts who decides**: any reviewer in scope still can. One level only; sequential approvals stay backlog item B10.
 - Q35 (working assumption): every requester may pick a reviewer (optional). An unassigned request stays in every in-scope reviewer's inbox.
 - The assignee is emailed through the outbox (M7.1), with eligibility checked again at the claim.
-- Details settled in M7b.2 (working assumptions, flagged in the pull request):
+- Details settled in M7b.2 (working assumptions, confirmed by the maintainer on 2026-11-02):
   - every assignment after the submit needs a note, the first one of an unassigned request included;
   - there is no "unassign": a reviewer reassigns, and a lapsed assignee falls back to unassigned on their own;
   - a resubmit after a return to `DRAFT` keeps the earlier assignee unless the requester picks another;
@@ -78,7 +78,7 @@ A new capability held in scope by `GROUP_ADMIN`, `MATERIAL_MANAGER` and `ENGINEE
   - Removing a line rejects it (`SUBMITTED`) or closes it short (`APPROVED`); it stays visible and is never deleted.
   - `CLOSED`, `REJECTED` and `CANCELLED` refuse edits (reopen first).
 
-- Details settled in M7b.3 (working assumptions, flagged in the pull request):
+- Details settled in M7b.3 (working assumptions, confirmed by the maintainer on 2026-11-02):
   - lines have no notes field (M4.1 kept it out), so an edit changes material, description, unit or quantity; its required reason is the reviewer's note;
   - `SUBMITTED`: an edit clears the line's decision whoever made it, the editor's own included; deciding in the same step takes `request.review`, and its note is the reason;
   - `APPROVED`: only a live line is edited; a new quantity becomes the requested and the approved quantity at once; without one, both stay (a partial approval stays partial) and must suit a new unit;
@@ -89,7 +89,7 @@ A new capability held in scope by `GROUP_ADMIN`, `MATERIAL_MANAGER` and `ENGINEE
   - a request submitted before M7b.3 has no copy: its first edit records one from the lines as they are then, marked `backfilled`;
   - `self_approved` means the editor decided the edited line themselves: always in `APPROVED`, in `SUBMITTED` when they approved or rejected it in the same step (a removal included);
   - a decision or an edit may carry the page's `seen_version` (submits plus edits); an older one is refused, so nobody approves a line they have not seen after another reviewer's edit;
-  - open for the maintainer: a replaced line is closed short with source `LINE`, so `reopen_line` can reopen it next to its replacement (both needs live again); nothing blocks it yet.
+  - a replaced line is closed short with source `LINE`, so `reopen_line` can reopen it next to its replacement (both needs live again); confirmed by the maintainer (2026-11-02): nothing blocks it.
 
 ### 6. The as-submitted copy and revisions (Q34, M7b.3, M7b.4)
 
