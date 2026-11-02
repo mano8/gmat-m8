@@ -156,6 +156,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - the project's materials at `/requests/projects/<id>/materials/`: the open lines of the requests the user may see, summed per material (approved, received, pending, awaiting handover, delivered, outstanding), most outstanding first, linked from the project page;
   - the order page's lines also show the remaining quantity and whether the line is receivable;
   - 3 URLs in the acceptance matrix; es/fr strings.
+- Email notifications (M7.1): a request submitted goes to its reviewers, a decision and goods received on site or handed over go to the requester, as outbox messages written in the business transaction (at most 20 BCC recipients, eligibility checked again at the claim); translated es/en/fr templates; per-user opt-out for business email at `/account/notifications/` (security email and supplier dispatches stay on).
 
 ### Changed
 
