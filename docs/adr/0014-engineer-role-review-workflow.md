@@ -8,7 +8,7 @@
 
 Issues #23 and #24 ask for three changes to the review of material requests:
 
-- an **engineer** who checks and validates requests without buying, receiving or handing anything over;
+- an **engineer** who checks and validates requests, ranked below the group administrator and above every other role;
 - requests sent to a **named reviewer**, and reviewers who **edit** a request's lines, approved requests included, because supplier stock and availability change after approval;
 - group administrators and material managers (and engineers) who **decide their own requests**. Today `allow_self_approval` on the procurement branch is the only way, and ADR-0010 Q4 keeps that rule unchanged.
 
@@ -19,12 +19,19 @@ The maintainer decided Q30-Q34 on 2026-11-01 (plan §10). Q35 and Q36 are workin
 ### 1. The `ENGINEER` role (Q30, M7b.1)
 
 - A **branch-level** membership (`branch` required, `company` null), scoped like `MATERIAL_MANAGER` (S1: the branch and the active branches it manages).
-- Capabilities. Own requests: `request.create` and `request.withdraw`. In scope: `request.view`, `request.review`, `request.edit`, `project.view` and `catalog.view`.
-- None of these: sourcing (`request.source`), cancelling other users' requests (`request.cancel_any`), purchasing (`po.*`), prices, suppliers, receipts, handovers, `project.manage`, `catalog.manage`, `audit.view`, `export.csv`.
+- **Rank** (maintainer, 2026-11-02): below `GROUP_ADMIN`, above every other role. The engineer holds **every capability of a material manager**, with the same reach, in its branch scope:
+  - own requests (`request.create`, `request.withdraw`);
+  - requests in scope (`request.view`, `request.review`, `request.edit`, `request.source`, `request.cancel_any`);
+  - purchasing and prices (`po.view`, `po.manage`, `price.view`);
+  - suppliers, catalog and projects (`supplier.view`, `supplier.manage`, `catalog.*`, `project.*`);
+  - receipts and handovers (`receipt.*`, `handover.*`);
+  - `audit.view` and `export.csv`.
+- Only `org.manage` stays the group administrators'. A test keeps every other non-admin role's capabilities a subset of the engineer's, so a capability later given to a material manager (or anyone below) and not to engineers fails the build.
+- The plan's first reading of Q30 (requests only, "to confirm in M7b.1") is replaced by this rank.
 - What follows from these capabilities:
-  - engineers read the attachments of the requests they see and add to their own (plan §5, the parent's capabilities);
+  - engineers read and moderate the attachments of the documents they reach (plan §5, the parent's capabilities);
   - they receive the `request.submitted` notices of their scope (M7.1, `request.review` holders);
-  - they get the inbox and "my requests" dashboard panels (M7.2).
+  - they get every dashboard panel a material manager gets (M7.2).
 - **Privileged**: in `PRIVILEGED_ROLES`. That means session MFA on every page and in `authorize_in_txn`, the 12-hour session (Q12), and `privilege_elevated_at` moved at every grant.
 - Only `org.manage` grants memberships, and only `GROUP_ADMIN` holds it. A material manager therefore cannot make anyone an engineer, and an invitation that grants the role is checked against its initiator's `org.manage` (F71).
 - Migration `organizations.0003_engineer_role`: the role CHECK accepts the new value and a shape CHECK binds engineer rows. It only expands the schema: the previous release keeps working.
@@ -80,6 +87,7 @@ A new capability held in scope by `GROUP_ADMIN`, `MATERIAL_MANAGER` and `ENGINEE
 ## Consequences
 
 - Granting the first engineer is a privileged grant: that user must enroll MFA before using the role.
+- Today an engineer and a material manager hold the same capabilities, because material managers also hold `request.edit` (Q32). The difference is the rank: an engineer must keep every capability of the roles below it, and future engineer-only rules (for example reviewing a material manager's request) build on it.
 - Reversing `organizations.0003` fails once an engineer membership exists, because memberships are revoked, never deleted. The fix is a forward migration.
 - Reviewer edits of approved lines change ledger inputs. M7b.3 is therefore built like the other ledger services (component lock, reconcile, floors) and tested with threaded races and hypothesis sequences. M8.1 depends on it.
 - The acceptance matrix has an engineer actor (with and without session MFA), and the A/B/C fixture and `seed_demo` have an engineer of A-MAD.
