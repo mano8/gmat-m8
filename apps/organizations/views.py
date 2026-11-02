@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
@@ -27,6 +28,11 @@ from apps.access.roles import Capability
 from apps.accounts import selectors as account_selectors
 from apps.accounts import services as account_services
 from apps.accounts.models import EmailChangeRequest, Invitation
+from apps.accounts.services import (
+    EMAIL_CHANGE_CONFIRM_MAIL,
+    EMAIL_CHANGE_NOTICE_MAIL,
+    INVITATION_MAIL,
+)
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
 from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
@@ -56,27 +62,32 @@ def _extra_query(**params: str) -> str:
 def _with_delivery(ctx: AccessContext, invitations: Iterable[Invitation]) -> list[Invitation]:
     """The invitations read through the scoped selector, each with its email's status.
 
-    ``delivery`` stays ``None`` for an invitation that no longer waits for an answer and for
-    one that sent no email (the bootstrap link).
+    ``delivery`` stays ``None`` for an invitation that no longer waits for an answer
+    (accepted, revoked or expired) and for one that sent no email (the bootstrap link).
     """
     rows = list(invitations)
-    pending = [row.pk for row in rows if row.accepted_at is None and row.revoked_at is None]
+    current = timezone.now()
+    pending = [
+        row.pk
+        for row in rows
+        if row.accepted_at is None and row.revoked_at is None and row.expires_at > current
+    ]
     found = notification_selectors.delivery_status(ctx, notification_selectors.INVITATION, pending)
     for row in rows:
-        row.delivery = found.get(row.pk)  # type: ignore[attr-defined]
+        row.delivery = found.get((row.pk, INVITATION_MAIL))  # type: ignore[attr-defined]
     return rows
 
 
 def _change_delivery(ctx: AccessContext, change: EmailChangeRequest) -> dict[str, object]:
     """An email change with the status of its two emails: to the new address, to the old one."""
-    kind, ids = notification_selectors.EMAIL_CHANGE, [change.pk]
-    confirm = notification_selectors.delivery_status(
-        ctx, kind, ids, source_ref="email_change.confirm"
+    found = notification_selectors.delivery_status(
+        ctx, notification_selectors.EMAIL_CHANGE, [change.pk]
     )
-    notice = notification_selectors.delivery_status(
-        ctx, kind, ids, source_ref="email_change.cancel"
-    )
-    return {"change": change, "confirm": confirm.get(change.pk), "notice": notice.get(change.pk)}
+    return {
+        "change": change,
+        "confirm": found.get((change.pk, EMAIL_CHANGE_CONFIRM_MAIL)),
+        "notice": found.get((change.pk, EMAIL_CHANGE_NOTICE_MAIL)),
+    }
 
 
 # --- people ----------------------------------------------------------------------------

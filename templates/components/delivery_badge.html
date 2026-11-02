@@ -2,7 +2,8 @@
 {% comment %}
   The delivery status of one email (M7c.1). Parameters: status (a notifications.selectors.DeliveryStatus
   or empty), object_id (the id of the invitation or change, for the element id); poll_url optional: while the message is queued or sending the badge reloads itself
-  from there every 5 s, and the fragment it gets back carries no trigger once the state is final.
+  from there (every 5 s, every 60 s once delayed), and the fragment it gets back carries no trigger once the
+  state is final. A redirect (the session ended) or an error stops the polling (static/js/app.js, data-poll).
   The state is a chip and a word, never colour alone.
 {% endcomment %}
 {% if status %}
@@ -10,7 +11,7 @@
         class="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
         data-testid="delivery-status"
         data-state="{% if status.delayed %}delayed{% else %}{{ status.state|lower }}{% endif %}"
-        {% if poll_url and status.polling %}hx-get="{{ poll_url }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+        {% if poll_url and status.polling %}hx-get="{{ poll_url }}" hx-trigger="every {{ status.poll_every }}" hx-swap="outerHTML" data-poll{% endif %}>
     {% include "components/status_chip.html" with label=status.label tone=status.tone %}
     <span class="text-soft">
       {% if status.state == "SENT" %}
