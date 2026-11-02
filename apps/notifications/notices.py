@@ -6,7 +6,9 @@ change leaves none. Each one queues at most one message per request, with the re
 ids and a capability on the request (``request.review`` for reviewers, ``request.view``
 for the requester) that the worker checks again at the claim.
 
-- ``request.submitted``: the users who can review the request, except its author;
+- ``request.submitted``: the users who can review the request, except its author; its
+  assigned reviewer (M7b.2) gets a message of their own instead;
+- ``request.reviewer_assigned``: the new assignee, unless they assigned it to themselves;
 - ``request.approved`` / ``request.rejected``: the requester, with their own decisions;
 - ``handover.posted``: the requester of each request served, with their own lines only
   (a ``DIRECT_RECEIPT`` handover is the receipt of goods on site).
@@ -28,6 +30,7 @@ from apps.access.roles import Capability
 from apps.accounts.models import User
 from apps.core.events import Event
 from apps.handovers.models import Handover
+from apps.material_requests import reviewers
 from apps.material_requests.models import MaterialRequest
 from apps.notifications import recipients
 from apps.notifications.outbox import queue_notification
@@ -68,17 +71,50 @@ def _request(request_id: Any) -> MaterialRequest:
 
 def on_request_submitted(event: Event) -> None:
     request = _request(event.payload["request_id"])
+    assigned = reviewers.assignee(request)
     with translation.override(settings.LANGUAGE_CODE):
         subject = _("Request %(number)s to review") % {"number": request.number}
         link = _absolute(reverse("requests:examine", args=[request.pk]))
+    excluded = {request.requested_by_id} | ({assigned.pk} if assigned is not None else set())
     _queue(
-        recipients.holders(Capability.REQUEST_REVIEW, request, exclude=request.requested_by_id),
+        recipients.holders(Capability.REQUEST_REVIEW, request, exclude=excluded),
         Capability.REQUEST_REVIEW,
         request,
         "request_submitted",
         subject,
         f"request.submitted:{request.pk}",
         {"link": link, "lines": request.lines.count()},
+    )
+    if assigned is not None and assigned.pk != request.requested_by_id:
+        _assigned(request, assigned, request.requested_by, "", f"request.submitted:{request.pk}")
+
+
+def on_reviewer_assigned(event: Event) -> None:
+    request = _request(event.payload["request_id"])
+    reviewer = User.objects.get(pk=event.payload["reviewer_id"])
+    if reviewer.pk == event.payload["assigned_by"]:
+        return
+    by = User.objects.get(pk=event.payload["assigned_by"])
+    note = event.payload["note"]
+    _assigned(request, reviewer, by, note, f"request.reviewer_assigned:{request.pk}")
+
+
+def _assigned(
+    request: MaterialRequest, reviewer: User, by: User, note: str, source_ref: str
+) -> None:
+    """Tell ``reviewer`` that ``by`` sent them ``request`` (while they may review it), with
+    the note of a reassignment."""
+    with translation.override(settings.LANGUAGE_CODE):
+        subject = _("Request %(number)s assigned to you") % {"number": request.number}
+        link = _absolute(reverse("requests:examine", args=[request.pk]))
+    _queue(
+        recipients.user_with(Capability.REQUEST_REVIEW, request, reviewer),
+        Capability.REQUEST_REVIEW,
+        request,
+        "request_assigned",
+        subject,
+        source_ref,
+        {"link": link, "lines": request.lines.count(), "assigned_by": by, "note": note},
     )
 
 
@@ -148,6 +184,7 @@ def register() -> None:
     from apps.core.events import subscribe
 
     subscribe("request.submitted", on_request_submitted)
+    subscribe("request.reviewer_assigned", on_reviewer_assigned)
     subscribe("request.approved", on_request_decided)
     subscribe("request.rejected", on_request_decided)
     subscribe("handover.posted", on_handover_posted)

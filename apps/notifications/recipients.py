@@ -5,6 +5,7 @@ checked again by the worker at the claim (``eligibility``): a user who lost the 
 by then receives nothing. A user who opted out of business email is never chosen.
 """
 
+from collections.abc import Collection
 from uuid import UUID
 
 from django.db.models import Model
@@ -31,7 +32,7 @@ def _active(users: list[User]) -> list[User]:
     return [user for user in users if user.pk not in skipped]
 
 
-def holders(capability: Capability, obj: Model, *, exclude: UUID | None = None) -> list[User]:
+def holders(capability: Capability, obj: Model, *, exclude: Collection[UUID] = ()) -> list[User]:
     """Active users who hold ``capability`` on ``obj`` now, opted-out ones left out.
 
     Candidates are the holders of a current membership whose role carries the capability;
@@ -44,8 +45,8 @@ def holders(capability: Capability, obj: Model, *, exclude: UUID | None = None) 
         is_active=True,
         offboarded_at__isnull=True,
     ).order_by("pk")
-    if exclude is not None:
-        candidates = candidates.exclude(pk=exclude)
+    if exclude:
+        candidates = candidates.exclude(pk__in=exclude)
     return _active(
         [user for user in candidates if AccessContext.for_user(user).can(capability, obj)]
     )

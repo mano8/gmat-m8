@@ -35,10 +35,11 @@ from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import SELF_DECIDING_ROLES, Capability
 from apps.access.scopes import object_in_scope
+from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
-from apps.material_requests import ledger
+from apps.material_requests import ledger, reviewers
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.projects.models import Project
 
@@ -243,6 +244,51 @@ def inbox(
     if needed_before is not None:
         rows = rows.filter(needed_by__lte=needed_before)
     return rows.order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+
+
+# --- reviewer assignment (M7b.2) -------------------------------------------------------
+
+
+def can_assign(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """Sending a submitted or approved request to another reviewer (the service checks again)."""
+    return of.status in INBOX_STATUSES and ctx.can(REVIEW, of)
+
+
+def eligible_reviewers(ctx: AccessContext, of: MaterialRequest) -> list[User]:
+    """Who ``of`` can be sent to (the reviewer choices), by name.
+
+    For its requester while it is a draft (judged against the procurement branch its
+    submit will take) and for a reviewer who may reassign it; nobody for anyone else.
+    """
+    if not (can_edit(ctx, of) or can_assign(ctx, of)):
+        return []
+    return reviewers.candidates(reviewers.target_branch(of))
+
+
+def assignee(of: MaterialRequest) -> User | None:
+    """The request's assigned reviewer while they still qualify; ``None``: unassigned."""
+    return reviewers.assignee(of)
+
+
+def assigned_to(ctx: AccessContext) -> QuerySet[MaterialRequest]:
+    """ "Assigned to me": the user's submitted and approved requests, the most pressing first.
+
+    Only while a grant through which they may be assigned still covers the request's
+    procurement branch: a revoked or expired assignee's list is empty, and the requests
+    read as unassigned everywhere else.
+    """
+    scope = reviewers.assignable_scope(ctx)
+    return (
+        MaterialRequest.objects.visible_to(ctx, REVIEW)
+        .filter(
+            scope.branch_q("procurement_branch"),
+            assigned_reviewer_id=ctx.user_id,
+            status__in=INBOX_STATUSES,
+        )
+        .select_related("project", "requested_by")
+        .annotate(line_count=Count("lines"))
+        .order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+    )
 
 
 def sourcing_to_decide(ctx: AccessContext) -> QuerySet[MaterialRequestLine]:

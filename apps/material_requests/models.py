@@ -124,6 +124,26 @@ class MaterialRequest(BaseModel):
     decided_at = models.DateTimeField(_("decided at"), null=True, blank=True)
     closed_at = models.DateTimeField(_("closed at"), null=True, blank=True)
     close_reason = models.TextField(_("close reason"), blank=True)
+    # The reviewer the request is sent to (M7b.2, Q31): never restricts who decides. A
+    # revoked or expired assignee reads as unassigned (``reviewers.assignee``); the row
+    # keeps them.
+    assigned_reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="assigned_requests",
+        verbose_name=_("assigned reviewer"),
+    )
+    assigned_at = models.DateTimeField(_("assigned at"), null=True, blank=True)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("assigned by"),
+    )
 
     objects = RequestQuerySet.as_manager()
 
@@ -155,11 +175,25 @@ class MaterialRequest(BaseModel):
                 | Q(status="CLOSED", closed_at__isnull=False, close_mode__in=["AUTO", "MANUAL"]),
                 name="mr_request_closure",
             ),
+            models.CheckConstraint(
+                condition=Q(
+                    assigned_reviewer__isnull=True,
+                    assigned_at__isnull=True,
+                    assigned_by__isnull=True,
+                )
+                | Q(
+                    assigned_reviewer__isnull=False,
+                    assigned_at__isnull=False,
+                    assigned_by__isnull=False,
+                ),
+                name="mr_request_assignment",
+            ),
         ]
         indexes = [
             models.Index(fields=["requested_by", "status"], name="mr_request_requester"),
             models.Index(fields=["procurement_branch", "status"], name="mr_request_branch"),
             models.Index(fields=["project", "status"], name="mr_request_project"),
+            models.Index(fields=["assigned_reviewer", "status"], name="mr_request_assignee"),
         ]
 
     def __str__(self) -> str:

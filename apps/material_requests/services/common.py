@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
+from apps.access.generations import lock_access_state, lock_users
 from apps.access.principals import Principal
 from apps.access.roles import Capability
 from apps.accounts.models import User
@@ -16,10 +17,11 @@ from apps.audit.recorder import record
 from apps.catalog.models import Material, UnitOfMeasure
 from apps.catalog.quantities import check_quantity
 from apps.core import events
+from apps.core.changes import apply_changes
 from apps.core.db import constraint_errors, db_now
 from apps.core.locking import LockLevel, LockOrder, LockSetChanged
 from apps.core.sequences import format_number, next_number
-from apps.material_requests import commitments, ledger
+from apps.material_requests import commitments, ledger, reviewers
 from apps.material_requests.commitments import LockedComponent
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.transitions import transition
@@ -73,6 +75,18 @@ def _authorize(
 def _authorize_project(principal: Principal, project: Project, locks: LockOrder) -> None:
     """``request.create`` on the project itself: new requests only where the actor may."""
     authorize_in_txn(principal, CREATE, project, locks=locks, read=Capability.PROJECT_VIEW)
+
+
+def _lock_people(locks: LockOrder, principal: Principal, reviewer_id: UUID) -> None:
+    """L0 before the authorization: the access state, then the actor's and the assignee's
+    ``User`` rows ``FOR SHARE`` in one statement (id order).
+
+    A change to the assignee's authority locks their row first (``FOR NO KEY UPDATE``) and
+    a change to an organization the access state (``FOR UPDATE``), so either is serialized
+    with the eligibility check (S8, S9).
+    """
+    lock_access_state(locks)
+    lock_users(locks, {principal.user_id, reviewer_id})
 
 
 def _verified(request: MaterialRequest) -> tuple[Any, ...]:
@@ -261,6 +275,28 @@ def _require_nothing_allocated_or_delivered(request: MaterialRequest) -> None:
             _("Material has already been ordered or delivered for this request."),
             code="in_progress",
         )
+
+
+def _set_reviewer(request: MaterialRequest, reviewer_id: UUID, actor_id: UUID) -> dict[str, Any]:
+    """Assign ``reviewer_id`` (locked by ``_lock_people``) once they qualify; return the
+    audit diff, empty when they already are the assignee.
+
+    The request's procurement branch must be final: the assignee has to cover it
+    (``reviewers.covers``). An unknown user is refused like an ineligible one.
+    """
+    reviewer = User.objects.filter(pk=reviewer_id).first()
+    if reviewer is None or not reviewers.covers(reviewer, request.procurement_branch_id):
+        raise ValidationError(
+            {
+                "reviewer": ValidationError(
+                    _("Choose a reviewer who can decide this request."), code="ineligible_reviewer"
+                )
+            }
+        )
+    diff = apply_changes(request, {"assigned_reviewer_id": reviewer_id}, {"assigned_reviewer_id"})
+    if diff:
+        request.assigned_at, request.assigned_by_id = db_now(), actor_id
+    return diff
 
 
 def _record(principal: Principal, action: str, request: MaterialRequest, **data: Any) -> None:
