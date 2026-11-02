@@ -5770,3 +5770,39 @@ msgstr "Boîte de réception"
 #: templates/partials/nav_items.html:112
 msgid "Security"
 msgstr "Sécurité"
+
+msgid "Created"
+msgstr "Créée"
+
+msgid "Expires"
+msgstr "Expire"
+
+msgid "Until"
+msgstr "Jusqu'à"
+
+msgid "Number"
+msgstr "Numéro"
+
+msgid "All roles"
+msgstr "Tous les rôles"
+
+msgid "All branches"
+msgstr "Toutes les agences"
+
+msgid "Validity"
+msgstr "Validité"
+
+msgid "Any"
+msgstr "Tous"
+
+msgid "Valid"
+msgstr "Valide"
+
+msgid "No email sent"
+msgstr "Aucun e-mail envoyé"
+
+msgid "Received from"
+msgstr "Reçu depuis"
+
+msgid "Received until"
+msgstr "Reçu jusqu'à"

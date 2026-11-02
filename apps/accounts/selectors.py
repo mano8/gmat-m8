@@ -8,16 +8,27 @@ invitation or email change by the hash kept in the session: nothing else is reac
 from typing import Literal
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models.functions import Now
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
+from apps.access.policy import valid_now
 from apps.access.roles import Capability
 from apps.accounts.models import EmailChangeRequest, Invitation, User
 from apps.accounts.tokens import same_hash
+from apps.notifications import selectors as notification_selectors
+from apps.organizations.models import Membership
 from apps.projects.models import ProjectAssignment
 
-PAGE_SIZE = 25
+DEFAULT_PER_PAGE = 25
+PEOPLE_SORTS = {"name": ("full_name", "email"), "email": ("email",)}
+PEOPLE_SORT_LABELS = {"name": _("Name"), "email": _("Email")}
+INVITATION_SORTS = {"created": ("created_at",), "expires": ("expires_at",)}
+INVITATION_SORT_LABELS = {"created": _("Created"), "expires": _("Expires")}
+NO_EMAIL = "none"
+EXPIRED, VALID = "expired", "valid"
 STATUSES = ("active", "inactive")
 
 
@@ -25,7 +36,14 @@ def _admin(ctx: AccessContext) -> bool:
     return ctx.has(Capability.ORG_MANAGE)
 
 
-def people(ctx: AccessContext, *, q: str = "", status: str = "") -> QuerySet[User]:
+def people(
+    ctx: AccessContext,
+    *,
+    q: str = "",
+    status: str = "",
+    role: str = "",
+    branch_id: UUID | None = None,
+) -> QuerySet[User]:
     if not _admin(ctx):
         return User.objects.none()
     rows = User.objects.select_related("employer_company").order_by("email")
@@ -35,7 +53,19 @@ def people(ctx: AccessContext, *, q: str = "", status: str = "") -> QuerySet[Use
         rows = rows.filter(is_active=True)
     elif status == "inactive":
         rows = rows.filter(is_active=False)
+    if role or branch_id:
+        rows = rows.filter(Exists(_holding(role, branch_id)))
     return rows
+
+
+def _holding(role: str, branch_id: UUID | None) -> QuerySet[Membership]:
+    """The user's valid memberships (outer ``pk``) of ``role`` and/or on ``branch_id``."""
+    held = Membership.objects.filter(valid_now(), user_id=OuterRef("pk"))
+    if role:
+        held = held.filter(role=role)
+    if branch_id:
+        held = held.filter(branch_id=branch_id)
+    return held
 
 
 def person(ctx: AccessContext, user_id: UUID) -> User:
@@ -56,7 +86,13 @@ def assignments_of(ctx: AccessContext, of: User) -> QuerySet[ProjectAssignment]:
 
 
 def invitations(
-    ctx: AccessContext, *, q: str = "", pending_only: bool = True, of: User | None = None
+    ctx: AccessContext,
+    *,
+    q: str = "",
+    pending_only: bool = True,
+    of: User | None = None,
+    state: str = "",
+    delivery: str = "",
 ) -> QuerySet[Invitation]:
     if not _admin(ctx):
         return Invitation.objects.none()
@@ -67,7 +103,23 @@ def invitations(
         rows = rows.filter(Q(email__icontains=q) | Q(full_name__icontains=q))
     if of is not None:
         rows = rows.filter(Q(target_user=of) | Q(email=of.email))
+    if state:
+        rows = (
+            rows.filter(expires_at__lte=Now())
+            if state == EXPIRED
+            else rows.filter(expires_at__gt=Now())
+        )
+    if delivery:
+        rows = _by_delivery(rows, delivery)
     return rows
+
+
+def _by_delivery(rows: QuerySet[Invitation], delivery: str) -> QuerySet[Invitation]:
+    """Invitations whose latest email is in state ``delivery`` (``NO_EMAIL``: none was sent)."""
+    rows = notification_selectors.with_delivery_state(rows, notification_selectors.INVITATION)
+    if delivery == NO_EMAIL:
+        return rows.filter(Q(delivery_state__isnull=True))
+    return rows.filter(Q(delivery_state=delivery))
 
 
 def invitation(ctx: AccessContext, invitation_id: UUID) -> Invitation:

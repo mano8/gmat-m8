@@ -11,6 +11,7 @@ class AuditFilterForm(forms.Form):
         max_length=100,
         widget=forms.TextInput(attrs={"type": "search", "enterkeyhint": "search"}),
     )
+    actor = forms.CharField(label=_("Who"), required=False, max_length=100)
     object_type = forms.ChoiceField(label=_("Object"), required=False)
     since = forms.DateField(
         label=_("From"), required=False, widget=forms.DateInput(attrs={"type": "date"})

@@ -10,12 +10,10 @@ same page without prices (§8.2). Every action is its own POST-only URL (``actio
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
-from urllib.parse import quote
 from uuid import UUID
 
 from django.conf import settings
 from django.contrib import messages
-from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -24,6 +22,7 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
 from apps.core.http import is_htmx
+from apps.core.listing import paginate, render_list
 from apps.purchasing import selectors
 from apps.purchasing.forms import (
     AllocationEntry,
@@ -43,7 +42,7 @@ from apps.purchasing.forms import (
 )
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.selectors import MANAGE, VIEW, AllocationRow, LineRow
-from apps.purchasing.views.common import Status, _detail_url, _on_order, _query
+from apps.purchasing.views.common import Status, _detail_url, _on_order
 
 
 def _uuids(values: list[str]) -> list[UUID]:
@@ -134,14 +133,25 @@ def order_list(request: HttpRequest) -> HttpResponse:
     filters = OrdersFilterForm(request.GET or None, ctx=ctx)
     data = filters.cleaned_data if filters.is_valid() else {}
     status = Status.ISSUED if "status" not in request.GET else data.get("status", "")
-    supplier = data.get("supplier")
-    rows = selectors.orders(ctx, status=status, supplier_id=supplier.pk if supplier else None)
-    page = Paginator(rows, selectors.PAGE_SIZE).get_page(request.GET.get("page"))
-    progress = selectors.progress(ctx, page.object_list)
-    template = "purchasing/orders.html#results" if is_htmx(request) else "purchasing/orders.html"
+    supplier, project = data.get("supplier"), data.get("project")
+    rows = selectors.orders(
+        ctx,
+        status=status,
+        supplier_id=supplier.pk if supplier else None,
+        project_id=project.pk if project else None,
+        q=data.get("q", ""),
+    )
+    listing = paginate(
+        request,
+        rows,
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.ORDER_SORTS,
+        sort_labels=selectors.ORDER_SORT_LABELS,
+    )
+    progress = selectors.progress(ctx, listing.rows)
     context = {
         "filters": filters,
-        "page_obj": page,
+        "listing": listing,
         "entries": [
             (
                 found,
@@ -149,15 +159,11 @@ def order_list(request: HttpRequest) -> HttpResponse:
                 if found.number and found.status != Status.CANCELLED
                 else None,
             )
-            for found in page.object_list
+            for found in listing.rows
         ],
         "can_manage": selectors.can_manage(ctx),
-        # An empty status is the "All" choice: the pager must keep it (a missing one means
-        # "pending").
-        "extra_query": _query(supplier=request.GET.get("supplier", ""))
-        + (f"&status={quote(request.GET['status'])}" if "status" in request.GET else ""),
     }
-    return render(request, template, context)
+    return render_list(request, "purchasing/orders.html", context)
 
 
 # --- the order page ----------------------------------------------------------------------------

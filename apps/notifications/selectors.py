@@ -3,8 +3,10 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 from uuid import UUID
 
+from django.db.models import OuterRef, QuerySet, Subquery
 from django.utils.functional import Promise
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -80,6 +82,23 @@ def email_opt_out(ctx: AccessContext) -> bool:
     if ctx.user_id is None:
         return False
     return NotificationPreference.objects.filter(user_id=ctx.user_id, email_opt_out=True).exists()
+
+
+def with_delivery_state(rows: QuerySet[Any], object_type: str) -> QuerySet[Any]:
+    """``rows`` (objects of ``object_type``, read through a scoped selector) annotated with
+    ``delivery_state``: the status of the latest security email about each, ``None`` for none.
+    Only the status is selected, as in :func:`delivery_status`."""
+    latest = (
+        EmailOutbox.objects.filter(
+            kind=Kind.SECURITY,
+            eligibility_object_type=object_type,
+            eligibility_object_id=OuterRef("pk"),
+        )
+        .order_by("-created_at", "-pk")
+        .values("status")[:1]
+    )
+    annotated: QuerySet[Any] = rows.annotate(delivery_state=Subquery(latest))
+    return annotated
 
 
 def delivery_status(

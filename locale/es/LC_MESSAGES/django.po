@@ -5732,3 +5732,39 @@ msgstr "Bandeja"
 #: templates/partials/nav_items.html:112
 msgid "Security"
 msgstr "Seguridad"
+
+msgid "Created"
+msgstr "Creada"
+
+msgid "Expires"
+msgstr "Caduca"
+
+msgid "Until"
+msgstr "Hasta"
+
+msgid "Number"
+msgstr "Número"
+
+msgid "All roles"
+msgstr "Todos los roles"
+
+msgid "All branches"
+msgstr "Todas las delegaciones"
+
+msgid "Validity"
+msgstr "Vigencia"
+
+msgid "Any"
+msgstr "Cualquiera"
+
+msgid "Valid"
+msgstr "Vigente"
+
+msgid "No email sent"
+msgstr "Sin correo enviado"
+
+msgid "Received from"
+msgstr "Recibido desde"
+
+msgid "Received until"
+msgstr "Recibido hasta"

@@ -6,12 +6,10 @@ POST-only views (``@mutating``), each on its own URL, for ``supplier.manage``. A
 without ``supplier.view`` gets 403 on every URL here (S7), and the services authorize again.
 """
 
-from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -20,8 +18,8 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
 from apps.core.forms import add_service_errors, error_text
-from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
+from apps.core.listing import paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
 from apps.suppliers import selectors, services
@@ -37,11 +35,6 @@ def _manageable(request: HttpRequest, supplier_id: UUID) -> Supplier:
     return supplier
 
 
-def _kept(**params: str | None) -> dict[str, str]:
-    """The filters that are set, for the pager's links."""
-    return {key: value for key, value in params.items() if value}
-
-
 @require_safe
 @require_capability(VIEW)
 def supplier_list(request: HttpRequest) -> HttpResponse:
@@ -50,18 +43,16 @@ def supplier_list(request: HttpRequest) -> HttpResponse:
     data = filters.cleaned_data if filters.is_valid() else {}
     q = data.get("q", "")
     state = data.get("state") or selectors.STATE_ACTIVE
-    page = Paginator(selectors.suppliers(ctx, q=q, state=state), selectors.PAGE_SIZE).get_page(
-        request.GET.get("page")
+    listing = paginate(
+        request,
+        selectors.suppliers(ctx, q=q, state=state),
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.SUPPLIER_SORTS,
+        default_sort="name",
+        sort_labels=selectors.SUPPLIER_SORT_LABELS,
     )
-    kept = _kept(q=q, state=request.GET.get("state"))
-    template = "suppliers/list.html#results" if is_htmx(request) else "suppliers/list.html"
-    context = {
-        "filters": filters,
-        "page_obj": page,
-        "extra_query": f"&{urlencode(kept)}" if kept else "",
-        "manageable": selectors.manageable(ctx),
-    }
-    return render(request, template, context)
+    context = {"filters": filters, "listing": listing, "manageable": selectors.manageable(ctx)}
+    return render_list(request, "suppliers/list.html", context)
 
 
 @require_safe

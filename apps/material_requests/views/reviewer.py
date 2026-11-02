@@ -6,7 +6,6 @@ from typing import Any
 from uuid import UUID
 
 from django.contrib import messages
-from django.core.paginator import Paginator
 from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -18,7 +17,7 @@ from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require_capability
 from apps.access.roles import Capability
 from apps.attachments import selectors as attachment_selectors
-from apps.core.http import is_htmx
+from apps.core.listing import paginate, render_list
 from apps.material_requests import ledger, selectors, services
 from apps.material_requests.forms import (
     ApproveAllForm,
@@ -42,7 +41,6 @@ from apps.material_requests.views.common import (
     _on_line,
     _on_request,
     _perform,
-    _query,
 )
 
 VIEW, CREATE, WITHDRAW = (
@@ -77,26 +75,20 @@ def inbox(request: HttpRequest) -> HttpResponse:
         needed_before=data.get("needed_before"),
         assigned_to_me=bool(data.get("assigned")),
     )
-    page = Paginator(rows, selectors.PAGE_SIZE).get_page(request.GET.get("page"))
-    template = (
-        "material_requests/inbox.html#results"
-        if is_htmx(request)
-        else "material_requests/inbox.html"
+    listing = paginate(
+        request,
+        rows,
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.INBOX_SORTS,
+        sort_labels=selectors.INBOX_SORT_LABELS,
     )
     context = {
         "filters": filters,
-        "page_obj": page,
+        "listing": listing,
         "status": status,
-        "mine": selectors.assigned_ids(ctx, list(page.object_list)),
-        "extra_query": _query(
-            status=request.GET.get("status", ""),
-            priority=request.GET.get("priority", ""),
-            project=request.GET.get("project", ""),
-            needed_before=request.GET.get("needed_before", ""),
-            assigned=request.GET.get("assigned", ""),
-        ),
+        "mine": selectors.assigned_ids(ctx, listing.rows),
     }
-    return render(request, template, context)
+    return render_list(request, "material_requests/inbox.html", context)
 
 
 @dataclass

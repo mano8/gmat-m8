@@ -15,10 +15,12 @@ from uuid import UUID
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from apps.access.context import AccessContext
 from apps.core.forms import IdempotentForm
 from apps.core.templatetags.ui_tags import quantity as format_quantity
 from apps.locations.models import Location
 from apps.material_requests.forms import quantity_field
+from apps.receiving import selectors
 from apps.receiving.models import GoodsReceipt, GoodsReceiptLine
 from apps.receiving.selectors import ReceiptRow, SplitChoice
 from apps.receiving.services import ReceiptLineInput
@@ -35,6 +37,35 @@ class ReceiptFilterForm(forms.Form):
     )
     status = forms.ChoiceField(
         label=_("Status"), required=False, choices=[("", _("All")), *GoodsReceipt.Status.choices]
+    )
+    place: Any = forms.ModelChoiceField(
+        label=_("Where"), required=False, queryset=None, empty_label=_("All")
+    )
+    received_from = forms.DateField(
+        label=_("Received from"), required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+    received_to = forms.DateField(
+        label=_("Received until"), required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["place"].queryset = selectors.receipt_places(ctx)  # type: ignore[attr-defined]
+
+    def clean(self) -> dict[str, Any]:
+        data: dict[str, Any] = super().clean() or {}
+        start, end = data.get("received_from"), data.get("received_to")
+        if start and end and start > end:
+            self.add_error("received_to", _("The end date cannot be before the start date."))
+        return data
+
+
+class ProjectSearchForm(forms.Form):
+    q = forms.CharField(
+        label=_("Search"),
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={"type": "search", "enterkeyhint": "search"}),
     )
 
 

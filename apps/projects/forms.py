@@ -17,14 +17,23 @@ from apps.projects.models import Project, ProjectAssignment
 STATUS_CHOICES = [("", _("All statuses")), *Project.Status.choices]
 
 
-class ProjectFilterForm(forms.Form):
-    q = forms.CharField(label=_("Search"), required=False, max_length=100)
-    status = forms.ChoiceField(label=_("Status"), required=False, choices=STATUS_CHOICES)
-
-
 class BranchChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]
     def label_from_instance(self, obj: Any) -> str:
         return f"{obj.company.code}-{obj.code} · {obj.name}"
+
+
+class ProjectFilterForm(forms.Form):
+    q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    status = forms.ChoiceField(label=_("Status"), required=False, choices=STATUS_CHOICES)
+    branch = BranchChoiceField(
+        label=_("Branch"), queryset=None, required=False, empty_label=_("All branches")
+    )
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["branch"].queryset = org_selectors.branches(  # type: ignore[attr-defined]
+            ctx, Capability.PROJECT_VIEW
+        )
 
 
 def _date(label: Any) -> forms.DateField:

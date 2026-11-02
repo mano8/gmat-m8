@@ -10,21 +10,22 @@
     {% include "components/button.html" with href=invite_url label=_("Invite someone") variant="primary" %}
   </div>
   {% url 'org:people' as list_url %}
-  {% include "components/filter_form.html" with form=filters target="#people-results" action=list_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#people-results" action=list_url grid="sm:grid-cols-[1fr_11rem_12rem_9rem_auto]" %}
   {% partialdef results inline %}
     <div id="people-results">
-      {% if page_obj.object_list %}
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
         <table class="table-responsive">
           <thead>
             <tr>
-              <th scope="col">{% translate "Email" %}</th>
-              <th scope="col">{% translate "Name" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="email" label=_("Email") %}
+              {% include "components/sort_header.html" with listing=listing key="name" label=_("Name") %}
               <th scope="col">{% translate "Employer" %}</th>
               <th scope="col">{% translate "Status" %}</th>
             </tr>
           </thead>
           <tbody>
-            {% for person in page_obj.object_list %}
+            {% for person in listing.rows %}
               <tr>
                 <td data-label="{% translate 'Email' %}">
                   <a href="{% url 'org:person' user_id=person.pk %}">{{ person.email }}</a>
@@ -36,7 +37,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination_legacy.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("Nobody found") text=_("Try another search.") %}
       {% endif %}

@@ -12,6 +12,7 @@ from uuid import UUID
 
 from django.db.models import Q, QuerySet
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
@@ -19,7 +20,9 @@ from apps.access.roles import Capability
 from apps.audit.models import AuditEvent
 
 VIEW = Capability.AUDIT_VIEW
-PAGE_SIZE = 50
+DEFAULT_PER_PAGE = 50
+EVENT_SORTS = {"time": ("occurred_at",)}
+EVENT_SORT_LABELS = {"time": _("When")}
 DISPLAY_FIELDS = (
     "id",
     "occurred_at",
@@ -36,6 +39,7 @@ class EventFilter:
     """What the list narrows to; every field is optional."""
 
     q: str = ""
+    actor: str = ""
     object_type: str = ""
     since: date | None = None
     until: date | None = None
@@ -55,6 +59,8 @@ def events(ctx: AccessContext, narrow: EventFilter | None = None) -> QuerySet[Au
             | Q(action__icontains=narrow.q)
             | Q(via__icontains=narrow.q)
         )
+    if narrow.actor:
+        rows = rows.filter(actor_label__icontains=narrow.actor)
     if narrow.object_type:
         rows = rows.filter(object_type=narrow.object_type)
     if narrow.since is not None:

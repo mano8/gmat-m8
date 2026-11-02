@@ -8,12 +8,11 @@ is shown to a group administrator but every action on it is refused by the servi
 """
 
 from collections.abc import Iterable
-from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
+from django.core.paginator import Page
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -28,8 +27,8 @@ from apps.accounts import selectors as account_selectors
 from apps.accounts import services as account_services
 from apps.accounts.models import EmailChangeRequest, Invitation
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
-from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
+from apps.core.listing import paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
 from apps.notifications import selectors as notification_selectors
@@ -48,11 +47,6 @@ from apps.organizations.forms import (
 ORG = Capability.ORG_MANAGE
 
 
-def _extra_query(**params: str) -> str:
-    kept = {key: value for key, value in params.items() if value}
-    return f"&{urlencode(kept)}" if kept else ""
-
-
 def _with_delivery(ctx: AccessContext, invitations: Iterable[Invitation]) -> list[Invitation]:
     """The invitations read through the scoped selector, each with its email's status.
 
@@ -65,6 +59,11 @@ def _with_delivery(ctx: AccessContext, invitations: Iterable[Invitation]) -> lis
     for row in rows:
         row.delivery = found.get(row.pk)  # type: ignore[attr-defined]
     return rows
+
+
+def _with_delivery_page(ctx: AccessContext, page: Page[Invitation]) -> None:
+    """Give each invitation of the page its delivery status, read in one query."""
+    page.object_list = _with_delivery(ctx, page.object_list)
 
 
 def _change_delivery(ctx: AccessContext, change: EmailChangeRequest) -> dict[str, object]:
@@ -86,20 +85,25 @@ def _change_delivery(ctx: AccessContext, change: EmailChangeRequest) -> dict[str
 @require_capability(ORG)
 def people(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
-    filters = PeopleFilterForm(request.GET or None)
-    q = status = ""
-    if filters.is_valid():
-        q, status = filters.cleaned_data["q"], filters.cleaned_data["status"]
-    page = Paginator(
-        account_selectors.people(ctx, q=q, status=status), account_selectors.PAGE_SIZE
-    ).get_page(request.GET.get("page"))
-    template = (
-        "organizations/people.html#results" if is_htmx(request) else "organizations/people.html"
-    )
-    return render(
+    filters = PeopleFilterForm(request.GET or None, ctx=ctx)
+    data = filters.cleaned_data if filters.is_valid() else {}
+    branch = data.get("branch")
+    listing = paginate(
         request,
-        template,
-        {"filters": filters, "page_obj": page, "extra_query": _extra_query(q=q, status=status)},
+        account_selectors.people(
+            ctx,
+            q=data.get("q", ""),
+            status=data.get("status", ""),
+            role=data.get("role", ""),
+            branch_id=branch.pk if branch else None,
+        ),
+        default_per_page=account_selectors.DEFAULT_PER_PAGE,
+        sorts=account_selectors.PEOPLE_SORTS,
+        default_sort="email",
+        sort_labels=account_selectors.PEOPLE_SORT_LABELS,
+    )
+    return render_list(
+        request, "organizations/people.html", {"filters": filters, "listing": listing}
     )
 
 
@@ -283,18 +287,23 @@ def revoke_email_change(request: HttpRequest, change_id: UUID) -> HttpResponse:
 def invitations(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
     filters = InvitationFilterForm(request.GET or None)
-    q = filters.cleaned_data["q"] if filters.is_valid() else ""
-    page = Paginator(account_selectors.invitations(ctx, q=q), account_selectors.PAGE_SIZE).get_page(
-        request.GET.get("page")
+    data = filters.cleaned_data if filters.is_valid() else {}
+    listing = paginate(
+        request,
+        account_selectors.invitations(
+            ctx,
+            q=data.get("q", ""),
+            state=data.get("state", ""),
+            delivery=data.get("delivery", ""),
+        ),
+        default_per_page=account_selectors.DEFAULT_PER_PAGE,
+        sorts=account_selectors.INVITATION_SORTS,
+        default_sort="-created",
+        sort_labels=account_selectors.INVITATION_SORT_LABELS,
     )
-    page.object_list = _with_delivery(ctx, page.object_list)
-    template = (
-        "organizations/invitations.html#results"
-        if is_htmx(request)
-        else "organizations/invitations.html"
-    )
-    return render(
-        request, template, {"filters": filters, "page_obj": page, "extra_query": _extra_query(q=q)}
+    _with_delivery_page(ctx, listing.page)
+    return render_list(
+        request, "organizations/invitations.html", {"filters": filters, "listing": listing}
     )
 
 

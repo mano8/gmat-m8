@@ -8,6 +8,7 @@ manager sees the project, never who else it is shared with.
 from uuid import UUID
 
 from django.db.models import Q, QuerySet
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
@@ -17,11 +18,15 @@ from apps.accounts.models import User
 from apps.organizations.models import Membership
 from apps.projects.models import Project, ProjectAssignment
 
-PAGE_SIZE = 25
+DEFAULT_PER_PAGE = 25
+PROJECT_SORTS = {"code": ("code",), "name": ("name", "code")}
+PROJECT_SORT_LABELS = {"code": _("Code"), "name": _("Name")}
 
 
-def projects(ctx: AccessContext, *, q: str = "", status: str = "") -> QuerySet[Project]:
-    """The projects ``ctx`` may view, filtered by text and status."""
+def projects(
+    ctx: AccessContext, *, q: str = "", status: str = "", branch_id: UUID | None = None
+) -> QuerySet[Project]:
+    """The projects ``ctx`` may view, filtered by text, status and branch."""
     rows = Project.objects.visible_to(ctx, Capability.PROJECT_VIEW).select_related(
         "branch__company", "procurement_branch__company"
     )
@@ -31,6 +36,8 @@ def projects(ctx: AccessContext, *, q: str = "", status: str = "") -> QuerySet[P
         )
     if status:
         rows = rows.filter(status=status)
+    if branch_id:
+        rows = rows.filter(branch_id=branch_id)
     return rows.order_by("code")
 
 

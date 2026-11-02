@@ -24,6 +24,7 @@ operator reading an order is checked priceless.
 import io
 import re
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
@@ -1684,6 +1685,36 @@ ROUTES: dict[str, tuple[Route, ...]] = {
         **_admin_model_routes(),
     }.items()
 } | APP_ROUTES
+
+# M7d.2: every paged list answers the same to every actor on a later page of the largest size.
+PAGED_LISTS = (
+    "catalog:list",
+    "suppliers:list",
+    "projects:list",
+    "org:people",
+    "org:invitations",
+    "requests:list",
+    "requests:new",
+    "requests:inbox",
+    "purchasing:orders",
+    "receiving:list",
+    "receiving:orders",
+    "receiving:projects",
+    "handovers:list",
+    "audit:list",
+)
+
+
+def _later_page(key: str, route: Route) -> Route:
+    return replace(
+        route,
+        position="page 2, 100 rows",
+        path=lambda world: f"{reverse(key)}?per_page=100&page=2",
+    )
+
+
+for _key in PAGED_LISTS:
+    ROUTES[_key] = (*ROUTES[_key], _later_page(_key, ROUTES[_key][0]))
 
 
 # --- the matrix --------------------------------------------------------------------------

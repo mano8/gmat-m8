@@ -5,7 +5,6 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
 from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -20,6 +19,7 @@ from apps.catalog import selectors as catalog_selectors
 from apps.core.forms import add_service_errors, error_text, form_error_text
 from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
+from apps.core.listing import paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
 from apps.material_requests import selectors, services
@@ -35,11 +35,7 @@ from apps.material_requests.forms import (
     SubmitForm,
 )
 from apps.material_requests.models import MaterialRequest
-from apps.material_requests.views.common import (
-    _own_draft,
-    _own_line_request,
-    _query,
-)
+from apps.material_requests.views.common import _own_draft, _own_line_request
 
 VIEW, CREATE, WITHDRAW = (
     Capability.REQUEST_VIEW,
@@ -64,22 +60,30 @@ LINES_TEMPLATE = "material_requests/draft_lines.html"
 @require_capability(VIEW)
 def request_list(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
-    filters = MyRequestsFilterForm(request.GET or None)
-    status = filters.cleaned_data["status"] if filters.is_valid() else ""
-    page = Paginator(selectors.my_requests(ctx, status=status), selectors.PAGE_SIZE).get_page(
-        request.GET.get("page")
+    filters = MyRequestsFilterForm(request.GET or None, ctx=ctx)
+    data = filters.cleaned_data if filters.is_valid() else {}
+    project = data.get("project")
+    listing = paginate(
+        request,
+        selectors.my_requests(
+            ctx,
+            status=data.get("status", ""),
+            q=data.get("q", ""),
+            project_id=project.pk if project else None,
+        ),
+        default_per_page=selectors.MY_REQUESTS_PER_PAGE,
+        sorts=selectors.MY_REQUEST_SORTS,
+        sort_labels=selectors.MY_REQUEST_SORT_LABELS,
     )
-    grouped = selectors.lines(ctx, list(page.object_list))
+    rows = listing.rows
+    grouped = selectors.lines(ctx, rows)
     context = {
         "filters": filters,
-        "status": status,
-        "statuses": filters.fields["status"].choices,  # type: ignore[attr-defined]
-        "page_obj": page,
-        "rows": [(item, grouped[item.pk]) for item in page.object_list],
-        "extra_query": _query(status=status),
+        "listing": listing,
+        "rows": [(item, grouped[item.pk]) for item in rows],
         "can_create": ctx.has(CREATE),
     }
-    return render(request, "material_requests/list.html", context)
+    return render_list(request, "material_requests/list.html", context)
 
 
 # --- new request: choose the project ------------------------------------------------------
@@ -91,24 +95,20 @@ def request_new(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
     search = ProjectSearchForm(request.GET or None)
     q = search.cleaned_data["q"] if search.is_valid() else ""
-    page = Paginator(selectors.creatable_projects(ctx, q=q), selectors.PROJECT_PAGE_SIZE).get_page(
-        request.GET.get("page")
+    listing = paginate(
+        request,
+        selectors.creatable_projects(ctx, q=q),
+        default_per_page=selectors.NEW_REQUEST_PER_PAGE,
+        sorts=selectors.PROJECT_SORTS,
+        sort_labels=selectors.PROJECT_SORT_LABELS,
     )
     # One key per button: tapping another project is another command (plan §4.8).
     entries = [
         (project, StartForm(ctx=ctx, actor_id=ctx.user_id, initial={"project": project.pk}))
-        for project in page.object_list
+        for project in listing.rows
     ]
-    template = (
-        "material_requests/new.html#results" if is_htmx(request) else "material_requests/new.html"
-    )
-    context = {
-        "filters": search,
-        "page_obj": page,
-        "entries": entries,
-        "extra_query": _query(q=q),
-    }
-    return render(request, template, context)
+    context = {"filters": search, "listing": listing, "entries": entries}
+    return render_list(request, "material_requests/new.html", context)
 
 
 @mutating(CREATE)

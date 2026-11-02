@@ -12,16 +12,18 @@
     {% endif %}
   </div>
   {% url 'purchasing:orders' as orders_url %}
-  {% include "components/filter_form.html" with form=filters target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_1fr_auto]" %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_9rem_1fr_1fr_auto]" %}
   {% partialdef results inline %}
     <div id="order-results" data-testid="orders">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
       {% if entries %}
         <table class="table-responsive">
           <thead>
             <tr>
-              <th scope="col">{% translate "Order" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="number" label=_("Order") %}
               <th scope="col">{% translate "Supplier" %}</th>
               <th scope="col">{% translate "Ship to" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="issued" label=_("Issued") %}
               <th scope="col">{% translate "Expected" %}</th>
               <th scope="col">{% translate "Status" %}</th>
             </tr>
@@ -34,6 +36,7 @@
                 </td>
                 <td data-label="{% translate 'Supplier' %}">{{ order.supplier.name }}</td>
                 <td data-label="{% translate 'Ship to' %}">{{ order.ship_to.name }}</td>
+                <td data-label="{% translate 'Issued' %}">{{ order.issued_at|date:"SHORT_DATE_FORMAT"|default:"—" }}</td>
                 <td data-label="{% translate 'Expected' %}">{{ order.expected_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</td>
                 <td data-label="{% translate 'Status' %}">
                   <span class="flex flex-wrap justify-end gap-1 sm:justify-start">
@@ -47,7 +50,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination_legacy.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No purchase orders") text=_("No order matches the filters.") %}
       {% endif %}

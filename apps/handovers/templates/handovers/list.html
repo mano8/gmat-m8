@@ -12,23 +12,24 @@
     {% endif %}
   </div>
   {% url 'handovers:list' as list_url %}
-  {% include "components/filter_form.html" with form=filters target="#handover-results" action=list_url grid="sm:grid-cols-[1fr_1fr_1fr_1fr_auto]" %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#handover-results" action=list_url grid="sm:grid-cols-[1fr_8rem_8rem_1fr_8rem_8rem_auto]" %}
   {% partialdef results inline %}
     <div id="handover-results" data-testid="handovers">
-      {% if page_obj.object_list %}
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
         <table class="table-responsive">
           <thead>
             <tr>
-              <th scope="col">{% translate "Handover" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="number" label=_("Handover") %}
               <th scope="col">{% translate "Project" %}</th>
               <th scope="col">{% translate "Kind" %}</th>
               <th scope="col">{% translate "Received by" %}</th>
-              <th scope="col">{% translate "Date" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="posted" label=_("Date") %}
               <th scope="col">{% translate "Status" %}</th>
             </tr>
           </thead>
           <tbody>
-            {% for handover in page_obj.object_list %}
+            {% for handover in listing.rows %}
               <tr data-testid="handover-row">
                 <td data-label="{% translate 'Handover' %}">
                   <a href="{% url 'handovers:detail' handover_id=handover.pk %}">{{ handover.number }}</a>
@@ -42,7 +43,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination_legacy.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No handovers") text=_("No handover matches the filters.") %}
       {% endif %}

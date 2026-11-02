@@ -49,8 +49,23 @@ from apps.material_requests.models import (
 )
 from apps.projects.models import Project
 
-PAGE_SIZE = 10
-PROJECT_PAGE_SIZE = 12
+DEFAULT_PER_PAGE = 25
+MY_REQUESTS_PER_PAGE = 10
+NEW_REQUEST_PER_PAGE = 10
+PROJECT_SORTS = {"code": ("code",), "name": ("name", "code")}
+PROJECT_SORT_LABELS = {"code": _("Code"), "name": _("Name")}
+MY_REQUEST_SORTS = {"number": ("number",), "submitted": ("submitted_at",)}
+MY_REQUEST_SORT_LABELS = {"number": _("Number"), "submitted": _("Submitted")}
+INBOX_SORTS = {
+    "needed": ("needed_by",),
+    "priority": ("priority_rank",),
+    "submitted": ("submitted_at",),
+}
+INBOX_SORT_LABELS = {
+    "needed": _("Needed by"),
+    "priority": _("Priority"),
+    "submitted": _("Submitted"),
+}
 RECENT_MATERIALS = 8
 # How many of the user's latest lines are looked at for the recent materials.
 RECENT_WINDOW = 60
@@ -108,8 +123,10 @@ def creatable_projects(ctx: AccessContext, *, q: str = "") -> QuerySet[Project]:
 # --- requests --------------------------------------------------------------------------
 
 
-def my_requests(ctx: AccessContext, *, status: str = "") -> QuerySet[MaterialRequest]:
-    """The user's own requests, newest first, optionally in one status."""
+def my_requests(
+    ctx: AccessContext, *, status: str = "", q: str = "", project_id: UUID | None = None
+) -> QuerySet[MaterialRequest]:
+    """The user's own requests, newest first, optionally in one status, project or number."""
     rows = (
         MaterialRequest.objects.visible_to(ctx, VIEW)
         .filter(requested_by_id=ctx.user_id)
@@ -117,7 +134,17 @@ def my_requests(ctx: AccessContext, *, status: str = "") -> QuerySet[MaterialReq
     )
     if status:
         rows = rows.filter(status=status)
+    if project_id is not None:
+        rows = rows.filter(project_id=project_id)
+    if q.strip():
+        rows = rows.filter(number__icontains=q.strip())
     return rows.order_by("-created_at")
+
+
+def my_request_projects(ctx: AccessContext) -> QuerySet[Project]:
+    """The projects the user has made requests for (the filter of "My requests")."""
+    own = my_requests(ctx).values("project_id")
+    return Project.objects.filter(pk__in=own).order_by("code")
 
 
 def request(ctx: AccessContext, request_id: UUID) -> MaterialRequest:
@@ -259,7 +286,9 @@ def inbox(
         rows = rows.filter(project_id=project_id)
     if needed_before is not None:
         rows = rows.filter(needed_by__lte=needed_before)
-    return rows.order_by(PRIORITY_RANK, F("needed_by").asc(nulls_last=True), "submitted_at")
+    return rows.annotate(priority_rank=PRIORITY_RANK).order_by(
+        "priority_rank", F("needed_by").asc(nulls_last=True), "submitted_at"
+    )
 
 
 # --- reviewer assignment (M7b.2) -------------------------------------------------------

@@ -7,9 +7,10 @@
   <h1 class="mb-1">{% translate "New request" %}</h1>
   <p class="mb-4 text-soft">{% translate "Which project is the material for?" %}</p>
   {% url 'requests:new' as new_url %}
-  {% include "components/filter_form.html" with form=filters target="#project-results" action=new_url grid="sm:grid-cols-[1fr_auto]" %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#project-results" action=new_url sort_always=True grid="sm:grid-cols-[1fr_auto]" %}
   {% partialdef results inline %}
     <div id="project-results">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
       {% if entries %}
         <ul class="grid gap-2">
           {% for project, start in entries %}
@@ -31,7 +32,7 @@
             </li>
           {% endfor %}
         </ul>
-        {% include "components/pagination_legacy.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No projects") text=_("No active project is open for your requests.") %}
       {% endif %}

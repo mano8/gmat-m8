@@ -24,10 +24,12 @@ The screens (M6.3) read the rest from here, every row through ``visible_to``:
 
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
 from django.db.models import Q, QuerySet, Sum
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
@@ -46,6 +48,10 @@ from apps.receiving.models import GoodsReceipt, GoodsReceiptLine
 
 VIEW, POST, VOID = Capability.HANDOVER_VIEW, Capability.HANDOVER_POST, Capability.HANDOVER_VOID
 ZERO = Decimal("0")
+
+DEFAULT_PER_PAGE = 25
+HANDOVER_SORTS = {"number": ("number",), "posted": ("handed_at",)}
+HANDOVER_SORT_LABELS = {"number": _("Handover"), "posted": _("Date")}
 
 
 @dataclass(frozen=True)
@@ -148,9 +154,11 @@ def handovers(
     kind: str = "",
     project_id: UUID | None = None,
     q: str = "",
+    handed_from: date | None = None,
+    handed_to: date | None = None,
 ) -> QuerySet[Handover]:
     """Handovers the user may see, newest first. ``q`` looks at the number, the project's
-    code or name and the receiver's typed name."""
+    code or name and the receiver's typed name; the dates are inclusive days."""
     rows = Handover.objects.visible_to(ctx, VIEW).select_related(
         "project", "branch__company", "source_location", "received_by"
     )
@@ -160,6 +168,10 @@ def handovers(
         rows = rows.filter(kind=kind)
     if project_id is not None:
         rows = rows.filter(project_id=project_id)
+    if handed_from is not None:
+        rows = rows.filter(handed_at__date__gte=handed_from)
+    if handed_to is not None:
+        rows = rows.filter(handed_at__date__lte=handed_to)
     if q:
         rows = rows.filter(
             Q(number__icontains=q)

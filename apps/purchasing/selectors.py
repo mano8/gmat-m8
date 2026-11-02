@@ -26,7 +26,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from django.db.models import F, Q, QuerySet
+from django.db.models import Exists, F, OuterRef, Q, QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -50,7 +50,9 @@ from apps.purchasing.waterfall import ZERO, OrderLineTotals, RequestLineFacts
 VIEW, MANAGE, PRICE = Capability.PO_VIEW, Capability.PO_MANAGE, Capability.PRICE_VIEW
 Status = PurchaseOrder.Status
 STALE_DRAFT_DAYS = 14  # Q24
-PAGE_SIZE = 25
+DEFAULT_PER_PAGE = 25
+ORDER_SORTS = {"number": ("number",), "issued": ("issued_at",)}
+ORDER_SORT_LABELS = {"number": _("Order"), "issued": _("Issued")}
 NEEDS_ATTENTION = (Dispatch.AMBIGUOUS, Dispatch.QUARANTINED)
 NOTICE_PENDING = (Dispatch.QUEUED, Dispatch.SENDING, Dispatch.FAILED)
 
@@ -59,9 +61,15 @@ NOTICE_PENDING = (Dispatch.QUEUED, Dispatch.SENDING, Dispatch.FAILED)
 
 
 def orders(
-    ctx: AccessContext, *, status: str = "", supplier_id: UUID | None = None
+    ctx: AccessContext,
+    *,
+    status: str = "",
+    supplier_id: UUID | None = None,
+    project_id: UUID | None = None,
+    q: str = "",
 ) -> QuerySet[PurchaseOrder]:
-    """Orders the user may see, newest first, optionally in one status or to one supplier."""
+    """Orders the user may see, newest first, optionally in one status, to one supplier,
+    buying for one project or matching a text (number, supplier name or reference)."""
     rows = PurchaseOrder.objects.visible_to(ctx, VIEW).select_related(
         "branch__company", "supplier", "ship_to"
     )
@@ -69,7 +77,23 @@ def orders(
         rows = rows.filter(status=status)
     if supplier_id is not None:
         rows = rows.filter(supplier_id=supplier_id)
+    if project_id is not None:
+        served = PurchaseAllocation.objects.filter(
+            po_line__po=OuterRef("pk"), request_line__project_id=project_id
+        )
+        rows = rows.filter(Exists(served))
+    if q.strip():
+        rows = rows.filter(
+            Q(number__icontains=q.strip())
+            | Q(supplier__name__icontains=q.strip())
+            | Q(supplier_ref__icontains=q.strip())
+        )
     return rows.order_by("-created_at")
+
+
+def order_projects(ctx: AccessContext) -> QuerySet[Project]:
+    """The projects of the orders list filter: the ones the user can see anyway."""
+    return Project.objects.visible_to(ctx, Capability.PROJECT_VIEW).order_by("code")
 
 
 def order(ctx: AccessContext, po_id: UUID) -> PurchaseOrder:

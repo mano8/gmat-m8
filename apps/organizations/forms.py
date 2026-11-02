@@ -7,8 +7,10 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.roles import BRANCH_ROLES, COMPANY_ROLES, ROLE_ASSIGNMENT_KIND, Capability, Role
+from apps.accounts import selectors as account_selectors
 from apps.accounts.services import AssignmentGrant, MembershipGrant
 from apps.core.forms import IdempotentForm, datetime_field
+from apps.notifications.models import Status
 from apps.organizations import selectors
 from apps.projects import selectors as project_selectors
 from apps.projects.forms import BranchChoiceField
@@ -18,11 +20,41 @@ STATUS_CHOICES = [("", _("Everyone")), ("active", _("Active")), ("inactive", _("
 
 class PeopleFilterForm(forms.Form):
     q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    role = forms.ChoiceField(
+        label=_("Role"), required=False, choices=[("", _("All roles")), *Role.choices]
+    )
+    branch = BranchChoiceField(
+        label=_("Branch"), queryset=None, required=False, empty_label=_("All branches")
+    )
     status = forms.ChoiceField(label=_("Status"), required=False, choices=STATUS_CHOICES)
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["branch"].queryset = selectors.branches(  # type: ignore[attr-defined]
+            ctx, Capability.ORG_MANAGE
+        )
 
 
 class InvitationFilterForm(forms.Form):
     q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    state = forms.ChoiceField(
+        label=_("Validity"),
+        required=False,
+        choices=[
+            ("", _("Any")),
+            (account_selectors.VALID, _("Valid")),
+            (account_selectors.EXPIRED, _("Expired")),
+        ],
+    )
+    delivery = forms.ChoiceField(
+        label=_("Email"),
+        required=False,
+        choices=[
+            ("", _("Any")),
+            *Status.choices,
+            (account_selectors.NO_EMAIL, _("No email sent")),
+        ],
+    )
 
 
 class CompanyChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]

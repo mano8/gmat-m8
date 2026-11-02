@@ -12,14 +12,15 @@
     {% endif %}
   </div>
   {% url 'suppliers:list' as list_url %}
-  {% include "components/filter_form.html" with form=filters target="#supplier-results" action=list_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#supplier-results" action=list_url %}
   {% partialdef results inline %}
     <div id="supplier-results">
-      {% if page_obj.object_list %}
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
         <table class="table-responsive">
           <thead>
             <tr>
-              <th scope="col">{% translate "Name" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="name" label=_("Name") %}
               <th scope="col">{% translate "Tax id" %}</th>
               <th scope="col">{% translate "Contact person" %}</th>
               <th scope="col">{% translate "Phone" %}</th>
@@ -27,7 +28,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for supplier in page_obj.object_list %}
+            {% for supplier in listing.rows %}
               <tr>
                 <td data-label="{% translate 'Name' %}">
                   <a href="{% url 'suppliers:detail' supplier_id=supplier.pk %}">{{ supplier.name }}</a>
@@ -40,7 +41,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination_legacy.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No suppliers") text=_("No supplier matches the filters.") %}
       {% endif %}

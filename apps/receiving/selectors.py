@@ -35,6 +35,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from django.db.models import Q, QuerySet
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
@@ -53,7 +54,13 @@ from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribu
 
 VIEW, POST, VOID = Capability.RECEIPT_VIEW, Capability.RECEIPT_POST, Capability.RECEIPT_VOID
 ZERO = Decimal("0")
-PAGE_SIZE = 25
+DEFAULT_PER_PAGE = 25
+RECEIPT_SORTS = {"number": ("number",), "posted": ("received_at",)}
+RECEIPT_SORT_LABELS = {"number": _("Receipt"), "posted": _("Received")}
+ORDER_SORTS = {"number": ("number",)}
+ORDER_SORT_LABELS = {"number": _("Order")}
+PROJECT_SORTS = {"code": ("code",), "name": ("name", "code")}
+PROJECT_SORT_LABELS = {"code": _("Code"), "name": _("Name")}
 
 
 @dataclass(frozen=True)
@@ -143,14 +150,17 @@ def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDe
 # --- the expected-deliveries screen -----------------------------------------------------------
 
 
-def expected_projects(ctx: AccessContext) -> QuerySet[Project]:
-    """Projects with a worksite the user may receive at (``receipt.view``), for the index."""
-    return (
+def expected_projects(ctx: AccessContext, *, q: str = "") -> QuerySet[Project]:
+    """Projects with a worksite the user may receive at (``receipt.view``), for the index;
+    ``q`` looks at the code and the name."""
+    rows = (
         Project.objects.visible_to(ctx, VIEW)
         .filter(worksite__isnull=False, status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD])
         .select_related("branch__company")
-        .order_by("code")
     )
+    if q.strip():
+        rows = rows.filter(Q(code__icontains=q.strip()) | Q(name__icontains=q.strip()))
+    return rows.order_by("code")
 
 
 def expected_project(ctx: AccessContext, project_id: UUID) -> Project:
@@ -178,9 +188,18 @@ def worksite(ctx: AccessContext, project_id: UUID) -> Location | None:
 # --- receipts -------------------------------
 
 
-def receipts(ctx: AccessContext, *, status: str = "", q: str = "") -> QuerySet[GoodsReceipt]:
+def receipts(
+    ctx: AccessContext,
+    *,
+    status: str = "",
+    q: str = "",
+    location_id: UUID | None = None,
+    received_from: date | None = None,
+    received_to: date | None = None,
+) -> QuerySet[GoodsReceipt]:
     """Receipts the user may see, newest first; ``q`` looks at the receipt's number, the
-    order's number and supplier and the delivery note."""
+    order's number and supplier and the delivery note; the rest narrows by place and by the
+    (inclusive) days it was received."""
     rows = GoodsReceipt.objects.visible_to(ctx, VIEW).select_related(
         "po", "location", "branch__company", "received_by"
     )
@@ -193,7 +212,18 @@ def receipts(ctx: AccessContext, *, status: str = "", q: str = "") -> QuerySet[G
             | Q(po__supplier_snapshot__name__icontains=q)
             | Q(delivery_note_ref__icontains=q)
         )
+    if location_id is not None:
+        rows = rows.filter(location_id=location_id)
+    if received_from is not None:
+        rows = rows.filter(received_at__date__gte=received_from)
+    if received_to is not None:
+        rows = rows.filter(received_at__date__lte=received_to)
     return rows
+
+
+def receipt_places(ctx: AccessContext) -> QuerySet[Location]:
+    """The places of the receipts list filter: the ones the user may read receipts of."""
+    return Location.objects.visible_to(ctx, VIEW).select_related("branch").order_by("name")
 
 
 def site_surplus(ctx: AccessContext) -> QuerySet[GoodsReceiptLine]:

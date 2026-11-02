@@ -345,14 +345,13 @@ class TestOrderList:
         received.receive(only_line(order), "6", {allocation(order, line): "6"})
         assert "Received" in page(manager, "orders")
 
-    def test_paging_keeps_the_all_statuses_choice(
-        self, manager: Client, buy: Buy, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr("apps.purchasing.selectors.PAGE_SIZE", 1)
-        buy(issue=False)
-        buy(issue=False)
-        html = page(manager, "orders", status="")
-        assert "?page=2&amp;status=" in html or "?page=2&status=" in html
+    def test_paging_keeps_the_all_statuses_choice(self, manager: Client, buy: Buy) -> None:
+        for _ in range(11):
+            buy(issue=False)
+        html = page(manager, "orders", status="", per_page="10")
+        link = next(part for part in html.split('href="') if "page=2" in part[:80])
+        assert "status=" in link.split('"')[0]
+        assert html.count('data-testid="order-row"') == 10
 
     def test_only_issued_orders_show_receipt_progress(
         self, manager: Client, buy: Buy, make_line: MakeLine

@@ -5550,3 +5550,39 @@ msgstr ""
 #: templates/partials/nav_items.html:112
 msgid "Security"
 msgstr ""
+
+msgid "Created"
+msgstr ""
+
+msgid "Expires"
+msgstr ""
+
+msgid "Until"
+msgstr ""
+
+msgid "Number"
+msgstr ""
+
+msgid "All roles"
+msgstr ""
+
+msgid "All branches"
+msgstr ""
+
+msgid "Validity"
+msgstr ""
+
+msgid "Any"
+msgstr ""
+
+msgid "Valid"
+msgstr ""
+
+msgid "No email sent"
+msgstr ""
+
+msgid "Received from"
+msgstr ""
+
+msgid "Received until"
+msgstr ""
