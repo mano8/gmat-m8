@@ -25,3 +25,7 @@ def test_values_keep_their_type_or_a_plain_form() -> None:
     assert cell(Decimal("1E+2")) == "100"
     assert cell(date(2026, 11, 2)) == "2026-11-02"
     assert cell(datetime(2026, 11, 2, 9, 30, 5, 123, tzinfo=UTC)) == "2026-11-02T09:30:05+00:00"
+
+
+def test_quoting_twice_changes_nothing() -> None:
+    assert cell(cell("=1+1")) == "'=1+1"

@@ -17,6 +17,7 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
 from apps.exports import selectors
+from apps.exports.cells import cell
 
 
 class _Echo:
@@ -26,9 +27,11 @@ class _Echo:
 
 def _lines(header: list[str], rows: Iterator[list[Any]]) -> Iterator[str]:
     writer = csv.writer(_Echo(), lineterminator="\r\n")
-    yield "\ufeff" + writer.writerow(header)
+    # Every value goes through ``cell`` (formula-safe) here, whatever the selector did already:
+    # ``cell`` leaves an already quoted value alone.
+    yield "\ufeff" + writer.writerow(map(cell, header))  # nosemgrep
     for row in rows:
-        yield writer.writerow(row)
+        yield writer.writerow(map(cell, row))  # nosemgrep
 
 
 @require_safe
