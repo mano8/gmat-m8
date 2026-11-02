@@ -52,10 +52,10 @@ VIEW, MANAGE, PRICE = Capability.PO_VIEW, Capability.PO_MANAGE, Capability.PRICE
 Status = PurchaseOrder.Status
 STALE_DRAFT_DAYS = 14  # Q24
 DEFAULT_PER_PAGE = 25
-WORKLIST_PER_PAGE = 50  # materials per page of the worklist (Q41)
-WORKLIST_SCOPE = ListScope(
-    max_per_page=50
-)  # a card per material with its lines: 50 is the most that stays in budget
+WORKLIST_PER_PAGE = 25  # materials per page of the worklist (Q41 said 50: see WORKLIST_SCOPE)
+# A card per material with its lines on every row: 25 is the most that stays in budget.
+WORKLIST_SCOPE = ListScope(max_per_page=25)
+UNALLOCATED_STRETCH = 200  # lines read at once for a section that is mostly empty
 SECTION_PER_PAGE = 10  # drafts, and quantity on order for nobody: fixed, each on its own page
 DRAFTS_SCOPE = ListScope(prefix="drafts_", anchor="draft-orders", sized=False)
 UNALLOCATED_SCOPE = ListScope(prefix="unallocated_", anchor="ordered-for-nobody", sized=False)

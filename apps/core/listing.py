@@ -396,7 +396,7 @@ rows that stretch yields, in order."""
 
 
 def _collect(
-    keys: Sequence[Hashable], window: Window, start: int, wanted: int
+    keys: Sequence[Hashable], window: Window, start: int, wanted: int, first: int = 0
 ) -> list[tuple[int, Any]]:
     """Up to ``wanted`` ``(position, row)`` from ``start`` on, reading stretches of ``keys``.
 
@@ -404,7 +404,7 @@ def _collect(
     so a list with few rows to show costs a handful of queries, not one set per stretch.
     """
     found: list[tuple[int, Any]] = []
-    position, step = start, max(wanted * 2, 20)
+    position, step = start, max(wanted * 2, 20, first)
     while position < len(keys) and len(found) < wanted:
         stretch = keys[position : position + step]
         found.extend((position + index, row) for index, row in window(stretch))
@@ -427,12 +427,14 @@ def cursor_page(
     *,
     default_per_page: int,
     scope: ListScope = WHOLE_PAGE,
+    first_stretch: int = 0,
 ) -> CursorPage:
     """The page of a list that ``?after=`` asks for, working out only what the page needs.
 
     ``keys`` are the candidates in the list's order (cheap to list: ids), ``window`` works out
     the rows of a stretch of them. Stretches are read until the page is full and one row is
-    known to follow it, so the work is the page plus at most a stretch.
+    known to follow it, so the work is the page plus at most a stretch. ``first_stretch`` makes
+    the first one longer for a list whose rows are rare (fewer rounds of queries).
     """
     if default_per_page not in scope.sizes:
         raise ImproperlyConfigured(f"default_per_page must be one of {scope.sizes}.")
@@ -440,7 +442,7 @@ def cursor_page(
     params.is_valid()
     size = (params.cleaned_data.get("per_page") if scope.sized else None) or default_per_page
     start = _position(request.GET.get(scope.after_param, ""), keys)
-    found = _collect(keys, window, start, size + 1)
+    found = _collect(keys, window, start, size + 1, first_stretch)
     back = tuple(t for t in request.GET.get(scope.back_param, "").split(",") if t)[:BACK_LIMIT]
     return CursorPage(
         rows=[row for _, row in found[:size]],

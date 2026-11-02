@@ -92,13 +92,22 @@ class TestWorklistMaterials:
             html = follow(manager, html, "next")
         assert sorted(seen) == sorted(str(pk) for pk in wanted)
 
-    def test_the_default_is_fifty_materials_a_page(
+    def test_the_default_is_the_largest_page_that_stays_in_budget(
         self, people: People, make_line: MakeLine
     ) -> None:
-        assert purchasing_selectors.WORKLIST_PER_PAGE == 50
-        self.lines(make_line, 51)
-        html = get(client_for(people.mm_mad), "purchasing:worklist")
-        assert html.count('data-testid="worklist-material"') == 50
+        """25 materials a page, and no larger size is offered (100 cards did not fit 300 ms)."""
+        assert purchasing_selectors.WORKLIST_PER_PAGE == 25
+        self.lines(make_line, 26)
+        manager = client_for(people.mm_mad)
+        html = get(manager, "purchasing:worklist")
+        assert html.count('data-testid="worklist-material"') == 25
+        assert '<option value="50"' not in html and '<option value="25"' in html
+        assert (
+            get(manager, "purchasing:worklist", per_page=100).count(
+                'data-testid="worklist-material"'
+            )
+            == 25
+        )
 
     def test_a_line_ticked_on_page_two_starts_a_draft(
         self, org: Org, people: People, make_line: MakeLine

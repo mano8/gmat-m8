@@ -90,6 +90,7 @@ def worklist(request: HttpRequest) -> HttpResponse:
         nobody.window,
         default_per_page=selectors.SECTION_PER_PAGE,
         scope=selectors.UNALLOCATED_SCOPE,
+        first_stretch=selectors.UNALLOCATED_STRETCH,
     )
     context = {
         "filters": filters,

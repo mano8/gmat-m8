@@ -182,7 +182,7 @@ SCREENS = (
         {"priority": "HIGH"},
         page="after",
         cursor=True,
-        largest="50",
+        largest="25",
     ),
     Screen(
         "expected-deliveries",
