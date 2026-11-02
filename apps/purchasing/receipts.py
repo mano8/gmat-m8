@@ -1,7 +1,7 @@
 """What goods receipts contribute to purchase-order lines and allocations (plan §4.5).
 
-Receiving (M6.1) refers to order lines and allocations, so this app cannot import it: it
-registers a ``ReceiptSource`` from its ``AppConfig.ready``. Until then nothing is received.
+Receiving refers to order lines and allocations, so this app cannot import it: it
+registers a ``ReceiptSource`` from its ``AppConfig.ready`` (``receiving.ledger``).
 
 - ``lines``: per order line, Σ ``qty_received`` on ``POSTED`` receipts (received; the
   line's remaining is ordered - received) and whether any posted receipt line exists (an

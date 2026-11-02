@@ -53,7 +53,8 @@ services:
       HTTP_PORT: ${HTTP_PORT:-8080}
       HTTPS_PORT: ${HTTPS_PORT:-8443}
       HTTPS_PORT_SUFFIX: ":${HTTPS_PORT:-8443}"
-      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-15MB}
+      # Just above an attachment's 10 MiB plus its form (ATTACHMENT_MAX_REQUEST_BYTES).
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-11MiB}
       CADDY_READ_BODY_TIMEOUT: ${CADDY_READ_BODY_TIMEOUT:-120s}
       HTTP_PROTOCOLS: ${HTTP_PROTOCOLS:-h1 h2}
       ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
@@ -116,6 +117,9 @@ services:
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
       # The same prefix Caddy restricts to ADMIN_ALLOWED_CIDRS.
       DJANGO_ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
+    # Attachments (M6.4): stored files and uploads in progress; never served from here.
+    volumes:
+      - media:/srv/media
     networks: [edge, db_web]
     depends_on:
       migrate:
@@ -128,7 +132,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
-    mem_limit: 512m
+    # Gunicorn plus up to two image decoders (512 MiB address space each, plan §9 sizing).
+    mem_limit: 1536m
 
   # The only process that sends email (plan §5): claims outbox rows, delivers them through
   # SMTP and runs the hourly housekeeping. Idle while flags/worker.paused exists.
@@ -147,6 +152,8 @@ services:
       WORKER_HEARTBEAT_FILE: /tmp/gmat-worker.heartbeat
     volumes:
       - ./flags:/srv/flags:ro
+      # Expired uploads' staging files and the media purge (plan §9).
+      - media:/srv/media
     networks: [db_worker, egress]
     depends_on:
       migrate:
@@ -235,8 +242,11 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-}
       BACKUP_HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
+      # The stored attachments the snapshot lists are copied from here (read only).
+      MEDIA_DIR: /srv/media/files
     volumes:
       - ./backups:/backups
+      - media:/srv/media:ro
     tmpfs:
       - /tmp
       # The base image declares a data volume; a tmpfs keeps Docker from creating an
@@ -285,3 +295,5 @@ volumes:
   pg_data:
   caddy_data:
   caddy_config:
+  # Attachments (M6.4): owned by uid 1000, created from the image's /srv/media.
+  media:

@@ -1,0 +1,96 @@
+{% extends "layouts/app.html" %}
+{% load i18n access ui_tags %}
+{% block head_title %}
+  {{ handover.number }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1 data-testid="handover-number">{{ handover.number }}</h1>
+    <p class="mt-1 flex flex-wrap gap-2">
+      {% include "handovers/status.html" with obj=handover %}
+      <span class="chip">{{ handover.get_kind_display }}</span>
+    </p>
+  </div>
+  <section class="card mb-4" aria-label="{% translate 'Handover details' %}">
+    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+      <div>
+        <dt class="text-sm text-soft">{% translate "Project" %}</dt>
+        <dd data-field="project">
+          {{ handover.project.code }} · {{ handover.project.name }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "From" %}</dt>
+        <dd data-field="source">
+          {{ handover.source_location.name }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Received by" %}</dt>
+        <dd data-field="received-by">{% if handover.received_by %}{{ handover.received_by.full_name|default:handover.received_by.email }}{% else %}{{ handover.received_by_name }}{% endif %}</dd>
+      </div>
+      <div>
+        <dt class="text-sm text-soft">{% translate "Handed over" %}</dt>
+        <dd>
+          {{ handover.handed_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.handed_by.full_name|default:handover.handed_by.email }}
+        </dd>
+      </div>
+      {% if handover.goods_receipt %}
+        <div class="sm:col-span-2">
+          <dt class="text-sm text-soft">{% translate "Goods receipt" %}</dt>
+          <dd>
+            {% can "receipt.view" handover.goods_receipt %}
+              <a href="{% url 'receiving:detail' receipt_id=handover.goods_receipt_id %}">{{ handover.goods_receipt.number }}</a>
+            {% else %}
+              {{ handover.goods_receipt.number }}
+            {% endcan %}
+          </dd>
+        </div>
+      {% endif %}
+      {% if handover.status == "VOIDED" %}
+        <div class="sm:col-span-2" data-testid="void-reason">
+          <dt class="text-sm text-soft">{% translate "Voided" %}</dt>
+          <dd>
+            {{ handover.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.voided_by.full_name|default:handover.voided_by.email }}
+            <span class="block whitespace-pre-line">{{ handover.void_reason }}</span>
+          </dd>
+        </div>
+      {% endif %}
+    </dl>
+  </section>
+  <section class="mb-4" aria-label="{% translate 'Lines' %}">
+    <h2 class="mb-2">{% translate "Lines" %}</h2>
+    <div data-testid="handover-lines">
+      {% for line in lines %}
+        <article class="card mb-3" data-testid="handover-line">
+          <p class="font-semibold">{{ line.request_line.description }}</p>
+          <p class="text-sm text-soft">{{ line.request_line.request.number }}</p>
+          <p class="mt-1 font-semibold" data-field="qty">{{ line.qty|quantity }} {{ line.request_line.unit.code }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% include "attachments/panel.html" with panel=attachments %}
+  {% if can_void %}
+    <section class="card mb-4" aria-label="{% translate 'Void the handover' %}">
+      <details>
+        <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Void the handover" %}</summary>
+        <p class="mb-2 text-sm text-soft">
+          {% translate "The material counts as not handed over again and the requests reopen. Hand it over again if it was only wrong." %}
+        </p>
+        <form method="post"
+              action="{% url 'handovers:void' handover_id=handover.pk %}"
+              data-once
+              data-testid="void-form">
+          {% csrf_token %}
+          {{ void_form.reason.as_field_group }}
+          {% include "components/button.html" with type="submit" label=_("Void the handover") variant="danger" %}
+        </form>
+      </details>
+    </section>
+  {% elif handover.kind == "DIRECT_RECEIPT" and handover.status == "POSTED" %}
+    <p class="text-sm text-soft" data-testid="direct-note">
+      {% translate "This material was received on site: it is voided together with its goods receipt." %}
+    </p>
+  {% endif %}
+{% endblock content %}

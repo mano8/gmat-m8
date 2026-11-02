@@ -278,7 +278,7 @@ class Component:
         return book
 
     def delivered(self, book: Book) -> dict[UUID, Decimal]:
-        """D of the component's request lines (posted handovers, M6.2)."""
+        """D of the component's request lines (posted handovers of both kinds)."""
         found = request_ledger.flows(list(book.request_lines))
         return {line_id: flow.delivered for line_id, flow in found.items()}
 

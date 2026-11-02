@@ -1,0 +1,24 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "New handover" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% translate "New handover" %}</h1>
+    <p class="mt-1 text-soft">{% translate "Choose the project the material is for. You can also start from a request." %}</p>
+  </div>
+  <div data-testid="handover-projects">
+    {% for project in projects %}
+      <article class="card mb-3" data-testid="handover-project">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="font-semibold">{{ project.code }} · {{ project.name }}</p>
+          <a class="btn btn-primary"
+             href="{% url 'handovers:new' %}?project={{ project.pk }}">{% translate "Hand material over" %}</a>
+        </div>
+      </article>
+    {% empty %}
+      {% include "components/empty_state.html" with title=_("Nothing to hand over") text=_("No approved request has material left to hand over.") %}
+    {% endfor %}
+  </div>
+{% endblock content %}

@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% load i18n ui_tags %}
+{% load i18n access ui_tags %}
 {% block head_title %}
   {{ order.number|default:_("Draft order") }} · gmat-m8
 {% endblock head_title %}
@@ -21,6 +21,12 @@
       {% if printable %}
         {% url 'purchasing:print' po_id=order.pk as print_url %}
         {% include "components/button.html" with href=print_url label=_("Printable page") %}
+      {% endif %}
+      {% if order.status == "ISSUED" %}
+        {% can "receipt.post" order %}
+          {% url 'receiving:receive' po_id=order.pk as receive_url %}
+          {% include "components/button.html" with href=receive_url label=_("Receive goods") %}
+        {% endcan %}
       {% endif %}
       {% if managing and order.status == "ISSUED" %}
         {% url 'purchasing:amendment' po_id=order.pk as amend_url %}

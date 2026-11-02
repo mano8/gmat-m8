@@ -60,6 +60,7 @@
       {% include "material_requests/material_picker.html" %}
     </section>
     {% include "material_requests/draft_lines.html" %}
+    {% include "attachments/panel.html" with panel=attachments %}
     <form method="post"
           action="{% url 'requests:cancel' request_id=request_obj.pk %}"
           class="mt-4">
@@ -71,6 +72,7 @@
       <h2 class="mb-2">{% translate "Lines" %}</h2>
       {% include "material_requests/lines_table.html" %}
     </section>
+    {% include "attachments/panel.html" with panel=attachments %}
     {% if withdrawable %}
       <form method="post"
             action="{% url 'requests:withdraw' request_id=request_obj.pk %}">
@@ -78,6 +80,10 @@
         <p class="mb-2 text-sm text-soft">{% translate "Withdraw the request to change it. You can send it again afterwards." %}</p>
         {% include "components/button.html" with label=_("Withdraw") type="submit" block=True %}
       </form>
+    {% endif %}
+    {% if request_obj.status != "DRAFT" %}
+      {% url 'requests:ledger' request_id=request_obj.pk as ledger_url %}
+      <p class="mb-4">{% include "components/button.html" with href=ledger_url label=_("Ledger") variant="link" %}</p>
     {% endif %}
     {% if reviewable %}
       <p class="mb-4">

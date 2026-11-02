@@ -13,7 +13,8 @@
 #
 # Checks: the dump's sha256 against the manifest; pg_restore completes without error; every
 # table's row count equals the manifest (the excluded tables must be empty); the migration
-# head and the newest audit event match.
+# head, the newest audit event and the attachment list match; every attachment of the list
+# is in the dump's media copy with its checksum.
 set -Eeuo pipefail
 umask 077
 # shellcheck source=common.sh
@@ -90,14 +91,33 @@ verify() {
             ($r.row_counts | keys[] | select(. as $t | $m.row_counts | has($t) | not)
               | "table \(.) is not in the manifest"),
             (if $m.migration_head != $r.migration_head then "migration head differs" else empty end),
-            (if $m.audit_last_event_id != $r.audit_last_event_id then "newest audit event differs" else empty end)
+            (if $m.audit_last_event_id != $r.audit_last_event_id then "newest audit event differs" else empty end),
+            (if ($m.attachments // []) != ($r.attachments // []) then "attachment list differs" else empty end)
           ] | .[]' -r)
+    local media_problems
+    media_problems=$(verify_media "$manifest" "${dump%.dump}.media")
+    if [ -n "$media_problems" ]; then
+        problems="${problems:+$problems$'\n'}$media_problems"
+    fi
     if [ -n "$problems" ]; then
         printf '%s\n' "$problems" >&2
         die "restore of $(basename "$dump") does not match its manifest"
     fi
     touch "$BACKUP_DIR/.last-verify-ok"
     log "restore verify OK: $(basename "$dump") matches its manifest"
+}
+
+# Every attachment the manifest lists must be in the media copy with its checksum.
+verify_media() {
+    local manifest="$1" media="$2" key sum
+    while read -r key sum; do
+        [ -n "$key" ] || continue
+        if [ ! -f "$media/$key" ]; then
+            printf 'attachment %s is not in the media copy\n' "$key"
+        elif [ "$(sha256_of "$media/$key")" != "$sum" ]; then
+            printf 'attachment %s differs from its checksum\n' "$key"
+        fi
+    done < <(jq -r '.attachments[]? | "\(.storage_key) \(.sha256)"' "$manifest")
 }
 
 case "${1:-}" in

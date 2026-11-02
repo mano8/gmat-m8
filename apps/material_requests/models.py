@@ -247,7 +247,7 @@ class MaterialRequestLine(BaseModel):
         ordering = ["request", "line_no"]
         constraints = [
             models.UniqueConstraint(fields=["request", "line_no"], name="mr_line_number"),
-            # The target of the handover lines' (request_line_id, project_id) key (C3, M6).
+            # The target of the handover lines' (request_line_id, project_id) key (C3).
             models.UniqueConstraint(fields=["id", "project"], name="mr_line_id_project"),
             models.CheckConstraint(condition=Q(line_no__gte=1), name="mr_line_no_positive"),
             models.CheckConstraint(

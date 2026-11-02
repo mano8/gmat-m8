@@ -15,6 +15,7 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
 from apps.access.roles import Capability
+from apps.attachments import selectors as attachment_selectors
 from apps.catalog import selectors as catalog_selectors
 from apps.core.forms import add_service_errors, error_text, form_error_text
 from apps.core.http import is_htmx
@@ -167,6 +168,7 @@ def request_detail(request: HttpRequest, request_id: UUID) -> HttpResponse:
     context = _draft_context(request, found)
     context["withdrawable"] = selectors.can_withdraw(ctx, found)
     context["reviewable"] = found.status != Status.DRAFT and selectors.can_review(ctx, found)
+    context["attachments"] = attachment_selectors.panel(ctx, found)
     return render(request, "material_requests/detail.html", context)
 
 

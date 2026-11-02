@@ -59,10 +59,30 @@ def test_the_worker_is_hardened_like_web(base: dict[str, Any]) -> None:
     for key in ("read_only", "cap_drop", "security_opt", "user", "tmpfs", "restart"):
         assert worker[key] == base["services"]["web"][key], key
     assert "ports" not in worker and "expose" not in worker
-    assert worker["volumes"] == ["./flags:/srv/flags:ro"]
+    assert worker["volumes"] == ["./flags:/srv/flags:ro", "media:/srv/media"]
     assert worker["healthcheck"]["test"][-1] == "worker-healthcheck"
     # An in-flight send may use its whole 60 s deadline before the container stops.
     assert worker["stop_grace_period"] == "75s"
+
+
+def test_the_media_volume_is_private_to_web_worker_and_backup(base: dict[str, Any]) -> None:
+    """Attachments (M6.4): web stores, the worker purges, the backup only reads; Caddy, which
+    serves files, never sees the volume, so nothing bypasses the authorised download."""
+    services = base["services"]
+    mounts = {
+        name: [volume for volume in service.get("volumes", []) if volume.startswith("media:")]
+        for name, service in services.items()
+    }
+    assert mounts == {
+        "caddy": [],
+        "migrate": [],
+        "web": ["media:/srv/media"],
+        "worker": ["media:/srv/media"],
+        "db": [],
+        "backup": ["media:/srv/media:ro"],
+    }
+    assert services["backup"]["environment"]["MEDIA_DIR"] == "/srv/media/files"
+    assert "media" in base["volumes"]
 
 
 def test_the_smtp_password_reaches_the_worker_only(base: dict[str, Any]) -> None:

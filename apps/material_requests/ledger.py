@@ -3,8 +3,8 @@
 Nothing here is stored. A line's approved quantity A is its own; the other inputs come from
 the documents that refer to it: received R, pending P (the waterfall), draft reservations
 Q and the allocated ceiling (Σ allocation ``qty`` on draft or issued orders, which a
-cancellation must find at zero) from purchasing (M5.1, with receipts from M6.1), and
-delivered D from handovers (M6.2). Those apps refer to request lines, so this one cannot
+cancellation must find at zero) from purchasing (with the receipts of ``receiving``), and
+delivered D from ``handovers``. Those apps refer to request lines, so this one cannot
 import them: each registers a ``FlowSource`` from its ``AppConfig.ready``. A flow nobody
 contributes is zero.
 

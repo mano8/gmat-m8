@@ -1,0 +1,55 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Materials" %} · {{ project.code }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% translate "Materials of the project" %}</h1>
+    <p class="mt-1 text-soft">{{ project.code }} · {{ project.name }}</p>
+  </div>
+  <p class="mb-3 text-sm text-soft">{% translate "Open approved lines only: what is still to arrive and to hand over on this worksite." %}</p>
+  {% if materials %}
+    <table class="table-responsive" data-testid="project-materials">
+      <thead>
+        <tr>
+          <th scope="col">{% translate "Material" %}</th>
+          <th scope="col">{% translate "Approved" %}</th>
+          <th scope="col">{% translate "Received" %}</th>
+          <th scope="col">{% translate "Pending receipt" %}</th>
+          <th scope="col">{% translate "Awaiting handover" %}</th>
+          <th scope="col">{% translate "Delivered" %}</th>
+          <th scope="col">{% translate "Outstanding" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in materials %}
+          <tr data-testid="project-material">
+            <td data-label="{% translate 'Material' %}">
+              {{ item.description }}
+              {% if item.reference %}<span class="block text-sm text-soft">{{ item.reference }}</span>{% endif %}
+            </td>
+            <td data-label="{% translate 'Approved' %}"
+                data-field="approved">{{ item.approved|quantity }} {{ item.unit_code }}</td>
+            <td data-label="{% translate 'Received' %}"
+                data-field="received">{{ item.received|quantity }} {{ item.unit_code }}</td>
+            <td data-label="{% translate 'Pending receipt' %}"
+                data-field="pending">{{ item.pending|quantity }} {{ item.unit_code }}</td>
+            <td data-label="{% translate 'Awaiting handover' %}"
+                data-field="awaiting">{{ item.awaiting_handover|quantity }} {{ item.unit_code }}</td>
+            <td data-label="{% translate 'Delivered' %}"
+                data-field="delivered">{{ item.delivered|quantity }} {{ item.unit_code }}</td>
+            <td data-label="{% translate 'Outstanding' %}"
+                data-field="outstanding">{{ item.outstanding|quantity }} {{ item.unit_code }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    {% include "components/empty_state.html" with title=_("Nothing is outstanding for this project.") %}
+  {% endif %}
+  {% url 'projects:detail' project_id=project.pk as project_url %}
+  <p class="mt-4">
+    {% include "components/button.html" with href=project_url label=_("Back to the project") variant="link" %}
+  </p>
+{% endblock content %}

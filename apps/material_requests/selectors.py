@@ -313,6 +313,8 @@ ACTION_LABELS = {
     "request_line.resolved": _("Linked to the catalog"),
     "request_line.closed_short": _("Line closed short"),
     "request_line.reopened": _("Line reopened"),
+    "attachment.added": _("File attached"),
+    "attachment.removed": _("File removed"),
 }
 
 
@@ -362,7 +364,13 @@ def _rescheduled_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
     return _join(*(f"{name}: {change.get('to') or '—'}" for name, change in changes.items()))
 
 
+def _attachment_detail(data: dict[str, Any], changes: dict[str, Any]) -> str:
+    return _join(data.get("file_name", ""), data.get("reason", ""))
+
+
 _DETAILS = {
+    "attachment.added": _attachment_detail,
+    "attachment.removed": _attachment_detail,
     "request_line.decided": _decided_detail,
     "request_line.reduced": _reduced_detail,
     "request_line.sourcing_set": _sourcing_detail,
@@ -396,3 +404,69 @@ def history(ctx: AccessContext, of: MaterialRequest) -> list[HistoryEntry]:
         )
         for event in events
     ]
+
+
+# --- the project's materials: what is still outstanding for the worksite (M6.5) ----------
+
+
+@dataclass(frozen=True)
+class ProjectMaterial:
+    """One material (or free-text description) over the open lines of a project."""
+
+    description: str
+    reference: str
+    unit_code: str
+    requests: int
+    approved: Decimal
+    received: Decimal
+    pending: Decimal
+    delivered: Decimal
+    awaiting_handover: Decimal
+    outstanding: Decimal
+
+
+def project_for_overview(ctx: AccessContext, project_id: UUID) -> Project:
+    found = Project.objects.visible_to(ctx, VIEW).filter(pk=project_id).first()
+    if found is None:
+        raise NotInScope(VIEW)
+    return found
+
+
+def _material_key(line: MaterialRequestLine) -> tuple[object, UUID]:
+    return (line.material_id or line.description.casefold(), line.unit_id)
+
+
+def _project_material(entries: list[ledger.LineLedger]) -> ProjectMaterial:
+    first = entries[0].line
+    material = first.material
+    return ProjectMaterial(
+        description=material.name if material else first.description,
+        reference=material.reference if material else "",
+        unit_code=first.unit.code,
+        requests=len({entry.line.request_id for entry in entries}),
+        approved=sum((entry.approved for entry in entries), ledger.ZERO),
+        received=sum((entry.flows.received for entry in entries), ledger.ZERO),
+        pending=sum((entry.flows.pending for entry in entries), ledger.ZERO),
+        delivered=sum((entry.flows.delivered for entry in entries), ledger.ZERO),
+        awaiting_handover=sum((entry.awaiting_handover for entry in entries), ledger.ZERO),
+        outstanding=sum((entry.outstanding for entry in entries), ledger.ZERO),
+    )
+
+
+def project_materials(ctx: AccessContext, of: Project) -> list[ProjectMaterial]:
+    """Per material, the open lines of the requests the user may see for this project.
+
+    Most outstanding first. Only open lines count (approved requests, live lines), so a
+    closed or cancelled request and a line closed short no longer weigh on the worksite.
+    """
+    rows = (
+        MaterialRequestLine.objects.visible_to(ctx, VIEW)
+        .filter(ledger.open_q(), request__project=of)
+        .select_related("request", "material", "unit")
+        .order_by("request__number", "line_no")
+    )
+    grouped: dict[tuple[object, UUID], list[ledger.LineLedger]] = {}
+    for entry in ledger.line_ledgers(rows):
+        grouped.setdefault(_material_key(entry.line), []).append(entry)
+    totals = [_project_material(entries) for entries in grouped.values()]
+    return sorted(totals, key=lambda item: (-item.outstanding, item.description.casefold()))

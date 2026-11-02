@@ -235,7 +235,8 @@ class Route:
     """One URL: how to build it, what each method returns per actor, which sentinels.
 
     ``path(world)`` builds the URL (default: ``reverse(key)``). ``methods`` has a row for
-    each of ``TABLE_METHODS``. ``data(world)`` is the POST body (default: empty). A URL
+    each of ``TABLE_METHODS``. ``data(world)`` is the POST body (default: empty), sent with
+    ``headers`` (the upload entry point wants a same-origin ``Origin``). A URL
     with an object lists one ``Route`` per object position (own scope, managed branch,
     foreign scope, own or someone else's document), named by ``position``.
     """
@@ -244,6 +245,7 @@ class Route:
     position: str = ""
     path: Callable[[World], str] | None = None
     data: Callable[[World], dict[str, Any]] | None = None
+    headers: Mapping[str, str] = field(default_factory=dict)
     allowed: frozenset[Sentinel] = frozenset()
     # Sentinels only some actors may see (the price: ``price.view`` holders), on top of ``allowed``.
     allowed_for: Mapping[str, frozenset[Sentinel]] = field(default_factory=dict)
@@ -253,12 +255,18 @@ class Route:
         return self.path(world) if self.path is not None else reverse(key)
 
 
-def send(client: Client, method: str, url: str, data: dict[str, Any] | None = None) -> Any:
+def send(
+    client: Client,
+    method: str,
+    url: str,
+    data: dict[str, Any] | None = None,
+    headers: Mapping[str, str] | None = None,
+) -> Any:
     """One request, independent of the ones before: rate-limit counters start empty."""
     cache.clear()
     if method == "POST":
-        return client.post(url, data or {})
-    return client.generic(method, url)
+        return client.post(url, data or {}, headers=dict(headers or {}))
+    return client.generic(method, url, headers=dict(headers or {}))
 
 
 def leaked(response: Any, allowed: frozenset[Sentinel]) -> list[Sentinel]:
@@ -283,7 +291,7 @@ def check_route(
         expected = route.methods[method]
         for actor in actors:
             data = route.data(world) if route.data is not None and method == "POST" else None
-            response = send(world.client(actor), method, url, data)
+            response = send(world.client(actor), method, url, data, route.headers)
             outcome = expected[actor]
             if not outcome.matches(response):
                 got = f"{response.status_code} {response.get('Location', '')}".strip()

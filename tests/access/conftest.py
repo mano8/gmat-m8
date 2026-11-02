@@ -11,19 +11,30 @@ from decimal import Decimal
 
 import pytest
 from allauth.account.models import EmailAddress
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from pytest_django import DjangoDbBlocker
 
 from apps.accounts.models import EmailChangeRequest, Invitation
 from apps.accounts.tokens import new_token
+from apps.attachments import files
+from apps.attachments.models import (
+    QUOTA_ID,
+    Attachment,
+    AttachmentReservation,
+    MediaDeletion,
+    StorageQuota,
+)
 from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
+from apps.handovers.models import Handover, HandoverLine
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.notifications.models import Status as MailStatus
 from apps.organizations.models import JointVentureMember, Membership
 from apps.projects.models import ProjectAssignment
+from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
 from tests.access.matrix import World, build_world
 from tests.orders import allocate, line, order
 from tests.org import build_sentinel_order
@@ -148,6 +159,84 @@ def _admin_rows(world: World) -> None:
     world.objects["draftallocation"] = allocate(
         draft_line, world.objects["approved_request_line"], "3"
     )
+    # A receipt of 2 at the hospital's worksite on an order of its own, with the direct
+    # handover it made (M6.1): the receiving and handover admin pages.
+    reviewable("received_request", Status.APPROVED, 6, approved=True)
+    received_line = world.objects["received_request_line"]
+    received = order(
+        org, status="ISSUED", issued_by=people.mm_mad, ship_to=org.worksite(org.hospital)
+    )
+    received_po_line = line(received, material, "3")
+    two = Decimal("2.000")
+    world.objects["goodsreceipt"] = receipt = GoodsReceipt.objects.create(
+        number="REC-A-MAD-2026-00001",
+        po=received,
+        branch=org.a_mad,
+        location=org.worksite(org.hospital),
+        received_at=decided,
+        received_by=people.wo_mad,
+    )
+    world.objects["goodsreceiptline"] = receipt_line = GoodsReceiptLine.objects.create(
+        receipt=receipt, po=received, po_line=received_po_line, qty_received=two
+    )
+    world.objects["receiptattribution"] = attribution = ReceiptAttribution.objects.create(
+        receipt_line=receipt_line,
+        allocation=allocate(received_po_line, received_line, "3"),
+        po_line=received_po_line,
+        qty=two,
+    )
+    world.objects["handover"] = handover = Handover.objects.create(
+        number="ENT-A-MAD-2026-00001",
+        kind=Handover.Kind.DIRECT_RECEIPT,
+        branch=org.a_mad,
+        source_location=receipt.location,
+        project=org.hospital,
+        handed_by=people.wo_mad,
+        received_by=people.wo_mad,
+        handed_at=decided,
+        goods_receipt=receipt,
+    )
+    world.objects["handoverline"] = HandoverLine.objects.create(
+        handover=handover,
+        project=org.hospital,
+        request_line=received_line,
+        qty=two,
+        receipt_attribution=attribution,
+    )
+    # A receipt at the warehouse (all surplus) and a handover from it (M6.3): the receiving and
+    # handover screens' warehouse positions, which a site manager does not reach.
+    world.objects["warehousereceipt"] = warehouse_receipt = GoodsReceipt.objects.create(
+        number="REC-A-MAD-2026-00002",
+        po=received,
+        branch=org.a_mad,
+        location=org.warehouses["A Madrid"],
+        received_at=decided,
+        received_by=people.wo_mad,
+    )
+    GoodsReceiptLine.objects.create(
+        receipt=warehouse_receipt,
+        po=received,
+        po_line=received_po_line,
+        qty_received=Decimal("1.000"),
+        surplus_qty=Decimal("1.000"),
+    )
+    world.objects["warehousehandover"] = warehouse_handover = Handover.objects.create(
+        number="ENT-A-MAD-2026-00002",
+        kind=Handover.Kind.FROM_WAREHOUSE,
+        branch=org.a_mad,
+        source_location=org.warehouses["A Madrid"],
+        project=org.hospital,
+        handed_by=people.wo_mad,
+        received_by=people.partner,
+        handed_at=decided,
+    )
+    HandoverLine.objects.create(
+        handover=warehouse_handover,
+        project=org.hospital,
+        request_line=world.objects["approved_request_line"],
+        qty=Decimal("1.000"),
+    )
+    _attachments(world)
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)
@@ -168,6 +257,46 @@ def _admin_rows(world: World) -> None:
         expires_at=later,
     )
     assert AuditEvent.objects.exists()
+
+
+def _attachments(world: World) -> None:
+    """One stored file on the technician's draft, the worksite and warehouse receipts and the
+    warehouse handover (M6.4), and a row of each attachment model for the admin."""
+    people = world.people
+    parents = {
+        "requestattachment": ("request", world.objects["materialrequest"], people.tech_mad),
+        "attachment": ("receipt", world.objects["goodsreceipt"], people.wo_mad),
+        "warehouseattachment": ("receipt", world.objects["warehousereceipt"], people.wo_mad),
+        "handoverattachment": ("handover", world.objects["warehousehandover"], people.wo_mad),
+    }
+    files.ensure_dirs()
+    for key, (field, parent, uploader) in parents.items():
+        storage_key = files.new_storage_key()
+        files.stored_path(storage_key).write_bytes(b"%PDF-1.4\n%%EOF\n")
+        world.objects[key] = Attachment.objects.create(
+            **{field: parent},
+            storage_key=storage_key,
+            file_name=f"{key}.pdf",
+            content_type=Attachment.ContentType.PDF,
+            size_bytes=15,
+            sha256="0" * 64,
+            uploaded_by=uploader,
+            uploaded_at=timezone.now(),
+        )
+    world.objects["attachmentreservation"] = AttachmentReservation.objects.create(
+        receipt=world.objects["goodsreceipt"],
+        reserved_by=people.wo_mad,
+        reserved_bytes=100,
+        state=AttachmentReservation.State.RELEASED,
+        lease_until=timezone.now(),
+        finished_at=timezone.now(),
+    )
+    world.objects["storagequota"], _ = StorageQuota.objects.get_or_create(
+        pk=QUOTA_ID, defaults={"limit_bytes": settings.ATTACHMENT_STORAGE_LIMIT}
+    )
+    world.objects["mediadeletion"] = MediaDeletion.objects.create(
+        storage_key=files.new_storage_key(), size_bytes=1, delete_after=timezone.now()
+    )
 
 
 @pytest.fixture(scope="module")

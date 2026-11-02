@@ -1,0 +1,85 @@
+{% load i18n %}
+{% comment %}
+  The attachments of a document page (``attachments.selectors.panel``). Parameter: panel.
+  Each row downloads through the authorised view; the upload and remove forms post to their
+  own URLs and come back to this page (``?back=``).
+{% endcomment %}
+{% if panel.shown %}
+  <section class="card mb-4"
+           aria-label="{% translate 'Attachments' %}"
+           data-testid="attachments">
+    <h2 class="mb-2">{% translate "Attachments" %}</h2>
+    {% if panel.rows %}
+      <ul class="mb-3 divide-y divide-line">
+        {% for row in panel.rows %}
+          <li class="py-2" data-testid="attachment">
+            {% if row.item.removed_at %}
+              <p class="text-soft line-through">{{ row.item.file_name }}</p>
+              <p class="text-sm text-soft" data-testid="attachment-removed">
+                {% blocktranslate trimmed with who=row.item.removed_by.full_name|default:row.item.removed_by.email when=row.item.removed_at|date:"SHORT_DATETIME_FORMAT" %}
+                  Removed by {{ who }} on {{ when }}
+                {% endblocktranslate %}
+                {% if row.item.removal_reason %}<span class="block whitespace-pre-line">{{ row.item.removal_reason }}</span>{% endif %}
+              </p>
+            {% else %}
+              <a class="inline-flex min-h-11 items-center font-medium"
+                 href="{% url 'attachments:download' attachment_id=row.item.pk %}"
+                 data-testid="attachment-link">{{ row.item.file_name }}</a>
+              <p class="text-sm text-soft">
+                {{ row.item.get_content_type_display }} · {{ row.item.size_bytes|filesizeformat }} · {{ row.item.uploaded_by.full_name|default:row.item.uploaded_by.email }} · {{ row.item.uploaded_at|date:"SHORT_DATETIME_FORMAT" }}
+              </p>
+              {% if row.can_remove %}
+                <details>
+                  <summary class="min-h-11 cursor-pointer py-2 text-sm text-danger">{% translate "Remove" %}</summary>
+                  <form method="post"
+                        action="{% url 'attachments:remove' attachment_id=row.item.pk %}?back={{ panel.back }}"
+                        data-once
+                        data-testid="attachment-remove">
+                    {% csrf_token %}
+                    {% if row.needs_reason %}
+                      <div class="field">
+                        <label for="id_remove_reason_{{ forloop.counter }}">{% translate "Reason" %}</label>
+                        <textarea id="id_remove_reason_{{ forloop.counter }}"
+                                  name="reason"
+                                  rows="2"
+                                  maxlength="500"
+                                  required></textarea>
+                      </div>
+                    {% endif %}
+                    {% include "components/button.html" with type="submit" label=_("Remove the attachment") variant="danger" %}
+                  </form>
+                </details>
+              {% endif %}
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if panel.can_add %}
+      <form method="post"
+            enctype="multipart/form-data"
+            action="{{ panel.upload_url }}"
+            data-once
+            data-testid="attachment-upload">
+        {% csrf_token %}
+        <input type="hidden" name="idempotency_key" value="{{ panel.upload_key }}">
+        <div class="field">
+          <label for="id_attachment_file_{{ panel.kind }}">{% translate "Photo or PDF" %}</label>
+          <input id="id_attachment_file_{{ panel.kind }}"
+                 type="file"
+                 name="file"
+                 accept="image/jpeg,image/png,image/webp,application/pdf"
+                 required>
+          <p class="helptext">
+            {% blocktranslate trimmed count left=panel.slots_left %}
+              JPEG, PNG, WebP or PDF, up to 10 MB. {{ left }} more file can be attached.
+            {% plural %}
+              JPEG, PNG, WebP or PDF, up to 10 MB. {{ left }} more files can be attached.
+            {% endblocktranslate %}
+          </p>
+        </div>
+        {% include "components/button.html" with type="submit" label=_("Attach") %}
+      </form>
+    {% endif %}
+  </section>
+{% endif %}

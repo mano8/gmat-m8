@@ -16,6 +16,9 @@
         {% if line.closed_short_at %}
           {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
         {% endif %}
+        {% if totals.receivable %}
+          {% include "components/status_chip.html" with label=_("Receivable") tone="ok" %}
+        {% endif %}
         {% if totals.unallocated > 0 %}
           {% include "components/status_chip.html" with label=_("Ordered for nobody") tone="warn" %}
         {% endif %}
@@ -46,6 +49,12 @@
           <dt class="text-soft">{% translate "Received" %}</dt>
           <dd data-field="received">
             {{ totals.received|quantity }} {{ line.unit.code }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-soft">{% translate "Remaining" %}</dt>
+          <dd data-field="remaining">
+            {{ totals.remaining|quantity }} {{ line.unit.code }}
           </dd>
         </div>
         <div>

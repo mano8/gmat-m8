@@ -41,6 +41,22 @@
     <span>{% translate "Orders" %}</span>
   </a>
 {% endcan %}
+{% can "receipt.view" %}
+  <a href="{% url 'receiving:list' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'receiving' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="inbox" %}
+    <span>{% translate "Receipts" %}</span>
+  </a>
+{% endcan %}
+{% can "handover.view" %}
+  <a href="{% url 'handovers:list' %}"
+     class="nav-link"
+     {% if request.resolver_match.app_name == 'handovers' %}aria-current="page"{% endif %}>
+    {% include "components/icon.html" with name="handover" %}
+    <span>{% translate "Handovers" %}</span>
+  </a>
+{% endcan %}
 {% can "project.view" %}
   <a href="{% url 'projects:list' %}"
      class="nav-link"

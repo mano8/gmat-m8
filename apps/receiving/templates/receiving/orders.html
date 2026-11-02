@@ -1,0 +1,61 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Receive goods" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1>{% translate "Receive goods" %}</h1>
+      <p class="mt-1 text-soft">{% translate "Find the purchase order the goods belong to." %}</p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      {% url 'receiving:projects' as projects_url %}
+      {% include "components/button.html" with href=projects_url label=_("Expected on site") %}
+    </div>
+  </div>
+  {% url 'receiving:orders' as orders_url %}
+  {% include "components/filter_form.html" with form=filters target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_auto]" %}
+  {% partialdef results inline %}
+    <div id="order-results" data-testid="receivable-orders">
+      {% if entries %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              <th scope="col">{% translate "Order" %}</th>
+              <th scope="col">{% translate "Supplier" %}</th>
+              <th scope="col">{% translate "Ship to" %}</th>
+              <th scope="col">{% translate "Expected" %}</th>
+              <th scope="col">{% translate "Received" %}</th>
+              <th scope="col">
+                <span class="sr-only">{% translate "Actions" %}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order, progress in entries %}
+              <tr data-testid="receivable-order">
+                <td data-label="{% translate 'Order' %}">{{ order.number }}</td>
+                <td data-label="{% translate 'Supplier' %}">{{ order.supplier_snapshot.name }}</td>
+                <td data-label="{% translate 'Ship to' %}">{{ order.ship_to.name }}</td>
+                <td data-label="{% translate 'Expected' %}">{{ order.expected_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</td>
+                <td data-label="{% translate 'Received' %}">
+                  {% if progress %}
+                    {% include "purchasing/progress.html" with progress=progress %}
+                  {% endif %}
+                </td>
+                <td>
+                  {% url 'receiving:receive' po_id=order.pk as receive_url %}
+                  {% include "components/button.html" with href=receive_url label=_("Receive") variant="primary" %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No orders to receive") text=_("No issued order matches the search. A site manager receives from the expected deliveries of a project.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

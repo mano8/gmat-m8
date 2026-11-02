@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Not attached" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <section class="card mx-auto max-w-md" data-testid="attachment-refused">
+    <h1 class="mb-2">{% translate "The file was not attached" %}</h1>
+    <p class="mb-4 text-soft">{{ message }}</p>
+    {% translate "Back to the document" as back_label %}
+    {% include "components/button.html" with href=back label=back_label variant="primary" %}
+  </section>
+{% endblock content %}
