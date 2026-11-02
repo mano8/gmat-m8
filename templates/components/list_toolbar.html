@@ -9,31 +9,44 @@
   number starts again at 1: a filter form never sends `page`.
   Pair it with components/list_summary.html and components/pagination.html inside the results
   partial.
+  A section of a page with several lists passes `scoped` (the toolbar then sits in its own
+  `.list-scope`, so its controls refresh only its results), `form_id` (unique on the page) and
+  `select` (the results' selector, taken out of the full page the server answers with) and sit
+  in a `data-list-section` element with their results (app.js announces the count there); the
+  names of its parameters come from the listing (`listing.per_page_param`).
 {% endcomment %}
-{% include "components/filter_form.html" with form=form target=target action=action grid=grid form_id="list-filter" %}
-<div class="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-  {% if listing.sort_options %}
-    <div class="field{% if not sort_always %} sm:hidden{% endif %}">
-      <label for="list-sort">{% translate "Sort by" %}</label>
-      <select id="list-sort" name="sort" form="list-filter">
-        {% for value, label in listing.sort_options %}
-          <option value="{{ value }}"{% if value == listing.sort %} selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  {% endif %}
-  <div class="field ml-auto">
-    <label for="list-per-page">{% translate "Rows per page" %}</label>
-    <select id="list-per-page" name="per_page" form="list-filter">
-      {% for size in listing.sizes %}
-        <option value="{{ size }}"
-                {% if size == listing.per_page %} selected{% endif %}>{{ size }}</option>
-      {% endfor %}
-    </select>
+{% with fid=form_id|default:"list-filter" %}
+  {% if scoped %}<div class="list-scope">{% endif %}
+  {% include "components/filter_form.html" with form=form target=target action=action grid=grid form_id=fid scoped=scoped select=select %}
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+    {% if listing.sort_options %}
+      <div class="field{% if not sort_always %} sm:hidden{% endif %}">
+        <label for="{{ fid }}-sort">{% translate "Sort by" %}</label>
+        <select id="{{ fid }}-sort" name="{{ listing.sort_param }}" form="{{ fid }}">
+          {% for value, label in listing.sort_options %}
+            <option value="{{ value }}"{% if value == listing.sort %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    {% if listing.sizes %}
+      <div class="field ml-auto">
+        <label for="{{ fid }}-per-page">{% translate "Rows per page" %}</label>
+        <select id="{{ fid }}-per-page"
+                name="{{ listing.per_page_param }}"
+                form="{{ fid }}">
+          {% for size in listing.sizes %}
+            <option value="{{ size }}"
+                    {% if size == listing.per_page %} selected{% endif %}>{{ size }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    <p class="sr-only"
+       role="status"
+       aria-live="polite"
+       aria-atomic="true"
+       data-list-status></p>
   </div>
-  <p class="sr-only"
-     role="status"
-     aria-live="polite"
-     aria-atomic="true"
-     data-list-status></p>
-</div>
+  {% if scoped %}</div>{% endif %}
+{% endwith %}

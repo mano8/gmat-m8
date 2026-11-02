@@ -1716,6 +1716,31 @@ def _later_page(key: str, route: Route) -> Route:
 for _key in PAGED_LISTS:
     ROUTES[_key] = (*ROUTES[_key], _later_page(_key, ROUTES[_key][0]))
 
+# M7d.3: the screens that render a page of sections answer the same to every actor with the
+# paging and filter parameters of each section, for every object position they have.
+PAGED_SECTIONS = {
+    "purchasing:worklist": "per_page=100&page=2&drafts_page=2&unallocated_page=2&priority=URGENT",
+    "receiving:expected": "per_page=100&page=2&supplier=x&expected_by=2030-01-01",
+    "requests:project_materials": "per_page=100&page=2&q=x&outstanding=on",
+    "projects:detail": "assignments_per_page=100&assignments_page=2&assignments-state=revoked",
+    "org:person": "memberships_page=2&projects_page=2&invitations_page=2&memberships-state=revoked",
+    "audit:object": "per_page=100&page=2&q=x&since=2030-01-01",
+}
+
+
+def _with_query(key: str, route: Route, query: str) -> Route:
+    def path(world: World) -> str:
+        url = route.url(key, world)
+        return f"{url}{'&' if '?' in url else '?'}{query}"
+
+    return replace(
+        route, position=f"{route.position} with {query.split('&')[0]}".strip(), path=path
+    )
+
+
+for _key, _query in PAGED_SECTIONS.items():
+    ROUTES[_key] = (*ROUTES[_key], *(_with_query(_key, route, _query) for route in ROUTES[_key]))
+
 
 # --- the matrix --------------------------------------------------------------------------
 

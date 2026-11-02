@@ -93,6 +93,16 @@ class MyRequestsFilterForm(forms.Form):
         self.fields["project"].queryset = selectors.my_request_projects(ctx)  # type: ignore[attr-defined]
 
 
+class ProjectMaterialsFilterForm(forms.Form):
+    q = forms.CharField(
+        label=_("Search"),
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={"type": "search", "enterkeyhint": "search"}),
+    )
+    outstanding = forms.BooleanField(label=_("Outstanding only"), required=False)
+
+
 class MaterialSearchForm(forms.Form):
     q = forms.CharField(
         label=_("Search materials"),

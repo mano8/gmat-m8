@@ -15,12 +15,14 @@ from apps.access.exceptions import NotInScope
 from apps.access.policy import valid_now
 from apps.access.roles import ROLE_ASSIGNMENT_KIND, Capability, Role
 from apps.accounts.models import User
+from apps.core.listing import OPEN_FIRST, by_revocation
 from apps.organizations.models import Membership
 from apps.projects.models import Project, ProjectAssignment
 
 DEFAULT_PER_PAGE = 25
 PROJECT_SORTS = {"code": ("code",), "name": ("name", "code")}
 PROJECT_SORT_LABELS = {"code": _("Code"), "name": _("Name")}
+SECTION_PER_PAGE = 10  # assignments on the project page
 
 
 def projects(
@@ -48,14 +50,22 @@ def project(ctx: AccessContext, project_id: UUID) -> Project:
     return found
 
 
-def assignments(ctx: AccessContext, of: Project) -> QuerySet[ProjectAssignment]:
-    """The project's assignments, newest first, for those who manage it; otherwise none."""
+def assignments(
+    ctx: AccessContext, of: Project, *, kind: str = "", state: str = ""
+) -> QuerySet[ProjectAssignment]:
+    """The project's assignments, newest first, for those who manage it; otherwise none.
+
+    ``kind`` and ``state`` (``listing.ACTIVE`` / ``REVOKED``) narrow them.
+    """
     if not ctx.can(Capability.PROJECT_MANAGE, of):
         return ProjectAssignment.objects.none()
+    rows = ProjectAssignment.objects.filter(project=of)
+    if kind:
+        rows = rows.filter(kind=kind)
     return (
-        ProjectAssignment.objects.filter(project=of)
+        by_revocation(rows, state)
         .select_related("user", "revoked_by")
-        .order_by("revoked_at", "-valid_from")
+        .order_by(OPEN_FIRST, "-valid_from")
     )
 
 

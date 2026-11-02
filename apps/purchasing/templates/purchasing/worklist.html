@@ -14,11 +14,12 @@
     </span>
   </div>
   {% url 'purchasing:worklist' as worklist_url %}
-  {% include "components/filter_form.html" with form=filters target="#worklist-results" action=worklist_url grid="sm:grid-cols-[1fr_1fr_1fr_auto]" %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#worklist-results" action=worklist_url grid="sm:grid-cols-[1fr_1fr_1fr_auto]" %}
   {% partialdef results inline %}
     <div id="worklist-results" data-testid="worklist">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
       <form method="get" action="{% url 'purchasing:new' %}">
-        {% for group in groups %}
+        {% for group in listing.rows %}
           <section class="card mb-3"
                    data-testid="worklist-material"
                    aria-label="{{ group.name }}">
@@ -72,19 +73,27 @@
         {% empty %}
           {% include "components/empty_state.html" with title=_("Nothing to purchase") text=_("No approved line is waiting to be bought for these filters.") %}
         {% endfor %}
-        {% if groups %}
-          <div class="mb-6">
+        {% if listing.rows %}
+          {% if listing.has_other_pages %}
+            <p class="mb-2 text-sm text-soft">
+              {% translate "Ticks count for this page only: start the order from the page you are on." %}
+            </p>
+          {% endif %}
+          <div class="mb-2">
             {% include "components/button.html" with type="submit" label=_("Start an order with the ticked lines") variant="primary" block=True %}
           </div>
         {% endif %}
       </form>
-      {% if drafts %}
-        <section class="mb-6" aria-label="{% translate 'Draft orders' %}">
+      {% include "components/pagination.html" with listing=listing %}
+      {% if draft_rows %}
+        <section class="my-6"
+                 id="draft-orders"
+                 aria-label="{% translate 'Draft orders' %}">
           <h2 class="mb-2">{% translate "Draft orders" %}</h2>
           <p class="mb-2 text-sm text-soft">
             {% translate "A draft keeps its quantities reserved: other drafts cannot take them." %}
           </p>
-          {% for draft, stale in drafts %}
+          {% for draft, stale in draft_rows %}
             <article class="card mb-3" data-testid="draft-order">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <a class="font-semibold"
@@ -100,15 +109,18 @@
               {% endif %}
             </article>
           {% endfor %}
+          {% include "components/pagination.html" with listing=drafts %}
         </section>
       {% endif %}
-      {% if unallocated %}
-        <section class="mb-6" aria-label="{% translate 'Ordered for nobody' %}">
+      {% if unallocated.rows %}
+        <section class="mb-6"
+                 id="ordered-for-nobody"
+                 aria-label="{% translate 'Ordered for nobody' %}">
           <h2 class="mb-2">{% translate "Ordered for nobody" %}</h2>
           <p class="mb-2 text-sm text-soft">
             {% translate "A cut or a closure freed this quantity: close the line short with the supplier, or keep the goods as stock." %}
           </p>
-          {% for row in unallocated %}
+          {% for row in unallocated.rows %}
             <article class="card mb-3" data-testid="unallocated-line">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <a class="font-semibold"
@@ -118,6 +130,7 @@
               <p class="text-sm text-soft">{{ row.line.material.reference }} · {{ row.line.material.name }}</p>
             </article>
           {% endfor %}
+          {% include "components/pagination.html" with listing=unallocated %}
         </section>
       {% endif %}
     </div>

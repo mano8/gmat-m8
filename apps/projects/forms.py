@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
 from apps.core.forms import IdempotentForm, datetime_field
+from apps.core.listing import REVOCATION_CHOICES
 from apps.organizations import selectors as org_selectors
 from apps.organizations.models import CODE_PATTERN
 from apps.projects import selectors
@@ -34,6 +35,15 @@ class ProjectFilterForm(forms.Form):
         self.fields["branch"].queryset = org_selectors.branches(  # type: ignore[attr-defined]
             ctx, Capability.PROJECT_VIEW
         )
+
+
+class AssignmentFilterForm(forms.Form):
+    """Narrows the "Shared with" section of the project page (prefix ``assignments``)."""
+
+    kind = forms.ChoiceField(
+        label=_("Kind"), required=False, choices=[("", _("All")), *ProjectAssignment.Kind.choices]
+    )
+    state = forms.ChoiceField(label=_("State"), required=False, choices=REVOCATION_CHOICES)
 
 
 def _date(label: Any) -> forms.DateField:

@@ -32,6 +32,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from itertools import groupby
 from uuid import UUID
 
 from django.db.models import Q, QuerySet
@@ -57,6 +58,7 @@ ZERO = Decimal("0")
 DEFAULT_PER_PAGE = 25
 RECEIPT_SORTS = {"number": ("number",), "posted": ("received_at",)}
 RECEIPT_SORT_LABELS = {"number": _("Receipt"), "posted": _("Received")}
+EXPECTED_PER_PAGE = 10  # orders per page of a project's expected deliveries
 ORDER_SORTS = {"number": ("number",)}
 ORDER_SORT_LABELS = {"number": _("Order")}
 PROJECT_SORTS = {"code": ("code",), "name": ("name", "code")}
@@ -118,6 +120,50 @@ def _soonest_first(row: ExpectedDelivery) -> tuple[object, ...]:
         row.material_reference,
         row.request_number,
     )
+
+
+@dataclass(frozen=True)
+class ExpectedFilter:
+    """What the expected-deliveries screen narrows to; both fields are optional.
+
+    Only fields of §3.4's projection are filterable: the supplier's display name (text) and
+    the order's expected date (``expected_by``: expected on or before that day; an order with
+    no expected date is left out while the filter is set).
+    """
+
+    supplier: str = ""
+    expected_by: date | None = None
+
+    def keeps(self, row: ExpectedDelivery) -> bool:
+        if self.supplier and self.supplier.casefold() not in row.supplier.casefold():
+            return False
+        if self.expected_by is None:
+            return True
+        return row.expected_date is not None and row.expected_date <= self.expected_by
+
+
+@dataclass(frozen=True)
+class ExpectedOrder:
+    """The rows of one order of the projection: the unit the screen pages by."""
+
+    po_id: UUID
+    items: tuple[ExpectedDelivery, ...]
+
+    @property
+    def first(self) -> ExpectedDelivery:
+        return self.items[0]
+
+
+def expected_orders(
+    ctx: AccessContext, project_id: UUID, narrow: ExpectedFilter | None = None
+) -> list[ExpectedOrder]:
+    """The project's expected deliveries grouped by order, soonest first, narrowed by
+    ``narrow`` (404 outside ``receipt.view``)."""
+    narrow = narrow or ExpectedFilter()
+    rows = (row for row in expected_deliveries(ctx, project_id) if narrow.keeps(row))
+    return [
+        ExpectedOrder(po_id, tuple(items)) for po_id, items in groupby(rows, key=lambda r: r.po_id)
+    ]
 
 
 def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDelivery]:

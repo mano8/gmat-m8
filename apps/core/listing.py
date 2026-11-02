@@ -15,17 +15,20 @@ from typing import Any
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.core.paginator import Page, Paginator
-from django.db.models import QuerySet
+from django.db.models import F, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.cache import patch_vary_headers
 from django.utils.functional import Promise
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy
 
 from apps.core.http import is_htmx
 
 PAGE_SIZES = (10, 25, 50, 100)
 """The page sizes a user may pick (Q39); the largest is the maximum."""
+
+_PAGE, _PER_PAGE, _SORT = "page", "per_page", "sort"
 
 SortKeys = Mapping[str, tuple[str, ...]]
 """Sort key (the value of ``?sort=``) → the ``order_by`` fields it stands for, ascending."""
@@ -44,6 +47,36 @@ class ListParams(forms.Form):
 
 
 @dataclass(frozen=True)
+class ListScope:
+    """Where a list keeps its parameters when it is not the only one on the page (M7d.3).
+
+    A screen with several paged sections gives each a ``prefix`` (``drafts_`` makes
+    ``drafts_page``), so every section pages on its own; ``anchor`` is the element id the
+    pager links return to; ``sized`` is false for a section whose page size is fixed.
+    """
+
+    prefix: str = ""
+    anchor: str = ""
+    sized: bool = True
+
+    @property
+    def page_param(self) -> str:
+        return f"{self.prefix}{_PAGE}"
+
+    @property
+    def per_page_param(self) -> str:
+        return f"{self.prefix}{_PER_PAGE}"
+
+    @property
+    def sort_param(self) -> str:
+        return f"{self.prefix}{_SORT}"
+
+
+WHOLE_PAGE = ListScope()
+"""The scope of the one list of a page: ``page``, ``per_page`` and ``sort``."""
+
+
+@dataclass(frozen=True)
 class ListPage:
     """One page of a list, with what the toolbar and the pager show."""
 
@@ -51,9 +84,30 @@ class ListPage:
     per_page: int
     sort: str
     """The effective sort: a key, ``-key`` when descending, empty for the queryset's own order."""
-    sizes: tuple[int, ...] = PAGE_SIZES
+    scope: ListScope = WHOLE_PAGE
     sort_options: tuple[tuple[str, str], ...] = ()
     """``(value, label)`` for the phone-size "sort by" select; empty when the list has no sort."""
+
+    @property
+    def sizes(self) -> tuple[int, ...]:
+        """The page sizes offered; none when the size of this list is fixed."""
+        return PAGE_SIZES if self.scope.sized else ()
+
+    @property
+    def page_param(self) -> str:
+        return self.scope.page_param
+
+    @property
+    def per_page_param(self) -> str:
+        return self.scope.per_page_param
+
+    @property
+    def sort_param(self) -> str:
+        return self.scope.sort_param
+
+    @property
+    def anchor(self) -> str:
+        return self.scope.anchor
 
     @property
     def rows(self) -> Sequence[Any]:
@@ -126,6 +180,16 @@ def _total_order(rows: QuerySet[Any], fields: tuple[str, ...]) -> QuerySet[Any]:
     return rows.order_by(*own, _PK)
 
 
+def _scoped_query(request: HttpRequest, scope: ListScope) -> dict[str, str]:
+    """The three list parameters of ``scope`` under the names :class:`ListParams` knows."""
+    names = {
+        _PAGE: scope.page_param,
+        _PER_PAGE: scope.per_page_param,
+        _SORT: scope.sort_param,
+    }
+    return {name: request.GET[wanted] for name, wanted in names.items() if wanted in request.GET}
+
+
 def paginate(
     request: HttpRequest,
     rows: QuerySet[Any] | Sequence[Any],
@@ -134,6 +198,7 @@ def paginate(
     sorts: SortKeys | None = None,
     default_sort: str = "",
     sort_labels: Mapping[str, str | Promise] | None = None,
+    scope: ListScope = WHOLE_PAGE,
 ) -> ListPage:
     """The page of ``rows`` that ``?page=``, ``?per_page=`` and ``?sort=`` ask for.
 
@@ -142,14 +207,15 @@ def paginate(
     queryset's own order is not one of the keys) and to ``default_per_page``. A queryset is
     always paged in a total order: the primary key follows whatever order it has.
     ``sort_labels`` (key → label) feeds the toolbar's "sort by" select for phone widths, where
-    the column headers are not shown.
+    the column headers are not shown. ``scope`` renames the three parameters for a section of
+    a page that has several lists.
     """
     if default_per_page not in PAGE_SIZES:
         raise ImproperlyConfigured(f"default_per_page must be one of {PAGE_SIZES}.")
-    params = ListParams(request.GET)
+    params = ListParams(_scoped_query(request, scope))
     params.is_valid()  # invalid fields are dropped from cleaned_data: the defaults apply
     data = params.cleaned_data
-    per_page = data.get("per_page") or default_per_page
+    per_page = (data.get("per_page") if scope.sized else None) or default_per_page
     sort: str = ""
     fields: tuple[str, ...] = ()
     for wanted in (data.get("sort") or "", default_sort):
@@ -161,7 +227,11 @@ def paginate(
         rows = _total_order(rows, fields)
     page = Paginator(rows, per_page).get_page(data.get("page") or 1)
     return ListPage(
-        page=page, per_page=per_page, sort=sort, sort_options=_sort_options(sort_labels)
+        page=page,
+        per_page=per_page,
+        sort=sort,
+        scope=scope,
+        sort_options=_sort_options(sort_labels),
     )
 
 
@@ -179,8 +249,32 @@ def render_list(
     return response
 
 
+ACTIVE, REVOKED = "active", "revoked"
+REVOCATION_CHOICES = [
+    ("", gettext_lazy("All")),
+    (ACTIVE, gettext_lazy("Active")),
+    (REVOKED, gettext_lazy("Revoked")),
+]
+"""The state filter of a section listing grants that are revoked, never deleted."""
+
+
+OPEN_FIRST = F("revoked_at").asc(nulls_first=True)
+"""Order of a grant list: the ones still in force first (a plain ``revoked_at`` puts the NULLs
+last on PostgreSQL), then the revoked."""
+
+
+def by_revocation(rows: QuerySet[Any], state: str) -> QuerySet[Any]:
+    """``rows`` that are not revoked (``active``) or that are (``revoked``); any other value
+    leaves them all."""
+    if state == ACTIVE:
+        return rows.filter(revoked_at__isnull=True)
+    if state == REVOKED:
+        return rows.filter(revoked_at__isnull=False)
+    return rows
+
+
 def active_filters(form: forms.Form) -> list[str]:
     """Names of the form's fields that carry a value in the request (the filters in force)."""
     if not form.is_bound:
         return []
-    return [name for name in form.fields if form.data.get(name)]
+    return [name for name in form.fields if form.data.get(form.add_prefix(name))]

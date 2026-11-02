@@ -8,7 +8,19 @@
     <h1>{% translate "History" %}</h1>
     <p class="text-soft">{{ object_type }} · {{ object_id }}</p>
   </div>
-  <div data-testid="audit-history">{% include "audit/rows.html" %}</div>
+  {% url 'audit:object' object_type=object_type object_id=object_id as history_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#history-results" action=history_url grid="sm:grid-cols-[1fr_9rem_9rem_auto]" %}
+  {% partialdef results inline %}
+    <div id="history-results" data-testid="audit-history">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
+        {% include "audit/rows.html" with events=listing.rows listing=listing %}
+        {% include "components/pagination.html" with listing=listing %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No events") text=_("No event matches the filters.") %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
   <p class="mt-4">
     {% url 'audit:list' as list_url %}
     {% include "components/button.html" with href=list_url label=_("Back to the audit") %}

@@ -20,14 +20,21 @@ from apps.access.mixins import mutating, require, require_capability
 from apps.access.roles import Capability
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
 from apps.core.idempotency import IdempotencyError
-from apps.core.listing import paginate, render_list
+from apps.core.listing import ListScope, paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
 from apps.projects import selectors, services
-from apps.projects.forms import AssignmentForm, ProjectCreateForm, ProjectFilterForm, ProjectForm
+from apps.projects.forms import (
+    AssignmentFilterForm,
+    AssignmentForm,
+    ProjectCreateForm,
+    ProjectFilterForm,
+    ProjectForm,
+)
 from apps.projects.models import Project
 
 VIEW, MANAGE = Capability.PROJECT_VIEW, Capability.PROJECT_MANAGE
+ASSIGNMENTS_SCOPE = ListScope(prefix="assignments_", anchor="assignments")
 
 
 @require_safe
@@ -67,10 +74,19 @@ def _detail(
 ) -> HttpResponse:
     ctx = access_for(request)
     manageable = selectors.manageable(ctx, project)
+    filters = AssignmentFilterForm(request.GET or None, prefix=ASSIGNMENTS_SCOPE.anchor)
+    data = filters.cleaned_data if filters.is_valid() else {}
+    listing = paginate(
+        request,
+        selectors.assignments(ctx, project, kind=data.get("kind", ""), state=data.get("state", "")),
+        default_per_page=selectors.SECTION_PER_PAGE,
+        scope=ASSIGNMENTS_SCOPE,
+    )
     context = {
         "project": project,
         "manageable": manageable,
-        "assignments": selectors.assignments(ctx, project),
+        "assignment_filters": filters,
+        "assignments": listing,
         "assignment_form": assignment_form
         or (AssignmentForm(ctx=ctx, actor_id=ctx.user_id) if manageable else None),
     }

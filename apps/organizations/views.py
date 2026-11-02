@@ -7,9 +7,11 @@ is shown to a group administrator but every action on it is refused by the servi
 (plan §3.4); the page hides the forms.
 """
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 from uuid import UUID
 
+from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Page
@@ -25,10 +27,10 @@ from apps.access.policy import may_manage_account
 from apps.access.roles import Capability
 from apps.accounts import selectors as account_selectors
 from apps.accounts import services as account_services
-from apps.accounts.models import EmailChangeRequest, Invitation
+from apps.accounts.models import EmailChangeRequest, Invitation, User
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
 from apps.core.idempotency import IdempotencyError
-from apps.core.listing import paginate, render_list
+from apps.core.listing import ListPage, ListScope, paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
 from apps.notifications import selectors as notification_selectors
@@ -39,9 +41,12 @@ from apps.organizations.forms import (
     EmployerForm,
     InvitationFilterForm,
     InvitationForm,
+    MembershipFilterForm,
     MembershipForm,
     PeopleFilterForm,
+    PersonInvitationFilterForm,
     ReasonForm,
+    SharedProjectFilterForm,
 )
 
 ORG = Capability.ORG_MANAGE
@@ -107,6 +112,58 @@ def people(request: HttpRequest) -> HttpResponse:
     )
 
 
+MEMBERSHIPS_SCOPE = ListScope(prefix="memberships_", anchor="roles")
+PROJECTS_SCOPE = ListScope(prefix="projects_", anchor="projects")
+INVITATIONS_SCOPE = ListScope(prefix="invitations_", anchor="invitations")
+
+
+def _section(
+    request: HttpRequest, rows: Callable[..., Any], form: type[forms.Form], scope: ListScope
+) -> tuple[forms.Form, ListPage]:
+    """A paged, filtered section of a person's page: ``rows(**cleaned_data)`` paged by
+    ``scope``. The filter fields are named after the section (``memberships-state``)."""
+    filters = form(request.GET or None, prefix=scope.prefix.removesuffix("_"))
+    data = filters.cleaned_data if filters.is_valid() else {}
+    listing = paginate(
+        request,
+        rows(**data),
+        default_per_page=account_selectors.SECTION_PER_PAGE,
+        scope=scope,
+    )
+    return filters, listing
+
+
+def _person_sections(request: HttpRequest, ctx: AccessContext, user: User) -> dict[str, Any]:
+    """The roles, shared projects and invitations of a person, each paged on its own."""
+    roles, role_page = _section(
+        request,
+        lambda **narrow: selectors.memberships(ctx, user, **narrow),
+        MembershipFilterForm,
+        MEMBERSHIPS_SCOPE,
+    )
+    shared, shared_page = _section(
+        request,
+        lambda **narrow: account_selectors.assignments_of(ctx, user, **narrow),
+        SharedProjectFilterForm,
+        PROJECTS_SCOPE,
+    )
+    invited, invited_page = _section(
+        request,
+        lambda **narrow: account_selectors.invitations(ctx, of=user, pending_only=False, **narrow),
+        PersonInvitationFilterForm,
+        INVITATIONS_SCOPE,
+    )
+    _with_delivery_page(ctx, invited_page.page)
+    return {
+        "membership_filters": roles,
+        "memberships": role_page,
+        "assignment_filters": shared,
+        "assignments": shared_page,
+        "invitation_filters": invited,
+        "invitations": invited_page,
+    }
+
+
 @require_safe
 @require_capability(ORG)
 def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
@@ -120,11 +177,7 @@ def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
         "person": user,
         "manageable": may_manage_account(request.user, user) and user.pk != ctx.user_id,
         "is_self": user.pk == ctx.user_id,
-        "memberships": selectors.memberships(ctx, user),
-        "assignments": account_selectors.assignments_of(ctx, user),
-        "invitations": _with_delivery(
-            ctx, account_selectors.invitations(ctx, of=user, pending_only=False)[:10]
-        ),
+        **_person_sections(request, ctx, user),
         "open_change": change,
         "change_delivery": None if change is None else _change_delivery(ctx, change),
         "membership_form": MembershipForm(ctx=ctx, actor_id=ctx.user_id),

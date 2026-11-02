@@ -14,7 +14,7 @@
     {% endblocktranslate %}
   </span>
   {% if filter_count %}
-    {% clear_filters_url form as clear_url %}
+    {% clear_filters_url form listing as clear_url %}
     <span>
       {% blocktranslate count filters=filter_count trimmed %}
         {{ filters }} filter active

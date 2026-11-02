@@ -5586,3 +5586,30 @@ msgstr ""
 
 msgid "Received until"
 msgstr ""
+
+msgid "Outstanding only"
+msgstr ""
+
+msgid "State"
+msgstr ""
+
+msgid "No role matches the filters."
+msgstr ""
+
+msgid "No project matches the filters."
+msgstr ""
+
+msgid "No invitation matches the filters."
+msgstr ""
+
+msgid "No assignment matches the filters."
+msgstr ""
+
+msgid "Ticks count for this page only: start the order from the page you are on."
+msgstr ""
+
+msgid "Expected by"
+msgstr ""
+
+msgid "No expected delivery matches the filters."
+msgstr ""

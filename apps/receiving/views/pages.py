@@ -8,7 +8,6 @@ projection with the supplier name, the material, the date and what their project
 expects (§3.4), and the form they get shows nothing else of the order.
 """
 
-from itertools import groupby
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +24,7 @@ from apps.locations.models import Location
 from apps.purchasing.models import PurchaseOrder
 from apps.receiving import selectors
 from apps.receiving.forms import (
+    ExpectedFilterForm,
     OrderSearchForm,
     ProjectSearchForm,
     ReceiptFilterForm,
@@ -170,14 +170,26 @@ def expected(request: HttpRequest, project_id: UUID) -> HttpResponse:
     """What is still coming to one project: §3.4's projection, grouped by order."""
     ctx = access_for(request)
     project = selectors.expected_project(ctx, project_id)
-    rows = selectors.expected_deliveries(ctx, project.pk)
-    place = selectors.worksite(ctx, project.pk)
-    groups = [
-        (po_id, list(items), receive_url(po_id, place) if place is not None else "")
-        for po_id, items in groupby(rows, key=lambda row: row.po_id)
-    ]
-    return render(
-        request,
-        "receiving/expected.html",
-        {"project": project, "groups": groups, "message": _("Nothing is expected here.")},
+    filters = ExpectedFilterForm(request.GET or None)
+    data = filters.cleaned_data if filters.is_valid() else {}
+    narrow = selectors.ExpectedFilter(
+        supplier=data.get("supplier", ""), expected_by=data.get("expected_by")
     )
+    listing = paginate(
+        request,
+        selectors.expected_orders(ctx, project.pk, narrow),
+        default_per_page=selectors.EXPECTED_PER_PAGE,
+    )
+    place = selectors.worksite(ctx, project.pk)
+    context = {
+        "project": project,
+        "filters": filters,
+        "listing": listing,
+        "orders": [
+            (found, receive_url(found.po_id, place) if place is not None else "")
+            for found in listing.rows
+        ],
+        "message": _("Nothing is expected here."),
+        "filtered": bool(narrow.supplier or narrow.expected_by),
+    }
+    return render_list(request, "receiving/expected.html", context)

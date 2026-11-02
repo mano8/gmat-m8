@@ -14,7 +14,9 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
 from apps.access.roles import Capability
+from apps.core.listing import paginate, render_list
 from apps.material_requests import selectors
+from apps.material_requests.forms import ProjectMaterialsFilterForm
 from apps.purchasing import selectors as purchasing_selectors
 
 VIEW = Capability.REQUEST_VIEW
@@ -40,5 +42,14 @@ def request_ledger(request: HttpRequest, request_id: UUID) -> HttpResponse:
 def project_materials(request: HttpRequest, project_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     found = selectors.project_for_overview(ctx, project_id)
-    context = {"project": found, "materials": selectors.project_materials(ctx, found)}
-    return render(request, "material_requests/project_materials.html", context)
+    filters = ProjectMaterialsFilterForm(request.GET or None)
+    data = filters.cleaned_data if filters.is_valid() else {}
+    listing = paginate(
+        request,
+        selectors.project_materials(
+            ctx, found, q=data.get("q", ""), outstanding_only=data.get("outstanding", False)
+        ),
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+    )
+    context = {"project": found, "filters": filters, "listing": listing}
+    return render_list(request, "material_requests/project_materials.html", context)

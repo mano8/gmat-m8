@@ -34,6 +34,7 @@ from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
 from apps.audit.models import AuditEvent
+from apps.core.listing import ListScope
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
 from apps.material_requests import selectors as request_selectors
@@ -51,6 +52,10 @@ VIEW, MANAGE, PRICE = Capability.PO_VIEW, Capability.PO_MANAGE, Capability.PRICE
 Status = PurchaseOrder.Status
 STALE_DRAFT_DAYS = 14  # Q24
 DEFAULT_PER_PAGE = 25
+WORKLIST_PER_PAGE = 50  # materials per page of the worklist (Q41)
+SECTION_PER_PAGE = 10  # drafts, and quantity on order for nobody: fixed, each on its own page
+DRAFTS_SCOPE = ListScope(prefix="drafts_", anchor="draft-orders", sized=False)
+UNALLOCATED_SCOPE = ListScope(prefix="unallocated_", anchor="ordered-for-nobody", sized=False)
 ORDER_SORTS = {"number": ("number",), "issued": ("issued_at",)}
 ORDER_SORT_LABELS = {"number": _("Order"), "issued": _("Issued")}
 NEEDS_ATTENTION = (Dispatch.AMBIGUOUS, Dispatch.QUARANTINED)

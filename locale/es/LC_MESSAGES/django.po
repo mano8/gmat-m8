@@ -5768,3 +5768,30 @@ msgstr "Recibido desde"
 
 msgid "Received until"
 msgstr "Recibido hasta"
+
+msgid "Outstanding only"
+msgstr "Solo lo pendiente de entrega"
+
+msgid "State"
+msgstr "Estado"
+
+msgid "No role matches the filters."
+msgstr "Ningún rol coincide con los filtros."
+
+msgid "No project matches the filters."
+msgstr "Ningún proyecto coincide con los filtros."
+
+msgid "No invitation matches the filters."
+msgstr "Ninguna invitación coincide con los filtros."
+
+msgid "No assignment matches the filters."
+msgstr "Ninguna asignación coincide con los filtros."
+
+msgid "Ticks count for this page only: start the order from the page you are on."
+msgstr "Las casillas marcadas valen solo para esta página: inicia el pedido desde la página en la que estás."
+
+msgid "Expected by"
+msgstr "Previsto para el"
+
+msgid "No expected delivery matches the filters."
+msgstr "Ninguna entrega prevista coincide con los filtros."

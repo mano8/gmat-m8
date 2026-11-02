@@ -5806,3 +5806,30 @@ msgstr "Reçu depuis"
 
 msgid "Received until"
 msgstr "Reçu jusqu'à"
+
+msgid "Outstanding only"
+msgstr "Seulement ce qui reste à livrer"
+
+msgid "State"
+msgstr "État"
+
+msgid "No role matches the filters."
+msgstr "Aucun rôle ne correspond aux filtres."
+
+msgid "No project matches the filters."
+msgstr "Aucun projet ne correspond aux filtres."
+
+msgid "No invitation matches the filters."
+msgstr "Aucune invitation ne correspond aux filtres."
+
+msgid "No assignment matches the filters."
+msgstr "Aucune affectation ne correspond aux filtres."
+
+msgid "Ticks count for this page only: start the order from the page you are on."
+msgstr "Les cases cochées ne valent que pour cette page : démarrez la commande depuis la page où vous êtes."
+
+msgid "Expected by"
+msgstr "Attendu avant le"
+
+msgid "No expected delivery matches the filters."
+msgstr "Aucune livraison attendue ne correspond aux filtres."

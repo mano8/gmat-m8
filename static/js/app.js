@@ -56,9 +56,11 @@
 
   // A list refreshed through htmx: the toolbar's live region announces the new result count
   // (the count itself sits in the swapped results, which a screen reader would not announce).
-  document.addEventListener("htmx:afterSettle", function () {
-    var status = document.querySelector("[data-list-status]");
-    var count = document.querySelector("[data-list-count]");
+  // A page with several lists wraps each one (toolbar and results) in a [data-list-section].
+  document.addEventListener("htmx:afterSettle", function (event) {
+    var scope = (event.target.closest && event.target.closest("[data-list-section]")) || document;
+    var status = scope.querySelector("[data-list-status]");
+    var count = scope.querySelector("[data-list-count]");
     if (status && count) {
       status.textContent = count.textContent.trim();
     }

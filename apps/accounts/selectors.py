@@ -18,6 +18,7 @@ from apps.access.policy import valid_now
 from apps.access.roles import Capability
 from apps.accounts.models import EmailChangeRequest, Invitation, User
 from apps.accounts.tokens import same_hash
+from apps.core.listing import OPEN_FIRST, by_revocation
 from apps.notifications import selectors as notification_selectors
 from apps.organizations.models import Membership
 from apps.projects.models import ProjectAssignment
@@ -29,6 +30,8 @@ INVITATION_SORTS = {"created": ("created_at",), "expires": ("expires_at",)}
 INVITATION_SORT_LABELS = {"created": _("Created"), "expires": _("Expires")}
 NO_EMAIL = "none"
 EXPIRED, VALID = "expired", "valid"
+PENDING, ACCEPTED, REVOKED = "pending", "accepted", "revoked"
+SECTION_PER_PAGE = 10  # memberships, projects and invitations on a person's page
 STATUSES = ("active", "inactive")
 
 
@@ -75,14 +78,17 @@ def person(ctx: AccessContext, user_id: UUID) -> User:
     return found
 
 
-def assignments_of(ctx: AccessContext, of: User) -> QuerySet[ProjectAssignment]:
+def assignments_of(
+    ctx: AccessContext, of: User, *, kind: str = "", state: str = ""
+) -> QuerySet[ProjectAssignment]:
+    """The projects shared with ``of``, open ones first; ``kind`` and ``state``
+    (``listing.ACTIVE`` / ``REVOKED``) narrow them."""
     if not _admin(ctx):
         return ProjectAssignment.objects.none()
-    return (
-        ProjectAssignment.objects.filter(user=of)
-        .select_related("project")
-        .order_by("revoked_at", "-valid_from")
-    )
+    rows = ProjectAssignment.objects.filter(user=of)
+    if kind:
+        rows = rows.filter(kind=kind)
+    return by_revocation(rows, state).select_related("project").order_by(OPEN_FIRST, "-valid_from")
 
 
 def invitations(
@@ -93,6 +99,7 @@ def invitations(
     of: User | None = None,
     state: str = "",
     delivery: str = "",
+    status: str = "",
 ) -> QuerySet[Invitation]:
     if not _admin(ctx):
         return Invitation.objects.none()
@@ -111,6 +118,17 @@ def invitations(
         )
     if delivery:
         rows = _by_delivery(rows, delivery)
+    return _by_status(rows, status)
+
+
+def _by_status(rows: QuerySet[Invitation], status: str) -> QuerySet[Invitation]:
+    """Invitations ``accepted``, ``revoked`` or still ``pending`` (any other value: all)."""
+    if status == ACCEPTED:
+        return rows.filter(accepted_at__isnull=False)
+    if status == REVOKED:
+        return rows.filter(accepted_at__isnull=True, revoked_at__isnull=False)
+    if status == PENDING:
+        return rows.filter(accepted_at__isnull=True, revoked_at__isnull=True)
     return rows
 
 

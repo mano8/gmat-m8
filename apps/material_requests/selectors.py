@@ -684,11 +684,15 @@ def _project_material(entries: list[ledger.LineLedger]) -> ProjectMaterial:
     )
 
 
-def project_materials(ctx: AccessContext, of: Project) -> list[ProjectMaterial]:
+def project_materials(
+    ctx: AccessContext, of: Project, *, q: str = "", outstanding_only: bool = False
+) -> list[ProjectMaterial]:
     """Per material, the open lines of the requests the user may see for this project.
 
     Most outstanding first. Only open lines count (approved requests, live lines), so a
     closed or cancelled request and a line closed short no longer weigh on the worksite.
+    ``q`` looks at the description and the reference; ``outstanding_only`` drops the
+    materials with nothing left to arrive or hand over.
     """
     rows = (
         MaterialRequestLine.objects.visible_to(ctx, VIEW)
@@ -700,4 +704,11 @@ def project_materials(ctx: AccessContext, of: Project) -> list[ProjectMaterial]:
     for entry in ledger.line_ledgers(rows):
         grouped.setdefault(_material_key(entry.line), []).append(entry)
     totals = [_project_material(entries) for entries in grouped.values()]
-    return sorted(totals, key=lambda item: (-item.outstanding, item.description.casefold()))
+    kept = [item for item in totals if _wanted(item, q.strip().casefold(), outstanding_only)]
+    return sorted(kept, key=lambda item: (-item.outstanding, item.description.casefold()))
+
+
+def _wanted(item: ProjectMaterial, needle: str, outstanding_only: bool) -> bool:
+    if outstanding_only and item.outstanding <= 0:
+        return False
+    return not needle or needle in f"{item.description} {item.reference}".casefold()

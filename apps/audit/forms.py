@@ -26,3 +26,11 @@ class AuditFilterForm(forms.Form):
             ("", _("All")),
             *((name, name) for name in object_types),
         ]
+
+
+class HistoryFilterForm(forms.Form):
+    """Narrows the history of one object: the object is fixed by the URL."""
+
+    q = AuditFilterForm.base_fields["q"]
+    since = AuditFilterForm.base_fields["since"]
+    until = AuditFilterForm.base_fields["until"]

@@ -16,8 +16,8 @@ from django.utils import translation
 from apps.catalog.models import Material, UnitOfMeasure
 from apps.core import listing
 from apps.core.http import is_htmx
-from apps.core.listing import PAGE_SIZES, ListPage, paginate, render_list
-from apps.core.templatetags.list_tags import active_filter_count, clear_filters_url
+from apps.core.listing import PAGE_SIZES, ListPage, ListScope, paginate, render_list
+from apps.core.templatetags.list_tags import active_filter_count, clear_filters_url, page_url
 from tests.org import Org, People, client_for
 
 SORTS = {"code": ("code",), "name": ("name",)}
@@ -347,3 +347,126 @@ class TestIsHtmx:
         request.htmx = True  # type: ignore[attr-defined]
         render_list(request, "x/list.html", {})
         assert names == ["x/list.html", "x/list.html#results"]
+
+
+class SectionFilters(forms.Form):
+    state = forms.CharField(required=False)
+
+
+DRAFTS = ListScope(prefix="drafts_", anchor="draft-orders", sized=False)
+ROLES = ListScope(prefix="roles_", anchor="roles")
+
+
+class TestScopes:
+    """A page with several lists: each reads and links its own parameters (M7d.3)."""
+
+    def test_the_parameters_are_named_after_the_prefix(self) -> None:
+        assert (ROLES.page_param, ROLES.per_page_param, ROLES.sort_param) == (
+            "roles_page",
+            "roles_per_page",
+            "roles_sort",
+        )
+        whole = paginate(get(), [1], default_per_page=10)
+        assert (whole.page_param, whole.per_page_param, whole.sort_param) == (
+            "page",
+            "per_page",
+            "sort",
+        )
+
+    def test_a_section_ignores_the_parameters_of_the_page_and_of_other_sections(self) -> None:
+        rows = list(range(300))
+        request = get("page=3&per_page=50&roles_page=2&roles_per_page=10&sort=name")
+        roles = paginate(request, rows, default_per_page=25, scope=ROLES)
+        assert (roles.number, roles.per_page) == (2, 10)
+        whole = paginate(request, rows, default_per_page=25)
+        assert (whole.number, whole.per_page) == (3, 50)
+        other = paginate(request, rows, default_per_page=25, scope=ListScope(prefix="x_"))
+        assert (other.number, other.per_page) == (1, 25)
+
+    def test_a_section_sorts_by_its_own_parameter(self) -> None:
+        sorted_ = paginate(
+            get("roles_sort=-name&sort=code"),
+            Material.objects.none(),
+            default_per_page=10,
+            sorts=SORTS,
+            scope=ROLES,
+        )
+        assert sorted_.sort == "-name"
+
+    def test_a_fixed_size_section_never_follows_a_per_page(self) -> None:
+        page = paginate(
+            get("drafts_per_page=100&drafts_page=2"),
+            list(range(30)),
+            default_per_page=10,
+            scope=DRAFTS,
+        )
+        assert (page.per_page, page.number, page.sizes) == (10, 2, ())
+        assert paginate(get(), [1], default_per_page=10, scope=ROLES).sizes == PAGE_SIZES
+
+    def test_the_page_link_changes_only_its_own_page(self) -> None:
+        request = get("q=a&page=2&roles_page=3")
+        roles = paginate(request, list(range(100)), default_per_page=10, scope=ROLES)
+        whole = paginate(request, list(range(100)), default_per_page=10)
+        assert page_url({"request": request}, roles, 4) == "?q=a&page=2&roles_page=4#roles"
+        assert page_url({"request": request}, whole, 5) == "?q=a&page=5&roles_page=3"
+
+    def test_clearing_a_section_keeps_the_rest_and_returns_to_it(self) -> None:
+        request = get("roles-state=revoked&roles_page=2&roles_per_page=50&projects_page=3")
+        roles = paginate(request, list(range(100)), default_per_page=10, scope=ROLES)
+        form = SectionFilters(request.GET, prefix="roles")
+        url = clear_filters_url({"request": request}, form, roles)
+        assert url == "/list/?roles_per_page=50&projects_page=3#roles"
+        assert active_filter_count(form) == 1
+        assert active_filter_count(SectionFilters({"state": "x"}, prefix="roles")) == 0
+
+    def test_the_toolbar_of_a_section_is_scoped_and_names_its_parameters(self) -> None:
+        request = get("")
+        roles = paginate(request, list(range(50)), default_per_page=10, scope=ROLES)
+        with translation.override("en"):
+            html = render(
+                "components/list_toolbar.html",
+                request,
+                form=SectionFilters(prefix="roles"),
+                listing=roles,
+                form_id="roles-filter",
+                scoped=True,
+                select="#roles-results",
+                target="#roles-results",
+                action="/list/",
+            )
+        assert '<div class="list-scope">' in html
+        assert 'id="roles-filter"' in html and 'hx-select="#roles-results"' in html
+        assert "from:closest .list-scope" in html
+        assert 'name="roles_per_page"' in html and 'form="roles-filter"' in html
+        fixed = paginate(request, list(range(50)), default_per_page=10, scope=DRAFTS)
+        with translation.override("en"):
+            html = render(
+                "components/list_toolbar.html",
+                request,
+                form=SectionFilters(),
+                listing=fixed,
+                target="#x",
+                action="/list/",
+            )
+        assert "Rows per page" not in html and "list-scope" not in html
+        assert "hx-select" not in html and "from:input" in html
+
+
+@pytest.mark.django_db
+class TestRevocation:
+    def test_the_state_filter_and_the_open_first_order(self, org: Org, people: People) -> None:
+        from django.utils import timezone
+
+        from apps.access.roles import Role
+        from apps.organizations.models import Membership
+        from tests.support import grant
+
+        grant(people.tech_mad, Role.TECHNICIAN, branch=org.a_sev, revoked_at=timezone.now())
+        rows = Membership.objects.filter(user=people.tech_mad)
+        revoked = listing.by_revocation(rows, listing.REVOKED)
+        active = listing.by_revocation(rows, listing.ACTIVE)
+        assert (revoked.count(), active.count()) == (1, 1)
+        assert listing.by_revocation(rows, "").count() == 2
+        assert listing.by_revocation(rows, "nope").count() == 2
+        ordered = rows.order_by(listing.OPEN_FIRST, "-valid_from")
+        assert [row.revoked_at is None for row in ordered] == [True, False]

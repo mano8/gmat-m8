@@ -69,6 +69,18 @@ class ProjectSearchForm(forms.Form):
     )
 
 
+class ExpectedFilterForm(forms.Form):
+    supplier = forms.CharField(
+        label=_("Supplier"),
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={"type": "search", "enterkeyhint": "search"}),
+    )
+    expected_by = forms.DateField(
+        label=_("Expected by"), required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+
 class OrderSearchForm(forms.Form):
     q = forms.CharField(
         label=_("Order number, supplier or project"),

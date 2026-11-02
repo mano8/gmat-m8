@@ -51,7 +51,10 @@ def can_view(ctx: AccessContext) -> bool:
 
 def events(ctx: AccessContext, narrow: EventFilter | None = None) -> QuerySet[AuditEvent]:
     """The events in scope, newest first; ``q`` looks at the actor, the action and the channel."""
-    rows = AuditEvent.objects.visible_to(ctx, VIEW).only(*DISPLAY_FIELDS)
+    return _narrowed(AuditEvent.objects.visible_to(ctx, VIEW).only(*DISPLAY_FIELDS), narrow)
+
+
+def _narrowed(rows: QuerySet[AuditEvent], narrow: EventFilter | None) -> QuerySet[AuditEvent]:
     narrow = narrow or EventFilter()
     if narrow.q:
         rows = rows.filter(
@@ -82,12 +85,18 @@ def object_types(ctx: AccessContext) -> list[str]:
     return list(found)
 
 
-def object_history(ctx: AccessContext, object_type: str, object_id: UUID) -> QuerySet[AuditEvent]:
-    """Everything that happened to one object, oldest first; none in scope is a 404."""
+def object_history(
+    ctx: AccessContext, object_type: str, object_id: UUID, narrow: EventFilter | None = None
+) -> QuerySet[AuditEvent]:
+    """Everything that happened to one object, oldest first; none in scope is a 404.
+
+    ``narrow`` filters the events shown, never whether the object is in scope: a filter that
+    matches nothing is an empty page, not a 404.
+    """
     rows = events(ctx).filter(object_type=object_type, object_id=object_id)
     if not rows.exists():
         raise NotInScope(VIEW)
-    return rows.order_by("occurred_at", "id")
+    return _narrowed(rows, narrow).order_by("occurred_at", "id")
 
 
 def _day_start(day: date) -> datetime:

@@ -21,7 +21,6 @@ from django.views.decorators.http import require_safe
 
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
-from apps.core.http import is_htmx
 from apps.core.listing import paginate, render_list
 from apps.purchasing import selectors
 from apps.purchasing.forms import (
@@ -77,18 +76,29 @@ def worklist(request: HttpRequest) -> HttpResponse:
     rows = selectors.to_purchase(
         ctx, project_id=project.pk if project else None, priority=data.get("priority", "")
     )
-    drafts = list(selectors.drafts(ctx, supplier_id=supplier_id))
-    template = (
-        "purchasing/worklist.html#results" if is_htmx(request) else "purchasing/worklist.html"
+    drafts = paginate(
+        request,
+        selectors.drafts(ctx, supplier_id=supplier_id),
+        default_per_page=selectors.SECTION_PER_PAGE,
+        scope=selectors.DRAFTS_SCOPE,
+    )
+    unallocated = paginate(
+        request,
+        selectors.unallocated_on_order(ctx, supplier_id=supplier_id),
+        default_per_page=selectors.SECTION_PER_PAGE,
+        scope=selectors.UNALLOCATED_SCOPE,
     )
     context = {
         "filters": filters,
-        "groups": selectors.by_material(rows),
-        "drafts": [(draft, selectors.is_stale(draft)) for draft in drafts],
-        "unallocated": selectors.unallocated_on_order(ctx, supplier_id=supplier_id),
+        "listing": paginate(
+            request, selectors.by_material(rows), default_per_page=selectors.WORKLIST_PER_PAGE
+        ),
+        "drafts": drafts,
+        "draft_rows": [(draft, selectors.is_stale(draft)) for draft in drafts.rows],
+        "unallocated": unallocated,
         "stale_days": selectors.STALE_DRAFT_DAYS,
     }
-    return render(request, template, context)
+    return render_list(request, "purchasing/worklist.html", context)
 
 
 # --- the builder's first step -----------------------------------------------------------------
