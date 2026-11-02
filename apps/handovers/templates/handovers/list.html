@@ -36,7 +36,7 @@
                 </td>
                 <td data-label="{% translate 'Project' %}">{{ handover.project.code }}</td>
                 <td data-label="{% translate 'Kind' %}">{{ handover.get_kind_display }}</td>
-                <td data-label="{% translate 'Received by' %}">{{ handover.received_by.full_name|default:handover.received_by.email|default:handover.received_by_name }}</td>
+                <td data-label="{% translate 'Received by' %}">{% if handover.received_by %}{{ handover.received_by.full_name|default:handover.received_by.email }}{% else %}{{ handover.received_by_name }}{% endif %}</td>
                 <td data-label="{% translate 'Date' %}">{{ handover.handed_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                 <td data-label="{% translate 'Status' %}">{% include "handovers/status.html" with obj=handover %}</td>
               </tr>
