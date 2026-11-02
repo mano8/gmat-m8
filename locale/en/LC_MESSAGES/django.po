@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 06:58+0100\n"
+"POT-Creation-Date: 2026-11-02 07:15+0100\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -360,7 +360,7 @@ msgid ""
 msgstr ""
 
 #: apps/accounts/templates/accounts/invitation_account.html:20
-#: templates/partials/nav_items.html:104
+#: templates/partials/nav_items.html:120
 msgid "Sign out"
 msgstr ""
 
@@ -683,13 +683,84 @@ msgstr ""
 msgid "%(name)s removed."
 msgstr ""
 
-#: apps/catalog/forms.py:26 apps/handovers/forms.py:32
+#: apps/audit/forms.py:9 apps/catalog/forms.py:26 apps/handovers/forms.py:32
 #: apps/material_requests/forms.py:49
 #: apps/material_requests/templates/material_requests/link.html:17
 #: apps/organizations/forms.py:20 apps/organizations/forms.py:25
 #: apps/projects/forms.py:21 apps/receiving/forms.py:31
 #: apps/suppliers/forms.py:14
 msgid "Search"
+msgstr ""
+
+#: apps/audit/forms.py:14 apps/audit/templates/audit/rows.html:8
+#: apps/audit/templates/audit/rows.html:20
+msgid "Object"
+msgstr ""
+
+#: apps/audit/forms.py:16 apps/handovers/templates/handovers/detail.html:23
+msgid "From"
+msgstr ""
+
+#: apps/audit/forms.py:19
+msgid "To"
+msgstr ""
+
+#: apps/audit/forms.py:25 apps/catalog/forms.py:36 apps/handovers/forms.py:38
+#: apps/handovers/forms.py:41 apps/handovers/forms.py:49
+#: apps/material_requests/forms.py:23 apps/material_requests/forms.py:196
+#: apps/material_requests/forms.py:210 apps/purchasing/forms.py:34
+#: apps/purchasing/forms.py:94 apps/purchasing/forms.py:105
+#: apps/purchasing/forms.py:113 apps/purchasing/forms.py:116
+#: apps/receiving/forms.py:37 apps/suppliers/forms.py:21
+msgid "All"
+msgstr ""
+
+#: apps/audit/templates/audit/list.html:4
+#: apps/audit/templates/audit/list.html:8 templates/partials/nav_items.html:97
+msgid "Audit"
+msgstr ""
+
+#: apps/audit/templates/audit/list.html:11
+#: apps/exports/templates/exports/index.html:4
+#: apps/exports/templates/exports/index.html:7
+#: templates/partials/nav_items.html:105
+msgid "Exports"
+msgstr ""
+
+#: apps/audit/templates/audit/list.html:22
+msgid "No events"
+msgstr ""
+
+#: apps/audit/templates/audit/list.html:22
+msgid "No event matches the filters."
+msgstr ""
+
+#: apps/audit/templates/audit/object.html:4
+#: apps/audit/templates/audit/object.html:8
+#: apps/material_requests/templates/material_requests/examine.html:305
+#: apps/material_requests/templates/material_requests/examine.html:306
+#: apps/purchasing/templates/purchasing/detail.html:205
+#: apps/purchasing/templates/purchasing/detail.html:206
+msgid "History"
+msgstr ""
+
+#: apps/audit/templates/audit/object.html:14
+msgid "Back to the audit"
+msgstr ""
+
+#: apps/audit/templates/audit/rows.html:5
+#: apps/audit/templates/audit/rows.html:14
+msgid "When"
+msgstr ""
+
+#: apps/audit/templates/audit/rows.html:6
+#: apps/audit/templates/audit/rows.html:15
+msgid "Who"
+msgstr ""
+
+#: apps/audit/templates/audit/rows.html:7
+#: apps/audit/templates/audit/rows.html:19
+msgid "Action"
 msgstr ""
 
 #: apps/catalog/forms.py:28 apps/catalog/forms.py:50
@@ -738,16 +809,6 @@ msgstr ""
 #: apps/organizations/templates/organizations/account_status.html:5
 #: apps/suppliers/forms.py:20 apps/suppliers/templates/suppliers/status.html:5
 msgid "Inactive"
-msgstr ""
-
-#: apps/catalog/forms.py:36 apps/handovers/forms.py:38
-#: apps/handovers/forms.py:41 apps/handovers/forms.py:49
-#: apps/material_requests/forms.py:23 apps/material_requests/forms.py:196
-#: apps/material_requests/forms.py:210 apps/purchasing/forms.py:34
-#: apps/purchasing/forms.py:94 apps/purchasing/forms.py:105
-#: apps/purchasing/forms.py:113 apps/purchasing/forms.py:116
-#: apps/receiving/forms.py:37 apps/suppliers/forms.py:21
-msgid "All"
 msgstr ""
 
 #: apps/catalog/forms.py:48 apps/catalog/forms.py:123
@@ -1272,6 +1333,30 @@ msgstr ""
 msgid "See all"
 msgstr ""
 
+#: apps/exports/selectors.py:256
+msgid "Material requests"
+msgstr ""
+
+#: apps/exports/selectors.py:257
+#: apps/purchasing/templates/purchasing/orders.html:4
+#: apps/purchasing/templates/purchasing/orders.html:8
+msgid "Purchase orders"
+msgstr ""
+
+#: apps/exports/selectors.py:258
+msgid "Goods receipts"
+msgstr ""
+
+#: apps/exports/templates/exports/index.html:8
+msgid ""
+"CSV files with the documents of your branches, one row per line. Prices "
+"appear only if you may see them."
+msgstr ""
+
+#: apps/exports/templates/exports/index.html:14
+msgid "Download CSV"
+msgstr ""
+
 #: apps/handovers/forms.py:41 apps/handovers/templates/handovers/list.html:24
 #: apps/handovers/templates/handovers/list.html:37
 msgid "Kind"
@@ -1487,10 +1572,6 @@ msgstr ""
 
 #: apps/handovers/templates/handovers/detail.html:14
 msgid "Handover details"
-msgstr ""
-
-#: apps/handovers/templates/handovers/detail.html:23
-msgid "From"
 msgstr ""
 
 #: apps/handovers/templates/handovers/detail.html:33
@@ -2412,13 +2493,6 @@ msgstr ""
 
 #: apps/material_requests/templates/material_requests/examine.html:299
 msgid "Cancel request"
-msgstr ""
-
-#: apps/material_requests/templates/material_requests/examine.html:305
-#: apps/material_requests/templates/material_requests/examine.html:306
-#: apps/purchasing/templates/purchasing/detail.html:205
-#: apps/purchasing/templates/purchasing/detail.html:206
-msgid "History"
 msgstr ""
 
 #: apps/material_requests/templates/material_requests/examine.html:311
@@ -4235,11 +4309,6 @@ msgstr ""
 msgid "Create the draft"
 msgstr ""
 
-#: apps/purchasing/templates/purchasing/orders.html:4
-#: apps/purchasing/templates/purchasing/orders.html:8
-msgid "Purchase orders"
-msgstr ""
-
 #: apps/purchasing/templates/purchasing/orders.html:25
 #: apps/purchasing/templates/purchasing/orders.html:37
 #: apps/receiving/templates/receiving/expected.html:20
@@ -4993,6 +5062,6 @@ msgstr ""
 msgid "Inbox"
 msgstr ""
 
-#: templates/partials/nav_items.html:96
+#: templates/partials/nav_items.html:112
 msgid "Security"
 msgstr ""

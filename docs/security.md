@@ -260,6 +260,16 @@ Code in `apps/notifications/notices.py`, `recipients.py`, `eligibility.py` and t
 - **Opt-out.** `NotificationPreference` (one row per user, default on) turns off business notifications only; security email and supplier dispatches are never optional. `set_email_opt_out` acts on the principal's own row (`catalog.view`, held by every role) and is audited as `notification_preference.changed`.
 - **Tests.** `tests/unit/notices/` (recipients of each event, privacy per projection, revocation before the claim, rollback), `tests/unit/notifications/test_preferences.py`, and the two URLs in the acceptance matrix.
 
+## Audit viewer and exports (step M7.3)
+
+Code in `apps/audit` (viewer) and `apps/exports`; plan M7.3, Q13, Q17.
+
+- **Scope.** An audit event belongs to the branch recorded with it: `AuditEvent.objects.visible_to(ctx, audit.view)` gives a material manager the events of their branches and a group administrator all of them, including the ones without a branch (installation-wide changes). Another branch's object history is a 404. Exports read the document tables through `visible_to(ctx, export.csv)`.
+- **What the screens do not show.** The event payload (`data`, which may hold prices) and the client address are not selected for display; the list shows time, actor, channel, action and object.
+- **Prices.** The order export has price columns only for who holds `price.view` somewhere, and a price only on the orders where that capability reaches (sentinel test in the acceptance matrix).
+- **Formula injection.** Every string written to a CSV goes through `apps.exports.cells.cell`: a value starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`. Numbers, dates and decimals are written in their plain form.
+- **Downloads** are attachments (`Content-Disposition`), streamed, `no-store` like every authenticated response. Drafts (requests and orders) are not exported. A download is a GET and is not audited: recording it would need a service on a read.
+
 ## System checks (`apps/core/checks.py`)
 
 | Id | Refuses |

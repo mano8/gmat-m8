@@ -17,6 +17,8 @@ urlpatterns = [
     path("handovers/", include("apps.handovers.urls")),
     path("attachments/", include("apps.attachments.urls")),
     path("org/", include("apps.organizations.urls")),
+    path("audit/", include("apps.audit.urls")),
+    path("exports/", include("apps.exports.urls")),
     path("dashboard/", include("apps.dashboards.urls")),
     path("i18n/", include("django.conf.urls.i18n")),
     path("", include("apps.core.urls")),

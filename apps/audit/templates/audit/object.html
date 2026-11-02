@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "History" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <div class="mb-4">
+    <h1>{% translate "History" %}</h1>
+    <p class="text-soft">{{ object_type }} · {{ object_id }}</p>
+  </div>
+  <div data-testid="audit-history">{% include "audit/rows.html" %}</div>
+  <p class="mt-4">
+    {% url 'audit:list' as list_url %}
+    {% include "components/button.html" with href=list_url label=_("Back to the audit") %}
+  </p>
+{% endblock content %}

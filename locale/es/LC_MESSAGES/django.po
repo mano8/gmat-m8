@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 06:58+0100\n"
+"POT-Creation-Date: 2026-11-02 07:15+0100\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -390,7 +390,7 @@ msgstr ""
 "vez."
 
 #: apps/accounts/templates/accounts/invitation_account.html:20
-#: templates/partials/nav_items.html:104
+#: templates/partials/nav_items.html:120
 msgid "Sign out"
 msgstr "Cerrar sesión"
 
@@ -719,7 +719,7 @@ msgstr "%(name)s adjuntado."
 msgid "%(name)s removed."
 msgstr "%(name)s retirado."
 
-#: apps/catalog/forms.py:26 apps/handovers/forms.py:32
+#: apps/audit/forms.py:9 apps/catalog/forms.py:26 apps/handovers/forms.py:32
 #: apps/material_requests/forms.py:49
 #: apps/material_requests/templates/material_requests/link.html:17
 #: apps/organizations/forms.py:20 apps/organizations/forms.py:25
@@ -727,6 +727,77 @@ msgstr "%(name)s retirado."
 #: apps/suppliers/forms.py:14
 msgid "Search"
 msgstr "Buscar"
+
+#: apps/audit/forms.py:14 apps/audit/templates/audit/rows.html:8
+#: apps/audit/templates/audit/rows.html:20
+msgid "Object"
+msgstr "Objeto"
+
+#: apps/audit/forms.py:16 apps/handovers/templates/handovers/detail.html:23
+msgid "From"
+msgstr "Desde"
+
+#: apps/audit/forms.py:19
+msgid "To"
+msgstr "Hasta"
+
+#: apps/audit/forms.py:25 apps/catalog/forms.py:36 apps/handovers/forms.py:38
+#: apps/handovers/forms.py:41 apps/handovers/forms.py:49
+#: apps/material_requests/forms.py:23 apps/material_requests/forms.py:196
+#: apps/material_requests/forms.py:210 apps/purchasing/forms.py:34
+#: apps/purchasing/forms.py:94 apps/purchasing/forms.py:105
+#: apps/purchasing/forms.py:113 apps/purchasing/forms.py:116
+#: apps/receiving/forms.py:37 apps/suppliers/forms.py:21
+msgid "All"
+msgstr "Todos"
+
+#: apps/audit/templates/audit/list.html:4
+#: apps/audit/templates/audit/list.html:8 templates/partials/nav_items.html:97
+msgid "Audit"
+msgstr "Auditoría"
+
+#: apps/audit/templates/audit/list.html:11
+#: apps/exports/templates/exports/index.html:4
+#: apps/exports/templates/exports/index.html:7
+#: templates/partials/nav_items.html:105
+msgid "Exports"
+msgstr "Exportaciones"
+
+#: apps/audit/templates/audit/list.html:22
+msgid "No events"
+msgstr "Sin eventos"
+
+#: apps/audit/templates/audit/list.html:22
+msgid "No event matches the filters."
+msgstr "Ningún evento coincide con los filtros."
+
+#: apps/audit/templates/audit/object.html:4
+#: apps/audit/templates/audit/object.html:8
+#: apps/material_requests/templates/material_requests/examine.html:305
+#: apps/material_requests/templates/material_requests/examine.html:306
+#: apps/purchasing/templates/purchasing/detail.html:205
+#: apps/purchasing/templates/purchasing/detail.html:206
+msgid "History"
+msgstr "Historial"
+
+#: apps/audit/templates/audit/object.html:14
+msgid "Back to the audit"
+msgstr "Volver a la auditoría"
+
+#: apps/audit/templates/audit/rows.html:5
+#: apps/audit/templates/audit/rows.html:14
+msgid "When"
+msgstr "Cuándo"
+
+#: apps/audit/templates/audit/rows.html:6
+#: apps/audit/templates/audit/rows.html:15
+msgid "Who"
+msgstr "Quién"
+
+#: apps/audit/templates/audit/rows.html:7
+#: apps/audit/templates/audit/rows.html:19
+msgid "Action"
+msgstr "Acción"
 
 #: apps/catalog/forms.py:28 apps/catalog/forms.py:50
 #: apps/catalog/templates/catalog/detail.html:35
@@ -775,16 +846,6 @@ msgstr "Activa"
 #: apps/suppliers/forms.py:20 apps/suppliers/templates/suppliers/status.html:5
 msgid "Inactive"
 msgstr "Inactiva"
-
-#: apps/catalog/forms.py:36 apps/handovers/forms.py:38
-#: apps/handovers/forms.py:41 apps/handovers/forms.py:49
-#: apps/material_requests/forms.py:23 apps/material_requests/forms.py:196
-#: apps/material_requests/forms.py:210 apps/purchasing/forms.py:34
-#: apps/purchasing/forms.py:94 apps/purchasing/forms.py:105
-#: apps/purchasing/forms.py:113 apps/purchasing/forms.py:116
-#: apps/receiving/forms.py:37 apps/suppliers/forms.py:21
-msgid "All"
-msgstr "Todos"
 
 #: apps/catalog/forms.py:48 apps/catalog/forms.py:123
 #: apps/catalog/templates/catalog/list.html:27
@@ -1142,12 +1203,10 @@ msgstr "Borrador"
 
 #: apps/dashboards/panels.py:171
 #, python-format
-#| msgid "expires %(date)s"
 msgid "since %(day)s"
 msgstr "desde el %(day)s"
 
 #: apps/dashboards/panels.py:196
-#| msgid "End date"
 msgid "no date"
 msgstr "sin fecha"
 
@@ -1166,7 +1225,6 @@ msgid "My requests"
 msgstr "Mis solicitudes"
 
 #: apps/dashboards/panels.py:336
-#| msgid "You have not made any request yet."
 msgid "You have no request in progress."
 msgstr "No tienes ninguna solicitud en curso."
 
@@ -1178,17 +1236,14 @@ msgid "Approval inbox"
 msgstr "Bandeja de aprobación"
 
 #: apps/dashboards/panels.py:344
-#| msgid "Nothing is outstanding for this project."
 msgid "Nothing is waiting for your decision."
 msgstr "Nada espera tu decisión."
 
 #: apps/dashboards/panels.py:349
-#| msgid "Sourcing set"
 msgid "Sourcing to decide"
 msgstr "Abastecimiento por decidir"
 
 #: apps/dashboards/panels.py:353
-#| msgid "Every approved line of this project has been handed over."
 msgid "Every approved line has its sourcing."
 msgstr "Todas las líneas aprobadas tienen su abastecimiento."
 
@@ -1205,7 +1260,6 @@ msgid "To purchase"
 msgstr "Por comprar"
 
 #: apps/dashboards/panels.py:362
-#| msgid "No approved line is waiting to be bought for these filters."
 msgid "Nothing is waiting to be bought."
 msgstr "Nada está pendiente de comprar."
 
@@ -1218,47 +1272,38 @@ msgid "No draft order is holding demand for long."
 msgstr "Ningún pedido en borrador retiene demanda desde hace tiempo."
 
 #: apps/dashboards/panels.py:376
-#| msgid "unallocated"
 msgid "Unallocated on order"
 msgstr "Pedido sin asignar"
 
 #: apps/dashboards/panels.py:380
-#| msgid "the ordered quantity was lowered"
 msgid "Every ordered quantity is allocated."
 msgstr "Toda la cantidad pedida está asignada."
 
 #: apps/dashboards/panels.py:385
-#| msgid "Pending receipt"
 msgid "Orders awaiting receipt"
 msgstr "Pedidos pendientes de recibir"
 
 #: apps/dashboards/panels.py:389
-#| msgid "Only an issued order is amended."
 msgid "No issued order is waiting for goods."
 msgstr "Ningún pedido emitido espera mercancía."
 
 #: apps/dashboards/panels.py:393
-#| msgid "purchase orders"
 msgid "Overdue orders"
 msgstr "Pedidos retrasados"
 
 #: apps/dashboards/panels.py:397
-#| msgid "Nothing is expected here."
 msgid "No order is past its expected date."
 msgstr "Ningún pedido ha pasado su fecha prevista."
 
 #: apps/dashboards/panels.py:402
-#| msgid "No handovers"
 msgid "To hand over"
 msgstr "Por entregar"
 
 #: apps/dashboards/panels.py:406
-#| msgid "Nothing left to hand over"
 msgid "Nothing received is waiting to be handed over."
 msgstr "Nada de lo recibido espera ser entregado."
 
 #: apps/dashboards/panels.py:410
-#| msgid "Surplus"
 msgid "Surplus on site"
 msgstr "Excedente en obra"
 
@@ -1267,7 +1312,6 @@ msgid "No surplus was left on a worksite."
 msgstr "No ha quedado excedente en ninguna obra."
 
 #: apps/dashboards/panels.py:419
-#| msgid "Close request"
 msgid "Closed requests to check"
 msgstr "Solicitudes cerradas por revisar"
 
@@ -1288,7 +1332,6 @@ msgid "Companies and branches"
 msgstr "Empresas y sucursales"
 
 #: apps/dashboards/panels.py:440
-#| msgid "The project is not active."
 msgid "There is no active branch."
 msgstr "No hay ninguna sucursal activa."
 
@@ -1330,6 +1373,32 @@ msgstr ""
 #: apps/dashboards/templates/dashboards/panel.html:34
 msgid "See all"
 msgstr "Ver todo"
+
+#: apps/exports/selectors.py:256
+msgid "Material requests"
+msgstr "Solicitudes de material"
+
+#: apps/exports/selectors.py:257
+#: apps/purchasing/templates/purchasing/orders.html:4
+#: apps/purchasing/templates/purchasing/orders.html:8
+msgid "Purchase orders"
+msgstr "Pedidos de compra"
+
+#: apps/exports/selectors.py:258
+msgid "Goods receipts"
+msgstr "Recepciones de mercancía"
+
+#: apps/exports/templates/exports/index.html:8
+msgid ""
+"CSV files with the documents of your branches, one row per line. Prices "
+"appear only if you may see them."
+msgstr ""
+"Archivos CSV con los documentos de sus sucursales, una fila por línea. Los "
+"precios solo aparecen si puede verlos."
+
+#: apps/exports/templates/exports/index.html:14
+msgid "Download CSV"
+msgstr "Descargar CSV"
 
 #: apps/handovers/forms.py:41 apps/handovers/templates/handovers/list.html:24
 #: apps/handovers/templates/handovers/list.html:37
@@ -1553,10 +1622,6 @@ msgstr "Este material se recibió en la obra; anula su recepción de mercancía.
 #: apps/handovers/templates/handovers/detail.html:14
 msgid "Handover details"
 msgstr "Detalles de la entrega"
-
-#: apps/handovers/templates/handovers/detail.html:23
-msgid "From"
-msgstr "Desde"
 
 #: apps/handovers/templates/handovers/detail.html:33
 #: apps/handovers/templates/handovers/new.html:59
@@ -2499,13 +2564,6 @@ msgstr "Solo es posible mientras no se haya pedido ni entregado nada."
 #: apps/material_requests/templates/material_requests/examine.html:299
 msgid "Cancel request"
 msgstr "Cancelar solicitud"
-
-#: apps/material_requests/templates/material_requests/examine.html:305
-#: apps/material_requests/templates/material_requests/examine.html:306
-#: apps/purchasing/templates/purchasing/detail.html:205
-#: apps/purchasing/templates/purchasing/detail.html:206
-msgid "History"
-msgstr "Historial"
 
 #: apps/material_requests/templates/material_requests/examine.html:311
 #, python-format
@@ -4376,11 +4434,6 @@ msgstr ""
 msgid "Create the draft"
 msgstr "Crear el borrador"
 
-#: apps/purchasing/templates/purchasing/orders.html:4
-#: apps/purchasing/templates/purchasing/orders.html:8
-msgid "Purchase orders"
-msgstr "Pedidos de compra"
-
 #: apps/purchasing/templates/purchasing/orders.html:25
 #: apps/purchasing/templates/purchasing/orders.html:37
 #: apps/receiving/templates/receiving/expected.html:20
@@ -5170,6 +5223,6 @@ msgstr "Solicitudes"
 msgid "Inbox"
 msgstr "Bandeja"
 
-#: templates/partials/nav_items.html:96
+#: templates/partials/nav_items.html:112
 msgid "Security"
 msgstr "Seguridad"

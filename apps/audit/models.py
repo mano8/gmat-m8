@@ -3,9 +3,18 @@
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.db.models import Q
 from django.db.models.functions import Now
 
+from apps.access.scopes import Scope, ScopedQuerySet
 from apps.core.ids import new_id
+
+
+class AuditEventQuerySet(ScopedQuerySet["AuditEvent"]):
+    def scope_q(self, scope: Scope) -> Q:
+        """Events by their branch (S1, S2); an event without a branch (installation-wide
+        changes, sign-ins) reaches only a grant that reaches everything."""
+        return scope.branch_q("branch_id")
 
 
 class AuditEvent(models.Model):
@@ -37,6 +46,8 @@ class AuditEvent(models.Model):
     data = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     request_id = models.CharField(max_length=64, blank=True)
     ip = models.GenericIPAddressField(null=True, blank=True)
+
+    objects = AuditEventQuerySet.as_manager()
 
     class Meta:
         ordering = ["-occurred_at", "-id"]

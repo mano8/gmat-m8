@@ -1,0 +1,30 @@
+{% load i18n %}
+<table class="table-responsive">
+  <thead>
+    <tr>
+      <th scope="col">{% translate "When" %}</th>
+      <th scope="col">{% translate "Who" %}</th>
+      <th scope="col">{% translate "Action" %}</th>
+      <th scope="col">{% translate "Object" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+      <tr data-testid="audit-row">
+        <td data-label="{% translate 'When' %}">{{ event.occurred_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+        <td data-label="{% translate 'Who' %}">
+          {{ event.actor_label }}
+          {% if event.via %}<span class="text-soft">· {{ event.via }}</span>{% endif %}
+        </td>
+        <td data-label="{% translate 'Action' %}">{{ event.action }}</td>
+        <td data-label="{% translate 'Object' %}">
+          {% if event.object_id %}
+            <a href="{% url 'audit:object' object_type=event.object_type object_id=event.object_id %}">{{ event.object_type }}</a>
+          {% else %}
+            <span class="text-soft">—</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>

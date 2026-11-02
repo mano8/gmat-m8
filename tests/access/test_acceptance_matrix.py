@@ -493,6 +493,61 @@ def dashboard_routes() -> tuple[Route, ...]:
     return (*panels, unknown)
 
 
+# Audit (M7.3): audit.view is the group administrators' and the material managers'; an event
+# belongs to its branch, so a manager gets 404 for another branch's object history.
+AUDIT_HOLDERS = PO_MANAGERS
+AUDIT_MAD_READERS = ("group_admin", "mm_mad")
+AUDIT_SEV_READERS = ("group_admin", "mm_sev", "mixed")
+EXPORT_KEYS = ("requests", "orders", "receipts")
+
+
+def _audit_url(key: str) -> Callable[[World], str]:
+    return lambda world: reverse(
+        "audit:object",
+        args=[world.objects[key].object_type, world.objects[key].object_id],
+    )
+
+
+def _export_url(key: str) -> Callable[[World], str]:
+    return lambda world: reverse("exports:download", kwargs={"key": key})
+
+
+def audit_routes() -> tuple[Route, ...]:
+    def history(readers: tuple[str, ...]) -> dict[str, Expect]:
+        return order_page(AUDIT_HOLDERS, readers)
+
+    return (
+        Route(history(AUDIT_MAD_READERS), position="own branch", path=_audit_url("audit_mad")),
+        Route(history(AUDIT_SEV_READERS), position="other branch", path=_audit_url("audit_sev")),
+        Route(
+            history(()),
+            position="unknown object",
+            path=lambda world: reverse("audit:object", args=["fixture.nothing", UNKNOWN_ID]),
+        ),
+    )
+
+
+def export_routes() -> tuple[Route, ...]:
+    downloads = [
+        Route(
+            app_page(**_each(OK, AUDIT_HOLDERS)),
+            position=key,
+            path=_export_url(key),
+            allowed=SUPPLIER_NAME,
+            allowed_for=PRICE_VIEWERS,
+        )
+        for key in EXPORT_KEYS
+    ]
+    return (
+        *downloads,
+        Route(
+            app_page(**_each(NOT_FOUND, AUDIT_HOLDERS)),
+            position="unknown export",
+            path=lambda world: "/exports/nothing.csv",
+        ),
+    )
+
+
 def order_page(
     capable: tuple[str, ...], readers: tuple[str, ...], ok: Outcome = OK
 ) -> dict[str, Expect]:
@@ -616,6 +671,10 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "notifications:settings": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
     "notifications:save": (Route(app_action(**_each(REDIRECT, CATALOG_VIEWERS))),),
     "dashboard:panel": dashboard_routes(),
+    "audit:list": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
+    "audit:object": audit_routes(),
+    "exports:index": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
+    "exports:download": export_routes(),
     "catalog:detail": (
         Route(
             app_page(**_each(OK, CATALOG_VIEWERS)),

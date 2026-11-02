@@ -157,6 +157,8 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - the order page's lines also show the remaining quantity and whether the line is receivable;
   - 3 URLs in the acceptance matrix; es/fr strings.
 - Email notifications (M7.1): a request submitted goes to its reviewers, a decision and goods received on site or handed over go to the requester, as outbox messages written in the business transaction (at most 20 BCC recipients, eligibility checked again at the claim); translated es/en/fr templates; per-user opt-out for business email at `/account/notifications/` (security email and supplier dispatches stay on).
+- Role dashboards (M7.2): the home page lists the capability-gated panels the user's roles reach, each loaded lazily from `/dashboard/panels/<key>/`.
+- Audit viewer and CSV exports (M7.3): `/audit/` lists the audit events of the user's branches with filters (text, object kind, dates) and `/audit/object/<type>/<id>/` shows one object's history, for `audit.view`; `/exports/` downloads material requests, purchase orders and goods receipts as CSV (one row per line, scoped to the user's branches, orders from their issue snapshots, prices only for `price.view`, every text cell quoted against spreadsheet formulas), for `export.csv`; neither shows an event's payload or address.
 
 ### Changed
 
