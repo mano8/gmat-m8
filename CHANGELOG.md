@@ -159,6 +159,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Email notifications (M7.1): a request submitted goes to its reviewers, a decision and goods received on site or handed over go to the requester, as outbox messages written in the business transaction (at most 20 BCC recipients, eligibility checked again at the claim); translated es/en/fr templates; per-user opt-out for business email at `/account/notifications/` (security email and supplier dispatches stay on).
 - Role dashboards (M7.2): the home page lists the capability-gated panels the user's roles reach, each loaded lazily from `/dashboard/panels/<key>/`.
 - Audit viewer and CSV exports (M7.3): `/audit/` lists the audit events of the user's branches with filters (text, object kind, dates) and `/audit/object/<type>/<id>/` shows one object's history, for `audit.view`; `/exports/` downloads material requests, purchase orders and goods receipts as CSV (one row per line, scoped to the user's branches, orders from their issue snapshots, prices only for `price.view`, every text cell quoted against spreadsheet formulas), for `export.csv`; neither shows an event's payload or address.
+- Engineer role (M7b.1, ADR-0014): `ENGINEER`, a privileged branch-level membership that creates its own requests and views, reviews and edits (`request.edit`) the requests of its branch scope, without sourcing, purchasing, prices, suppliers, receipts or handovers; granted by group administrators from `/org/`; an engineer in `seed_demo` (`eng-mad`).
 
 ### Changed
 
@@ -178,6 +179,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Every URL answers 405 to any method but GET, HEAD and POST (`AllowedMethodsMiddleware`); the admin and allauth used to treat `PUT` or `OPTIONS` as a page load or a form post.
 - The admin's password-change pages hand over to allauth's (rate limit included); Django's admin form was a second way to change a password.
 - `elevate_privilege` is private to the organization services (`_elevate_privilege`): it writes without authorizing, so only an authorized service may call it. Since M2.6 it lives in `apps.organizations.grants` with the membership target rules, shared by `grant_membership` and invitation acceptance; it is still called only inside an authorized transaction (like `audit.record`).
+- Self-decisions (M7b.1, #23, ADR-0014): group administrators, material managers and engineers approve or reject their own requests, judged by the membership that covers the request and with session MFA; other reviewers still need the procurement branch's `allow_self_approval`. Self-decisions are marked `self_decided` in the audit.
 
 ### Fixed
 
