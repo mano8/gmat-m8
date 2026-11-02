@@ -49,15 +49,15 @@
                       <span class="font-medium">{{ request_obj.number }}</span>
                       <span class="text-sm text-soft">{{ line.project.code }}</span>
                       {% if request_obj.priority == "URGENT" %}
-                        {% include "components/status_chip.html" with label=request_obj.get_priority_display tone="danger" %}
+                        {% chip request_obj.get_priority_display "danger" %}
                       {% elif request_obj.priority == "HIGH" %}
-                        {% include "components/status_chip.html" with label=request_obj.get_priority_display tone="warn" %}
+                        {% chip request_obj.get_priority_display "warn" %}
                       {% endif %}
                       {% if request_obj.needed_by %}
                         <span class="text-sm text-soft">{% translate "Needed by" %} {{ request_obj.needed_by|date:"SHORT_DATE_FORMAT" }}</span>
                       {% endif %}
                       {% if row.reserved > 0 %}
-                        {% include "components/status_chip.html" with label=_("Reserved in drafts") tone="brand" %}
+                        {% chip _("Reserved in drafts") "brand" %}
                       {% endif %}
                     </span>
                     <span class="mt-1 grid grid-cols-3 gap-2 text-sm">

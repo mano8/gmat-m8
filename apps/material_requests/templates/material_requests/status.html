@@ -1,13 +1,13 @@
-{% load i18n %}
+{% load i18n ui_tags %}
 {% comment %}The status chip of a request. Parameter: obj (the request).{% endcomment %}
 {% if obj.status == "APPROVED" %}
-  {% include "components/status_chip.html" with label=obj.get_status_display tone="ok" %}
+  {% chip obj.get_status_display "ok" %}
 {% elif obj.status == "SUBMITTED" %}
-  {% include "components/status_chip.html" with label=obj.get_status_display tone="brand" %}
+  {% chip obj.get_status_display "brand" %}
 {% elif obj.status == "REJECTED" %}
-  {% include "components/status_chip.html" with label=obj.get_status_display tone="danger" %}
+  {% chip obj.get_status_display "danger" %}
 {% elif obj.status == "DRAFT" %}
-  {% include "components/status_chip.html" with label=obj.get_status_display tone="warn" %}
+  {% chip obj.get_status_display "warn" %}
 {% else %}
-  {% include "components/status_chip.html" with label=obj.get_status_display %}
+  {% chip obj.get_status_display %}
 {% endif %}

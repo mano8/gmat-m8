@@ -74,6 +74,7 @@ def request_list(request: HttpRequest) -> HttpResponse:
         default_per_page=selectors.MY_REQUESTS_PER_PAGE,
         sorts=selectors.MY_REQUEST_SORTS,
         sort_labels=selectors.MY_REQUEST_SORT_LABELS,
+        scope=selectors.MY_REQUESTS_SCOPE,
     )
     rows = listing.rows
     grouped = selectors.lines(ctx, rows)

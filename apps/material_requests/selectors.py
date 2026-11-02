@@ -39,6 +39,7 @@ from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
+from apps.core.listing import ListScope
 from apps.material_requests import ledger, reviewers, revisions
 from apps.material_requests.models import (
     MaterialRequest,
@@ -55,6 +56,8 @@ NEW_REQUEST_PER_PAGE = 10
 PROJECT_SORTS = {"code": ("code",), "name": ("name", "code")}
 PROJECT_SORT_LABELS = {"code": _("Code"), "name": _("Name")}
 MY_REQUEST_SORTS = {"number": ("number",), "submitted": ("submitted_at",)}
+# A card with every line of the request: 50 of them is the largest page that stays in budget.
+MY_REQUESTS_SCOPE = ListScope(max_per_page=50)
 MY_REQUEST_SORT_LABELS = {"number": _("Number"), "submitted": _("Submitted")}
 INBOX_SORTS = {
     "needed": ("needed_by",),

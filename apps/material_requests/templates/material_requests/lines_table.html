@@ -35,16 +35,16 @@
           <td data-label="{% translate 'Status' %}">
             <span class="flex flex-wrap justify-end gap-1 sm:justify-start">
               {% if line.pk in edited_lines %}
-                {% include "components/status_chip.html" with label=_("Edited") tone="brand" %}
+                {% chip _("Edited") "brand" %}
               {% endif %}
               {% if line.closed_short_at %}
-                {% include "components/status_chip.html" with label=_("Closed short") tone="warn" %}
+                {% chip _("Closed short") "warn" %}
               {% elif line.decision == "APPROVED" %}
-                {% include "components/status_chip.html" with label=_("Approved") tone="ok" %}
+                {% chip _("Approved") "ok" %}
               {% elif line.decision == "REJECTED" %}
-                {% include "components/status_chip.html" with label=_("Rejected") tone="danger" %}
+                {% chip _("Rejected") "danger" %}
               {% else %}
-                {% include "components/status_chip.html" with label=_("Pending") %}
+                {% chip _("Pending") %}
               {% endif %}
             </span>
             {% if line.decision_note %}<span class="mt-1 block text-sm text-soft">{{ line.decision_note }}</span>{% endif %}

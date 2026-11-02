@@ -526,12 +526,12 @@ class TestCursorPage:
     def test_a_page_costs_the_stretches_it_needs(self) -> None:
         reads = Reads()
         listing.cursor_page(get(""), keys_of(100_000), reads, default_per_page=10)
-        assert reads.stretches == [44]  # one stretch of 4 x (10 + 1) keys, not the list
+        assert reads.stretches == [22]  # one stretch of 2 x (10 + 1) keys, not the list
 
     def test_a_sparse_list_reads_on_until_the_page_is_full(self) -> None:
         reads = Reads(every=50)
         page = listing.cursor_page(get(""), keys_of(1000), reads, default_per_page=10)
-        assert len(page.rows) == 10 and reads.stretches[:3] == [44, 88, 176]
+        assert len(page.rows) == 10 and reads.stretches[:3] == [22, 44, 88]
 
     @pytest.mark.parametrize(
         "after",
@@ -578,6 +578,31 @@ class TestCursorPage:
         assert (len(page.rows), page.sizes, page.page_param) == (10, (), "nobody_after")
         assert page.rows[0] == 10
         assert page.reset_params == ("nobody_after", "nobody_back")
+
+
+class TestHeavyLists:
+    """A list whose rows are heavy offers fewer sizes (``max_per_page``)."""
+
+    def test_the_sizes_stop_at_the_cap_and_a_larger_one_falls_back(self) -> None:
+        scope = ListScope(max_per_page=50)
+        assert scope.sizes == (10, 25, 50)
+        page = paginate(get("per_page=100"), list(range(300)), default_per_page=25, scope=scope)
+        assert (page.per_page, page.sizes) == (25, (10, 25, 50))
+        assert len(cursor_of("per_page=100", scope).rows) == 10
+        assert (
+            paginate(
+                get("per_page=50"), list(range(300)), default_per_page=25, scope=scope
+            ).per_page
+            == 50
+        )
+
+    def test_the_default_must_be_offered(self) -> None:
+        with pytest.raises(ImproperlyConfigured):
+            paginate(get(), [1], default_per_page=100, scope=ListScope(max_per_page=50))
+
+
+def cursor_of(query: str, scope: ListScope) -> Any:
+    return listing.cursor_page(get(query), keys_of(100), Reads(), default_per_page=10, scope=scope)
 
 
 class TestHead:

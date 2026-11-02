@@ -46,6 +46,10 @@ class ListParams(forms.Form):
     )
     sort = forms.CharField(required=False, max_length=40)
 
+    def __init__(self, data: Mapping[str, str], sizes: Sequence[int] = PAGE_SIZES) -> None:
+        super().__init__(data)
+        self.fields["per_page"].choices = [(size, str(size)) for size in sizes]  # type: ignore[attr-defined]
+
 
 @dataclass(frozen=True)
 class ListScope:
@@ -53,12 +57,21 @@ class ListScope:
 
     A screen with several paged sections gives each a ``prefix`` (``drafts_`` makes
     ``drafts_page``), so every section pages on its own; ``anchor`` is the element id the
-    pager links return to; ``sized`` is false for a section whose page size is fixed.
+    pager links return to; ``sized`` is false for a section whose page size is fixed;
+    ``max_per_page`` caps the sizes offered for a list whose rows are heavy (a card with its
+    lines on every row): the largest page of such a list must still answer within the
+    budget of plan M7d.4.
     """
 
     prefix: str = ""
     anchor: str = ""
     sized: bool = True
+    max_per_page: int = PAGE_SIZES[-1]
+
+    @property
+    def sizes(self) -> tuple[int, ...]:
+        """The page sizes this list offers."""
+        return tuple(size for size in PAGE_SIZES if size <= self.max_per_page)
 
     @property
     def page_param(self) -> str:
@@ -103,7 +116,7 @@ class ListPage:
     @property
     def sizes(self) -> tuple[int, ...]:
         """The page sizes offered; none when the size of this list is fixed."""
-        return PAGE_SIZES if self.scope.sized else ()
+        return self.scope.sizes if self.scope.sized else ()
 
     @property
     def page_param(self) -> str:
@@ -236,9 +249,9 @@ def paginate(
     the column headers are not shown. ``scope`` renames the three parameters for a section of
     a page that has several lists.
     """
-    if default_per_page not in PAGE_SIZES:
-        raise ImproperlyConfigured(f"default_per_page must be one of {PAGE_SIZES}.")
-    params = ListParams(_scoped_query(request, scope))
+    if default_per_page not in scope.sizes:
+        raise ImproperlyConfigured(f"default_per_page must be one of {scope.sizes}.")
+    params = ListParams(_scoped_query(request, scope), scope.sizes)
     params.is_valid()  # invalid fields are dropped from cleaned_data: the defaults apply
     data = params.cleaned_data
     per_page = (data.get("per_page") if scope.sized else None) or default_per_page
@@ -312,7 +325,7 @@ class CursorPage:
 
     @property
     def sizes(self) -> tuple[int, ...]:
-        return PAGE_SIZES if self.scope.sized else ()
+        return self.scope.sizes if self.scope.sized else ()
 
     @property
     def page_param(self) -> str:
@@ -387,11 +400,11 @@ def _collect(
 ) -> list[tuple[int, Any]]:
     """Up to ``wanted`` ``(position, row)`` from ``start`` on, reading stretches of ``keys``.
 
-    A stretch is four times what is wanted and doubles each time the page is still not full,
+    A stretch is twice what is wanted and doubles each time the page is still not full,
     so a list with few rows to show costs a handful of queries, not one set per stretch.
     """
     found: list[tuple[int, Any]] = []
-    position, step = start, max(wanted * 4, 20)
+    position, step = start, max(wanted * 2, 20)
     while position < len(keys) and len(found) < wanted:
         stretch = keys[position : position + step]
         found.extend((position + index, row) for index, row in window(stretch))
@@ -421,9 +434,9 @@ def cursor_page(
     the rows of a stretch of them. Stretches are read until the page is full and one row is
     known to follow it, so the work is the page plus at most a stretch.
     """
-    if default_per_page not in PAGE_SIZES:
-        raise ImproperlyConfigured(f"default_per_page must be one of {PAGE_SIZES}.")
-    params = ListParams(_scoped_query(request, scope))
+    if default_per_page not in scope.sizes:
+        raise ImproperlyConfigured(f"default_per_page must be one of {scope.sizes}.")
+    params = ListParams(_scoped_query(request, scope), scope.sizes)
     params.is_valid()
     size = (params.cleaned_data.get("per_page") if scope.sized else None) or default_per_page
     start = _position(request.GET.get(scope.after_param, ""), keys)
