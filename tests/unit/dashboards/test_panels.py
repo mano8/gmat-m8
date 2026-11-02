@@ -124,17 +124,32 @@ class TestAssigned:
         assert content.rows[0].label == line.request.number
         assert panels.assigned(AccessContext.for_user(people.mm_mad)).count == 0
 
-    def test_an_approved_request_is_not_waiting_for_a_decision(
+    def test_approved_and_rejected_requests_count_too_closed_ones_do_not(
         self, people: People, make_line: MakeLine
     ) -> None:
-        line = make_line("4")
-        services.assign_reviewer(
-            principal_for(people.mm_mad),
-            line.request_id,
-            reviewer_id=people.engineer.pk,
-            note="Follow it up",
-        )
-        assert panels.assigned(AccessContext.for_user(people.engineer)).count == 0
+        Status = MaterialRequest.Status
+        found = {}
+        for status in (Status.SUBMITTED, Status.APPROVED, Status.REJECTED, Status.CLOSED):
+            line = make_line("4", status=Status.SUBMITTED)
+            services.assign_reviewer(
+                principal_for(people.mm_mad),
+                line.request_id,
+                reviewer_id=people.engineer.pk,
+                note="Yours",
+            )
+            closed = {"closed_at": timezone.now(), "close_mode": "AUTO"}
+            MaterialRequest.objects.filter(pk=line.request_id).update(
+                status=status, **(closed if status == Status.CLOSED else {})
+            )
+            found[status] = line.request.number
+        content = panels.assigned(AccessContext.for_user(people.engineer))
+        assert content.count == 3
+        assert {row.label for row in content.rows} == {
+            found[Status.SUBMITTED],
+            found[Status.APPROVED],
+            found[Status.REJECTED],
+        }
+        assert any("Rejected" in row.detail for row in content.rows)
 
     def test_only_who_can_be_assigned_gets_the_panel_and_it_links_to_the_filter(
         self, people: People
@@ -142,6 +157,7 @@ class TestAssigned:
         assert "assigned" in keys(AccessContext.for_user(people.engineer))
         assert "assigned" not in keys(AccessContext.for_user(people.site_manager))
         assert panels.BY_KEY["assigned"].query == "?assigned=1"
+        assert not panels.BY_KEY["assigned"].alert  # rejected requests ask for no action
 
 
 class TestSourcingAndPurchasing:

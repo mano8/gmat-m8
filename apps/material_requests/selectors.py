@@ -282,8 +282,11 @@ def assignee(of: MaterialRequest) -> User | None:
     return reviewers.assignee(of)
 
 
-def assigned_to(ctx: AccessContext) -> QuerySet[MaterialRequest]:
-    """ "Assigned to me": the user's submitted and approved requests, the most pressing first.
+def assigned_to(
+    ctx: AccessContext, *, statuses: Sequence[str] = INBOX_STATUSES
+) -> QuerySet[MaterialRequest]:
+    """ "Assigned to me": the user's requests in ``statuses`` (submitted and approved by
+    default), the most pressing first.
 
     Only while a grant through which they may be assigned still covers the request's
     procurement branch: a revoked or expired assignee's list is empty, and the requests
@@ -295,7 +298,7 @@ def assigned_to(ctx: AccessContext) -> QuerySet[MaterialRequest]:
         .filter(
             scope.branch_q("procurement_branch"),
             assigned_reviewer_id=ctx.user_id,
-            status__in=INBOX_STATUSES,
+            status__in=statuses,
         )
         .select_related("project", "requested_by")
         .annotate(line_count=Count("lines"))
