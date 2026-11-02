@@ -237,7 +237,7 @@ PROJECT_VIEWERS = (
     "partner",
     "mixed",
 )
-PROJECT_MANAGERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
+PROJECT_MANAGERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "mixed")
 # Who sees each object position of a project URL (S1, S3, S4; technicians and partners only
 # ACTIVE projects).
 HOSPITAL_VIEWERS = (
@@ -252,7 +252,7 @@ HOSPITAL_VIEWERS = (
 )
 SEV_VIEWERS = ("group_admin", "mm_sev", "mixed")
 ON_HOLD_VIEWERS = ("group_admin", "mm_mad", "engineer", "wo_mad")
-HOSPITAL_MANAGERS = ("group_admin", "mm_mad")
+HOSPITAL_MANAGERS = ("group_admin", "mm_mad", "engineer")
 
 
 def _each(outcome: Outcome, names: tuple[str, ...]) -> dict[str, Outcome]:
@@ -332,7 +332,7 @@ CATALOG_MANAGERS = PROJECT_MANAGERS
 
 # Suppliers are read by who holds supplier.view and changed by who holds supplier.manage; the
 # mixed user manages through A-SEV (S6). Not site managers, technicians or partners.
-SUPPLIER_VIEWERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "mixed")
+SUPPLIER_VIEWERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "wo_mad", "mixed")
 SUPPLIER_MANAGERS = PROJECT_MANAGERS
 
 
@@ -408,15 +408,15 @@ def request_url(name: str, key: str) -> Callable[[World], str]:
 
 
 # The reviewer's screens (M4.4). request.review is held somewhere by group administrators,
-# material managers, engineers (M7b.1, an A-MAD one) and site managers; request.source (and
-# cancel_any) not by site managers or engineers.
+# material managers, engineers (M7b.1: everything a material manager holds; the fixture's is
+# A-MAD's) and site managers; request.source (and cancel_any) not by site managers.
 # On the technician's request at the hospital (bought for by A-MAD) the readers are those
 # whose scope or assignment reaches it; the material manager of A-SEV holds the capability
 # elsewhere and gets 404, a warehouse operator or the technician none (403).
 REVIEWERS = ("group_admin", "mm_mad", "mm_sev", "engineer", "site_manager", "mixed")
-SOURCERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
+SOURCERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "mixed")
 REVIEW_READERS = ("group_admin", "mm_mad", "engineer", "site_manager")
-SOURCE_READERS = ("group_admin", "mm_mad")
+SOURCE_READERS = ("group_admin", "mm_mad", "engineer")
 
 
 def review_page() -> dict[str, Expect]:
@@ -443,10 +443,10 @@ def line_of(name: str, key: str) -> Callable[[World], str]:
 # reads the orders of its branches; po.manage (not warehouse operators) builds and changes
 # them. The orders of the fixture are A-MAD's: the material manager of A-SEV and the mixed
 # user (a manager at A-SEV only) hold the capability elsewhere and get 404.
-PO_VIEWERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "mixed")
-PO_MANAGERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
-PO_READERS = ("group_admin", "mm_mad", "wo_mad")
-PO_ACTORS = ("group_admin", "mm_mad")
+PO_VIEWERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "wo_mad", "mixed")
+PO_MANAGERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "mixed")
+PO_READERS = ("group_admin", "mm_mad", "engineer", "wo_mad")
+PO_ACTORS = ("group_admin", "mm_mad", "engineer")
 # Price (and the quantities of other projects) a purchase screen may show: the manager's.
 PRICE_VIEWERS = {name: frozenset({Sentinel.PRICE}) for name in PO_ACTORS}
 PO_SENTINELS = SUPPLIER_SENTINELS | {Sentinel.OTHER_PROJECT_QUANTITY}
@@ -456,12 +456,13 @@ PO_SENTINELS = SUPPLIER_SENTINELS | {Sentinel.OTHER_PROJECT_QUANTITY}
 # administrators, material managers, warehouse operators and site managers (the mixed user is a
 # manager at A-SEV). The hospital is A-MAD's to buy for and B-MAD's to run, so its receipts and
 # handovers are read by the A-MAD staff and its site manager; receipt.void and handover.void are
-# the managers' (the first two of ``WHOLE_ORDER``); handover.post excludes site managers.
-RECEIPT_HOLDERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "site_manager", "mixed")
-RECEIPT_VOIDERS = ("group_admin", "mm_mad", "mm_sev", "mixed")
-HANDOVER_POSTERS = ("group_admin", "mm_mad", "mm_sev", "wo_mad", "mixed")
-WHOLE_ORDER = ("group_admin", "mm_mad", "wo_mad")
-HOSPITAL_RECEIVERS = ("group_admin", "mm_mad", "wo_mad", "site_manager")
+# the managers' and the engineer's (the first three of ``WHOLE_ORDER``); handover.post excludes
+# site managers.
+RECEIPT_HOLDERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "wo_mad", "site_manager", "mixed")
+RECEIPT_VOIDERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "mixed")
+HANDOVER_POSTERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "wo_mad", "mixed")
+WHOLE_ORDER = ("group_admin", "mm_mad", "engineer", "wo_mad")
+HOSPITAL_RECEIVERS = ("group_admin", "mm_mad", "engineer", "wo_mad", "site_manager")
 SUPPLIER_NAME = frozenset({Sentinel.SUPPLIER_NAME})
 OTHER_QUANTITY = frozenset({Sentinel.OTHER_PROJECT_QUANTITY})
 
@@ -512,9 +513,10 @@ def dashboard_routes() -> tuple[Route, ...]:
 
 
 # Audit (M7.3): audit.view is the group administrators' and the material managers'; an event
-# belongs to its branch, so a manager gets 404 for another branch's object history.
-AUDIT_HOLDERS = PO_MANAGERS
-AUDIT_MAD_READERS = ("group_admin", "mm_mad")
+# belongs to its branch, so a manager gets 404 for another branch's object history. Engineers
+# hold both, like material managers (ADR-0014).
+AUDIT_HOLDERS = ("group_admin", "mm_mad", "mm_sev", "engineer", "mixed")
+AUDIT_MAD_READERS = ("group_admin", "mm_mad", "engineer")
 AUDIT_SEV_READERS = ("group_admin", "mm_sev", "mixed")
 EXPORT_KEYS = ("requests", "orders", "receipts")
 
@@ -597,7 +599,7 @@ def purchase_url(name: str, key: str) -> Callable[[World], str]:
 # back to the page with the error and nothing changes, so every actor meets the same file;
 # the technician removes their own draft's file, which needs none.
 UPLOAD_ORIGIN = {"Origin": "http://testserver"}
-FILE_MANAGERS = ("group_admin", "mm_mad")
+FILE_MANAGERS = ("group_admin", "mm_mad", "engineer")
 
 
 def _upload_body(world: World) -> dict[str, Any]:
@@ -1304,7 +1306,10 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "receiving:void": (
         Route(
             project_action(
-                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                REDIRECT,
             ),
             position="worksite",
             path=_object_url("receiving:void", "goodsreceipt"),
@@ -1312,7 +1317,10 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         ),
         Route(
             project_action(
-                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                REDIRECT,
             ),
             position="warehouse",
             path=_object_url("receiving:void", "warehousereceipt"),
@@ -1324,12 +1332,12 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "handovers:new": (
         Route(app_page(**_each(OK, HANDOVER_POSTERS)), position="no project"),
         Route(
-            project_page(HANDOVER_POSTERS, WHOLE_ORDER[:3], WHOLE_ORDER[:3]),
+            project_page(HANDOVER_POSTERS, WHOLE_ORDER, WHOLE_ORDER),
             position="a project",
             path=lambda world: f"{reverse('handovers:new')}?project={world.org.hospital.pk}",
         ),
         Route(
-            project_page(HANDOVER_POSTERS, WHOLE_ORDER[:3], WHOLE_ORDER[:3]),
+            project_page(HANDOVER_POSTERS, WHOLE_ORDER, WHOLE_ORDER),
             position="a request",
             path=lambda world: (
                 f"{reverse('handovers:new')}?request={world.objects['approved_request'].pk}"
@@ -1343,7 +1351,7 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             note="back to the choice of a project",
         ),
         Route(
-            project_action(HANDOVER_POSTERS, WHOLE_ORDER[:3], WHOLE_ORDER[:3], OK),
+            project_action(HANDOVER_POSTERS, WHOLE_ORDER, WHOLE_ORDER, OK),
             position="a project",
             data=lambda world: {"project": str(world.org.hospital.pk)},
             note="an empty form: 200 with errors",
@@ -1369,7 +1377,10 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "handovers:void": (
         Route(
             project_action(
-                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                REDIRECT,
             ),
             position="from a warehouse",
             path=_object_url("handovers:void", "warehousehandover"),
@@ -1377,7 +1388,10 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         ),
         Route(
             project_action(
-                RECEIPT_VOIDERS, ("group_admin", "mm_mad"), ("group_admin", "mm_mad"), REDIRECT
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                REDIRECT,
             ),
             position="received on site",
             path=_object_url("handovers:void", "handover"),

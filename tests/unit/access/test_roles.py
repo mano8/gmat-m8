@@ -24,29 +24,29 @@ from apps.projects.models import ProjectAssignment
 PLAN_TABLE = """
 org.manage          | ● | — | — | — | — | — | —
 project.view        | ● | ● | ● | ○ | ● | ○ | ●
-project.manage      | ● | ● | — | — | — | — | —
+project.manage      | ● | ● | — | — | — | — | ●
 catalog.view        | ● | ● | ● | ● | ● | ● | ●
-catalog.manage      | ● | ● | — | — | — | — | —
-supplier.view       | ● | ● | ● | — | — | — | —
-supplier.manage     | ● | ● | — | — | — | — | —
+catalog.manage      | ● | ● | — | — | — | — | ●
+supplier.view       | ● | ● | ● | — | — | — | ●
+supplier.manage     | ● | ● | — | — | — | — | ●
 request.create      | ○ | ○ | — | ○ | ○ | ○ | ○
 request.withdraw    | ○ | ○ | — | ○ | ○ | ○ | ○
 request.view        | ● | ● | ● | ○ | ○ own | ○ own | ●
 request.review      | ● | ● | — | ○ | — | — | ●
 request.edit        | ● | ● | — | — | — | — | ●
-request.source      | ● | ● | — | — | — | — | —
-request.cancel_any  | ● | ● | — | — | — | — | —
-po.view             | ● | ● | ● | — | — | — | —
-po.manage           | ● | ● | — | — | — | — | —
-price.view          | ● | ● | — | — | — | — | —
-receipt.view        | ● | ● | ● | ○ site | — | — | —
-receipt.post        | ● | ● | ● | ○ site (Q9) | — | — | —
-receipt.void        | ● | ● | — | — | — | — | —
-handover.view       | ● | ● | ● | ○ | — | — | —
-handover.post       | ● | ● | ● | — | — | — | —
-handover.void       | ● | ● | — | — | — | — | —
-audit.view          | ● | ● | — | — | — | — | —
-export.csv          | ● | ● | — | — | — | — | —
+request.source      | ● | ● | — | — | — | — | ●
+request.cancel_any  | ● | ● | — | — | — | — | ●
+po.view             | ● | ● | ● | — | — | — | ●
+po.manage           | ● | ● | — | — | — | — | ●
+price.view          | ● | ● | — | — | — | — | ●
+receipt.view        | ● | ● | ● | ○ site | — | — | ●
+receipt.post        | ● | ● | ● | ○ site (Q9) | — | — | ●
+receipt.void        | ● | ● | — | — | — | — | ●
+handover.view       | ● | ● | ● | ○ | — | — | ●
+handover.post       | ● | ● | ● | — | — | — | ●
+handover.void       | ● | ● | — | — | — | — | ●
+audit.view          | ● | ● | — | — | — | — | ●
+export.csv          | ● | ● | — | — | — | — | ●
 """
 # "○" on one's own drafts is ownership; on anything else it is the assigned projects.
 OWN_DRAFTS = {"request.create", "request.withdraw"}
@@ -131,17 +131,14 @@ class TestConsistency:
         assert {Role.GROUP_ADMIN, Role.MATERIAL_MANAGER, Role.ENGINEER} == SELF_DECIDING_ROLES
         assert SELF_DECIDING_ROLES <= PRIVILEGED_ROLES
 
-    def test_engineers_review_and_edit_but_never_source_buy_or_receive(self) -> None:
-        """Q30: own requests, and in their branch scope view, review and edit only."""
-        assert dict(ROLE_CAPABILITIES[Role.ENGINEER]) == {
-            Capability.PROJECT_VIEW: Reach.SCOPE,
-            Capability.CATALOG_VIEW: Reach.SCOPE,
-            Capability.REQUEST_CREATE: Reach.OWN,
-            Capability.REQUEST_WITHDRAW: Reach.OWN,
-            Capability.REQUEST_VIEW: Reach.SCOPE,
-            Capability.REQUEST_REVIEW: Reach.SCOPE,
-            Capability.REQUEST_EDIT: Reach.SCOPE,
-        }
+    def test_engineers_rank_between_group_administrators_and_everyone_else(self) -> None:
+        """Every capability of every non-admin role is an engineer's too, at least as far
+        (maintainer, 2026-11-02); only ``org.manage`` stays the group administrators'."""
+        engineer = ROLE_CAPABILITIES[Role.ENGINEER]
+        assert dict(engineer) == dict(ROLE_CAPABILITIES[Role.MATERIAL_MANAGER])
+        assert set(ROLE_CAPABILITIES[Role.GROUP_ADMIN]) - set(engineer) == {Capability.ORG_MANAGE}
+        for role in set(Role) - {Role.GROUP_ADMIN, Role.ENGINEER}:
+            assert set(ROLE_CAPABILITIES[role]) <= set(engineer), role
         assert ROLE_SCOPE_BASIS[Role.ENGINEER] is ScopeBasis.BRANCH
 
     def test_request_edit_holders(self) -> None:

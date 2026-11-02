@@ -8,9 +8,9 @@ plan's table, one row per capability and one column per role:
   assignment-scoped roles (site managers, partners), whose scope is those projects;
 - ``Reach.OWN`` (○ own): only the objects the user created, within the membership's scope.
 
-``ENGINEER`` (Q30, ADR-0014) reviews and edits the requests of its branch scope and makes
-its own; ``request.edit`` (a reviewer's line edits in ``SUBMITTED`` and ``APPROVED``) is
-used by the services of M7b.3.
+``ENGINEER`` (Q30, ADR-0014) ranks below the group administrator and above every other
+role: it holds every capability of a material manager in its branch scope. ``request.edit``
+(a reviewer's line edits in ``SUBMITTED`` and ``APPROVED``) is used by the services of M7b.3.
 
 ``attachment.add`` / ``attachment.remove`` are not capabilities of their own: they follow
 the parent document (plan §5, Attachments) and arrive with M6.4.
@@ -146,29 +146,29 @@ _MATRIX: dict[Capability, tuple[Reach | None, ...]] = {
     #                                GA   MM   WO   SM   TECH PART ENG
     Capability.ORG_MANAGE:          (_SC, _NO, _NO, _NO, _NO, _NO, _NO),
     Capability.PROJECT_VIEW:        (_SC, _SC, _SC, _AS, _SC, _AS, _SC),
-    Capability.PROJECT_MANAGE:      (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
+    Capability.PROJECT_MANAGE:      (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
     Capability.CATALOG_VIEW:        (_SC, _SC, _SC, _SC, _SC, _SC, _SC),
-    Capability.CATALOG_MANAGE:      (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.SUPPLIER_VIEW:       (_SC, _SC, _SC, _NO, _NO, _NO, _NO),
-    Capability.SUPPLIER_MANAGE:     (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
+    Capability.CATALOG_MANAGE:      (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.SUPPLIER_VIEW:       (_SC, _SC, _SC, _NO, _NO, _NO, _SC),
+    Capability.SUPPLIER_MANAGE:     (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
     Capability.REQUEST_CREATE:      (_OW, _OW, _NO, _OW, _OW, _OW, _OW),
     Capability.REQUEST_WITHDRAW:    (_OW, _OW, _NO, _OW, _OW, _OW, _OW),
     Capability.REQUEST_VIEW:        (_SC, _SC, _SC, _AS, _OW, _OW, _SC),
     Capability.REQUEST_REVIEW:      (_SC, _SC, _NO, _AS, _NO, _NO, _SC),
     Capability.REQUEST_EDIT:        (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
-    Capability.REQUEST_SOURCE:      (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.REQUEST_CANCEL_ANY:  (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.PO_VIEW:             (_SC, _SC, _SC, _NO, _NO, _NO, _NO),
-    Capability.PO_MANAGE:           (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.PRICE_VIEW:          (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.RECEIPT_VIEW:        (_SC, _SC, _SC, _AS, _NO, _NO, _NO),
-    Capability.RECEIPT_POST:        (_SC, _SC, _SC, _AS, _NO, _NO, _NO),
-    Capability.RECEIPT_VOID:        (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.HANDOVER_VIEW:       (_SC, _SC, _SC, _AS, _NO, _NO, _NO),
-    Capability.HANDOVER_POST:       (_SC, _SC, _SC, _NO, _NO, _NO, _NO),
-    Capability.HANDOVER_VOID:       (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.AUDIT_VIEW:          (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
-    Capability.EXPORT_CSV:          (_SC, _SC, _NO, _NO, _NO, _NO, _NO),
+    Capability.REQUEST_SOURCE:      (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.REQUEST_CANCEL_ANY:  (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.PO_VIEW:             (_SC, _SC, _SC, _NO, _NO, _NO, _SC),
+    Capability.PO_MANAGE:           (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.PRICE_VIEW:          (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.RECEIPT_VIEW:        (_SC, _SC, _SC, _AS, _NO, _NO, _SC),
+    Capability.RECEIPT_POST:        (_SC, _SC, _SC, _AS, _NO, _NO, _SC),
+    Capability.RECEIPT_VOID:        (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.HANDOVER_VIEW:       (_SC, _SC, _SC, _AS, _NO, _NO, _SC),
+    Capability.HANDOVER_POST:       (_SC, _SC, _SC, _NO, _NO, _NO, _SC),
+    Capability.HANDOVER_VOID:       (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.AUDIT_VIEW:          (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
+    Capability.EXPORT_CSV:          (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
 }
 # fmt: on
 
