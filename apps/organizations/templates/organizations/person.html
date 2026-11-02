@@ -117,13 +117,18 @@
       <h3 class="mb-2 font-semibold">{% translate "Email address" %}</h3>
       {% if open_change %}
         <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <p class="text-soft">
-            {% if open_change.confirmed_at %}
-              {% blocktranslate with email=open_change.new_email date=open_change.apply_after|date:"SHORT_DATETIME_FORMAT" %}Changes to {{ email }} after {{ date }}.{% endblocktranslate %}
-            {% else %}
-              {% blocktranslate with email=open_change.new_email %}Waiting for {{ email }} to confirm.{% endblocktranslate %}
-            {% endif %}
-          </p>
+          <div class="grid gap-1">
+            <p class="text-soft">
+              {% if open_change.confirmed_at %}
+                {% blocktranslate with email=open_change.new_email date=open_change.apply_after|date:"SHORT_DATETIME_FORMAT" %}Changes to {{ email }} after {{ date }}.{% endblocktranslate %}
+              {% else %}
+                {% blocktranslate with email=open_change.new_email %}Waiting for {{ email }} to confirm.{% endblocktranslate %}
+              {% endif %}
+            </p>
+            {% with confirm=change_delivery.confirm notice=change_delivery.notice change=open_change %}
+              {% include "organizations/delivery_email_change.html" %}
+            {% endwith %}
+          </div>
           <form method="post"
                 action="{% url 'org:revoke_email_change' change_id=open_change.pk %}">
             {% csrf_token %}
@@ -169,6 +174,9 @@
               {% translate "revoked" %}
             {% else %}
               {% translate "pending" %}
+            {% endif %}
+            {% if invitation.delivery %}
+              <span class="ms-1">{% include "organizations/delivery_invitation.html" %}</span>
             {% endif %}
           </li>
         {% endfor %}

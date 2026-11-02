@@ -7,6 +7,7 @@ is shown to a group administrator but every action on it is refused by the servi
 (plan §3.4); the page hides the forms.
 """
 
+from collections.abc import Iterable
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -18,17 +19,20 @@ from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
+from apps.access.context import AccessContext
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require_capability
 from apps.access.policy import may_manage_account
 from apps.access.roles import Capability
 from apps.accounts import selectors as account_selectors
 from apps.accounts import services as account_services
+from apps.accounts.models import EmailChangeRequest, Invitation
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
 from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
+from apps.notifications import selectors as notification_selectors
 from apps.organizations import selectors, services
 from apps.organizations.forms import (
     ConfirmForm,
@@ -47,6 +51,32 @@ ORG = Capability.ORG_MANAGE
 def _extra_query(**params: str) -> str:
     kept = {key: value for key, value in params.items() if value}
     return f"&{urlencode(kept)}" if kept else ""
+
+
+def _with_delivery(ctx: AccessContext, invitations: Iterable[Invitation]) -> list[Invitation]:
+    """The invitations read through the scoped selector, each with its email's status.
+
+    ``delivery`` stays ``None`` for an invitation that no longer waits for an answer and for
+    one that sent no email (the bootstrap link).
+    """
+    rows = list(invitations)
+    pending = [row.pk for row in rows if row.accepted_at is None and row.revoked_at is None]
+    found = notification_selectors.delivery_status(ctx, notification_selectors.INVITATION, pending)
+    for row in rows:
+        row.delivery = found.get(row.pk)  # type: ignore[attr-defined]
+    return rows
+
+
+def _change_delivery(ctx: AccessContext, change: EmailChangeRequest) -> dict[str, object]:
+    """An email change with the status of its two emails: to the new address, to the old one."""
+    kind, ids = notification_selectors.EMAIL_CHANGE, [change.pk]
+    confirm = notification_selectors.delivery_status(
+        ctx, kind, ids, source_ref="email_change.confirm"
+    )
+    notice = notification_selectors.delivery_status(
+        ctx, kind, ids, source_ref="email_change.cancel"
+    )
+    return {"change": change, "confirm": confirm.get(change.pk), "notice": notice.get(change.pk)}
 
 
 # --- people ----------------------------------------------------------------------------
@@ -81,14 +111,18 @@ def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
     open_change = account_selectors.email_changes(ctx, user).filter(
         applied_at__isnull=True, cancelled_at__isnull=True, revoked_at__isnull=True
     )
+    change = open_change.first()
     context = {
         "person": user,
         "manageable": may_manage_account(request.user, user) and user.pk != ctx.user_id,
         "is_self": user.pk == ctx.user_id,
         "memberships": selectors.memberships(ctx, user),
         "assignments": account_selectors.assignments_of(ctx, user),
-        "invitations": account_selectors.invitations(ctx, of=user, pending_only=False)[:10],
-        "open_change": open_change.first(),
+        "invitations": _with_delivery(
+            ctx, account_selectors.invitations(ctx, of=user, pending_only=False)[:10]
+        ),
+        "open_change": change,
+        "change_delivery": None if change is None else _change_delivery(ctx, change),
         "membership_form": MembershipForm(ctx=ctx, actor_id=ctx.user_id),
         "employer_form": EmployerForm(initial={"company": user.employer_company_id}, ctx=ctx),
         "email_form": EmailChangeForm(),
@@ -218,7 +252,8 @@ def request_email_change(request: HttpRequest, user_id: UUID) -> HttpResponse:
         return conflict(request)
     else:
         messages.success(
-            request, _("Confirmation sent to the new address; the current one can cancel.")
+            request,
+            _("Confirmation queued for sending to the new address; the current one can cancel."),
         )
     return _back(user.pk)
 
@@ -252,6 +287,7 @@ def invitations(request: HttpRequest) -> HttpResponse:
     page = Paginator(account_selectors.invitations(ctx, q=q), account_selectors.PAGE_SIZE).get_page(
         request.GET.get("page")
     )
+    page.object_list = _with_delivery(ctx, page.object_list)
     template = (
         "organizations/invitations.html#results"
         if is_htmx(request)
@@ -287,7 +323,8 @@ def create_invitation(request: HttpRequest) -> HttpResponse:
             return conflict(request)
         else:
             messages.success(
-                request, _("Invitation sent to %(email)s.") % {"email": invitation.email}
+                request,
+                _("Invitation queued for sending to %(email)s.") % {"email": invitation.email},
             )
             return redirect("org:invitations")
     return render(request, "organizations/invitation_form.html", {"form": form})
@@ -304,7 +341,9 @@ def resend_invitation(request: HttpRequest, invitation_id: UUID) -> HttpResponse
     except RetryExhausted:
         return conflict(request)
     else:
-        messages.success(request, _("Invitation sent again; the previous link no longer works."))
+        messages.success(
+            request, _("Invitation queued for sending again; the previous link no longer works.")
+        )
     return redirect("org:invitations")
 
 
@@ -323,3 +362,27 @@ def revoke_invitation(request: HttpRequest, invitation_id: UUID) -> HttpResponse
     else:
         messages.success(request, _("Invitation revoked."))
     return redirect("org:invitations")
+
+
+# --- delivery status fragments (M7c.1) ---------------------------------------------------
+
+
+@require_safe
+@require_capability(ORG)
+def invitation_delivery(request: HttpRequest, invitation_id: UUID) -> HttpResponse:
+    """The badge of one invitation's email, polled while the message is in flight."""
+    ctx = access_for(request)
+    invitation = account_selectors.invitation(ctx, invitation_id)
+    (row,) = _with_delivery(ctx, [invitation])
+    return render(request, "organizations/delivery_invitation.html", {"invitation": row})
+
+
+@require_safe
+@require_capability(ORG)
+def email_change_delivery(request: HttpRequest, change_id: UUID) -> HttpResponse:
+    """The badges of the two emails of an email change, polled while one is in flight."""
+    ctx = access_for(request)
+    change = account_selectors.email_change(ctx, change_id)
+    return render(
+        request, "organizations/delivery_email_change.html", _change_delivery(ctx, change)
+    )

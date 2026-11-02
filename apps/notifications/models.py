@@ -184,6 +184,12 @@ class EmailOutbox(BaseModel):
                 name="notifications_outbox_unwiped",
             ),
             models.Index(fields=["source_po"], name="notifications_outbox_source_po"),
+            # The delivery badges (M7c.1): the latest security mail about an object.
+            models.Index(
+                fields=["eligibility_object_id", "-created_at"],
+                condition=Q(kind=Kind.SECURITY),
+                name="notifications_outbox_secobj",
+            ),
         ]
 
     def __str__(self) -> str:

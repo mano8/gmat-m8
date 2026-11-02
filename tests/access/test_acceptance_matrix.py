@@ -1549,6 +1549,12 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         Route(org_action(), path=_object_url("org:revoke_email_change", "emailchangerequest")),
     ),
     "org:invitations": (Route(org_page()),),
+    "org:invitation_delivery": (
+        Route(org_page(), path=_object_url("org:invitation_delivery", "invitation")),
+    ),
+    "org:email_change_delivery": (
+        Route(org_page(), path=_object_url("org:email_change_delivery", "emailchangerequest")),
+    ),
     "org:new_invitation": (Route(org_page()),),
     "org:create_invitation": (Route(org_action(OK), note="an empty form: 200 with errors"),),
     "org:resend_invitation": (

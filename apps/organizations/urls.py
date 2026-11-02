@@ -28,9 +28,19 @@ urlpatterns = [
         views.revoke_email_change,
         name="revoke_email_change",
     ),
+    path(
+        "email-changes/<uuid:change_id>/delivery/",
+        views.email_change_delivery,
+        name="email_change_delivery",
+    ),
     path("invitations/", views.invitations, name="invitations"),
     path("invitations/new/", views.new_invitation, name="new_invitation"),
     path("invitations/create/", views.create_invitation, name="create_invitation"),
+    path(
+        "invitations/<uuid:invitation_id>/delivery/",
+        views.invitation_delivery,
+        name="invitation_delivery",
+    ),
     path(
         "invitations/<uuid:invitation_id>/resend/",
         views.resend_invitation,

@@ -1,0 +1,2 @@
+{% url 'org:invitation_delivery' invitation_id=invitation.pk as poll_url %}
+{% include "components/delivery_badge.html" with status=invitation.delivery object_id=invitation.pk poll_url=poll_url %}

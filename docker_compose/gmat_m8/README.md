@@ -82,6 +82,21 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web mana
 
 `seed_demo` runs as that group administrator and, through the same services as the app, creates the A/B/C organization of plan §3.2 (companies A, B (joint venture of A and C) and C; branches A-MAD, A-SEV and B-MAD, managed by A-MAD; warehouses), one user per role plus a user with mixed memberships (`mm-mad@demo.example`, `mm-sev`, `eng-mad`, `wo-mad`, `tech-mad`, `site-manager`, `partner`, `mixed`), four projects (one on hold; the site manager and the partner are shared on `HOSP-X`), about 200 materials and 5 suppliers. The password of the new users is `--password` or a random one, printed once. Privileged roles enroll MFA at their first sign-in; with Mailpit (`http://127.0.0.1:8025`) password resets work. It is idempotent: a second run reports everything as existing. To load your own data instead, see `docs/import-templates/` (`manage import_catalog | import_suppliers | import_projects <file> --operator <email> [--dry-run]`).
 
+## Local mail (Mailpit)
+
+On a local stack (no `-f`, or the dev overlay) every email goes to Mailpit, never to a real inbox: an invitation, an email change or a password reset sent to `someone@example.org` stays on your machine. The worker delivers (the admin screens show "queued", then "sent" once it has; see "Delivery status" in the app), and Mailpit keeps the message until its container is recreated.
+
+Mailpit is not published by the local-mail overlay, so read it from inside the network:
+
+```bash
+# list the messages (JSON: recipient, subject, time)
+docker compose exec mailpit wget -qO- http://localhost:8025/api/v1/messages
+# the newest one, with its text (the one-time link of an invitation or reset is in "Text")
+docker compose exec mailpit wget -qO- http://localhost:8025/api/v1/message/latest
+```
+
+Pipe either through `python3 -m json.tool` (or `jq`) to read it. The dev overlay publishes the web UI on `http://127.0.0.1:8025` instead. If a message never arrives, check that the worker is running and not paused (`flags/worker.paused`) and that `OUTBOUND_EMAIL` in `app.env` is not `off`: the app waits for the worker and shows a message still queued after ten minutes as delayed.
+
 ## Day to day
 
 ```bash
