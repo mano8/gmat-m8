@@ -23,6 +23,6 @@
     {% empty %}
       {% include "components/empty_state.html" with title=_("No projects") text=_("No project with a worksite is assigned to you.") %}
     {% endfor %}
-    {% include "components/pagination.html" %}
+    {% include "components/pagination_legacy.html" %}
   </div>
 {% endblock content %}

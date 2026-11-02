@@ -1,0 +1,27 @@
+{% load i18n list_tags %}
+{% comment %}
+  The head of a list's results partial: how many rows match and, when filters are in force, how
+  many and a way to clear them. Parameters: form (the filter form), listing (the ListPage).
+  `data-list-count` is read by app.js into the toolbar's live region after a refresh.
+{% endcomment %}
+{% active_filter_count form as filter_count %}
+<p class="mb-2 flex flex-wrap items-center gap-x-3 text-sm text-soft">
+  <span data-list-count>
+    {% blocktranslate count total=listing.total trimmed %}
+      {{ total }} result
+    {% plural %}
+      {{ total }} results
+    {% endblocktranslate %}
+  </span>
+  {% if filter_count %}
+    {% clear_filters_url form as clear_url %}
+    <span>
+      {% blocktranslate count filters=filter_count trimmed %}
+        {{ filters }} filter active
+      {% plural %}
+        {{ filters }} filters active
+      {% endblocktranslate %}
+    </span>
+    <a href="{{ clear_url }}" class="underline">{% translate "Clear filters" %}</a>
+  {% endif %}
+</p>

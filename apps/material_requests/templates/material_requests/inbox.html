@@ -41,7 +41,7 @@
             </p>
           </article>
         {% endfor %}
-        {% include "components/pagination.html" %}
+        {% include "components/pagination_legacy.html" %}
       {% else %}
         {% include "components/empty_state.html" with title=_("Nothing to review") text=_("No request matches the filters.") %}
       {% endif %}

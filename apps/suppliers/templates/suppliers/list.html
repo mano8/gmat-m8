@@ -40,7 +40,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination_legacy.html" %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No suppliers") text=_("No supplier matches the filters.") %}
       {% endif %}

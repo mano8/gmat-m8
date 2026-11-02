@@ -52,7 +52,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination_legacy.html" %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No orders to receive") text=_("No issued order matches the search. A site manager receives from the expected deliveries of a project.") %}
       {% endif %}

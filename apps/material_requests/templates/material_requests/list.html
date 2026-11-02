@@ -40,7 +40,7 @@
         </details>
       </article>
     {% endfor %}
-    {% include "components/pagination.html" %}
+    {% include "components/pagination_legacy.html" %}
   {% else %}
     {% url 'requests:new' as new_url %}
     {% if can_create %}

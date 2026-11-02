@@ -17,7 +17,7 @@
     <div id="audit-results" data-testid="audit">
       {% if page_obj.object_list %}
         {% include "audit/rows.html" with events=page_obj.object_list %}
-        {% include "components/pagination.html" %}
+        {% include "components/pagination_legacy.html" %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No events") text=_("No event matches the filters.") %}
       {% endif %}

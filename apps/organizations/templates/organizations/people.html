@@ -36,7 +36,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination_legacy.html" %}
       {% else %}
         {% include "components/empty_state.html" with title=_("Nobody found") text=_("Try another search.") %}
       {% endif %}

@@ -47,7 +47,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination_legacy.html" %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No purchase orders") text=_("No order matches the filters.") %}
       {% endif %}

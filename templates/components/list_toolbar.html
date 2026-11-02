@@ -1,0 +1,38 @@
+{% load i18n %}
+{% comment %}
+  The filters of a list (components/filter_form.html) plus its page size and, on phones, its
+  sort order. Parameters: form (the filter form), listing (the ListPage), target (a CSS selector
+  of the results partial), action (the list's URL), and optionally grid.
+  The page size and sort controls join the filter form with form="list-filter", so one change
+  of either refreshes the results through htmx (and submits without JavaScript) and the page
+  number starts again at 1: a filter form never sends `page`.
+  Pair it with components/list_summary.html and components/pagination_legacy.html inside the results
+  partial.
+{% endcomment %}
+{% include "components/filter_form.html" with form=form target=target action=action grid=grid form_id="list-filter" %}
+<div class="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+  {% if listing.sort_options %}
+    <div class="field sm:hidden">
+      <label for="list-sort">{% translate "Sort by" %}</label>
+      <select id="list-sort" name="sort" form="list-filter">
+        {% for value, label in listing.sort_options %}
+          <option value="{{ value }}"{% if value == listing.sort %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+  <div class="field ml-auto">
+    <label for="list-per-page">{% translate "Rows per page" %}</label>
+    <select id="list-per-page" name="per_page" form="list-filter">
+      {% for size in listing.sizes %}
+        <option value="{{ size }}"
+                {% if size == listing.per_page %} selected{% endif %}>{{ size }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <p class="sr-only"
+     role="status"
+     aria-live="polite"
+     aria-atomic="true"
+     data-list-status></p>
+</div>

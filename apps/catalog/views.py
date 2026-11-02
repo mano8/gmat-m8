@@ -7,12 +7,10 @@ then the object (404 when the user cannot see the catalog at all, 403 when they 
 change it). The services authorize again inside their transaction.
 """
 
-from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -31,8 +29,8 @@ from apps.catalog.forms import (
 )
 from apps.catalog.models import Material, MaterialCategory
 from apps.core.forms import add_service_errors, error_text
-from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
+from apps.core.listing import paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
 
@@ -44,12 +42,6 @@ def _manageable(request: HttpRequest, material_id: UUID) -> Material:
     material = selectors.material(access_for(request), material_id)
     require(request, MANAGE, material, read=VIEW)
     return material
-
-
-def _query(**params: str) -> str:
-    """The filters, for the pager's links."""
-    kept = {key: value for key, value in params.items() if value}
-    return f"&{urlencode(kept)}" if kept else ""
 
 
 # --- materials ----------------------------------------------------------------------
@@ -65,20 +57,16 @@ def material_list(request: HttpRequest) -> HttpResponse:
         q = filters.cleaned_data["q"]
         category = filters.cleaned_data["category"]
         state = filters.cleaned_data["state"] or selectors.STATE_ACTIVE
-    page = Paginator(
+    listing = paginate(
+        request,
         selectors.materials(ctx, q=q, category_id=category.pk if category else None, state=state),
-        selectors.PAGE_SIZE,
-    ).get_page(request.GET.get("page"))
-    template = "catalog/list.html#results" if is_htmx(request) else "catalog/list.html"
-    context = {
-        "filters": filters,
-        "page_obj": page,
-        "extra_query": _query(
-            q=q, category=str(category.pk) if category else "", state=request.GET.get("state", "")
-        ),
-        "manageable": selectors.manageable(ctx),
-    }
-    return render(request, template, context)
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.MATERIAL_SORTS,
+        default_sort="reference",
+        sort_labels=selectors.MATERIAL_SORT_LABELS,
+    )
+    context = {"filters": filters, "listing": listing, "manageable": selectors.manageable(ctx)}
+    return render_list(request, "catalog/list.html", context)
 
 
 @require_safe

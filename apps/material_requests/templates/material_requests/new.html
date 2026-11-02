@@ -31,7 +31,7 @@
             </li>
           {% endfor %}
         </ul>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination_legacy.html" %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No projects") text=_("No active project is open for your requests.") %}
       {% endif %}

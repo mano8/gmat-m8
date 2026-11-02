@@ -54,6 +54,16 @@
     }
   });
 
+  // A list refreshed through htmx: the toolbar's live region announces the new result count
+  // (the count itself sits in the swapped results, which a screen reader would not announce).
+  document.addEventListener("htmx:afterSettle", function () {
+    var status = document.querySelector("[data-list-status]");
+    var count = document.querySelector("[data-list-count]");
+    if (status && count) {
+      status.textContent = count.textContent.trim();
+    }
+  });
+
   // The language switcher submits when the selection changes (without JavaScript the form
   // still has its button).
   document.addEventListener("change", function (event) {
