@@ -6,6 +6,7 @@ urlpatterns = [
     path(f"{settings.ADMIN_URL_PATH}/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
     path("invite/", include("apps.accounts.invitation_urls")),
+    path("account/notifications/", include("apps.notifications.urls")),
     path("account/email-change/", include("apps.accounts.email_change_urls")),
     path("projects/", include("apps.projects.urls")),
     path("catalog/", include("apps.catalog.urls")),

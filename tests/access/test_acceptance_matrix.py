@@ -566,6 +566,9 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # site manager whose assignments are all revoked); managers change it.
     "catalog:list": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
     "catalog:search": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    # M7.1: every member (catalog.view) sets their own business-email choice.
+    "notifications:settings": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "notifications:save": (Route(app_action(**_each(REDIRECT, CATALOG_VIEWERS))),),
     "catalog:detail": (
         Route(
             app_page(**_each(OK, CATALOG_VIEWERS)),

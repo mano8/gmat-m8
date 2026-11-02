@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 20:54+0100\n"
+"POT-Creation-Date: 2026-11-02 06:35+0100\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -949,6 +949,7 @@ msgstr ""
 
 #: apps/catalog/templates/catalog/category_form.html:20
 #: apps/catalog/templates/catalog/form.html:20
+#: apps/notifications/templates/notifications/settings.html:25
 #: apps/organizations/templates/organizations/person.html:66
 #: apps/organizations/templates/organizations/person.html:115
 #: apps/projects/templates/projects/detail.html:114
@@ -1582,6 +1583,8 @@ msgstr ""
 #: apps/material_requests/forms.py:271
 #: apps/material_requests/templates/material_requests/detail.html:20
 #: apps/material_requests/templates/material_requests/examine.html:34
+#: apps/notifications/templates/notifications/email/request_submitted.html:14
+#: apps/notifications/templates/notifications/email/request_submitted.txt:4
 #: apps/purchasing/forms.py:103
 msgid "Priority"
 msgstr ""
@@ -1592,6 +1595,8 @@ msgstr ""
 #: apps/material_requests/templates/material_requests/examine.html:40
 #: apps/material_requests/templates/material_requests/inbox.html:37
 #: apps/material_requests/templates/material_requests/list.html:33
+#: apps/notifications/templates/notifications/email/request_submitted.html:15
+#: apps/notifications/templates/notifications/email/request_submitted.txt:3
 #: apps/purchasing/templates/purchasing/worklist.html:56
 msgid "Needed by"
 msgstr ""
@@ -2598,6 +2603,126 @@ msgstr ""
 msgid "Quarantined"
 msgstr ""
 
+#: apps/notifications/models.py:250 apps/organizations/models.py:218
+#: apps/projects/models.py:93
+msgid "user"
+msgstr ""
+
+#: apps/notifications/models.py:252
+msgid "no business email"
+msgstr ""
+
+#: apps/notifications/models.py:255
+msgid "notification preference"
+msgstr ""
+
+#: apps/notifications/models.py:256
+msgid "notification preferences"
+msgstr ""
+
+#: apps/notifications/notices.py:72
+#: apps/notifications/templates/notifications/email/request_submitted.html:9
+#, python-format
+msgid "Request %(number)s to review"
+msgstr ""
+
+#: apps/notifications/notices.py:90
+#, python-format
+msgid "Request %(number)s approved"
+msgstr ""
+
+#: apps/notifications/notices.py:90
+#: apps/notifications/templates/notifications/email/request_decided.html:10
+#, python-format
+msgid "Request %(number)s rejected"
+msgstr ""
+
+#: apps/notifications/notices.py:125
+#: apps/notifications/templates/notifications/email/request_handed_over.html:10
+#, python-format
+msgid "Request %(number)s: goods received on site"
+msgstr ""
+
+#: apps/notifications/notices.py:127
+#: apps/notifications/templates/notifications/email/request_handed_over.html:10
+#, python-format
+msgid "Request %(number)s: goods handed over"
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_decided.html:10
+#, python-format
+msgid "Request %(number)s reviewed"
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_decided.html:20
+#: apps/notifications/templates/notifications/email/request_handed_over.html:19
+#: apps/notifications/templates/notifications/email/request_submitted.html:17
+msgid "Open the request"
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_decided.txt:1
+#, python-format
+msgid "Your request %(number)s for %(project)s has been reviewed."
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_decided.txt:1
+#, python-format
+msgid "Your request %(number)s for %(project)s has been rejected."
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_handed_over.html:18
+#: apps/notifications/templates/notifications/email/request_handed_over.txt:5
+msgid "Document"
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_handed_over.txt:1
+#, python-format
+msgid "Materials of your request %(number)s arrived at %(project)s."
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_handed_over.txt:1
+#, python-format
+msgid "Materials of your request %(number)s were handed over for %(project)s."
+msgstr ""
+
+#: apps/notifications/templates/notifications/email/request_submitted.html:11
+#, python-format
+msgid "From %(name)s for %(project)s: %(lines)s line."
+msgid_plural "From %(name)s for %(project)s: %(lines)s lines."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/notifications/templates/notifications/email/request_submitted.txt:1
+#, python-format
+msgid ""
+"Request %(number)s for %(project)s from %(name)s is waiting for your review "
+"(%(lines)s line)."
+msgid_plural ""
+"Request %(number)s for %(project)s from %(name)s is waiting for your review "
+"(%(lines)s lines)."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/notifications/templates/notifications/settings.html:4
+#: apps/notifications/templates/notifications/settings.html:7
+#: templates/components/messages.html:7 templates/layouts/app.html:23
+msgid "Notifications"
+msgstr ""
+
+#: apps/notifications/templates/notifications/settings.html:19
+msgid "Email me about my requests"
+msgstr ""
+
+#: apps/notifications/templates/notifications/settings.html:21
+msgid ""
+"Requests waiting for your review, decisions on your requests and materials "
+"delivered to you. Account security emails are always sent."
+msgstr ""
+
+#: apps/notifications/views.py:35
+msgid "Your notification settings were saved."
+msgstr ""
+
 #: apps/organizations/deactivation.py:57
 #, python-format
 msgid "Cannot deactivate while these documents are open: %(documents)s"
@@ -2771,10 +2896,6 @@ msgstr ""
 
 #: apps/organizations/models.py:187
 msgid "A branch that manages others cannot be managed."
-msgstr ""
-
-#: apps/organizations/models.py:218 apps/projects/models.py:93
-msgid "user"
 msgstr ""
 
 #: apps/organizations/models.py:220
@@ -4713,10 +4834,6 @@ msgstr ""
 msgid "Filter"
 msgstr ""
 
-#: templates/components/messages.html:7
-msgid "Notifications"
-msgstr ""
-
 #: templates/components/messages.html:16
 msgid "Dismiss"
 msgstr ""
@@ -4744,7 +4861,7 @@ msgstr ""
 msgid "Back to the start"
 msgstr ""
 
-#: templates/layouts/app.html:10 templates/layouts/app.html:31
+#: templates/layouts/app.html:10 templates/layouts/app.html:33
 msgid "Main navigation"
 msgstr ""
 

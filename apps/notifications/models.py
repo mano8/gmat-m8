@@ -233,3 +233,27 @@ class EmailAttempt(BaseModel):
 
     def __str__(self) -> str:
         return f"attempt {self.number} of {self.message_id}"
+
+
+class NotificationPreference(BaseModel):
+    """A user's choice about non-critical email (M7.1).
+
+    Business notifications (a request to review, a decision, goods handed over) are skipped
+    for a user who opted out. Security email and supplier dispatches are never optional. No
+    row means the default: notifications on.
+    """
+
+    user = models.OneToOneField(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="notification_preference",
+        verbose_name=_("user"),
+    )
+    email_opt_out = models.BooleanField(_("no business email"), default=False)
+
+    class Meta:
+        verbose_name = _("notification preference")
+        verbose_name_plural = _("notification preferences")
+
+    def __str__(self) -> str:
+        return f"{self.user_id}: {'off' if self.email_opt_out else 'on'}"

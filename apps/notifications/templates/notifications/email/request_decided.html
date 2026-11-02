@@ -1,0 +1,22 @@
+{% load i18n ui_tags %}
+{% get_current_language as language %}<!DOCTYPE html>
+<html lang="{{ language }}">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ request_obj.number }}</title>
+  </head>
+  <body>
+    <h1>
+      {% if approved %}{% blocktranslate with number=request_obj.number %}Request {{ number }} reviewed{% endblocktranslate %}{% else %}{% blocktranslate with number=request_obj.number %}Request {{ number }} rejected{% endblocktranslate %}{% endif %}
+    </h1>
+    <p>{{ request_obj.project.name }}</p>
+    <ul>
+      {% for line in lines %}
+        <li>
+          {{ line.description }}: {{ line.get_decision_display }}{% if line.approved_qty is not None %} ({{ line.approved_qty|quantity }} {{ line.unit.code }}){% endif %}{% if line.decision_note %} - {{ line.decision_note }}{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    <p><a href="{{ link }}">{% translate "Open the request" %}</a></p>
+  </body>
+</html>

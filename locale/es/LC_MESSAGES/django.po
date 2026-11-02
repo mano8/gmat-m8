@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 20:54+0100\n"
+"POT-Creation-Date: 2026-11-02 06:35+0100\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -986,6 +986,7 @@ msgstr "Editar categoría %(name)s"
 
 #: apps/catalog/templates/catalog/category_form.html:20
 #: apps/catalog/templates/catalog/form.html:20
+#: apps/notifications/templates/notifications/settings.html:25
 #: apps/organizations/templates/organizations/person.html:66
 #: apps/organizations/templates/organizations/person.html:115
 #: apps/projects/templates/projects/detail.html:114
@@ -1636,6 +1637,8 @@ msgstr "Buscar materiales"
 #: apps/material_requests/forms.py:271
 #: apps/material_requests/templates/material_requests/detail.html:20
 #: apps/material_requests/templates/material_requests/examine.html:34
+#: apps/notifications/templates/notifications/email/request_submitted.html:14
+#: apps/notifications/templates/notifications/email/request_submitted.txt:4
 #: apps/purchasing/forms.py:103
 msgid "Priority"
 msgstr "Prioridad"
@@ -1646,6 +1649,8 @@ msgstr "Prioridad"
 #: apps/material_requests/templates/material_requests/examine.html:40
 #: apps/material_requests/templates/material_requests/inbox.html:37
 #: apps/material_requests/templates/material_requests/list.html:33
+#: apps/notifications/templates/notifications/email/request_submitted.html:15
+#: apps/notifications/templates/notifications/email/request_submitted.txt:3
 #: apps/purchasing/templates/purchasing/worklist.html:56
 msgid "Needed by"
 msgstr "Necesario para el"
@@ -2402,7 +2407,6 @@ msgstr "Recibido"
 #: apps/material_requests/templates/material_requests/ledger.html:56
 #: apps/material_requests/templates/material_requests/project_materials.html:19
 #: apps/material_requests/templates/material_requests/project_materials.html:36
-#| msgid "Post the receipt"
 msgid "Pending receipt"
 msgstr "Pendiente de recibir"
 
@@ -2419,12 +2423,10 @@ msgstr "Comprometido"
 #: apps/material_requests/templates/material_requests/ledger.html:80
 #: apps/material_requests/templates/material_requests/project_materials.html:20
 #: apps/material_requests/templates/material_requests/project_materials.html:38
-#| msgid "Nothing to hand over"
 msgid "Awaiting handover"
 msgstr "Pendiente de entregar"
 
 #: apps/material_requests/templates/material_requests/ledger.html:95
-#| msgid "Close the request"
 msgid "Closed with the request"
 msgstr "Cerrada con la solicitud"
 
@@ -2433,7 +2435,6 @@ msgid "Reductions of the quantity on order"
 msgstr "Reducciones de la cantidad pedida"
 
 #: apps/material_requests/templates/material_requests/ledger.html:119
-#| msgid "Add request lines"
 msgid "This request has no lines."
 msgstr "Esta solicitud no tiene líneas."
 
@@ -2444,7 +2445,6 @@ msgstr "Volver a la solicitud"
 
 #: apps/material_requests/templates/material_requests/ledger.html:125
 #: apps/material_requests/templates/material_requests/project_materials.html:8
-#| msgid "Share the project"
 msgid "Materials of the project"
 msgstr "Materiales de la obra"
 
@@ -2519,7 +2519,6 @@ msgstr "No hay ningún proyecto activo abierto a sus solicitudes."
 
 #: apps/material_requests/templates/material_requests/project_materials.html:4
 #: apps/projects/templates/projects/detail.html:15
-#| msgid "Material"
 msgid "Materials"
 msgstr "Materiales"
 
@@ -2532,12 +2531,10 @@ msgstr ""
 "esta obra."
 
 #: apps/material_requests/templates/material_requests/project_materials.html:49
-#| msgid "A line is not of this project."
 msgid "Nothing is outstanding for this project."
 msgstr "No queda nada pendiente en esta obra."
 
 #: apps/material_requests/templates/material_requests/project_materials.html:53
-#| msgid "Back to the request"
 msgid "Back to the project"
 msgstr "Volver a la obra"
 
@@ -2673,6 +2670,145 @@ msgstr "Caducado"
 #: apps/notifications/models.py:42
 msgid "Quarantined"
 msgstr "En cuarentena"
+
+#: apps/notifications/models.py:250 apps/organizations/models.py:218
+#: apps/projects/models.py:93
+msgid "user"
+msgstr "usuario"
+
+#: apps/notifications/models.py:252
+#| msgid "new email"
+msgid "no business email"
+msgstr "sin correo de gestión"
+
+#: apps/notifications/models.py:255
+#| msgid "Notification"
+msgid "notification preference"
+msgstr "preferencia de notificación"
+
+#: apps/notifications/models.py:256
+#| msgid "Notifications"
+msgid "notification preferences"
+msgstr "preferencias de notificación"
+
+#: apps/notifications/notices.py:72
+#: apps/notifications/templates/notifications/email/request_submitted.html:9
+#, python-format
+#| msgid "Request %(number)s submitted."
+msgid "Request %(number)s to review"
+msgstr "Solicitud %(number)s pendiente de revisión"
+
+#: apps/notifications/notices.py:90
+#, python-format
+#| msgid "Receipt %(number)s posted."
+msgid "Request %(number)s approved"
+msgstr "Solicitud %(number)s aprobada"
+
+#: apps/notifications/notices.py:90
+#: apps/notifications/templates/notifications/email/request_decided.html:10
+#, python-format
+#| msgid "Request %(number)s submitted."
+msgid "Request %(number)s rejected"
+msgstr "Solicitud %(number)s rechazada"
+
+#: apps/notifications/notices.py:125
+#: apps/notifications/templates/notifications/email/request_handed_over.html:10
+#, python-format
+#| msgid "Receipt %(number)s was already posted."
+msgid "Request %(number)s: goods received on site"
+msgstr "Solicitud %(number)s: material recibido en obra"
+
+#: apps/notifications/notices.py:127
+#: apps/notifications/templates/notifications/email/request_handed_over.html:10
+#, python-format
+#| msgid "Request %(number)s submitted."
+msgid "Request %(number)s: goods handed over"
+msgstr "Solicitud %(number)s: material entregado"
+
+#: apps/notifications/templates/notifications/email/request_decided.html:10
+#, python-format
+#| msgid "Request %(number)s submitted."
+msgid "Request %(number)s reviewed"
+msgstr "Solicitud %(number)s revisada"
+
+#: apps/notifications/templates/notifications/email/request_decided.html:20
+#: apps/notifications/templates/notifications/email/request_handed_over.html:19
+#: apps/notifications/templates/notifications/email/request_submitted.html:17
+#| msgid "Reopen the request"
+msgid "Open the request"
+msgstr "Abrir la solicitud"
+
+#: apps/notifications/templates/notifications/email/request_decided.txt:1
+#, python-format
+msgid "Your request %(number)s for %(project)s has been reviewed."
+msgstr "Su solicitud %(number)s para %(project)s ha sido revisada."
+
+#: apps/notifications/templates/notifications/email/request_decided.txt:1
+#, python-format
+msgid "Your request %(number)s for %(project)s has been rejected."
+msgstr "Su solicitud %(number)s para %(project)s ha sido rechazada."
+
+#: apps/notifications/templates/notifications/email/request_handed_over.html:18
+#: apps/notifications/templates/notifications/email/request_handed_over.txt:5
+msgid "Document"
+msgstr "Documento"
+
+#: apps/notifications/templates/notifications/email/request_handed_over.txt:1
+#, python-format
+msgid "Materials of your request %(number)s arrived at %(project)s."
+msgstr "El material de su solicitud %(number)s ha llegado a %(project)s."
+
+#: apps/notifications/templates/notifications/email/request_handed_over.txt:1
+#, python-format
+msgid "Materials of your request %(number)s were handed over for %(project)s."
+msgstr ""
+"El material de su solicitud %(number)s se ha entregado para %(project)s."
+
+#: apps/notifications/templates/notifications/email/request_submitted.html:11
+#, python-format
+msgid "From %(name)s for %(project)s: %(lines)s line."
+msgid_plural "From %(name)s for %(project)s: %(lines)s lines."
+msgstr[0] "De %(name)s para %(project)s: %(lines)s línea."
+msgstr[1] "De %(name)s para %(project)s: %(lines)s líneas."
+
+#: apps/notifications/templates/notifications/email/request_submitted.txt:1
+#, python-format
+msgid ""
+"Request %(number)s for %(project)s from %(name)s is waiting for your review "
+"(%(lines)s line)."
+msgid_plural ""
+"Request %(number)s for %(project)s from %(name)s is waiting for your review "
+"(%(lines)s lines)."
+msgstr[0] ""
+"La solicitud %(number)s para %(project)s de %(name)s espera su revisión "
+"(%(lines)s línea)."
+msgstr[1] ""
+"La solicitud %(number)s para %(project)s de %(name)s espera su revisión "
+"(%(lines)s líneas)."
+
+#: apps/notifications/templates/notifications/settings.html:4
+#: apps/notifications/templates/notifications/settings.html:7
+#: templates/components/messages.html:7 templates/layouts/app.html:23
+msgid "Notifications"
+msgstr "Notificaciones"
+
+#: apps/notifications/templates/notifications/settings.html:19
+#| msgid "email change requests"
+msgid "Email me about my requests"
+msgstr "Enviarme correos sobre mis solicitudes"
+
+#: apps/notifications/templates/notifications/settings.html:21
+msgid ""
+"Requests waiting for your review, decisions on your requests and materials "
+"delivered to you. Account security emails are always sent."
+msgstr ""
+"Solicitudes pendientes de su revisión, decisiones sobre sus solicitudes y "
+"material que se le entrega. Los correos de seguridad de la cuenta se envían "
+"siempre."
+
+#: apps/notifications/views.py:35
+msgid "Your notification settings were saved."
+msgstr "Se guardaron sus ajustes de notificaciones."
 
 #: apps/organizations/deactivation.py:57
 #, python-format
@@ -2853,10 +2989,6 @@ msgstr "Una delegación gestionada no puede gestionar otras delegaciones."
 #: apps/organizations/models.py:187
 msgid "A branch that manages others cannot be managed."
 msgstr "Una delegación que gestiona otras no puede estar gestionada."
-
-#: apps/organizations/models.py:218 apps/projects/models.py:93
-msgid "user"
-msgstr "usuario"
 
 #: apps/organizations/models.py:220
 msgid "role"
@@ -4025,7 +4157,6 @@ msgid "Please quote the order number on the delivery note and the invoice."
 msgstr "Indiquen el número de pedido en el albarán y en la factura."
 
 #: apps/purchasing/templates/purchasing/line.html:20
-#| msgid "Receive"
 msgid "Receivable"
 msgstr "Recibible"
 
@@ -4871,10 +5002,6 @@ msgstr "Saltar al contenido"
 msgid "Filter"
 msgstr "Filtrar"
 
-#: templates/components/messages.html:7
-msgid "Notifications"
-msgstr "Notificaciones"
-
 #: templates/components/messages.html:16
 msgid "Dismiss"
 msgstr "Cerrar"
@@ -4902,7 +5029,7 @@ msgstr "Siguiente"
 msgid "Back to the start"
 msgstr "Volver al inicio"
 
-#: templates/layouts/app.html:10 templates/layouts/app.html:31
+#: templates/layouts/app.html:10 templates/layouts/app.html:33
 msgid "Main navigation"
 msgstr "Navegación principal"
 

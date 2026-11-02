@@ -41,9 +41,11 @@ from django.db.models import Min, QuerySet
 from django.db.models.functions import Now
 
 from apps.access.authorization import authorize_in_txn
-from apps.access.principals import SystemPrincipal
+from apps.access.principals import SessionPrincipal, SystemPrincipal
+from apps.access.roles import Capability
+from apps.audit.recorder import record
 from apps.core.db import db_now
-from apps.core.locking import LockLevel, LockOrder, run_in_transaction
+from apps.core.locking import LockLevel, LockOrder, run_in_transaction, transactional
 from apps.notifications import eligibility, housekeeping
 from apps.notifications.crypto import unseal
 from apps.notifications.dispatch import DispatchSource, dispatch_source
@@ -52,6 +54,7 @@ from apps.notifications.models import (
     EmailAttempt,
     EmailOutbox,
     Kind,
+    NotificationPreference,
     Outcome,
     Status,
 )
@@ -467,3 +470,33 @@ def run_housekeeping(principal: SystemPrincipal) -> dict[str, int]:
         name: _housekeep_in_txn(principal, name, task)
         for name, task in housekeeping.tasks().items()
     }
+
+
+# --- the user's own choice about business email (M7.1) -------------------------------------
+
+
+@transactional
+def set_email_opt_out(principal: SessionPrincipal, opt_out: bool) -> NotificationPreference:
+    """Turn the signed-in user's business email off (``True``) or on (``False``).
+
+    Any current member may do this for themselves: ``catalog.view`` is the capability every
+    role holds, and the row is always the principal's own. Security email and supplier
+    dispatches are not affected. A change that alters nothing writes nothing.
+    """
+    user = authorize_in_txn(principal, Capability.CATALOG_VIEW, locks=LockOrder())
+    preference, created = NotificationPreference.objects.select_for_update().get_or_create(
+        user=user, defaults={"email_opt_out": opt_out}
+    )
+    changed = preference.email_opt_out != opt_out if not created else opt_out
+    if not changed:
+        return preference
+    if not created:
+        preference.email_opt_out = opt_out
+        preference.save(update_fields=["email_opt_out", "updated_at"])
+    record(
+        principal.audit_identity,
+        "notification_preference.changed",
+        obj=preference,
+        data={"email_opt_out": opt_out},
+    )
+    return preference

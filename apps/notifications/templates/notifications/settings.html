@@ -1,0 +1,28 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Notifications" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-4">{% translate "Notifications" %}</h1>
+  <form method="post"
+        class="card max-w-2xl"
+        action="{% url 'notifications:save' %}"
+        data-testid="notification-settings">
+    {% csrf_token %}
+    <label class="flex items-start gap-3">
+      <input type="checkbox"
+             name="business_email"
+             value="on"
+             {% if not email_opt_out %}checked{% endif %}>
+      <span>
+        <strong>{% translate "Email me about my requests" %}</strong>
+        <br>
+        <span class="text-muted">{% translate "Requests waiting for your review, decisions on your requests and materials delivered to you. Account security emails are always sent." %}</span>
+      </span>
+    </label>
+    <div class="flex flex-wrap gap-3">
+      {% include "components/button.html" with type="submit" label=_("Save") variant="primary" %}
+    </div>
+  </form>
+{% endblock content %}
