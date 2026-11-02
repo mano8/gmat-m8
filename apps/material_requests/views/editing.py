@@ -31,6 +31,7 @@ from apps.material_requests.forms import (
     LineRemoveForm,
     MaterialSearchForm,
     ReviewerLineAddForm,
+    shown_quantity,
 )
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services import LineEdit
@@ -68,10 +69,12 @@ def _initial(
     picked so far and the version of the request the page shows."""
     initial: dict[str, object] = {"material": chosen, "seen_version": selectors.version(found)}
     if line is not None:
+        new_unit = chosen is not None and chosen.unit_id != line.unit_id
         initial |= {
             "free_text": line.free_text,
             "unit": line.unit_id,
-            "requested_qty": line.requested_qty,
+            # Another unit: the quantity is given again, never carried over.
+            "requested_qty": None if new_unit else shown_quantity(line),
         }
     return initial
 

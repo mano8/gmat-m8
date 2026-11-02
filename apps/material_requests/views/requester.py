@@ -203,6 +203,7 @@ def request_review(request: HttpRequest, request_id: UUID) -> HttpResponse:
         initial=SubmitForm.initial_for(found),
         actor_id=ctx.user_id,
         reviewers=selectors.eligible_reviewers(ctx, found),
+        current=found.assigned_reviewer_id,
     )
     return _review(request, found, form)
 
@@ -338,7 +339,10 @@ def request_submit(request: HttpRequest, request_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     found = _own_draft(request, request_id)
     form = SubmitForm(
-        request.POST, actor_id=ctx.user_id, reviewers=selectors.eligible_reviewers(ctx, found)
+        request.POST,
+        actor_id=ctx.user_id,
+        reviewers=selectors.eligible_reviewers(ctx, found),
+        current=found.assigned_reviewer_id,
     )
     if form.is_valid():
         try:

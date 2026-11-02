@@ -906,7 +906,7 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             review_action(),
             position="a submitted request",
             path=request_url("requests:approve_all", "approve_request"),
-            note="the first reviewer approves it, the others find it decided",
+            note="no page version: back to the page, nothing approved",
         ),
     ),
     "requests:return_to_draft": (

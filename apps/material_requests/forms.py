@@ -43,8 +43,23 @@ def user_label(user: User) -> str:
 
 def seen_version_field() -> forms.IntegerField:
     """The version of the request the page showed (``selectors.version``): the services
-    refuse a decision or an edit made on a page older than the request (M7b.3)."""
-    return forms.IntegerField(required=False, min_value=0, widget=forms.HiddenInput)
+    refuse a decision or an edit made on a page older than the request (M7b.3). Every page
+    sends it, so a form without it is refused rather than left unchecked."""
+    return forms.IntegerField(
+        min_value=0,
+        widget=forms.HiddenInput,
+        error_messages={"required": _("This page is out of date: reload it.")},
+    )
+
+
+def shown_quantity(line: MaterialRequestLine) -> Decimal:
+    """The quantity the change dialog shows: the approved one on an approved request (an
+    edit there sets both), the requested one otherwise."""
+    approved: Decimal | None = line.approved_qty
+    if line.request.status == MaterialRequest.Status.APPROVED and approved is not None:
+        return approved
+    requested: Decimal = line.requested_qty
+    return requested
 
 
 def quantity_field(label: Any = QUANTITY, *, required: bool = True) -> forms.DecimalField:
@@ -166,15 +181,24 @@ class SubmitForm(IdempotentForm):
         help_text=_("Optional. Any reviewer of the branch can still decide the request."),
     )
 
-    def __init__(self, *args: Any, reviewers: Sequence[User] = (), **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        reviewers: Sequence[User] = (),
+        current: UUID | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """``current``: the reviewer an earlier submit assigned. A resubmit keeps them unless
+        another is picked (no unassigning, ADR-0014 §4), so "no one" is offered only to a
+        request without a current reviewer among the choices."""
         super().__init__(*args, **kwargs)
-        if reviewers:
-            self.fields["reviewer"].choices = [  # type: ignore[attr-defined]
-                ("", _("No one in particular")),
-                *((str(user.pk), user_label(user)) for user in reviewers),
-            ]
-        else:
+        if not reviewers:
             del self.fields["reviewer"]
+            return
+        choices: list[tuple[str, Any]] = [(str(user.pk), user_label(user)) for user in reviewers]
+        if current not in {user.pk for user in reviewers}:
+            choices.insert(0, ("", _("No one in particular")))
+        self.fields["reviewer"].choices = choices  # type: ignore[attr-defined]
 
     def clean_needed_by(self) -> Any:
         value = self.cleaned_data["needed_by"]
@@ -225,6 +249,7 @@ class InboxFilterForm(forms.Form):
         choices=[
             (MaterialRequest.Status.SUBMITTED, _("To review")),
             (MaterialRequest.Status.APPROVED, _("Approved")),
+            (MaterialRequest.Status.REJECTED, _("Rejected")),
         ],
     )
     priority = forms.ChoiceField(
@@ -391,11 +416,17 @@ class LineChangeForm(IdempotentForm):
 
     def clean(self) -> dict[str, Any]:
         data: dict[str, Any] = super().clean() or {}
-        if self.line is None and data.get("requested_qty") is None:
+        if data.get("requested_qty") is None and (self.line is None or self._new_unit()):
             self.add_error(
                 "requested_qty", forms.ValidationError(_("Give a quantity."), code="required")
             )
         return data
+
+    def _new_unit(self) -> bool:
+        """The edit measures the line in another unit: its quantity must be given again."""
+        material, unit = self.cleaned_data.get("material"), self.cleaned_data.get("unit")
+        new = material.unit_id if material is not None else (unit.pk if unit else None)
+        return self.line is not None and new is not None and new != self.line.unit_id
 
     def changes(self) -> dict[str, Any]:
         """What differs from the line (all of it for a new line): the service takes only
@@ -405,7 +436,9 @@ class LineChangeForm(IdempotentForm):
         else:
             found = self._description_changes()
         quantity = self.cleaned_data.get("requested_qty")
-        if quantity is not None and self._differs(quantity, "requested_qty"):
+        if quantity is not None and (
+            self.line is None or self._new_unit() or quantity != shown_quantity(self.line)
+        ):
             found["requested_qty"] = quantity
         return found
 

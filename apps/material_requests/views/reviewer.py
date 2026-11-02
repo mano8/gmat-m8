@@ -204,17 +204,8 @@ def _review_row(
 
 
 def _review_rows(
-    ctx: Any, found: MaterialRequest, entries: list[ledger.LineLedger]
+    ctx: Any, found: MaterialRequest, entries: list[ledger.LineLedger], access: RowAccess
 ) -> list[ReviewRow]:
-    access = RowAccess(
-        user_id=ctx.user_id,
-        deciding=found.status == Status.SUBMITTED and selectors.can_decide(ctx, found),
-        approved=found.status == Status.APPROVED,
-        reviewing=selectors.can_review(ctx, found),
-        sourcing=selectors.can_source(ctx, found),
-        editing=selectors.can_edit_lines(ctx, found),
-        version=selectors.version(found),
-    )
     history = {item.line.pk: item for item in selectors.line_history(ctx, found)}
     return [_review_row(access, entry, history.get(entry.line.pk)) for entry in entries]
 
@@ -228,14 +219,23 @@ def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
     found = _on_request(request, request_id, REVIEW)
     entries = selectors.lines(ctx, [found])[found.pk]
     sourcing = selectors.can_source(ctx, found)
-    reviewers = selectors.eligible_reviewers(ctx, found) if selectors.can_assign(ctx, found) else []
+    reviewers = _assignable(ctx, found) if selectors.can_assign(ctx, found) else []
+    access = RowAccess(
+        user_id=ctx.user_id,
+        deciding=found.status == Status.SUBMITTED and selectors.can_decide(ctx, found),
+        approved=found.status == Status.APPROVED,
+        reviewing=selectors.can_review(ctx, found),
+        sourcing=sourcing,
+        editing=selectors.can_edit_lines(ctx, found),
+        version=selectors.version(found),
+    )
     context = {
         "request_obj": found,
-        "rows": _review_rows(ctx, found, entries),
+        "rows": _review_rows(ctx, found, entries, access),
         "assignee": selectors.assignee(found),
         "assign_form": AssignForm(reviewers=reviewers) if reviewers else None,
-        "can_edit_lines": selectors.can_edit_lines(ctx, found),
-        "approve_all_form": ApproveAllForm(initial={"seen_version": selectors.version(found)}),
+        "can_edit_lines": access.editing,
+        "approve_all_form": ApproveAllForm(initial={"seen_version": access.version}),
         "can_decide": selectors.can_decide(ctx, found),
         "can_source": sourcing,
         "can_cancel_any": selectors.can_cancel_any(ctx, found),
@@ -285,7 +285,9 @@ def request_approve_all(request: HttpRequest, request_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     found = _on_request(request, request_id, REVIEW)
     form = ApproveAllForm(request.POST)
-    seen = form.cleaned_data["seen_version"] if form.is_valid() else None
+    if not form.is_valid():
+        return _invalid(request, form, _examine_url(found))
+    seen = form.cleaned_data["seen_version"]
     return _perform(
         request,
         lambda: services.approve_all(ctx.principal, found.pk, seen_version=seen),
@@ -294,13 +296,23 @@ def request_approve_all(request: HttpRequest, request_id: UUID) -> HttpResponse:
     )
 
 
+def _assignable(ctx: Any, found: MaterialRequest) -> list[Any]:
+    """The reviewers the request can be sent to: not the one it is already with (assigning
+    them again would change nothing and drop the note)."""
+    return [
+        user
+        for user in selectors.eligible_reviewers(ctx, found)
+        if user.pk != found.assigned_reviewer_id
+    ]
+
+
 @mutating(REVIEW)
 def request_assign(request: HttpRequest, request_id: UUID) -> HttpResponse:
     """Send the request to another reviewer, with a note (the choices come from the
     selector, the service judges the assignee again)."""
     ctx = access_for(request)
     found = _on_request(request, request_id, REVIEW)
-    form = AssignForm(request.POST, reviewers=selectors.eligible_reviewers(ctx, found))
+    form = AssignForm(request.POST, reviewers=_assignable(ctx, found))
     if not form.is_valid():
         return _invalid(request, form, _examine_url(found))
     return _perform(

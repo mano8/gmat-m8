@@ -41,8 +41,16 @@ def page(client: Client, request: MaterialRequest) -> str:
     return str(response.content.decode())
 
 
+# The actions whose form carries the version of the page (M7b.4), as the page sends it.
+VERSIONED = {"decide_line", "approve_all"}
+
+
 def post(client: Client, name: str, target: Any, data: dict[str, Any] | None = None) -> Any:
-    return client.post(reverse(f"requests:{name}", args=[target.pk]), data or {}, follow=True)
+    data = dict(data or {})
+    if name in VERSIONED:
+        request = target.request if isinstance(target, MaterialRequestLine) else target
+        data.setdefault("seen_version", str(selectors.version(request)))
+    return client.post(reverse(f"requests:{name}", args=[target.pk]), data, follow=True)
 
 
 def messages_of(response: Any) -> list[str]:
@@ -370,7 +378,10 @@ class TestDecisions:
     ) -> None:
         own = make_request(Status.SUBMITTED, user=people.site_manager)
         client = client_for(people.site_manager)
-        response = client.post(reverse("requests:approve_all", args=[own.pk]))
+        response = client.post(
+            reverse("requests:approve_all", args=[own.pk]),
+            {"seen_version": str(selectors.version(own))},
+        )
         assert response.status_code == 403
         assert refreshed(own).status == Status.SUBMITTED
 
@@ -654,6 +665,6 @@ class TestBusyDatabase:
         monkeypatch.setattr(services, service, give_up)
         submitted = make_request(Status.SUBMITTED)
         response = client_for(people.mm_mad).post(
-            reverse(f"requests:{name}", args=[submitted.pk]), {"reason": "x"}
+            reverse(f"requests:{name}", args=[submitted.pk]), {"reason": "x", "seen_version": "0"}
         )
         assert response.status_code == 409

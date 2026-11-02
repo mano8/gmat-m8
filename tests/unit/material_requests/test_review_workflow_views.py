@@ -151,6 +151,17 @@ class TestSubmitPicker:
         draft.refresh_from_db()
         assert draft.status == Status.DRAFT
 
+    def test_a_resubmit_keeps_the_reviewer_unless_another_is_picked(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        draft, client = make_request(), client_for(people.tech_mad)
+        services.submit(principal_for(people.tech_mad), draft.pk, reviewer_id=people.engineer.pk)
+        services.return_to_draft(principal_for(people.mm_mad), draft.pk, note="Add the size")
+        review = client.get(url("review", draft))
+        form = review.context["form"]
+        assert "" not in dict(form.fields["reviewer"].choices)  # no unassigning (ADR-0014 §4)
+        assert str(form.initial["reviewer"]) == str(people.engineer.pk)
+
     def test_without_candidates_the_form_has_no_picker(self) -> None:
         form = SubmitForm(reviewers=[])
         assert "reviewer" not in form.fields
@@ -185,6 +196,21 @@ class TestAssignedToMe:
         ctx = AccessContext.for_user(people.engineer)
         assert list(selectors.inbox(ctx, status=Status.APPROVED, assigned_to_me=True)) == [found]
         assert list(selectors.inbox(ctx, status=Status.SUBMITTED, assigned_to_me=True)) == []
+
+    def test_rejected_requests_sent_to_the_user_are_listed_too(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        found = submitted(make_request, people, lines=1)
+        services.assign_reviewer(
+            principal_for(people.mm_mad), found.pk, reviewer_id=people.engineer.pk, note="Yours"
+        )
+        line = found.lines.get()
+        services.decide_line(
+            principal_for(people.mm_mad), line.pk, decision="REJECTED", note="Duplicate"
+        )
+        client = client_for(people.engineer)
+        page = html(client.get(reverse("requests:inbox"), {"assigned": "1", "status": "REJECTED"}))
+        assert number_of(found) in page and "Assigned to me" in page
 
     def test_a_lapsed_assignee_has_an_empty_list(
         self, make_request: MakeRequest, people: People
@@ -248,6 +274,24 @@ class TestAssignment:
         found.refresh_from_db()
         assert found.assigned_reviewer is None
 
+    def test_the_current_assignee_is_not_offered_again(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        found, client = submitted(make_request, people), client_for(people.mm_mad)
+        services.assign_reviewer(
+            principal_for(people.mm_mad), found.pk, reviewer_id=people.engineer.pk, note="Yours"
+        )
+        response = client.get(url("examine", found))
+        choices = dict(response.context["assign_form"].fields["reviewer"].choices)
+        assert str(people.engineer.pk) not in choices and str(people.mm_mad.pk) in choices
+        again = client.post(
+            url("assign_reviewer", found),
+            {"reviewer": str(people.engineer.pk), "note": "Again"},
+            follow=True,
+        )
+        assert "Select a valid choice" in " ".join(messages_of(again))
+        assert AuditEvent.objects.filter(action="request.reviewer_assigned").count() == 1
+
     def test_a_site_manager_may_reassign_but_not_be_assigned(
         self, make_request: MakeRequest, people: People
     ) -> None:
@@ -290,6 +334,19 @@ class TestPageVersion:
             follow=True,
         )
         assert "Every pending line is approved." in messages_of(fresh)
+
+    def test_a_form_without_the_version_is_refused_not_left_unchecked(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        found, client = submitted(make_request, people), client_for(people.mm_mad)
+        refused = client.post(url("approve_all", found), {}, follow=True)
+        assert "This page is out of date: reload it." in " ".join(messages_of(refused))
+        line = found.lines.get(line_no=1)
+        undecided = client.post(url("decide_line", line), {"decision": "APPROVED"}, follow=True)
+        assert "out of date" in " ".join(messages_of(undecided))
+        found.refresh_from_db()
+        assert found.status == Status.SUBMITTED
+        assert not found.lines.exclude(decision=Decision.PENDING).exists()
 
 
 def page_has_version(page: str, version: int) -> bool:
@@ -396,6 +453,33 @@ class TestEditTools:
         assert line.material == breaker and line.unit == breaker.unit
         assert "Line 1 changed." in messages_of(response)
 
+    def test_a_partly_approved_line_is_raised_back_to_its_request(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        found, client = approved(make_request, people), client_for(people.engineer)
+        line = found.lines.get(line_no=1)
+        services.reduce_approved_qty(
+            principal_for(people.mm_mad), line.pk, approved_qty=Decimal("6"), reason="Stock"
+        )
+        page = dialog(client, url("edit_line", line))
+        assert page.context["form"].initial["requested_qty"] == Decimal("6")  # what is approved
+        response = save(client, page, requested_qty="10", reason="Supplier has it again")
+        assert "Line 1 changed." in messages_of(response)
+        line.refresh_from_db()
+        assert (line.requested_qty, line.approved_qty) == (Decimal("10"), Decimal("10"))
+
+    def test_another_unit_asks_for_the_quantity_again(
+        self, make_request: MakeRequest, people: People, breaker: Material
+    ) -> None:
+        found, client = submitted(make_request, people), client_for(people.engineer)
+        line = found.lines.get(line_no=1)
+        page = dialog(client, url("edit_line", line), material=str(breaker.pk))
+        assert page.context["form"].initial["requested_qty"] is None  # not carried over
+        response = save(client, page, material=str(breaker.pk), reason="Breaker")
+        assert "Give a quantity." in " ".join(messages_of(response))
+        line.refresh_from_db()
+        assert line.material_id != breaker.pk
+
     def test_an_unknown_material_in_the_link_is_ignored(
         self, make_request: MakeRequest, people: People
     ) -> None:
@@ -419,7 +503,11 @@ class TestEditTools:
         remove = changed.context["rows"][1].remove.initial
         removed = client.post(
             url("remove_reviewed_line", second),
-            {"reason": "Not needed", "idempotency_key": remove["idempotency_key"]},
+            {
+                "reason": "Not needed",
+                "idempotency_key": remove["idempotency_key"],
+                "seen_version": remove["seen_version"],
+            },
             follow=True,
         )
         assert "Line 2 removed." in messages_of(removed)

@@ -130,14 +130,10 @@ def inbox(ctx: AccessContext) -> Content:
     )
 
 
-# What the "Assigned to me" panel counts (maintainer, 2026-11-02): the requests sent to the
-# user that are waiting for a decision, approved or rejected.
-ASSIGNED_STATUSES = (Status.SUBMITTED, Status.APPROVED, Status.REJECTED)
-
-
 def assigned(ctx: AccessContext) -> Content:
-    """Submitted, approved and rejected requests sent to the user (M7b.4)."""
-    rows = request_selectors.assigned_to(ctx, statuses=ASSIGNED_STATUSES)
+    """Submitted, approved and rejected requests sent to the user (M7b.4; maintainer,
+    2026-11-02). The inbox's "Assigned to me" filter lists each status."""
+    rows = request_selectors.assigned_to(ctx, statuses=request_selectors.ASSIGNED_STATUSES)
     return _content(
         rows.count(),
         (

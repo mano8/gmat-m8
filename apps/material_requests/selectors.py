@@ -219,6 +219,9 @@ def can_withdraw(ctx: AccessContext, of: MaterialRequest) -> bool:
 
 # What the inbox lists: requests waiting for a decision, and approved ones to follow up.
 INBOX_STATUSES = (Status.SUBMITTED, Status.APPROVED)
+# What the inbox's status filter and "Assigned to me" can list (M7b.4, maintainer
+# 2026-11-02): rejected requests too, to look back at.
+ASSIGNED_STATUSES = (*INBOX_STATUSES, Status.REJECTED)
 # Most urgent first, then the earliest needed-by date (none last), then the oldest submit.
 PRIORITY_RANK = Case(
     When(priority="URGENT", then=Value(0)),
@@ -238,17 +241,18 @@ def inbox(
     needed_before: date | None = None,
     assigned_to_me: bool = False,
 ) -> QuerySet[MaterialRequest]:
-    """Requests in the user's review scope in one status, the most pressing first.
+    """Requests in the user's review scope in one status (submitted unless another of
+    ``ASSIGNED_STATUSES`` is asked), the most pressing first.
 
     ``assigned_to_me`` keeps the ones sent to the user (``assigned_to``, M7b.4).
     """
     rows = (
-        assigned_to(ctx)
+        assigned_to(ctx, statuses=ASSIGNED_STATUSES)
         if assigned_to_me
         else MaterialRequest.objects.visible_to(ctx, REVIEW)
         .select_related("project", "requested_by")
         .annotate(line_count=Count("lines"))
-    ).filter(status=status if status in INBOX_STATUSES else Status.SUBMITTED)
+    ).filter(status=status if status in ASSIGNED_STATUSES else Status.SUBMITTED)
     if priority:
         rows = rows.filter(priority=priority)
     if project_id is not None:
@@ -309,7 +313,9 @@ def assigned_to(
 def assigned_ids(ctx: AccessContext, of: Sequence[MaterialRequest]) -> set[UUID]:
     """Which of ``of`` are assigned to the user and still count (as in ``assigned_to``)."""
     return set(
-        assigned_to(ctx).filter(pk__in=[found.pk for found in of]).values_list("pk", flat=True)
+        assigned_to(ctx, statuses=ASSIGNED_STATUSES)
+        .filter(pk__in=[found.pk for found in of])
+        .values_list("pk", flat=True)
     )
 
 
