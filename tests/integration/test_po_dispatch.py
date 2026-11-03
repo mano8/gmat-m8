@@ -9,11 +9,16 @@ The purchasing app's own ``DispatchSource`` is registered (``apps.purchasing.app
   queued and sent;
 - two outcomes of one cancelled order racing to queue its notice queue it once;
 - the claim / cancel interleaving that used to deadlock (claim holds the order ``FOR
-  SHARE``, cancel wants it ``FOR UPDATE``, or the other way round) completes either way.
+  SHARE``, cancel wants it ``FOR UPDATE``, or the other way round) completes either way;
+- the same with an amendment (M8.1): a claimed revision is never superseded, and a claim
+  that waited for the amendment never sends the revision it superseded;
+- the abandoned-attempt sweep racing the attempt's own late outcome (M8.1): the message
+  ends with the outcome and the cancellation notice is queued once, whichever wins.
 """
 
 import time
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -21,18 +26,27 @@ import pytest
 from django.core import mail
 from django.core.mail.backends.smtp import EmailBackend as SMTPBackend
 from django.db import transaction
+from django.db.models.functions import Now
 from django.test import override_settings
 
 from apps.access.principals import SystemPrincipal
 from apps.audit.models import AuditEvent
+from apps.catalog.models import Material, UnitOfMeasure
 from apps.core import events
 from apps.notifications.models import EmailAttempt, EmailOutbox, Kind, Outcome, Status
 from apps.notifications.outbox import queue_dispatch
-from apps.notifications.services import Claim, claim_next, record_outcome
+from apps.notifications.services import (
+    Claim,
+    Reconciled,
+    claim_next,
+    reconcile_abandoned,
+    record_outcome,
+)
 from apps.notifications.worker import Result, Worker, send
 from apps.purchasing import dispatch, services
 from apps.purchasing.dispatch import OrderDispatches, queue_order
 from apps.purchasing.models import PurchaseOrder
+from apps.purchasing.services import HeaderAmendment
 from tests import orders
 from tests.integration.conftest import run_concurrently
 from tests.org import Org, People
@@ -271,3 +285,115 @@ def test_two_outcomes_racing_to_queue_the_notice_queue_it_once(
     )
     assert results == [True, True]
     assert [message.pk for message in first] == [dispatch_of(order, Kind.PO_CANCELLATION).pk]
+
+
+# --- amendments and abandoned attempts (M8.1) -------------------------------------------
+
+
+@pytest.fixture
+def lined(issue: Callable[[], PurchaseOrder]) -> Callable[[], PurchaseOrder]:
+    """An issued, queued order with a line to receive (an amendment keeps it issued)."""
+
+    def make() -> PurchaseOrder:
+        order = issue()
+        unit, _ = UnitOfMeasure.objects.get_or_create(
+            code="M", defaults={"name": "m", "decimals": 2}
+        )
+        material = Material.objects.create(reference="CAB-25", name="Cable 2,5", unit=unit)
+        orders.line(order, material, "10")
+        return order
+
+    return make
+
+
+def amend(people: People, order: PurchaseOrder) -> PurchaseOrder:
+    return services.amend(
+        principal_for(people.mm_mad),
+        order.pk,
+        reason="Delivery window",
+        header=HeaderAmendment(notes="Call before delivering"),
+    )
+
+
+@pytest.fixture
+def slow_amend() -> Iterator[None]:
+    """The amendment holds the order ``FOR UPDATE`` (and its rows) for ``HOLD``."""
+    unsubscribe = events.subscribe("purchase_order.amended", lambda event: time.sleep(HOLD))
+    yield
+    unsubscribe()
+
+
+def test_an_amendment_waits_for_a_claim_in_progress(
+    lined: Callable[[], PurchaseOrder], people: People, slow_claim: None
+) -> None:
+    order = lined()
+    claimed, amended = second_starts_later(
+        lambda: claim_next(SystemPrincipal()), lambda: amend(people, order)
+    )
+    assert isinstance(claimed, Claim)
+    assert isinstance(amended, PurchaseOrder)  # no deadlock, no lock timeout
+    first = EmailOutbox.objects.get(pk=claimed.message_id)
+    assert first.status == Status.SENDING  # being sent: never superseded
+    revised = EmailOutbox.objects.exclude(pk=first.pk).get(source_po=order, kind=Kind.PO_ORDER)
+    assert revised.status == Status.QUEUED
+    system = SystemPrincipal()
+    record_outcome(system, claimed.attempt_id, Outcome.SENT)
+    following = claim_next(system)
+    assert isinstance(following, Claim) and following.message_id == revised.pk
+
+
+def test_a_claim_waits_for_an_amendment_holding_the_order(
+    lined: Callable[[], PurchaseOrder], people: People, slow_amend: None
+) -> None:
+    order = lined()
+    first = dispatch_of(order)
+    amended, claimed = second_starts_later(
+        lambda: amend(people, order), lambda: claim_next(SystemPrincipal())
+    )
+    assert isinstance(amended, PurchaseOrder)
+    assert claimed is None  # its candidate was superseded under the locks
+    assert EmailOutbox.objects.get(pk=first.pk).status == Status.SUPERSEDED
+    assert not EmailAttempt.objects.filter(message=first).exists()
+    following = claim_next(SystemPrincipal())
+    assert isinstance(following, Claim) and following.message_id != first.pk
+
+
+@pytest.mark.parametrize("first", ["sweep", "outcome"])
+def test_the_abandoned_attempt_sweep_racing_its_late_outcome(
+    issue: Callable[[], PurchaseOrder],
+    people: People,
+    monkeypatch: pytest.MonkeyPatch,
+    first: str,
+) -> None:
+    """The worker lost track of a dispatch (its attempt is past the deadline) while the
+    buyer cancelled the order. The sweep (``AMBIGUOUS``) and the attempt's late ``SENT``
+    lock the same row: the late outcome wins either way, and the cancellation notice
+    both of them owe is queued once."""
+    order = issue()
+    system = SystemPrincipal()
+    claimed = claim_next(system)
+    assert isinstance(claimed, Claim)
+    services.cancel(principal_for(people.mm_mad), order.pk, reason="Stop")
+    EmailAttempt.objects.filter(pk=claimed.attempt_id).update(
+        started_at=Now() - timedelta(minutes=10)
+    )
+    record_attempt = OrderDispatches.record_attempt
+    held: list[bool] = []
+
+    def slow(self: OrderDispatches, *args: Any) -> None:
+        record_attempt(self, *args)
+        if not held:  # the first holds the order and the row while it waits
+            held.append(True)
+            time.sleep(HOLD)
+
+    monkeypatch.setattr(OrderDispatches, "record_attempt", slow)
+    sweep = lambda: reconcile_abandoned(system)  # noqa: E731
+    late = lambda: record_outcome(system, claimed.attempt_id, Outcome.SENT)  # noqa: E731
+    results = second_starts_later(*((sweep, late) if first == "sweep" else (late, sweep)))
+    reconciled = next(result for result in results if isinstance(result, Reconciled))
+    assert reconciled.abandoned == (1 if first == "sweep" else 0)
+    assert True in results  # the late outcome reached the message
+    attempt = EmailAttempt.objects.get(pk=claimed.attempt_id)
+    assert (attempt.outcome, attempt.abandoned) == (Outcome.SENT, False)
+    assert dispatch_of(order).status == Status.SENT
+    assert dispatch_of(order, Kind.PO_CANCELLATION).status == Status.QUEUED

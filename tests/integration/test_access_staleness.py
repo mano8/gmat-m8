@@ -7,6 +7,8 @@ Every write runs the full check inside its transaction, whatever the page load s
 - a membership that expires between page load and submit denies the write (an expiry
   bumps no counter);
 - a password, email or MFA change between page load and submit denies the write;
+- a password reset or an offboarding that waits behind a running write ends the session
+  for every later write (M8.1);
 - a privilege elevation without an MFA step-up denies privileged writes.
 
 The "page load" is the session principal a request builds; the write is a service call.
@@ -19,14 +21,17 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import pytest
+from allauth.account.forms import default_token_generator
 from django.db import transaction
 
 from apps.access.authorization import authorize_in_txn
 from apps.access.exceptions import AccessDenied, MFARequired, NotInScope, StaleSession
 from apps.access.principals import SessionPrincipal
 from apps.access.roles import Capability, Role
+from apps.accounts.adapters import AccountAdapter
 from apps.accounts.mfa import reset_mfa
 from apps.accounts.models import User
+from apps.accounts.services import offboard_user
 from apps.core import events
 from apps.core.db import db_now
 from apps.core.locking import LockOrder
@@ -115,6 +120,56 @@ def test_a_revocation_waiting_behind_a_running_write_applies_to_every_later_writ
     for later in (page_load, principal_for(world.manager)):
         with pytest.raises(DENIED):
             write(later, world, "after")
+    assert Project.objects.get(pk=world.project.pk).name == "during"
+
+
+def reset_password(world: World) -> object:
+    """A password reset redeemed through the adapter: under the user-row lock (§3.6)."""
+    user = User.objects.get(pk=world.manager.pk)
+    token = default_token_generator.make_token(user)
+    AccountAdapter().redeem_password_reset(user, token, "a-new-long-password-3")
+    return "reset"
+
+
+def offboard(world: World) -> object:
+    return offboard_user(world.admin, world.manager.pk)
+
+
+@pytest.mark.parametrize(
+    "change", [reset_password, offboard], ids=["password-reset", "offboarding"]
+)
+def test_a_credential_change_waiting_behind_a_running_write_ends_the_session(
+    world: World, change: Callable[[World], object]
+) -> None:
+    """The change locks the user's row ``FOR UPDATE``; the running write holds it ``FOR
+    SHARE``, so the change waits for it, and no write of the old session follows."""
+    page_load = principal_for(world.manager)
+    holding = threading.Event()
+    timeline: dict[str, float] = {}
+
+    def hold_the_locks(event: events.Event) -> None:
+        holding.set()
+        time.sleep(0.6)
+        timeline["write_releases"] = time.monotonic()
+
+    def run(index: int) -> object:
+        if index == 0:
+            return write(page_load, world, "during")
+        assert holding.wait(10)
+        timeline["change_starts"] = time.monotonic()
+        changed = change(world)
+        timeline["change_commits"] = time.monotonic()
+        return changed
+
+    undo = events.subscribe("project.updated", hold_the_locks)
+    try:
+        written, changed = run_concurrently(2, run)
+    finally:
+        undo()
+    assert isinstance(written, Project) and not isinstance(changed, Exception), changed
+    assert timeline["change_starts"] < timeline["write_releases"] < timeline["change_commits"]
+    with pytest.raises((StaleSession, *DENIED)):
+        write(page_load, world, "after")
     assert Project.objects.get(pk=world.project.pk).name == "during"
 
 
