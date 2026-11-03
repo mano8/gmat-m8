@@ -74,7 +74,10 @@ class Screen:
     """A list and how to ask for its pages.
 
     ``size``, ``page`` and ``sort`` are the names of its parameters (a section of a page has
-    a prefix). ``filtered`` is a narrowing that still leaves a long list.
+    a prefix). ``filtered`` is a narrowing that still leaves a long list. ``conditional``
+    counts the queries a page skips when it has nothing for them (the delivery status of
+    invitations is read only when the page holds one still pending): the page's count may
+    differ by that much, never by a query per row.
     """
 
     name: str
@@ -86,6 +89,7 @@ class Screen:
     fixed_size: bool = False
     cursor: bool = False
     largest: str = "100"  # the largest page size the list offers
+    conditional: int = 0
 
 
 def reverse_(name: str, *args: Any) -> Callable[[World], str]:
@@ -135,6 +139,7 @@ SCREENS = (
         reverse_("org:invitations"),
         ("group_admin",),
         {"state": "valid", "delivery": "SENT"},
+        conditional=1,
     ),
     Screen(
         "my-requests",
@@ -236,6 +241,7 @@ SCREENS = (
         size="invitations_per_page",
         page="invitations_page",
         fixed_size=True,
+        conditional=1,
     ),
     *PANELS,
     Screen(
@@ -325,10 +331,13 @@ def test_a_list_does_not_query_per_row(world: World, screen: Screen, actor: str)
         get(client, url, {screen.size: sizes[1], screen.page: LAST}),
     )
     if not screen.fixed_size:
-        assert first[1] == get(client, url, {screen.size: screen.largest})[1], (
-            "10 rows cost another count than 100"
+        large = get(client, url, {screen.size: screen.largest})[1]
+        assert abs(first[1] - large) <= screen.conditional, (
+            f"10 rows cost {first[1]} queries, 100 rows {large}"
         )
-    assert first[1] == last[1], f"first page {first[1]} queries, last page {last[1]}"
+    assert abs(first[1] - last[1]) <= screen.conditional, (
+        f"first page {first[1]} queries, last page {last[1]}"
+    )
 
 
 @pytest.mark.parametrize(("screen", "actor"), CASES, ids=IDS)
