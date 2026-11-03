@@ -75,6 +75,7 @@ WORKLIST_PER_PAGE = 25  # materials per page of the worklist (Q41 said 50: see W
 # A card per material with its lines on every row: 25 is the most that stays in budget.
 WORKLIST_SCOPE = ListScope(max_per_page=25)
 UNALLOCATED_STRETCH = 200  # lines read at once for a section that is mostly empty
+WORKLIST_STRETCH = 78  # 3 x (page + 1) candidate lines first: one stretch fills most pages
 SECTION_PER_PAGE = 10  # drafts, and quantity on order for nobody: fixed, each on its own page
 DRAFTS_SCOPE = ListScope(prefix="drafts_", anchor="draft-orders", sized=False)
 UNALLOCATED_SCOPE = ListScope(prefix="unallocated_", anchor="ordered-for-nobody", sized=False)

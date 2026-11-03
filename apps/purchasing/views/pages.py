@@ -100,6 +100,7 @@ def worklist(request: HttpRequest) -> HttpResponse:
             worklist.window,
             default_per_page=selectors.WORKLIST_PER_PAGE,
             scope=selectors.WORKLIST_SCOPE,
+            first_stretch=selectors.WORKLIST_STRETCH,
         ),
         "drafts": drafts,
         "draft_rows": [(draft, selectors.is_stale(draft)) for draft in drafts.rows],
