@@ -1,6 +1,7 @@
 """Helpers shared by the test modules (fixtures live in ``tests/conftest.py``)."""
 
 import time
+from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 from types import EllipsisType
 from typing import Any
@@ -111,3 +112,22 @@ def error_codes(exc: Any) -> set[str]:
     if hasattr(error, "error_dict"):
         return {item.code for items in error.error_dict.values() for item in items if item.code}
     return {item.code for item in error.error_list if item.code}
+
+
+type Seek = Callable[[str, int], Sequence[Any]]
+type Window = Callable[[Sequence[Any]], list[tuple[int, Any]]]
+
+
+def every_key(seek: Seek, size: int = 1000) -> list[Any]:
+    """The candidates of a cursor list (``apps.core.listing.Seek``), from the start."""
+    return read_all(seek, lambda chunk: list(enumerate(chunk)), size)
+
+
+def read_all(seek: Seek, window: Window, size: int) -> list[Any]:
+    """Every row of a cursor list, read ``size`` candidates at a time like a pager would."""
+    rows: list[Any] = []
+    keys = seek("", size)
+    while keys:
+        rows.extend(row for _, row in window(keys))
+        keys = seek(str(keys[-1]), size) if len(keys) == size else []
+    return rows

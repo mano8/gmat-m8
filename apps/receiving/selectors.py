@@ -28,19 +28,20 @@ The screens (M6.3) read the rest from here:
   whole order (``po.view``); a site manager gets what their project can take (§3.4).
 """
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from itertools import groupby
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import BooleanField, ExpressionWrapper, Q, QuerySet, Value
+from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
+from apps.core.listing import seek_after
 from apps.handovers.models import Handover
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
@@ -134,12 +135,12 @@ class ExpectedFilter:
     supplier: str = ""
     expected_by: date | None = None
 
-    def keeps(self, row: ExpectedDelivery) -> bool:
-        if self.supplier and self.supplier.casefold() not in row.supplier.casefold():
-            return False
-        if self.expected_by is None:
-            return True
-        return row.expected_date is not None and row.expected_date <= self.expected_by
+    def narrow(self, orders: QuerySet[PurchaseOrder]) -> QuerySet[PurchaseOrder]:
+        if self.supplier:
+            orders = orders.filter(supplier_snapshot__name__icontains=self.supplier)
+        if self.expected_by is not None:
+            orders = orders.filter(expected_date__lte=self.expected_by)
+        return orders
 
 
 @dataclass(frozen=True)
@@ -154,16 +155,34 @@ class ExpectedOrder:
         return self.items[0]
 
 
-def expected_orders(
-    ctx: AccessContext, project_id: UUID, narrow: ExpectedFilter | None = None
-) -> list[ExpectedOrder]:
-    """The project's expected deliveries grouped by order, soonest first, narrowed by
-    ``narrow`` (404 outside ``receipt.view``)."""
-    narrow = narrow or ExpectedFilter()
-    rows = (row for row in expected_deliveries(ctx, project_id) if narrow.keeps(row))
-    return [
-        ExpectedOrder(po_id, tuple(items)) for po_id, items in groupby(rows, key=lambda r: r.po_id)
-    ]
+def _project_allocations(ctx: AccessContext, project: Project) -> QuerySet[PurchaseAllocation]:
+    """The live allocations of the project's open lines (in ``receipt.view`` scope) on an
+    issued order."""
+    lines = (
+        MaterialRequestLine.objects.visible_to(ctx, VIEW)
+        .filter(request_ledger.open_q(), project=project)
+        .values("pk")
+    )
+    return PurchaseAllocation.objects.filter(
+        request_line__in=lines, qty__gt=0, po_line__po__status=PurchaseOrder.Status.ISSUED
+    )
+
+
+def _expected_rows(allocations: QuerySet[PurchaseAllocation]) -> list[ExpectedDelivery]:
+    """The rows of ``allocations`` still expecting goods, soonest first."""
+    listed = list(
+        allocations.select_related("po_line__po", "po_line__unit", "request_line__request")
+    )
+    if not listed:
+        return []
+    book = book_for_order_lines({allocation.po_line_id for allocation in listed})
+    flows = request_ledger.flows({allocation.request_line_id for allocation in listed})
+    expected = {
+        allocation.pk: _expected(allocation, book, flows[allocation.request_line_id])
+        for allocation in listed
+    }
+    rows = [_row(a, expected[a.pk]) for a in listed if expected[a.pk] > 0]
+    return sorted(rows, key=_soonest_first)
 
 
 def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDelivery]:
@@ -171,26 +190,49 @@ def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDe
     project = Project.objects.visible_to(ctx, VIEW).filter(pk=project_id).first()
     if project is None:
         raise NotInScope(VIEW)
-    lines = (
-        MaterialRequestLine.objects.visible_to(ctx, VIEW)
-        .filter(request_ledger.open_q(), project=project)
-        .values("pk")
+    return _expected_rows(_project_allocations(ctx, project))
+
+
+SOONEST_ORDER = ("seek_undated", "seek_date", "seek_number", "pk")
+
+
+def _soonest(orders: QuerySet[PurchaseOrder]) -> QuerySet[PurchaseOrder]:
+    """``orders`` with the fields of ``SOONEST_ORDER``: expected date (none last), number."""
+    return orders.annotate(
+        seek_undated=ExpressionWrapper(Q(expected_date__isnull=True), BooleanField()),
+        seek_date=Coalesce("expected_date", Value(date.min)),
+        seek_number=Coalesce("number", Value("")),
     )
-    allocations = list(
-        PurchaseAllocation.objects.filter(
-            request_line__in=lines, qty__gt=0, po_line__po__status=PurchaseOrder.Status.ISSUED
-        ).select_related("po_line__po", "po_line__unit", "request_line__request")
-    )
-    if not allocations:
-        return []
-    book = book_for_order_lines({allocation.po_line_id for allocation in allocations})
-    flows = request_ledger.flows({allocation.request_line_id for allocation in allocations})
-    expected = {
-        allocation.pk: _expected(allocation, book, flows[allocation.request_line_id])
-        for allocation in allocations
-    }
-    rows = [_row(a, expected[a.pk]) for a in allocations if expected[a.pk] > 0]
-    return sorted(rows, key=_soonest_first)
+
+
+class ExpectedOrders:
+    """The project's expected deliveries grouped by order, soonest first, a page at a time
+    (M7d.4): ``seek`` reads the next orders that buy for the project from the database,
+    narrowed in SQL, and ``window`` works out what is still expected on a stretch of them,
+    leaving out an order with nothing left to come."""
+
+    def __init__(
+        self, ctx: AccessContext, project: Project, narrow: ExpectedFilter | None = None
+    ) -> None:
+        self._allocations = _project_allocations(ctx, project)
+        orders = PurchaseOrder.objects.filter(pk__in=self._allocations.values("po_line__po_id"))
+        self._orders = (narrow or ExpectedFilter()).narrow(orders)
+
+    def seek(self, cursor: str, limit: int) -> list[UUID]:
+        rows = seek_after(
+            _soonest(self._orders), _soonest(PurchaseOrder.objects.all()), SOONEST_ORDER, cursor
+        )
+        return list(rows.values_list("pk", flat=True)[:limit])
+
+    def window(self, chunk: Sequence[UUID]) -> list[tuple[int, ExpectedOrder]]:
+        by_order: dict[UUID, list[ExpectedDelivery]] = {}
+        for row in _expected_rows(self._allocations.filter(po_line__po_id__in=list(chunk))):
+            by_order.setdefault(row.po_id, []).append(row)
+        return [
+            (index, ExpectedOrder(pk, tuple(by_order[pk])))
+            for index, pk in enumerate(chunk)
+            if pk in by_order
+        ]
 
 
 # --- the expected-deliveries screen -----------------------------------------------------------

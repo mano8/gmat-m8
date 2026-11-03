@@ -28,7 +28,8 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import Q, QuerySet, Sum
+from django.db.models import Q, QuerySet, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
@@ -38,6 +39,7 @@ from apps.access.roles import Capability
 from apps.access.scopes import object_in_scope
 from apps.accounts.models import User
 from apps.catalog.models import Material
+from apps.core.listing import seek_after
 from apps.handovers.models import Handover, HandoverLine
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
@@ -299,28 +301,44 @@ def open_lines(
     return [row for row in rows if row.outstanding > 0]
 
 
+HANDOVER_ORDER = ("seek_number", "line_no", "pk")
+
+
 def _awaiting_handover_lines(ctx: AccessContext) -> QuerySet[MaterialRequestLine]:
-    return (
-        MaterialRequestLine.objects.visible_to(ctx, POST)
-        .filter(request_ledger.open_q())
-        .order_by("request__number", "line_no", "pk")
-    )
+    return MaterialRequestLine.objects.visible_to(ctx, POST).filter(request_ledger.open_q())
+
+
+def _in_request_order(rows: QuerySet[MaterialRequestLine]) -> QuerySet[MaterialRequestLine]:
+    return rows.annotate(seek_number=Coalesce("request__number", Value("")))
 
 
 def awaiting_handover(ctx: AccessContext) -> list[request_ledger.LineLedger]:
     """Open lines with goods received and not yet handed over (the ledger's *awaiting
     handover*), within ``handover.post`` scope, ordered by request (M7.2 dashboard)."""
-    lines = _awaiting_handover_lines(ctx).select_related("request", "project", "material", "unit")
+    lines = (
+        _in_request_order(_awaiting_handover_lines(ctx))
+        .order_by(*HANDOVER_ORDER)
+        .select_related("request", "project", "material", "unit")
+    )
     return [entry for entry in request_ledger.line_ledgers(lines) if entry.awaiting_handover > 0]
 
 
 class AwaitingHandover:
     """``awaiting_handover`` a stretch at a time, for a count that stops at a cap (M7d.4):
-    ``keys`` are the open lines in order, ``window`` works out the ledgers of a stretch."""
+    ``seek`` reads the next open lines in order, ``window`` works out the ledgers of a
+    stretch."""
 
     def __init__(self, ctx: AccessContext) -> None:
         self._lines = _awaiting_handover_lines(ctx)
-        self.keys: list[UUID] = list(self._lines.values_list("pk", flat=True))
+
+    def seek(self, cursor: str, limit: int) -> list[UUID]:
+        rows = seek_after(
+            _in_request_order(self._lines),
+            _in_request_order(MaterialRequestLine.objects.all()),
+            HANDOVER_ORDER,
+            cursor,
+        )
+        return list(rows.values_list("pk", flat=True)[:limit])
 
     def window(self, chunk: Sequence[UUID]) -> list[tuple[int, request_ledger.LineLedger]]:
         lines = self._lines.filter(pk__in=list(chunk)).select_related(

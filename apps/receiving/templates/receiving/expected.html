@@ -50,7 +50,7 @@
           {% include "components/empty_state.html" with title=message text=_("Goods bought for this project will be listed here once the order is issued.") %}
         {% endif %}
       {% endfor %}
-      {% include "components/pagination.html" with listing=listing %}
+      {% include "components/cursor_pagination.html" with listing=listing %}
     </div>
   {% endpartialdef %}
 {% endblock content %}

@@ -8,14 +8,16 @@ selector and hands it to :func:`paginate`; the template renders the page with
 falls back to the default, never to a 400, 404 or 500.
 """
 
+import re
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID
 
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.core.paginator import Page, Paginator
-from django.db.models import F, QuerySet
+from django.db.models import F, Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.cache import patch_vary_headers
@@ -290,12 +292,12 @@ def render_list(
 
 # --- lists read from a cursor (Q40) -----------------------------------------------------------
 
-CURSOR_START = "0"
+CURSOR_START = ""
 BACK_LIMIT = 10
 """How many earlier pages a page remembers in its link (older ones lead back to the first)."""
 MAX_STRETCH = 1000
-"""The most keys a stretch reads at once (the stretches double while a page is not full)."""
-_IDENT = 8
+"""The most candidates a stretch reads at once (the stretches double while a page is not full)."""
+_CURSOR = re.compile(r"[0-9A-Za-z-]{1,64}")
 
 
 @dataclass(frozen=True)
@@ -305,8 +307,8 @@ class CursorPage:
     For a list whose rows are worked out one by one (a ledger per request line), counting
     them means working out all of them. This page knows only where it starts, where the next
     page starts and where the ones before it did, so reading it costs the page, not the list:
-    ``First`` / ``Previous`` / ``Next``, no total. A cursor is ``<position>.<end of the key>``:
-    when rows came or went in between, the key finds the place again.
+    ``First`` / ``Previous`` / ``Next``, no total. A cursor is the key of the candidate the page
+    follows (keyset paging): the database reads on from there, whatever came or went before.
     """
 
     rows: list[Any]
@@ -366,63 +368,53 @@ class CursorPage:
 
     @property
     def following(self) -> tuple[str, ...]:
-        """What the next page remembers: this page and the ones before it."""
-        return (self.start, *self.back)[:BACK_LIMIT]
+        """What the next page remembers: this page and the ones before it (the first page
+        needs no cursor: an empty memory leads back to it)."""
+        return tuple(token for token in (self.start, *self.back) if token)[:BACK_LIMIT]
 
 
-def _token(position: int, keys: Sequence[Hashable]) -> str:
-    if position <= 0 or position >= len(keys):
-        return CURSOR_START
-    return f"{position}.{str(keys[position])[-_IDENT:]}"
+def _cursor(value: str) -> str:
+    """A cursor as it came in, or the start for anything that cannot be one."""
+    return value if _CURSOR.fullmatch(value) else CURSOR_START
 
 
-def _position(token: str, keys: Sequence[Hashable]) -> int:
-    """Where ``token`` points in ``keys``; its key finds it again if the list moved."""
-    head, _, ident = token.partition(".")
-    if not (head.isascii() and head.isdigit()):
-        return 0
-    position = min(int(head), len(keys))
-    if not ident or (position < len(keys) and str(keys[position])[-_IDENT:] == ident):
-        return position
-    for index, key in enumerate(keys):
-        if str(key)[-_IDENT:] == ident:
-            return index
-    return position
-
+type Seek = Callable[[str, int], Sequence[Hashable]]
+"""Takes a cursor (``CURSOR_START`` or the ``str`` of a key it returned before) and a count,
+and returns the keys of up to that many candidates after it, in the list's order: one
+``LIMIT`` query, see :func:`seek_after`."""
 
 type Window = Callable[[Sequence[Any]], list[tuple[int, Any]]]
 """Takes the keys of a stretch of the list and returns ``(index in the stretch, row)`` of the
 rows that stretch yields, in order."""
 
 
-def _collect(
-    keys: Sequence[Hashable], window: Window, start: int, wanted: int, first: int = 0
-) -> list[tuple[int, Any]]:
-    """Up to ``wanted`` ``(position, row)`` from ``start`` on, reading stretches of ``keys``.
-
-    A stretch is twice what is wanted and doubles each time the page is still not full,
-    so a list with few rows to show costs a handful of queries, not one set per stretch.
+def _collect(seek: Seek, window: Window, after: str, wanted: int, first: int = 0) -> list[Any]:
+    """Up to ``wanted`` ``(key, row)`` after the cursor ``after``, reading stretches of
+    candidates. A stretch is twice what is wanted and doubles each time the page is still not
+    full, so a list with few rows to show costs a handful of queries, not one set per stretch.
     """
-    found: list[tuple[int, Any]] = []
-    position, step = start, max(wanted * 2, 20, first)
-    while position < len(keys) and len(found) < wanted:
-        stretch = keys[position : position + step]
-        found.extend((position + index, row) for index, row in window(stretch))
-        position += len(stretch)
-        step = min(step * 2, MAX_STRETCH)
+    found: list[tuple[Hashable, Any]] = []
+    step = max(wanted * 2, 20, first)
+    while len(found) < wanted:
+        keys = seek(after, step)
+        if keys:
+            found.extend((keys[index], row) for index, row in window(keys))
+        if len(keys) < step:
+            break
+        after, step = str(keys[-1]), min(step * 2, MAX_STRETCH)
     return found
 
 
-def head(keys: Sequence[Hashable], window: Window, *, limit: int) -> tuple[list[Any], bool]:
+def head(seek: Seek, window: Window, *, limit: int) -> tuple[list[Any], bool]:
     """The first ``limit`` rows of a list, and whether more follow: a count that stops at
     ``limit`` (a dashboard's "99+") without working out the rest."""
-    found = _collect(keys, window, 0, limit + 1)
+    found = _collect(seek, window, CURSOR_START, limit + 1)
     return [row for _, row in found[:limit]], len(found) > limit
 
 
 def cursor_page(
     request: HttpRequest,
-    keys: Sequence[Hashable],
+    seek: Seek,
     window: Window,
     *,
     default_per_page: int,
@@ -431,27 +423,56 @@ def cursor_page(
 ) -> CursorPage:
     """The page of a list that ``?after=`` asks for, working out only what the page needs.
 
-    ``keys`` are the candidates in the list's order (cheap to list: ids), ``window`` works out
-    the rows of a stretch of them. Stretches are read until the page is full and one row is
-    known to follow it, so the work is the page plus at most a stretch. ``first_stretch`` makes
-    the first one longer for a list whose rows are rare (fewer rounds of queries).
+    ``seek`` reads the candidates after a cursor in the list's order (cheap: keys), ``window``
+    works out the rows of a stretch of them. Stretches are read until the page is full and one
+    row is known to follow it, so the work is the page plus at most a stretch. ``first_stretch``
+    makes the first one longer for a list whose rows are rare (fewer rounds of queries).
     """
     if default_per_page not in scope.sizes:
         raise ImproperlyConfigured(f"default_per_page must be one of {scope.sizes}.")
     params = ListParams(_scoped_query(request, scope), scope.sizes)
     params.is_valid()
     size = (params.cleaned_data.get("per_page") if scope.sized else None) or default_per_page
-    start = _position(request.GET.get(scope.after_param, ""), keys)
-    found = _collect(keys, window, start, size + 1, first_stretch)
-    back = tuple(t for t in request.GET.get(scope.back_param, "").split(",") if t)[:BACK_LIMIT]
+    start = _cursor(request.GET.get(scope.after_param, ""))
+    found = _collect(seek, window, start, size + 1, first_stretch)
+    back = tuple(
+        _cursor(token) for token in request.GET.get(scope.back_param, "").split(",") if token
+    )[:BACK_LIMIT]
     return CursorPage(
         rows=[row for _, row in found[:size]],
         per_page=size,
-        start=_token(start, keys),
-        next=_token(found[size - 1][0] + 1, keys) if len(found) > size else "",
+        start=start,
+        next=str(found[size - 1][0]) if len(found) > size else "",
         back=back,
         scope=scope,
     )
+
+
+def after_q(fields: Sequence[str], values: Sequence[Any]) -> Q:
+    """The rows that come after ``values`` in the order of ``fields`` (all ascending, none
+    NULL): ``(f1, f2, ...) > (v1, v2, ...)`` spelled out as ``Q``."""
+    found = Q(**{f"{fields[-1]}__gt": values[-1]})
+    for field, value in zip(reversed(fields[:-1]), reversed(values[:-1]), strict=True):
+        found = Q(**{f"{field}__gt": value}) | (Q(**{field: value}) & found)
+    return found
+
+
+def seek_after(
+    rows: QuerySet[Any], anchors: QuerySet[Any], fields: Sequence[str], cursor: str
+) -> QuerySet[Any]:
+    """``rows`` in the order of ``fields`` from just after the row ``cursor`` names: a keyset
+    seek, so a page reads from its place instead of counting its way there.
+
+    The cursor is a primary key, read in ``anchors`` (the same ``fields`` without the list's
+    filters, so a row that left the list since still marks its place); its values are only
+    compared, never shown. A cursor that names nothing reads from the start.
+    """
+    ordered = rows.order_by(*fields)
+    try:
+        anchor = anchors.filter(pk=UUID(cursor)).values_list(*fields).first() if cursor else None
+    except ValueError:
+        anchor = None
+    return ordered.filter(after_q(fields, anchor)) if anchor else ordered
 
 
 ACTIVE, REVOKED = "active", "revoked"

@@ -86,7 +86,7 @@ def worklist(request: HttpRequest) -> HttpResponse:
     )
     unallocated = cursor_page(
         request,
-        nobody.keys,
+        nobody.seek,
         nobody.window,
         default_per_page=selectors.SECTION_PER_PAGE,
         scope=selectors.UNALLOCATED_SCOPE,
@@ -96,7 +96,7 @@ def worklist(request: HttpRequest) -> HttpResponse:
         "filters": filters,
         "listing": cursor_page(
             request,
-            worklist.keys,
+            worklist.seek,
             worklist.window,
             default_per_page=selectors.WORKLIST_PER_PAGE,
             scope=selectors.WORKLIST_SCOPE,

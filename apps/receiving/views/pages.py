@@ -19,7 +19,7 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
 from apps.attachments import selectors as attachment_selectors
-from apps.core.listing import paginate, render_list
+from apps.core.listing import cursor_page, paginate, render_list
 from apps.locations.models import Location
 from apps.purchasing.models import PurchaseOrder
 from apps.receiving import selectors
@@ -175,10 +175,9 @@ def expected(request: HttpRequest, project_id: UUID) -> HttpResponse:
     narrow = selectors.ExpectedFilter(
         supplier=data.get("supplier", ""), expected_by=data.get("expected_by")
     )
-    listing = paginate(
-        request,
-        selectors.expected_orders(ctx, project.pk, narrow),
-        default_per_page=selectors.EXPECTED_PER_PAGE,
+    orders = selectors.ExpectedOrders(ctx, project, narrow)
+    listing = cursor_page(
+        request, orders.seek, orders.window, default_per_page=selectors.EXPECTED_PER_PAGE
     )
     place = selectors.worksite(ctx, project.pk)
     context = {

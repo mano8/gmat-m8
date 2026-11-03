@@ -29,7 +29,7 @@ ZERO = Decimal("0")
 DRAFT, ISSUED = "DRAFT", "ISSUED"
 COMMITTING = frozenset({DRAFT, ISSUED})  # orders whose allocations count as allocated
 PRIORITY_RANK = {"URGENT": 0, "HIGH": 1, "NORMAL": 2, "LOW": 3}
-_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ class RequestLineFacts:
             self.needed_by is None,
             self.needed_by or date.min,
             self.submitted_at is None,
-            self.submitted_at or _EPOCH,
+            self.submitted_at or EPOCH,
         )
 
 

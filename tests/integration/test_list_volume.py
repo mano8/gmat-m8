@@ -36,6 +36,7 @@ from apps.handovers.models import Handover
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.purchasing import selectors as purchasing_selectors
 from apps.purchasing.models import PurchaseOrder
+from apps.receiving import selectors as receiving_selectors
 from apps.receiving.models import GoodsReceipt
 from tests.org import Org, People, build_org, build_people, client_for
 from tests.volume import Volume, build_volume
@@ -189,12 +190,16 @@ SCREENS = (
         of("receiving:expected", lambda w: w.org.hospital.pk),
         ("site_manager", "mm_mad"),
         {"supplier": "volumen 01"},
+        page="after",
+        cursor=True,
     ),
     Screen(
         "project-materials",
         of("requests:project_materials", lambda w: w.org.hospital.pk),
         ("mm_mad",),
         {"q": "cable", "outstanding": "on"},
+        page="after",
+        cursor=True,
     ),
     Screen(
         "project-assignments",
@@ -345,12 +350,12 @@ def test_a_list_answers_within_the_budget(world: World, screen: Screen, actor: s
     assert filtered_seconds <= BUDGET_SECONDS, f"filtered: {filtered_seconds * 1000:.0f} ms"
 
 
-def walk(keys: list[Any], window: Any, size: int) -> list[Any]:
+def walk(seek: Any, window: Any, size: int) -> list[Any]:
     """Every row of a cursor list, page after page."""
     rows: list[Any] = []
     query: dict[str, str] = {"per_page": str(size)}
     while True:
-        page = cursor_page(RequestFactory().get("/", query), keys, window, default_per_page=50)
+        page = cursor_page(RequestFactory().get("/", query), seek, window, default_per_page=50)
         rows += page.rows
         if not page.next:
             return rows
@@ -363,7 +368,7 @@ def test_the_cursor_worklist_gives_the_rows_of_the_whole_list(world: World, acto
     eager = purchasing_selectors.by_material(purchasing_selectors.to_purchase(ctx))
     worklist = purchasing_selectors.Worklist(ctx)
     for size in (10, 100):
-        lazy = walk(worklist.keys, worklist.window, size)
+        lazy = walk(worklist.seek, worklist.window, size)
         assert len(lazy) == len(eager) > size
         assert [
             (g.reference, [(r.line.pk, r.to_purchase, r.reserved) for r in g.rows]) for g in lazy
@@ -379,9 +384,24 @@ def test_the_cursor_section_of_unallocated_lines_gives_the_whole_list(
     ctx = AccessContext.for_user(getattr(world.people, actor))
     eager = purchasing_selectors.unallocated_on_order(ctx)
     nobody = purchasing_selectors.Unallocated(ctx)
-    lazy = walk(nobody.keys, nobody.window, 10)
+    lazy = walk(nobody.seek, nobody.window, 10)
     assert len(eager) > 10
     assert [(r.line.pk, r.unallocated) for r in lazy] == [(r.line.pk, r.unallocated) for r in eager]
+
+
+@pytest.mark.parametrize("actor", ["site_manager", "mm_mad"])
+def test_the_cursor_expected_deliveries_give_the_rows_of_the_whole_list(
+    world: World, actor: str
+) -> None:
+    ctx = AccessContext.for_user(getattr(world.people, actor))
+    project = world.org.hospital
+    eager = receiving_selectors.expected_deliveries(ctx, project.pk)
+    orders = receiving_selectors.ExpectedOrders(ctx, project)
+    lazy = [row for order in walk(orders.seek, orders.window, 10) for row in order.items]
+    assert len({row.po_id for row in eager}) > 10
+    assert sorted((r.allocation_id, r.expected) for r in lazy) == sorted(
+        (r.allocation_id, r.expected) for r in eager
+    )
 
 
 def test_a_dashboard_count_stops_at_the_cap(world: World) -> None:

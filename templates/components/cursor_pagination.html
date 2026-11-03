@@ -8,7 +8,7 @@
   <nav class="mt-4 flex flex-wrap items-center justify-between gap-2"
        aria-label="{% translate 'Pagination' %}">
     {% if listing.has_previous %}
-      {% cursor_url listing "0" as first_url %}
+      {% cursor_url listing "" as first_url %}
       <a class="btn"
          href="{{ first_url }}"
          aria-label="{% translate 'First page' %}">«</a>

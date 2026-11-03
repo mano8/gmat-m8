@@ -26,7 +26,20 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from django.db.models import Exists, F, OuterRef, Q, QuerySet
+from django.db.models import (
+    BooleanField,
+    Case,
+    Exists,
+    ExpressionWrapper,
+    F,
+    IntegerField,
+    OuterRef,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -34,7 +47,7 @@ from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
 from apps.audit.models import AuditEvent
-from apps.core.listing import ListScope
+from apps.core.listing import ListScope, seek_after
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
 from apps.material_requests import selectors as request_selectors
@@ -46,7 +59,13 @@ from apps.projects.models import Project
 from apps.purchasing.components import TrimReason
 from apps.purchasing.ledger import book_for_order_lines
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
-from apps.purchasing.waterfall import ZERO, OrderLineTotals, RequestLineFacts
+from apps.purchasing.waterfall import (
+    EPOCH,
+    PRIORITY_RANK,
+    ZERO,
+    OrderLineTotals,
+    RequestLineFacts,
+)
 
 VIEW, MANAGE, PRICE = Capability.PO_VIEW, Capability.PO_MANAGE, Capability.PRICE_VIEW
 Status = PurchaseOrder.Status
@@ -425,35 +444,57 @@ def by_material(rows: Iterable[WorklistRow]) -> list[MaterialGroup]:
     return list(groups.values())
 
 
+ATTRIBUTION_ORDER = ("seek_rank", "seek_undated", "seek_needed", "seek_unsent", "seek_sent", "pk")
+"""``RequestLineFacts.order_key`` and the line id in SQL (see ``_in_attribution_order``)."""
+
+
+def _in_attribution_order(rows: QuerySet[MaterialRequestLine]) -> QuerySet[MaterialRequestLine]:
+    """``rows`` with the fields of ``ATTRIBUTION_ORDER``: the waterfall's priority rank, the
+    needed-by date (none last) and the submit time (none last), never NULL, so the database
+    pages them in exactly the order ``waterfall`` attributes."""
+    return rows.annotate(
+        seek_rank=Case(
+            *(
+                When(request__priority=name, then=Value(rank))
+                for name, rank in PRIORITY_RANK.items()
+            ),
+            default=Value(len(PRIORITY_RANK)),
+            output_field=IntegerField(),
+        ),
+        seek_undated=ExpressionWrapper(Q(request__needed_by__isnull=True), BooleanField()),
+        seek_needed=Coalesce("request__needed_by", Value(date.min)),
+        seek_unsent=ExpressionWrapper(Q(request__submitted_at__isnull=True), BooleanField()),
+        seek_sent=Coalesce("request__submitted_at", Value(EPOCH)),
+    )
+
+
 class Worklist:
     """The worklist screen's view of ``to_purchase``, worked out a page at a time.
 
-    ``keys`` lists the candidate lines in attribution order from one light query (ids and the
-    request's ordering fields); ``window`` works out the ledgers of the materials in a stretch
-    of them and yields each material group at its most urgent line that still needs buying,
-    exactly where ``by_material(to_purchase(...))`` puts it. A page costs the groups it
-    shows, however long the backlog is (M7d.4).
+    ``seek`` reads the next candidate lines in attribution order from the database (one
+    ``LIMIT`` query of ids); ``window`` works out the ledgers of the materials of a stretch of
+    them and yields each material group at its most urgent line that still needs buying,
+    exactly where ``by_material(to_purchase(...))`` puts it. A page costs the groups it shows,
+    however long the backlog is (M7d.4).
     """
 
     def __init__(
         self, ctx: AccessContext, *, project_id: UUID | None = None, priority: str = ""
     ) -> None:
         self._lines = _worklist_lines(ctx, project_id=project_id, priority=priority)
-        light = self._lines.values_list(
-            "pk",
-            "request_id",
-            "material_id",
-            "request__priority",
-            "request__needed_by",
-            "request__submitted_at",
-        )
-        candidates = sorted(
-            (_order_key(pk, request_id, rank, needed_by, submitted_at), material_id)
-            for pk, request_id, material_id, rank, needed_by, submitted_at in light
-        )
-        self.keys: list[UUID] = [key[-1] for key, _ in candidates]  # type: ignore[misc]
-        self._material = {key[-1]: material_id for key, material_id in candidates}
+        self._material: dict[UUID, UUID] = {}
         self._groups: dict[UUID, MaterialGroup | None] = {}
+
+    def seek(self, cursor: str, limit: int) -> list[UUID]:
+        rows = seek_after(
+            _in_attribution_order(self._lines),
+            _in_attribution_order(MaterialRequestLine.objects.all()),
+            ATTRIBUTION_ORDER,
+            cursor,
+        )
+        found = list(rows.values_list("pk", "material_id")[:limit])
+        self._material.update(found)
+        return [pk for pk, _ in found]
 
     def _work_out(self, material_ids: set[UUID]) -> None:
         rows = _worklist_rows(self._lines.filter(material_id__in=material_ids))
@@ -487,34 +528,50 @@ class UnallocatedRow:
     unallocated: Decimal
 
 
+def _receivable_lines(ctx: AccessContext, supplier_id: UUID | None) -> QuerySet[PurchaseOrderLine]:
+    lines = PurchaseOrderLine.objects.visible_to(ctx, MANAGE).filter(
+        po__status=Status.ISSUED, closed_short_at__isnull=True
+    )
+    return lines if supplier_id is None else lines.filter(po__supplier_id=supplier_id)
+
+
 def unallocated_on_order(
     ctx: AccessContext, *, supplier_id: UUID | None = None
 ) -> list[UnallocatedRow]:
     """Receivable order lines with quantity on order for nobody (flagged, §4.5)."""
-    lines = PurchaseOrderLine.objects.visible_to(ctx, MANAGE).filter(
-        po__status=Status.ISSUED, closed_short_at__isnull=True
+    listed = list(
+        _receivable_lines(ctx, supplier_id)
+        .select_related("po", "material", "unit")
+        .order_by("po__number", "line_no")
     )
-    if supplier_id is not None:
-        lines = lines.filter(po__supplier_id=supplier_id)
-    listed = list(lines.select_related("po", "material", "unit").order_by("po__number", "line_no"))
     book = book_for_order_lines([line.pk for line in listed])
     rows = [UnallocatedRow(line, book.order_line_totals(line.pk).unallocated) for line in listed]
     return [row for row in rows if row.unallocated > 0]
 
 
+ORDER_LINE_ORDER = ("seek_number", "line_no", "pk")
+
+
+def _in_number_order(rows: QuerySet[PurchaseOrderLine]) -> QuerySet[PurchaseOrderLine]:
+    return rows.annotate(seek_number=Coalesce("po__number", Value("")))
+
+
 class Unallocated:
     """``unallocated_on_order`` a page at a time (as :class:`Worklist`): the receivable order
-    lines in number order, worked out in stretches until the page is full."""
+    lines in number order, read on from the cursor and worked out in stretches until the page
+    is full."""
 
     def __init__(self, ctx: AccessContext, *, supplier_id: UUID | None = None) -> None:
-        lines = PurchaseOrderLine.objects.visible_to(ctx, MANAGE).filter(
-            po__status=Status.ISSUED, closed_short_at__isnull=True
+        self._lines = _receivable_lines(ctx, supplier_id)
+
+    def seek(self, cursor: str, limit: int) -> list[UUID]:
+        rows = seek_after(
+            _in_number_order(self._lines),
+            _in_number_order(PurchaseOrderLine.objects.all()),
+            ORDER_LINE_ORDER,
+            cursor,
         )
-        if supplier_id is not None:
-            lines = lines.filter(po__supplier_id=supplier_id)
-        self.keys: list[UUID] = list(
-            lines.order_by("po__number", "line_no", "pk").values_list("pk", flat=True)
-        )
+        return list(rows.values_list("pk", flat=True)[:limit])
 
     def window(self, chunk: Sequence[UUID]) -> list[tuple[int, UnallocatedRow]]:
         book = book_for_order_lines(chunk)

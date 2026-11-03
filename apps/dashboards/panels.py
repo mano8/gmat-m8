@@ -174,7 +174,7 @@ def sourcing(ctx: AccessContext) -> Content:
 
 def to_purchase(ctx: AccessContext) -> Content:
     worklist = purchasing_selectors.Worklist(ctx)
-    rows, more = head(worklist.keys, worklist.line_window, limit=COUNT_CAP)
+    rows, more = head(worklist.seek, worklist.line_window, limit=COUNT_CAP)
     return _content(
         len(rows),
         (
@@ -206,7 +206,7 @@ def stale_drafts(ctx: AccessContext) -> Content:
 
 def unallocated(ctx: AccessContext) -> Content:
     nobody = purchasing_selectors.Unallocated(ctx)
-    rows, more = head(nobody.keys, nobody.window, limit=COUNT_CAP)
+    rows, more = head(nobody.seek, nobody.window, limit=COUNT_CAP)
     return _content(
         len(rows),
         (
@@ -261,7 +261,7 @@ def dispatches(ctx: AccessContext) -> Content:
 
 def to_hand_over(ctx: AccessContext) -> Content:
     awaiting = handover_selectors.AwaitingHandover(ctx)
-    rows, more = head(awaiting.keys, awaiting.window, limit=COUNT_CAP)
+    rows, more = head(awaiting.seek, awaiting.window, limit=COUNT_CAP)
     return _content(
         len(rows),
         (

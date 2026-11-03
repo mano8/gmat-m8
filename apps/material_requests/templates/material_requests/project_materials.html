@@ -50,7 +50,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" with listing=listing %}
+        {% include "components/cursor_pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("Nothing is outstanding for this project.") %}
       {% endif %}

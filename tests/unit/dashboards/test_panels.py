@@ -17,7 +17,7 @@ from apps.purchasing.models import PurchaseOrder
 from tests.orders import order as make_order
 from tests.org import Org, People
 from tests.outbox import make_dispatch
-from tests.support import principal_for
+from tests.support import every_key, principal_for, read_all
 from tests.unit.purchasing.conftest import Buy, MakeLine
 from tests.unit.receiving.conftest import Receive
 
@@ -324,14 +324,17 @@ class TestGoods:
         eager = handover_selectors.awaiting_handover(wo)
         awaiting = handover_selectors.AwaitingHandover(wo)
         for size in (1, 2, 50):
-            lazy = []
-            for start in range(0, len(awaiting.keys), size):
-                lazy += [e for _, e in awaiting.window(awaiting.keys[start : start + size])]
+            lazy = read_all(awaiting.seek, awaiting.window, size)
             assert [(e.line.pk, e.awaiting_handover) for e in lazy] == [
                 (e.line.pk, e.awaiting_handover) for e in eager
             ]
         assert len(eager) == 3
-        assert handover_selectors.AwaitingHandover(AccessContext.for_user(people.mm_sev)).keys == []
+        assert (
+            every_key(
+                handover_selectors.AwaitingHandover(AccessContext.for_user(people.mm_sev)).seek
+            )
+            == []
+        )
 
     def test_site_surplus_is_what_a_worksite_could_not_take(
         self,

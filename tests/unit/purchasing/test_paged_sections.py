@@ -41,8 +41,9 @@ def link(html: str, rel: str) -> str:
     return found[1].replace("&amp;", "&")
 
 
-def follow(client: Client, html: str, rel: str) -> str:
-    response = client.get(reverse("purchasing:worklist") + link(html, rel))
+def follow(client: Client, html: str, rel: str, url: str = "") -> str:
+    """The page the pager link with ``rel`` leads to, on ``url`` (the worklist by default)."""
+    response = client.get((url or reverse("purchasing:worklist")) + link(html, rel))
     assert response.status_code == 200
     return str(response.content.decode())
 
@@ -203,6 +204,10 @@ class TestWorklistSections:
             def __init__(self, ctx: Any, **_: Any) -> None:
                 self.keys = [f"line-{number:03d}" for number in range(SIZE + 1)]
 
+            def seek(self, cursor: str, limit: int) -> list[str]:
+                start = self.keys.index(cursor) + 1 if cursor in self.keys else 0
+                return self.keys[start : start + limit]
+
             def window(self, chunk: Any) -> list[tuple[int, UnallocatedRow]]:
                 return [(index, UnallocatedRow(po_line, Decimal(4))) for index in range(len(chunk))]
 
@@ -233,9 +238,11 @@ class TestExpectedDeliveries:
         client = client_for(people.wo_mad)
         first = get(client, "receiving:expected", org.hospital.pk)
         assert first.count('data-testid="expected-order"') == SIZE
-        assert "Showing 1\u201310 of 11" in first
-        second = get(client, "receiving:expected", org.hospital.pk, page=2)
-        assert second.count('data-testid="expected-order"') == 1
+        assert "10 shown" in first and " of 11" not in first  # read from a cursor: no total
+        second = follow(
+            client, first, "next", reverse("receiving:expected", args=[org.hospital.pk])
+        )
+        assert second.count('data-testid="expected-order"') == 1 and 'rel="next"' not in second
         wide = get(client, "receiving:expected", org.hospital.pk, per_page=25)
         assert wide.count('data-testid="expected-order"') == SIZE + 1
 
@@ -285,7 +292,7 @@ class TestExpectedDeliveries:
 
     def test_nothing_expected_still_says_so(self, org: Org, people: People) -> None:
         html = get(client_for(people.site_manager), "receiving:expected", org.hospital.pk)
-        assert "Nothing is expected here" in html and "0 results" in html
+        assert "Nothing is expected here" in html and "0 shown" in html
 
 
 class TestProjectMaterials:
@@ -298,18 +305,21 @@ class TestProjectMaterials:
         client = client_for(people.mm_mad)
         first = get(client, "requests:project_materials", org.hospital.pk, per_page=SIZE)
         assert first.count('data-testid="project-material"') == SIZE
-        assert "Showing 1\u201310 of 11" in first
-        second = get(client, "requests:project_materials", org.hospital.pk, per_page=SIZE, page=2)
-        assert second.count('data-testid="project-material"') == 1
+        assert "10 shown" in first and " of 11" not in first  # read from a cursor: no total
+        url = reverse("requests:project_materials", args=[org.hospital.pk])
+        second = follow(client, first, "next", url)
+        assert second.count('data-testid="project-material"') == 1 and "per_page=10" in link(
+            second, "prev"
+        )
         default = get(client, "requests:project_materials", org.hospital.pk)
         assert default.count('data-testid="project-material"') == SIZE + 1
 
-    def test_most_outstanding_stays_first(
+    def test_the_materials_come_in_alphabetical_order(
         self, org: Org, people: People, make_line: MakeLine
     ) -> None:
         self.lines(make_line, org)
         html = get(client_for(people.mm_mad), "requests:project_materials", org.hospital.pk)
-        assert html.index("MAT-010") < html.index("MAT-000")
+        assert html.index("MAT-000") < html.index("MAT-010") < html.index("MAT-002")
 
     def test_text_filter_looks_at_name_and_reference(
         self, org: Org, people: People, make_line: MakeLine

@@ -2,11 +2,14 @@
 
 import re
 from typing import Any
+from urllib.parse import quote
+from uuid import uuid7
 
 import pytest
 from django import forms
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models import Q
 from django.http import HttpResponse
 from django.template.loader import get_template
 from django.test import RequestFactory
@@ -477,35 +480,43 @@ class TestRevocation:
 # --- lists read from a cursor (M7d.4, Q40) -----------------------------------------------------
 
 
-class Reads:
-    """A ``window`` over numbered keys that yields the multiples of ``every`` and counts the
-    stretches it was asked for (the work a page costs)."""
+class Source:
+    """A list of numbered candidates: ``seek`` reads on after a cursor as the database would,
+    ``window`` yields the multiples of ``every`` and counts the stretches it was asked for (the
+    work a page costs)."""
 
-    def __init__(self, every: int = 1) -> None:
+    def __init__(self, count: int, every: int = 1) -> None:
+        self.keys = range(count)
         self.every = every
         self.stretches: list[int] = []
 
-    def __call__(self, chunk: Any) -> list[tuple[int, Any]]:
+    def seek(self, cursor: str, limit: int) -> list[int]:
+        start = int(cursor) + 1 if cursor.isdigit() else 0
+        return list(self.keys[start : start + limit])
+
+    def window(self, chunk: Any) -> list[tuple[int, Any]]:
         self.stretches.append(len(chunk))
         return [(i, key) for i, key in enumerate(chunk) if key % self.every == 0]
 
 
-def keys_of(count: int) -> list[int]:
-    return list(range(count))
+def page_of(request: Any, source: Source, size: int = 10, **options: Any) -> Any:
+    return listing.cursor_page(
+        request, source.seek, source.window, default_per_page=size, **options
+    )
 
 
 def cursor(query: str, count: int, *, every: int = 1, size: int = 10) -> Any:
-    return listing.cursor_page(get(query), keys_of(count), Reads(every), default_per_page=size)
+    return page_of(get(query), Source(count, every), size)
 
 
 class TestCursorPage:
     def test_the_first_page_and_where_the_next_starts(self) -> None:
         page = cursor("", 35)
-        assert page.rows == keys_of(10)
+        assert page.rows == list(range(10))
         assert (page.start, page.back, page.has_previous) == (listing.CURSOR_START, (), False)
-        assert page.next == "10.10"
+        assert page.next == "9"  # the key of the last row shown: the next page reads after it
         second = cursor(f"after={page.next}", 35)
-        assert second.rows == keys_of(20)[10:]
+        assert second.rows == list(range(10, 20))
         assert second.has_previous and second.start == page.next
 
     def test_the_pages_cover_the_list_once(self) -> None:
@@ -516,22 +527,33 @@ class TestCursorPage:
             if not page.next:
                 break
             query = f"after={page.next}"
-        assert seen == [key for key in keys_of(47) if key % 3 == 0]
+        assert seen == [key for key in range(47) if key % 3 == 0]
 
     def test_an_exact_page_has_no_next_and_one_more_row_has(self) -> None:
         assert cursor("", 10).next == "" and not cursor("", 10).has_other_pages
-        assert cursor("", 11).next != ""
-        assert cursor("after=10.10", 11).rows == [10]
+        assert cursor("", 11).next == "9"
+        assert cursor("after=9", 11).rows == [10]
 
     def test_a_page_costs_the_stretches_it_needs(self) -> None:
-        reads = Reads()
-        listing.cursor_page(get(""), keys_of(100_000), reads, default_per_page=10)
-        assert reads.stretches == [22]  # one stretch of 2 x (10 + 1) keys, not the list
+        source = Source(100_000)
+        page_of(get(""), source)
+        assert source.stretches == [22]  # one stretch of 2 x (10 + 1) keys, not the list
 
     def test_a_sparse_list_reads_on_until_the_page_is_full(self) -> None:
-        reads = Reads(every=50)
-        page = listing.cursor_page(get(""), keys_of(1000), reads, default_per_page=10)
-        assert len(page.rows) == 10 and reads.stretches[:3] == [22, 44, 88]
+        source = Source(1000, every=50)
+        page = page_of(get(""), source)
+        assert len(page.rows) == 10 and source.stretches[:3] == [22, 44, 88]
+
+    def test_a_longer_first_stretch_for_a_list_whose_rows_are_rare(self) -> None:
+        source = Source(1000, every=50)
+        page_of(get(""), source, first_stretch=200)
+        assert source.stretches[0] == 200
+
+    def test_the_end_of_the_list_ends_the_reading(self) -> None:
+        source = Source(30, every=7)
+        page = page_of(get(""), source)
+        assert page.rows == [0, 7, 14, 21, 28] and page.next == ""
+        assert source.stretches == [22, 8]
 
     @pytest.mark.parametrize(
         "after",
@@ -540,15 +562,10 @@ class TestCursorPage:
     def test_a_bad_cursor_never_fails(self, after: str) -> None:
         assert isinstance(cursor(f"after={after}", 30).rows, list)
 
-    def test_a_cursor_finds_its_place_again_when_the_list_moved(self) -> None:
-        def window(chunk: Any) -> list[tuple[int, Any]]:
-            return list(enumerate(chunk))
-
-        keys = [f"line-{n:03d}" for n in range(30)]
-        first = listing.cursor_page(get(""), keys, window, default_per_page=10)
-        moved = ["new-a", "new-b", *keys]  # two rows came in before the cursor
-        second = listing.cursor_page(get(f"after={first.next}"), moved, window, default_per_page=10)
-        assert second.rows[0] == "line-010"
+    @pytest.mark.parametrize("after", ["a" * 65, "1,2", "<b>", "\u00b2", "9 9", "1;drop"])
+    def test_what_cannot_be_a_cursor_reads_from_the_start(self, after: str) -> None:
+        page = cursor(f"after={quote(after)}", 30)
+        assert (page.start, page.rows[0]) == (listing.CURSOR_START, 0)
 
     def test_the_page_size_is_chosen_and_falls_back(self) -> None:
         assert len(cursor("per_page=25", 100).rows) == 25
@@ -556,28 +573,59 @@ class TestCursorPage:
 
     def test_a_default_size_that_is_not_offered_is_a_mistake(self) -> None:
         with pytest.raises(ImproperlyConfigured):
-            listing.cursor_page(get(""), [], Reads(), default_per_page=12)
+            page_of(get(""), Source(0), size=12)
 
     def test_back_remembers_the_pages_before_up_to_a_limit(self) -> None:
-        many = ",".join(f"{n}.{n}" for n in range(1, 30))
-        page = cursor(f"back={many}", 10)
+        many = ",".join(str(n) for n in range(1, 30))
+        page = cursor(f"after=40&back={many}", 100)
         assert len(page.back) == listing.BACK_LIMIT
         assert len(page.following) == listing.BACK_LIMIT
 
     def test_the_previous_page_is_the_nearest_remembered_one(self) -> None:
-        page = cursor("after=10.10&back=0,", 35)
+        page = cursor("after=9", 35)
         assert page.previous == (listing.CURSOR_START, ())
-        deeper = cursor("after=20.20&back=10.10,0", 35)
-        assert deeper.previous == ("10.10", ("0",))
-        assert deeper.following == (deeper.start, "10.10", "0")
+        assert page.following == ("9",)  # the first page needs no cursor to be found again
+        deeper = cursor("after=19&back=9", 35)
+        assert deeper.previous == ("9", ())
+        assert deeper.following == ("19", "9")
 
     def test_a_section_reads_its_own_parameters(self) -> None:
         scope = ListScope(prefix="nobody_", anchor="nobody", sized=False)
-        request = get("nobody_after=10.10&after=5&nobody_per_page=100&per_page=25")
-        page = listing.cursor_page(request, keys_of(40), Reads(), default_per_page=10, scope=scope)
+        request = get("nobody_after=10&after=5&nobody_per_page=100&per_page=25")
+        page = page_of(request, Source(40), scope=scope)
         assert (len(page.rows), page.sizes, page.page_param) == (10, (), "nobody_after")
-        assert page.rows[0] == 10
+        assert page.rows[0] == 11
         assert page.reset_params == ("nobody_after", "nobody_back")
+
+
+@pytest.mark.django_db
+class TestSeekAfter:
+    """The keyset seek of the sources, on a real table (catalog units: seeded, read-only)."""
+
+    def rows(self) -> Any:
+        return UnitOfMeasure.objects.all()
+
+    def test_it_reads_on_after_the_row_the_cursor_names(self) -> None:
+        ordered = list(self.rows().order_by("code", "pk"))
+        middle = ordered[len(ordered) // 2]
+        after = listing.seek_after(self.rows(), self.rows(), ("code", "pk"), str(middle.pk))
+        assert list(after) == ordered[len(ordered) // 2 + 1 :]
+
+    def test_the_anchor_may_lie_outside_the_list(self) -> None:
+        ordered = list(self.rows().order_by("code", "pk"))
+        first, rest = ordered[0], ordered[1:]
+        narrowed = self.rows().exclude(pk=first.pk)
+        after = listing.seek_after(narrowed, self.rows(), ("code", "pk"), str(first.pk))
+        assert list(after) == rest
+
+    @pytest.mark.parametrize("cursor", ["", "nope", str(uuid7())])
+    def test_a_cursor_that_names_nothing_reads_from_the_start(self, cursor: str) -> None:
+        after = listing.seek_after(self.rows(), self.rows(), ("code", "pk"), cursor)
+        assert list(after) == list(self.rows().order_by("code", "pk"))
+
+    def test_the_row_comparison_is_lexicographic(self) -> None:
+        found = listing.after_q(("a", "b", "c"), (1, 2, 3))
+        assert str(found) == str(Q(a__gt=1) | (Q(a=1) & (Q(b__gt=2) | (Q(b=2) & Q(c__gt=3)))))
 
 
 class TestHeavyLists:
@@ -602,30 +650,32 @@ class TestHeavyLists:
 
 
 def cursor_of(query: str, scope: ListScope) -> Any:
-    return listing.cursor_page(get(query), keys_of(100), Reads(), default_per_page=10, scope=scope)
+    return page_of(get(query), Source(100), scope=scope)
 
 
 class TestHead:
     def test_the_first_rows_and_whether_more_follow(self) -> None:
-        rows, more = listing.head(keys_of(500), Reads(), limit=99)
+        source = Source(500)
+        rows, more = listing.head(source.seek, source.window, limit=99)
         assert (len(rows), more) == (99, True)
 
     def test_a_short_list_is_all_there_is(self) -> None:
-        rows, more = listing.head(keys_of(7), Reads(), limit=99)
+        short, exact = Source(7), Source(99)
+        rows, more = listing.head(short.seek, short.window, limit=99)
         assert (len(rows), more) == (7, False)
-        rows, more = listing.head(keys_of(99), Reads(), limit=99)
+        rows, more = listing.head(exact.seek, exact.window, limit=99)
         assert (len(rows), more) == (99, False)
 
     def test_it_stops_reading_once_it_knows(self) -> None:
-        reads = Reads()
-        listing.head(keys_of(1_000_000), reads, limit=99)
-        assert sum(reads.stretches) < 1_000
+        source = Source(1_000_000)
+        listing.head(source.seek, source.window, limit=99)
+        assert sum(source.stretches) < 1_000
 
 
 class TestCursorComponents:
     def pager(self, query: str, count: int = 35) -> str:
         request = get(query)
-        page = listing.cursor_page(request, keys_of(count), Reads(), default_per_page=10)
+        page = page_of(request, Source(count))
         with translation.override("en"):
             return render("components/cursor_pagination.html", request, listing=page)
 
@@ -633,18 +683,18 @@ class TestCursorComponents:
         html = self.pager("q=cable")
         assert 'rel="next"' in html and 'rel="prev"' not in html
         assert html.count('aria-disabled="true"') == 2  # First and Previous
-        assert "q=cable" in html and "after=10." in html
+        assert "q=cable" in html and "after=9" in html
 
     def test_a_later_page_offers_first_previous_and_next(self) -> None:
-        html = self.pager("after=10.10&per_page=25", count=100)
+        html = self.pager("after=10&per_page=25", count=100)
         assert 'rel="prev"' in html and 'rel="next"' in html
         assert 'aria-label="First page"' in html
         links = re.findall(r'href="([^"]*)"', html)
         assert links.count("?per_page=25") == 2  # First and Previous: the cursor is gone
-        assert any("after=35.35" in link and "back=10.10" in link for link in links)
+        assert any("after=35" in link and "back=10" in link for link in links)
 
     def test_the_last_page_disables_next(self) -> None:
-        html = self.pager("after=30.30")
+        html = self.pager("after=30")
         assert 'rel="next"' not in html and 'rel="prev"' in html
 
     def test_one_page_has_no_pager(self) -> None:
@@ -652,7 +702,7 @@ class TestCursorComponents:
 
     def test_the_summary_says_what_is_shown_not_how_many_there_are(self) -> None:
         request = get("")
-        page = listing.cursor_page(request, keys_of(35), Reads(), default_per_page=10)
+        page = page_of(request, Source(35))
         with translation.override("en"):
             html = render(
                 "components/list_summary.html", request, form=SectionFilters(), listing=page
@@ -660,7 +710,7 @@ class TestCursorComponents:
         assert "10 shown" in html and "results" not in html
 
     def test_clearing_the_filters_drops_the_cursor(self) -> None:
-        request = get("q=cable&after=10.10&back=0&per_page=25")
-        page = listing.cursor_page(request, keys_of(35), Reads(), default_per_page=10)
+        request = get("q=cable&after=10&back=0&per_page=25")
+        page = page_of(request, Source(35))
         url = clear_filters_url({"request": request}, SectionFilters(), page)
         assert "after" not in url and "back" not in url and "per_page=25" in url
