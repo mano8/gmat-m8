@@ -290,7 +290,8 @@ class Sentinel(StrEnum):
 
     Each step that adds the model behind a value seeds it into the fixture: the supplier
     name, email and phone are on ``Org.supplier`` (M3.2); the price and another project's
-    quantity are on the issued order of ``build_sentinel_order`` (M5.1). The acceptance
+    quantity are on the issued order of ``build_sentinel_order`` (M5.1); the mail error on a
+    failed email-change mail of the access world (M7c.1). The acceptance
     matrix checks every response against all of them.
     """
 
@@ -299,6 +300,8 @@ class Sentinel(StrEnum):
     SUPPLIER_EMAIL = "sentinel-supplier@zyxwvut.example"
     SUPPLIER_PHONE = "+34 699 000 111"
     OTHER_PROJECT_QUANTITY = "4242.125"
+    # The error text of a failed security email (M7c.1): ``last_error`` is never shown.
+    MAIL_ERROR = "SMTP 550 Zyxwvut mailbox error"
 
     @property
     def pattern(self) -> re.Pattern[str]:

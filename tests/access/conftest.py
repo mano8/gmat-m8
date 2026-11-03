@@ -51,7 +51,7 @@ from apps.projects.models import ProjectAssignment
 from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
 from tests.access.matrix import World, build_world
 from tests.orders import allocate, line, order
-from tests.org import build_sentinel_order
+from tests.org import Sentinel, build_sentinel_order
 from tests.outbox import make_dispatch
 
 
@@ -348,7 +348,7 @@ def _security_mail(world: World) -> None:
         source_ref="email_change.cancel",
     )
     EmailOutbox.objects.filter(pk=failed.pk).update(
-        status=MailStatus.FAILED, last_error="SMTP 550 at RCPT"
+        status=MailStatus.FAILED, last_error=Sentinel.MAIL_ERROR.value
     )
 
 

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 12:49+0000\n"
+"POT-Creation-Date: 2026-11-02 16:18+0000\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -158,78 +158,78 @@ msgstr "solicitud de cambio de correo"
 msgid "email change requests"
 msgstr "solicitudes de cambio de correo"
 
-#: apps/accounts/services.py:154
+#: apps/accounts/services.py:158
 msgid "The project is not active."
 msgstr "La obra no está activa."
 
-#: apps/accounts/services.py:166
+#: apps/accounts/services.py:170
 msgid "An invitation grants at least one role."
 msgstr "Una invitación concede al menos un rol."
 
-#: apps/accounts/services.py:174
+#: apps/accounts/services.py:178
 msgid "Unknown kind."
 msgstr "Tipo desconocido."
 
-#: apps/accounts/services.py:195
+#: apps/accounts/services.py:199
 msgid "You are invited to gmat-m8"
 msgstr "Te han invitado a gmat-m8"
 
-#: apps/accounts/services.py:220
+#: apps/accounts/services.py:224
 msgid "Confirm your new email address"
 msgstr "Confirma tu nueva dirección de correo"
 
-#: apps/accounts/services.py:231
+#: apps/accounts/services.py:235
 msgid "Your email address is about to change"
 msgstr "Tu dirección de correo va a cambiar"
 
-#: apps/accounts/services.py:338
+#: apps/accounts/services.py:342
 msgid "This address already has a pending invitation: resend or revoke it."
 msgstr ""
 "Esta dirección ya tiene una invitación pendiente: reenvíala o revócala."
 
-#: apps/accounts/services.py:349
+#: apps/accounts/services.py:353
 msgid "An active account keeps its employer."
 msgstr "Una cuenta activa conserva su empresa empleadora."
 
-#: apps/accounts/services.py:387
+#: apps/accounts/services.py:391
 msgid "This invitation is no longer pending."
 msgstr "Esta invitación ya no está pendiente."
 
-#: apps/accounts/services.py:406
+#: apps/accounts/services.py:410
 msgid "Run bootstrap_admin again to replace a first-administrator link."
 msgstr ""
 "Ejecuta bootstrap_admin de nuevo para sustituir un enlace de primer "
 "administrador."
 
-#: apps/accounts/services.py:584
+#: apps/accounts/services.py:588
 msgid "You cannot offboard your own account."
 msgstr "No puedes dar de baja tu propia cuenta."
 
-#: apps/accounts/services.py:587
+#: apps/accounts/services.py:591
 msgid "This account is already offboarded."
 msgstr "Esta cuenta ya está dada de baja."
 
-#: apps/accounts/services.py:633
+#: apps/accounts/services.py:637
 msgid "This account is inactive."
 msgstr "Esta cuenta está inactiva."
 
-#: apps/accounts/services.py:636
+#: apps/accounts/services.py:640
 msgid "This is the current address."
 msgstr "Es la dirección actual."
 
-#: apps/accounts/services.py:640
+#: apps/accounts/services.py:644
 msgid "Another account uses this address."
 msgstr "Otra cuenta usa esta dirección."
 
-#: apps/accounts/services.py:688
+#: apps/accounts/services.py:692
 msgid "This email change is no longer open."
 msgstr "Este cambio de correo ya no está abierto."
 
-#: apps/accounts/services.py:765
+#: apps/accounts/services.py:769
 msgid "An account with this email exists."
 msgstr "Ya existe una cuenta con este correo."
 
-#: apps/accounts/services.py:787 apps/organizations/grants.py:30
+#: apps/accounts/services.py:791 apps/organizations/grants.py:30
 #: apps/organizations/services.py:296 apps/organizations/services.py:509
 msgid "The company is inactive."
 msgstr "La empresa está inactiva."
@@ -3188,7 +3188,6 @@ msgid "Sending"
 msgstr "Enviando"
 
 #: apps/notifications/models.py:35 apps/notifications/models.py:48
-#: tests/unit/organizations/test_delivery.py:101
 msgid "Sent"
 msgstr "Enviado"
 
@@ -3274,51 +3273,57 @@ msgstr "Solicitud %(number)s: material recibido en obra"
 msgid "Request %(number)s: goods handed over"
 msgstr "Solicitud %(number)s: material entregado"
 
-#: apps/notifications/selectors.py:38
-#| msgid "Waiting for %(email)s to confirm."
+#: apps/notifications/selectors.py:42
 msgid "Waiting for the mail worker."
 msgstr "Esperando al proceso de envío de correo."
 
-#: apps/notifications/selectors.py:39
+#: apps/notifications/selectors.py:43
 msgid "Being handed to the mail server."
 msgstr "Entregándose al servidor de correo."
 
-#: apps/notifications/selectors.py:40
+#: apps/notifications/selectors.py:44
 msgid "The mail server refused it. Nothing was delivered."
 msgstr "El servidor de correo lo rechazó. No se entregó nada."
 
-#: apps/notifications/selectors.py:41
+#: apps/notifications/selectors.py:45
 msgid "The mail server did not answer: it may or may not have arrived."
 msgstr "El servidor de correo no respondió: puede haber llegado o no."
 
-#: apps/notifications/selectors.py:42
-#| msgid "Line replaced by a reviewer"
+#: apps/notifications/selectors.py:46
 msgid "Replaced by a newer message."
 msgstr "Sustituido por un mensaje más reciente."
 
-#: apps/notifications/selectors.py:43
+#: apps/notifications/selectors.py:47
 msgid "Cancelled before it was sent."
 msgstr "Cancelado antes de enviarse."
 
-#: apps/notifications/selectors.py:44
+#: apps/notifications/selectors.py:48
 msgid "Not sent: it no longer applied when its turn came."
 msgstr "No enviado: ya no procedía cuando le tocó el turno."
 
-#: apps/notifications/selectors.py:45
+#: apps/notifications/selectors.py:49
 msgid "Not sent in time: its link expired."
 msgstr "No se envió a tiempo: su enlace caducó."
 
-#: apps/notifications/selectors.py:46
+#: apps/notifications/selectors.py:50
 msgid "Held back by the system. Tell the operator."
 msgstr "Retenido por el sistema. Avise al operador."
 
-#: apps/notifications/selectors.py:48
+#: apps/notifications/selectors.py:52
 msgid "Delayed"
 msgstr "Retrasado"
 
-#: apps/notifications/selectors.py:49
+#: apps/notifications/selectors.py:53
 msgid "Still not sent. Tell the operator."
 msgstr "Aún sin enviar. Avise al operador."
+
+#: apps/notifications/selectors.py:54
+msgid "Retrying"
+msgstr "Reintentando"
+
+#: apps/notifications/selectors.py:55
+msgid "An attempt failed; the mail worker tries again."
+msgstr "Un intento falló; el proceso de envío lo vuelve a intentar."
 
 #: apps/notifications/templates/notifications/email/request_assigned.html:11
 #: apps/notifications/templates/notifications/email/request_assigned.txt:1
@@ -3674,14 +3679,10 @@ msgid "Platform operator"
 msgstr "Operador de la plataforma"
 
 #: apps/organizations/templates/organizations/delivery_email_change.html:11
-#: tests/unit/organizations/test_delivery.py:253
-#| msgid "Confirm your new address"
 msgid "Confirmation to the new address"
 msgstr "Confirmación a la nueva dirección"
 
 #: apps/organizations/templates/organizations/delivery_email_change.html:17
-#: tests/unit/organizations/test_delivery.py:254
-#| msgid "This is the current address."
 msgid "Notice to the current address"
 msgstr "Aviso a la dirección actual"
 
@@ -3842,33 +3843,31 @@ msgstr "revocada"
 msgid "pending"
 msgstr "pendiente"
 
-#: apps/organizations/views.py:155
+#: apps/organizations/views.py:166
 msgid "Role granted."
 msgstr "Rol concedido."
 
-#: apps/organizations/views.py:170
+#: apps/organizations/views.py:181
 msgid "Role revoked."
 msgstr "Rol revocado."
 
-#: apps/organizations/views.py:194 apps/projects/views.py:211
+#: apps/organizations/views.py:205 apps/projects/views.py:211
 msgid "Validity saved."
 msgstr "Validez guardada."
 
-#: apps/organizations/views.py:214
+#: apps/organizations/views.py:225
 msgid "Employer saved."
 msgstr "Empresa empleadora guardada."
 
-#: apps/organizations/views.py:224
+#: apps/organizations/views.py:235
 msgid "Tick the confirmation to offboard this account."
 msgstr "Marca la confirmación para dar de baja esta cuenta."
 
-#: apps/organizations/views.py:233
+#: apps/organizations/views.py:244
 msgid "Account offboarded."
 msgstr "Cuenta dada de baja."
 
-#: apps/organizations/views.py:256
-#| msgid ""
-#| "Confirmation sent to the new address; the current one can cancel."
+#: apps/organizations/views.py:267
 msgid ""
 "Confirmation queued for sending to the new address; the current one can "
 "cancel."
@@ -3876,25 +3875,23 @@ msgstr ""
 "Confirmación en cola para enviarse a la nueva dirección; la actual puede "
 "cancelar."
 
-#: apps/organizations/views.py:274
+#: apps/organizations/views.py:285
 msgid "Email change revoked."
 msgstr "Cambio de correo revocado."
 
-#: apps/organizations/views.py:327
+#: apps/organizations/views.py:338
 #, python-format
-#| msgid "Invitation sent to %(email)s."
 msgid "Invitation queued for sending to %(email)s."
 msgstr "Invitación en cola para enviarse a %(email)s."
 
-#: apps/organizations/views.py:345
-#| msgid "Invitation sent again; the previous link no longer works."
+#: apps/organizations/views.py:356
 msgid ""
 "Invitation queued for sending again; the previous link no longer works."
 msgstr ""
 "Invitación en cola para enviarse de nuevo; el enlace anterior ya no "
 "funciona."
 
-#: apps/organizations/views.py:363
+#: apps/organizations/views.py:374
 msgid "Invitation revoked."
 msgstr "Invitación revocada."
 

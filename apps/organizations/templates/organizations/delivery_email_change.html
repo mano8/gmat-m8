@@ -2,10 +2,7 @@
 {% comment %}
   The two emails of an email change and their delivery (M7c.1). Polled as a whole while either is in flight.
 {% endcomment %}
-<div id="delivery-{{ change.pk }}"
-     class="grid gap-1"
-     data-testid="email-change-delivery"
-     {% if confirm.polling or notice.polling %}hx-get="{% url 'org:email_change_delivery' change_id=change.pk %}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+<div id="delivery-{{ change.pk }}" class="grid gap-1" data-testid="email-change-delivery" {% if confirm.polling or notice.polling %}hx-get="{% url 'org:email_change_delivery' change_id=change.pk %}" hx-trigger="every {% if confirm.polling and not confirm.delayed or notice.polling and not notice.delayed %}5s{% else %}60s{% endif %}" hx-swap="outerHTML" data-poll{% endif %}>
   {% if confirm %}
     <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <span class="text-soft">{% translate "Confirmation to the new address" %}</span>
