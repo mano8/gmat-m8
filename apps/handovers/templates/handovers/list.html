@@ -12,37 +12,38 @@
     {% endif %}
   </div>
   {% url 'handovers:list' as list_url %}
-  {% include "components/filter_form.html" with form=filters target="#handover-results" action=list_url grid="sm:grid-cols-[1fr_1fr_1fr_1fr_auto]" %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#handover-results" action=list_url grid="sm:grid-cols-[1fr_8rem_8rem_1fr_8rem_8rem_auto]" %}
   {% partialdef results inline %}
     <div id="handover-results" data-testid="handovers">
-      {% if page_obj.object_list %}
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
         <table class="table-responsive">
           <thead>
             <tr>
-              <th scope="col">{% translate "Handover" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="number" label=_("Handover") %}
               <th scope="col">{% translate "Project" %}</th>
               <th scope="col">{% translate "Kind" %}</th>
               <th scope="col">{% translate "Received by" %}</th>
-              <th scope="col">{% translate "Date" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="posted" label=_("Date") %}
               <th scope="col">{% translate "Status" %}</th>
             </tr>
           </thead>
           <tbody>
-            {% for handover in page_obj.object_list %}
+            {% for handover in listing.rows %}
               <tr data-testid="handover-row">
                 <td data-label="{% translate 'Handover' %}">
                   <a href="{% url 'handovers:detail' handover_id=handover.pk %}">{{ handover.number }}</a>
                 </td>
                 <td data-label="{% translate 'Project' %}">{{ handover.project.code }}</td>
                 <td data-label="{% translate 'Kind' %}">{{ handover.get_kind_display }}</td>
-                <td data-label="{% translate 'Received by' %}">{{ handover.received_by.full_name|default:handover.received_by.email|default:handover.received_by_name }}</td>
+                <td data-label="{% translate 'Received by' %}">{% if handover.received_by %}{{ handover.received_by.full_name|default:handover.received_by.email }}{% else %}{{ handover.received_by_name }}{% endif %}</td>
                 <td data-label="{% translate 'Date' %}">{{ handover.handed_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                 <td data-label="{% translate 'Status' %}">{% include "handovers/status.html" with obj=handover %}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No handovers") text=_("No handover matches the filters.") %}
       {% endif %}

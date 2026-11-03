@@ -28,17 +28,20 @@ The screens (M6.3) read the rest from here:
   whole order (``po.view``); a site manager gets what their project can take (§3.4).
 """
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import BooleanField, ExpressionWrapper, Q, QuerySet, Value
+from django.db.models.functions import Coalesce
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
+from apps.core.listing import seek_after
 from apps.handovers.models import Handover
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
@@ -53,7 +56,14 @@ from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribu
 
 VIEW, POST, VOID = Capability.RECEIPT_VIEW, Capability.RECEIPT_POST, Capability.RECEIPT_VOID
 ZERO = Decimal("0")
-PAGE_SIZE = 25
+DEFAULT_PER_PAGE = 25
+RECEIPT_SORTS = {"number": ("number",), "posted": ("received_at",)}
+RECEIPT_SORT_LABELS = {"number": _("Receipt"), "posted": _("Received")}
+EXPECTED_PER_PAGE = 10  # orders per page of a project's expected deliveries
+ORDER_SORTS = {"number": ("number",)}
+ORDER_SORT_LABELS = {"number": _("Order")}
+PROJECT_SORTS = {"code": ("code",), "name": ("name", "code")}
+PROJECT_SORT_LABELS = {"code": _("Code"), "name": _("Name")}
 
 
 @dataclass(frozen=True)
@@ -113,44 +123,132 @@ def _soonest_first(row: ExpectedDelivery) -> tuple[object, ...]:
     )
 
 
-def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDelivery]:
-    """What is still coming to this project, soonest first (404 outside ``receipt.view``)."""
-    project = Project.objects.visible_to(ctx, VIEW).filter(pk=project_id).first()
-    if project is None:
-        raise NotInScope(VIEW)
+@dataclass(frozen=True)
+class ExpectedFilter:
+    """What the expected-deliveries screen narrows to; both fields are optional.
+
+    Only fields of §3.4's projection are filterable: the supplier's display name (text) and
+    the order's expected date (``expected_by``: expected on or before that day; an order with
+    no expected date is left out while the filter is set).
+    """
+
+    supplier: str = ""
+    expected_by: date | None = None
+
+    def narrow(self, orders: QuerySet[PurchaseOrder]) -> QuerySet[PurchaseOrder]:
+        if self.supplier:
+            orders = orders.filter(supplier_snapshot__name__icontains=self.supplier)
+        if self.expected_by is not None:
+            orders = orders.filter(expected_date__lte=self.expected_by)
+        return orders
+
+
+@dataclass(frozen=True)
+class ExpectedOrder:
+    """The rows of one order of the projection: the unit the screen pages by."""
+
+    po_id: UUID
+    items: tuple[ExpectedDelivery, ...]
+
+    @property
+    def first(self) -> ExpectedDelivery:
+        return self.items[0]
+
+
+def _project_allocations(ctx: AccessContext, project: Project) -> QuerySet[PurchaseAllocation]:
+    """The live allocations of the project's open lines (in ``receipt.view`` scope) on an
+    issued order."""
     lines = (
         MaterialRequestLine.objects.visible_to(ctx, VIEW)
         .filter(request_ledger.open_q(), project=project)
         .values("pk")
     )
-    allocations = list(
-        PurchaseAllocation.objects.filter(
-            request_line__in=lines, qty__gt=0, po_line__po__status=PurchaseOrder.Status.ISSUED
-        ).select_related("po_line__po", "po_line__unit", "request_line__request")
+    return PurchaseAllocation.objects.filter(
+        request_line__in=lines, qty__gt=0, po_line__po__status=PurchaseOrder.Status.ISSUED
     )
-    if not allocations:
+
+
+def _expected_rows(allocations: QuerySet[PurchaseAllocation]) -> list[ExpectedDelivery]:
+    """The rows of ``allocations`` still expecting goods, soonest first."""
+    listed = list(
+        allocations.select_related("po_line__po", "po_line__unit", "request_line__request")
+    )
+    if not listed:
         return []
-    book = book_for_order_lines({allocation.po_line_id for allocation in allocations})
-    flows = request_ledger.flows({allocation.request_line_id for allocation in allocations})
+    book = book_for_order_lines({allocation.po_line_id for allocation in listed})
+    flows = request_ledger.flows({allocation.request_line_id for allocation in listed})
     expected = {
         allocation.pk: _expected(allocation, book, flows[allocation.request_line_id])
-        for allocation in allocations
+        for allocation in listed
     }
-    rows = [_row(a, expected[a.pk]) for a in allocations if expected[a.pk] > 0]
+    rows = [_row(a, expected[a.pk]) for a in listed if expected[a.pk] > 0]
     return sorted(rows, key=_soonest_first)
+
+
+def expected_deliveries(ctx: AccessContext, project_id: UUID) -> list[ExpectedDelivery]:
+    """What is still coming to this project, soonest first (404 outside ``receipt.view``)."""
+    project = Project.objects.visible_to(ctx, VIEW).filter(pk=project_id).first()
+    if project is None:
+        raise NotInScope(VIEW)
+    return _expected_rows(_project_allocations(ctx, project))
+
+
+SOONEST_ORDER = ("seek_undated", "seek_date", "seek_number", "pk")
+
+
+def _soonest(orders: QuerySet[PurchaseOrder]) -> QuerySet[PurchaseOrder]:
+    """``orders`` with the fields of ``SOONEST_ORDER``: expected date (none last), number."""
+    return orders.annotate(
+        seek_undated=ExpressionWrapper(Q(expected_date__isnull=True), BooleanField()),
+        seek_date=Coalesce("expected_date", Value(date.min)),
+        seek_number=Coalesce("number", Value("")),
+    )
+
+
+class ExpectedOrders:
+    """The project's expected deliveries grouped by order, soonest first, a page at a time
+    (M7d.4): ``seek`` reads the next orders that buy for the project from the database,
+    narrowed in SQL, and ``window`` works out what is still expected on a stretch of them,
+    leaving out an order with nothing left to come."""
+
+    def __init__(
+        self, ctx: AccessContext, project: Project, narrow: ExpectedFilter | None = None
+    ) -> None:
+        self._allocations = _project_allocations(ctx, project)
+        orders = PurchaseOrder.objects.filter(pk__in=self._allocations.values("po_line__po_id"))
+        self._orders = (narrow or ExpectedFilter()).narrow(orders)
+
+    def seek(self, cursor: str, limit: int) -> list[UUID]:
+        rows = seek_after(
+            _soonest(self._orders), _soonest(PurchaseOrder.objects.all()), SOONEST_ORDER, cursor
+        )
+        return list(rows.values_list("pk", flat=True)[:limit])
+
+    def window(self, chunk: Sequence[UUID]) -> list[tuple[int, ExpectedOrder]]:
+        by_order: dict[UUID, list[ExpectedDelivery]] = {}
+        for row in _expected_rows(self._allocations.filter(po_line__po_id__in=list(chunk))):
+            by_order.setdefault(row.po_id, []).append(row)
+        return [
+            (index, ExpectedOrder(pk, tuple(by_order[pk])))
+            for index, pk in enumerate(chunk)
+            if pk in by_order
+        ]
 
 
 # --- the expected-deliveries screen -----------------------------------------------------------
 
 
-def expected_projects(ctx: AccessContext) -> QuerySet[Project]:
-    """Projects with a worksite the user may receive at (``receipt.view``), for the index."""
-    return (
+def expected_projects(ctx: AccessContext, *, q: str = "") -> QuerySet[Project]:
+    """Projects with a worksite the user may receive at (``receipt.view``), for the index;
+    ``q`` looks at the code and the name."""
+    rows = (
         Project.objects.visible_to(ctx, VIEW)
         .filter(worksite__isnull=False, status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD])
         .select_related("branch__company")
-        .order_by("code")
     )
+    if q.strip():
+        rows = rows.filter(Q(code__icontains=q.strip()) | Q(name__icontains=q.strip()))
+    return rows.order_by("code")
 
 
 def expected_project(ctx: AccessContext, project_id: UUID) -> Project:
@@ -178,9 +276,18 @@ def worksite(ctx: AccessContext, project_id: UUID) -> Location | None:
 # --- receipts -------------------------------
 
 
-def receipts(ctx: AccessContext, *, status: str = "", q: str = "") -> QuerySet[GoodsReceipt]:
+def receipts(
+    ctx: AccessContext,
+    *,
+    status: str = "",
+    q: str = "",
+    location_id: UUID | None = None,
+    received_from: date | None = None,
+    received_to: date | None = None,
+) -> QuerySet[GoodsReceipt]:
     """Receipts the user may see, newest first; ``q`` looks at the receipt's number, the
-    order's number and supplier and the delivery note."""
+    order's number and supplier and the delivery note; the rest narrows by place and by the
+    (inclusive) days it was received."""
     rows = GoodsReceipt.objects.visible_to(ctx, VIEW).select_related(
         "po", "location", "branch__company", "received_by"
     )
@@ -193,7 +300,18 @@ def receipts(ctx: AccessContext, *, status: str = "", q: str = "") -> QuerySet[G
             | Q(po__supplier_snapshot__name__icontains=q)
             | Q(delivery_note_ref__icontains=q)
         )
+    if location_id is not None:
+        rows = rows.filter(location_id=location_id)
+    if received_from is not None:
+        rows = rows.filter(received_at__date__gte=received_from)
+    if received_to is not None:
+        rows = rows.filter(received_at__date__lte=received_to)
     return rows
+
+
+def receipt_places(ctx: AccessContext) -> QuerySet[Location]:
+    """The places of the receipts list filter: the ones the user may read receipts of."""
+    return Location.objects.visible_to(ctx, VIEW).select_related("branch").order_by("name")
 
 
 def site_surplus(ctx: AccessContext) -> QuerySet[GoodsReceiptLine]:

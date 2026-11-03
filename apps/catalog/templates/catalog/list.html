@@ -16,22 +16,23 @@
     </div>
   </div>
   {% url 'catalog:list' as list_url %}
-  {% include "components/filter_form.html" with form=filters target="#material-results" action=list_url grid="sm:grid-cols-[1fr_14rem_9rem_auto]" %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#material-results" action=list_url grid="sm:grid-cols-[1fr_14rem_9rem_auto]" %}
   {% partialdef results inline %}
     <div id="material-results">
-      {% if page_obj.object_list %}
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
         <table class="table-responsive">
           <thead>
             <tr>
-              <th scope="col">{% translate "Reference" %}</th>
-              <th scope="col">{% translate "Name" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="reference" label=_("Reference") %}
+              {% include "components/sort_header.html" with listing=listing key="name" label=_("Name") %}
               <th scope="col">{% translate "Category" %}</th>
               <th scope="col">{% translate "Unit" %}</th>
               <th scope="col">{% translate "Status" %}</th>
             </tr>
           </thead>
           <tbody>
-            {% for material in page_obj.object_list %}
+            {% for material in listing.rows %}
               <tr>
                 <td data-label="{% translate 'Reference' %}">
                   <a href="{% url 'catalog:detail' material_id=material.pk %}">{{ material.reference }}</a>
@@ -44,7 +45,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No materials") text=_("No material matches the filters.") %}
       {% endif %}

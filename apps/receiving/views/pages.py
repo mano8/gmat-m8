@@ -8,11 +8,9 @@ projection with the supplier name, the material, the date and what their project
 expects (§3.4), and the form they get shows nothing else of the order.
 """
 
-from itertools import groupby
 from typing import Any
 from uuid import UUID
 
-from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.translation import gettext as _
@@ -21,19 +19,20 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
 from apps.attachments import selectors as attachment_selectors
-from apps.core.http import is_htmx
+from apps.core.listing import cursor_page, paginate, render_list
 from apps.locations.models import Location
 from apps.purchasing.models import PurchaseOrder
 from apps.receiving import selectors
-from apps.receiving.forms import OrderSearchForm, ReceiptFilterForm, ReceiptForm, RequiredReasonForm
+from apps.receiving.forms import (
+    ExpectedFilterForm,
+    OrderSearchForm,
+    ProjectSearchForm,
+    ReceiptFilterForm,
+    ReceiptForm,
+    RequiredReasonForm,
+)
 from apps.receiving.selectors import POST, VIEW
 from apps.receiving.views.common import chosen_place, order_for_receipt, receive_url
-
-
-def _extra_query(**params: str) -> str:
-    kept = [f"&{key}={value}" for key, value in params.items() if value]
-    return "".join(kept)
-
 
 # --- receipts -------------------------------
 
@@ -42,18 +41,26 @@ def _extra_query(**params: str) -> str:
 @require_capability(VIEW)
 def receipt_list(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
-    filters = ReceiptFilterForm(request.GET or None)
+    filters = ReceiptFilterForm(request.GET or None, ctx=ctx)
     data = filters.cleaned_data if filters.is_valid() else {}
-    rows = selectors.receipts(ctx, status=data.get("status", ""), q=data.get("q", ""))
-    page = Paginator(rows, selectors.PAGE_SIZE).get_page(request.GET.get("page"))
-    template = "receiving/list.html#results" if is_htmx(request) else "receiving/list.html"
-    context = {
-        "filters": filters,
-        "page_obj": page,
-        "can_post": selectors.can_post(ctx),
-        "extra_query": _extra_query(q=data.get("q", ""), status=data.get("status", "")),
-    }
-    return render(request, template, context)
+    place = data.get("place")
+    rows = selectors.receipts(
+        ctx,
+        status=data.get("status", ""),
+        q=data.get("q", ""),
+        location_id=place.pk if place else None,
+        received_from=data.get("received_from"),
+        received_to=data.get("received_to"),
+    )
+    listing = paginate(
+        request,
+        rows,
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.RECEIPT_SORTS,
+        sort_labels=selectors.RECEIPT_SORT_LABELS,
+    )
+    context = {"filters": filters, "listing": listing, "can_post": selectors.can_post(ctx)}
+    return render_list(request, "receiving/list.html", context)
 
 
 @require_safe
@@ -84,16 +91,20 @@ def order_search(request: HttpRequest) -> HttpResponse:
     filters = OrderSearchForm(request.GET or None)
     data = filters.cleaned_data if filters.is_valid() else {}
     rows = selectors.receivable_orders(ctx, q=data.get("q", ""))
-    page = Paginator(rows, selectors.PAGE_SIZE).get_page(request.GET.get("page"))
-    progress = selectors.receipt_progress(list(page.object_list))
-    template = "receiving/orders.html#results" if is_htmx(request) else "receiving/orders.html"
+    listing = paginate(
+        request,
+        rows,
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.ORDER_SORTS,
+        sort_labels=selectors.ORDER_SORT_LABELS,
+    )
+    progress = selectors.receipt_progress(listing.rows)
     context = {
         "filters": filters,
-        "page_obj": page,
-        "entries": [(found, progress.get(found.pk)) for found in page.object_list],
-        "extra_query": _extra_query(q=data.get("q", "")),
+        "listing": listing,
+        "entries": [(found, progress.get(found.pk)) for found in listing.rows],
     }
-    return render(request, template, context)
+    return render_list(request, "receiving/orders.html", context)
 
 
 def receive_page(
@@ -140,9 +151,17 @@ def receive(request: HttpRequest, po_id: UUID) -> HttpResponse:
 @require_capability(VIEW)
 def project_list(request: HttpRequest) -> HttpResponse:
     """The projects with a worksite the user may receive at."""
-    projects = selectors.expected_projects(access_for(request))
-    page = Paginator(projects, selectors.PAGE_SIZE).get_page(request.GET.get("page"))
-    return render(request, "receiving/projects.html", {"page_obj": page})
+    ctx = access_for(request)
+    filters = ProjectSearchForm(request.GET or None)
+    q = filters.cleaned_data["q"] if filters.is_valid() else ""
+    listing = paginate(
+        request,
+        selectors.expected_projects(ctx, q=q),
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.PROJECT_SORTS,
+        sort_labels=selectors.PROJECT_SORT_LABELS,
+    )
+    return render_list(request, "receiving/projects.html", {"filters": filters, "listing": listing})
 
 
 @require_safe
@@ -151,14 +170,25 @@ def expected(request: HttpRequest, project_id: UUID) -> HttpResponse:
     """What is still coming to one project: §3.4's projection, grouped by order."""
     ctx = access_for(request)
     project = selectors.expected_project(ctx, project_id)
-    rows = selectors.expected_deliveries(ctx, project.pk)
-    place = selectors.worksite(ctx, project.pk)
-    groups = [
-        (po_id, list(items), receive_url(po_id, place) if place is not None else "")
-        for po_id, items in groupby(rows, key=lambda row: row.po_id)
-    ]
-    return render(
-        request,
-        "receiving/expected.html",
-        {"project": project, "groups": groups, "message": _("Nothing is expected here.")},
+    filters = ExpectedFilterForm(request.GET or None)
+    data = filters.cleaned_data if filters.is_valid() else {}
+    narrow = selectors.ExpectedFilter(
+        supplier=data.get("supplier", ""), expected_by=data.get("expected_by")
     )
+    orders = selectors.ExpectedOrders(ctx, project, narrow)
+    listing = cursor_page(
+        request, orders.seek, orders.window, default_per_page=selectors.EXPECTED_PER_PAGE
+    )
+    place = selectors.worksite(ctx, project.pk)
+    context = {
+        "project": project,
+        "filters": filters,
+        "listing": listing,
+        "orders": [
+            (found, receive_url(found.po_id, place) if place is not None else "")
+            for found in listing.rows
+        ],
+        "message": _("Nothing is expected here."),
+        "filtered": bool(narrow.supplier or narrow.expected_by),
+    }
+    return render_list(request, "receiving/expected.html", context)

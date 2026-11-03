@@ -7,22 +7,86 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.roles import BRANCH_ROLES, COMPANY_ROLES, ROLE_ASSIGNMENT_KIND, Capability, Role
+from apps.accounts import selectors as account_selectors
 from apps.accounts.services import AssignmentGrant, MembershipGrant
 from apps.core.forms import IdempotentForm, datetime_field
+from apps.core.listing import REVOCATION_CHOICES
+from apps.notifications.models import Status
 from apps.organizations import selectors
 from apps.projects import selectors as project_selectors
 from apps.projects.forms import BranchChoiceField
+from apps.projects.models import ProjectAssignment
 
 STATUS_CHOICES = [("", _("Everyone")), ("active", _("Active")), ("inactive", _("Inactive"))]
 
 
 class PeopleFilterForm(forms.Form):
     q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    role = forms.ChoiceField(
+        label=_("Role"), required=False, choices=[("", _("All roles")), *Role.choices]
+    )
+    branch = BranchChoiceField(
+        label=_("Branch"), queryset=None, required=False, empty_label=_("All branches")
+    )
     status = forms.ChoiceField(label=_("Status"), required=False, choices=STATUS_CHOICES)
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["branch"].queryset = selectors.branches(  # type: ignore[attr-defined]
+            ctx, Capability.ORG_MANAGE
+        )
 
 
 class InvitationFilterForm(forms.Form):
     q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    state = forms.ChoiceField(
+        label=_("Validity"),
+        required=False,
+        choices=[
+            ("", _("Any")),
+            (account_selectors.VALID, _("Valid")),
+            (account_selectors.EXPIRED, _("Expired")),
+        ],
+    )
+    delivery = forms.ChoiceField(
+        label=_("Email"),
+        required=False,
+        choices=[
+            ("", _("Any")),
+            *Status.choices,
+            (account_selectors.NO_EMAIL, _("No email sent")),
+        ],
+    )
+
+
+class MembershipFilterForm(forms.Form):
+    """Narrows the "Roles" section of a person's page (prefix ``memberships``)."""
+
+    state = forms.ChoiceField(label=_("State"), required=False, choices=REVOCATION_CHOICES)
+
+
+class SharedProjectFilterForm(forms.Form):
+    """Narrows the "Projects shared" section of a person's page (prefix ``projects``)."""
+
+    kind = forms.ChoiceField(
+        label=_("Kind"), required=False, choices=[("", _("All")), *ProjectAssignment.Kind.choices]
+    )
+    state = forms.ChoiceField(label=_("State"), required=False, choices=REVOCATION_CHOICES)
+
+
+class PersonInvitationFilterForm(forms.Form):
+    """Narrows the "Invitations" section of a person's page (prefix ``invitations``)."""
+
+    status = forms.ChoiceField(
+        label=_("Status"),
+        required=False,
+        choices=[
+            ("", _("All")),
+            (account_selectors.PENDING, _("Pending")),
+            (account_selectors.ACCEPTED, _("Accepted")),
+            (account_selectors.REVOKED, _("Revoked")),
+        ],
+    )
 
 
 class CompanyChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]

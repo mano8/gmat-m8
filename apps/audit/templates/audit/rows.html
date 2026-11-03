@@ -2,7 +2,11 @@
 <table class="table-responsive">
   <thead>
     <tr>
-      <th scope="col">{% translate "When" %}</th>
+      {% if listing %}
+        {% include "components/sort_header.html" with listing=listing key="time" label=_("When") %}
+      {% else %}
+        <th scope="col">{% translate "When" %}</th>
+      {% endif %}
       <th scope="col">{% translate "Who" %}</th>
       <th scope="col">{% translate "Action" %}</th>
       <th scope="col">{% translate "Object" %}</th>

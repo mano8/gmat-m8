@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gmat-m8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 16:18+0000\n"
+"POT-Creation-Date: 2026-11-02 16:30+0000\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -816,8 +816,8 @@ msgstr "Action"
 
 #: apps/catalog/forms.py:28 apps/catalog/forms.py:50
 #: apps/catalog/templates/catalog/detail.html:35
-#: apps/catalog/templates/catalog/list.html:28
-#: apps/catalog/templates/catalog/list.html:40
+#: apps/catalog/templates/catalog/list.html:29
+#: apps/catalog/templates/catalog/list.html:41
 msgid "Category"
 msgstr "Catégorie"
 
@@ -825,8 +825,8 @@ msgstr "Catégorie"
 msgid "All categories"
 msgstr "Toutes les catégories"
 
-#: apps/catalog/forms.py:31 apps/catalog/templates/catalog/list.html:30
-#: apps/catalog/templates/catalog/list.html:42 apps/handovers/forms.py:38
+#: apps/catalog/forms.py:31 apps/catalog/templates/catalog/list.html:31
+#: apps/catalog/templates/catalog/list.html:43 apps/handovers/forms.py:38
 #: apps/handovers/templates/handovers/list.html:27
 #: apps/handovers/templates/handovers/list.html:40
 #: apps/material_requests/forms.py:81 apps/material_requests/forms.py:247
@@ -863,8 +863,8 @@ msgid "Inactive"
 msgstr "Inactif"
 
 #: apps/catalog/forms.py:48 apps/catalog/forms.py:123
-#: apps/catalog/templates/catalog/list.html:27
-#: apps/catalog/templates/catalog/list.html:39
+#: apps/catalog/selectors.py:27 apps/catalog/templates/catalog/list.html:28
+#: apps/catalog/templates/catalog/list.html:40
 #: apps/organizations/templates/organizations/people.html:21
 #: apps/organizations/templates/organizations/people.html:32
 #: apps/projects/forms.py:39 apps/projects/templates/projects/list.html:23
@@ -908,8 +908,9 @@ msgstr "Article de stock"
 msgid "Kept in the warehouse, so it can be handed over from stock."
 msgstr "Conservé en entrepôt : il peut donc être remis depuis le stock."
 
-#: apps/catalog/forms.py:108 apps/catalog/templates/catalog/list.html:26
-#: apps/catalog/templates/catalog/list.html:36
+#: apps/catalog/forms.py:108 apps/catalog/selectors.py:27
+#: apps/catalog/templates/catalog/list.html:27
+#: apps/catalog/templates/catalog/list.html:37
 #: apps/purchasing/templates/purchasing/email/order.html:38
 #: apps/purchasing/templates/purchasing/print.html:60
 msgid "Reference"
@@ -1140,17 +1141,17 @@ msgstr "Nouveau matériel"
 msgid "Edit material %(reference)s"
 msgstr "Modifier le matériel %(reference)s"
 
-#: apps/catalog/templates/catalog/list.html:29
-#: apps/catalog/templates/catalog/list.html:41
+#: apps/catalog/templates/catalog/list.html:30
+#: apps/catalog/templates/catalog/list.html:42
 #: apps/material_requests/forms.py:132 apps/material_requests/forms.py:399
 msgid "Unit"
 msgstr "Unité"
 
-#: apps/catalog/templates/catalog/list.html:49
+#: apps/catalog/templates/catalog/list.html:50
 msgid "No materials"
 msgstr "Aucun matériel"
 
-#: apps/catalog/templates/catalog/list.html:49
+#: apps/catalog/templates/catalog/list.html:50
 msgid "No material matches the filters."
 msgstr "Aucun matériel ne correspond aux filtres."
 
@@ -1159,32 +1160,32 @@ msgstr "Aucun matériel ne correspond aux filtres."
 msgid "No material matches."
 msgstr "Aucun matériel ne correspond."
 
-#: apps/catalog/views.py:129
+#: apps/catalog/views.py:117
 #, python-format
 msgid "Material %(reference)s added."
 msgstr "Matériel %(reference)s ajouté."
 
-#: apps/catalog/views.py:158
+#: apps/catalog/views.py:146
 #, python-format
 msgid "Material %(reference)s saved."
 msgstr "Matériel %(reference)s enregistré."
 
-#: apps/catalog/views.py:177
+#: apps/catalog/views.py:165
 #, python-format
 msgid "Material %(reference)s reactivated."
 msgstr "Matériel %(reference)s réactivé."
 
-#: apps/catalog/views.py:179
+#: apps/catalog/views.py:167
 #, python-format
 msgid "Material %(reference)s deactivated."
 msgstr "Matériel %(reference)s désactivé."
 
-#: apps/catalog/views.py:227
+#: apps/catalog/views.py:215
 #, python-format
 msgid "Category %(name)s added."
 msgstr "Catégorie %(name)s ajoutée."
 
-#: apps/catalog/views.py:260
+#: apps/catalog/views.py:248
 #, python-format
 msgid "Category %(name)s saved."
 msgstr "Catégorie %(name)s enregistrée."
@@ -1209,6 +1210,21 @@ msgstr "Laissez vide pour ne pas fixer de fin."
 #: apps/core/forms.py:56 apps/organizations/forms.py:84
 msgid "The end must be after the start."
 msgstr "La fin doit être après le début."
+
+#: apps/core/listing.py:110
+#| msgid "Draft order"
+msgid "Default order"
+msgstr "Ordre par défaut"
+
+#: apps/core/listing.py:112
+#, python-format
+msgid "%(label)s (ascending)"
+msgstr "%(label)s (croissant)"
+
+#: apps/core/listing.py:113
+#, python-format
+msgid "%(label)s (descending)"
+msgstr "%(label)s (décroissant)"
 
 #: apps/core/responses.py:52 apps/material_requests/views/common.py:107
 #: apps/purchasing/views/common.py:97
@@ -3291,7 +3307,7 @@ msgstr "Demande %(number)s : matériel reçu sur le chantier"
 msgid "Request %(number)s: goods handed over"
 msgstr "Demande %(number)s : matériel remis"
 
-#: apps/notifications/selectors.py:42
+#: apps/notifications/selectors.py:38
 msgid "Waiting for the mail worker."
 msgstr "En attente du processus d'envoi des courriels."
 
@@ -3309,7 +3325,7 @@ msgstr ""
 "Le serveur de courrier n'a pas répondu : le message est peut-être arrivé, ou"
 " non."
 
-#: apps/notifications/selectors.py:46
+#: apps/notifications/selectors.py:42
 msgid "Replaced by a newer message."
 msgstr "Remplacé par un message plus récent."
 
@@ -3889,7 +3905,7 @@ msgstr "Cochez la confirmation pour désactiver ce compte."
 msgid "Account offboarded."
 msgstr "Compte désactivé."
 
-#: apps/organizations/views.py:267
+#: apps/organizations/views.py:256
 msgid ""
 "Confirmation queued for sending to the new address; the current one can "
 "cancel."
@@ -3906,7 +3922,7 @@ msgstr "Changement d'e-mail révoqué."
 msgid "Invitation queued for sending to %(email)s."
 msgstr "Invitation mise en file d'envoi vers %(email)s."
 
-#: apps/organizations/views.py:356
+#: apps/organizations/views.py:345
 msgid ""
 "Invitation queued for sending again; the previous link no longer works."
 msgstr ""
@@ -5658,32 +5674,86 @@ msgstr ""
 msgid "Skip to content"
 msgstr "Aller au contenu"
 
-#: templates/components/filter_form.html:19
+#: templates/components/filter_form.html:21
 msgid "Filter"
 msgstr "Filtrer"
+
+#: templates/components/list_summary.html:10
+#, python-format
+msgid "%(total)s result"
+msgid_plural "%(total)s results"
+msgstr[0] "%(total)s résultat"
+msgstr[1] "%(total)s résultats"
+
+#: templates/components/list_summary.html:19
+#, python-format
+msgid "%(filters)s filter active"
+msgid_plural "%(filters)s filters active"
+msgstr[0] "%(filters)s filtre actif"
+msgstr[1] "%(filters)s filtres actifs"
+
+#: templates/components/list_summary.html:25
+msgid "Clear filters"
+msgstr "Effacer les filtres"
+
+#: templates/components/list_toolbar.html:16
+msgid "Sort by"
+msgstr "Trier par"
+
+#: templates/components/list_toolbar.html:25
+msgid "Rows per page"
+msgstr "Lignes par page"
 
 #: templates/components/messages.html:16
 msgid "Dismiss"
 msgstr "Fermer"
 
-#: templates/components/pagination.html:8
+#: templates/components/pagination.html:10
+#, python-format
+msgid "Showing %(first)s–%(last)s of %(total)s"
+msgstr "Affichage de %(first)s–%(last)s sur %(total)s"
+
+#: templates/components/pagination.html:16
+#: templates/components/pagination_legacy.html:8
 msgid "Pagination"
 msgstr "Pagination"
 
-#: templates/components/pagination.html:12
-#: templates/components/pagination.html:14
+#: templates/components/pagination.html:20
+#: templates/components/pagination.html:27
+msgid "First page"
+msgstr "Première page"
+
+#: templates/components/pagination.html:23
+#: templates/components/pagination.html:28
+#: templates/components/pagination_legacy.html:12
+#: templates/components/pagination_legacy.html:14
 msgid "Previous"
 msgstr "Précédent"
 
-#: templates/components/pagination.html:17
+#: templates/components/pagination.html:31
+#: templates/components/pagination_legacy.html:17
 #, python-format
 msgid "Page %(number)s of %(total)s"
 msgstr "Page %(number)s sur %(total)s"
 
-#: templates/components/pagination.html:22
-#: templates/components/pagination.html:24
+#: templates/components/pagination.html:41
+#: templates/components/pagination.html:45
+#, python-format
+#| msgid "Purchase order %(number)s"
+msgid "Page %(number)s"
+msgstr "Page %(number)s"
+
+#: templates/components/pagination.html:53
+#: templates/components/pagination.html:58
+#: templates/components/pagination_legacy.html:22
+#: templates/components/pagination_legacy.html:24
 msgid "Next"
 msgstr "Suivant"
+
+#: templates/components/pagination.html:56
+#: templates/components/pagination.html:61
+msgid "Last page"
+msgstr "Dernière page"
 
 #: templates/errors/base_error.html:24
 msgid "Back to the start"
@@ -5708,3 +5778,72 @@ msgstr "Boîte de réception"
 #: templates/partials/nav_items.html:112
 msgid "Security"
 msgstr "Sécurité"
+
+msgid "Created"
+msgstr "Créée"
+
+msgid "Expires"
+msgstr "Expire"
+
+msgid "Until"
+msgstr "Jusqu'à"
+
+msgid "Number"
+msgstr "Numéro"
+
+msgid "All roles"
+msgstr "Tous les rôles"
+
+msgid "All branches"
+msgstr "Toutes les agences"
+
+msgid "Validity"
+msgstr "Validité"
+
+msgid "Any"
+msgstr "Tous"
+
+msgid "Valid"
+msgstr "Valide"
+
+msgid "No email sent"
+msgstr "Aucun e-mail envoyé"
+
+msgid "Received from"
+msgstr "Reçu depuis"
+
+msgid "Received until"
+msgstr "Reçu jusqu'à"
+
+msgid "Outstanding only"
+msgstr "Seulement ce qui reste à livrer"
+
+msgid "State"
+msgstr "État"
+
+msgid "No role matches the filters."
+msgstr "Aucun rôle ne correspond aux filtres."
+
+msgid "No project matches the filters."
+msgstr "Aucun projet ne correspond aux filtres."
+
+msgid "No invitation matches the filters."
+msgstr "Aucune invitation ne correspond aux filtres."
+
+msgid "No assignment matches the filters."
+msgstr "Aucune affectation ne correspond aux filtres."
+
+msgid "Ticks count for this page only: start the order from the page you are on."
+msgstr "Les cases cochées ne valent que pour cette page : démarrez la commande depuis la page où vous êtes."
+
+msgid "Expected by"
+msgstr "Attendu avant le"
+
+msgid "No expected delivery matches the filters."
+msgstr "Aucune livraison attendue ne correspond aux filtres."
+
+msgid "%(shown)s shown"
+msgstr "%(shown)s affichés"
+
+msgid "Not revoked"
+msgstr "Non révoqué"

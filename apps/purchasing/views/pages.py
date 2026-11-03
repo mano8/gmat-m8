@@ -7,15 +7,14 @@ an issued order, each only to who holds ``po.manage`` on it; a warehouse operato
 same page without prices (§8.2). Every action is its own POST-only URL (``actions``).
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
-from urllib.parse import quote
 from uuid import UUID
 
 from django.conf import settings
 from django.contrib import messages
-from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -23,7 +22,7 @@ from django.views.decorators.http import require_safe
 
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
-from apps.core.http import is_htmx
+from apps.core.listing import cursor_page, paginate, render_list
 from apps.purchasing import selectors
 from apps.purchasing.forms import (
     AllocationEntry,
@@ -43,7 +42,7 @@ from apps.purchasing.forms import (
 )
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.selectors import MANAGE, VIEW, AllocationRow, LineRow
-from apps.purchasing.views.common import Status, _detail_url, _on_order, _query
+from apps.purchasing.views.common import Status, _detail_url, _on_order
 
 
 def _uuids(values: list[str]) -> list[UUID]:
@@ -75,21 +74,40 @@ def worklist(request: HttpRequest) -> HttpResponse:
     data = filters.cleaned_data if filters.is_valid() else {}
     project, supplier = data.get("project"), data.get("supplier")
     supplier_id = supplier.pk if supplier else None
-    rows = selectors.to_purchase(
+    worklist = selectors.Worklist(
         ctx, project_id=project.pk if project else None, priority=data.get("priority", "")
     )
-    drafts = list(selectors.drafts(ctx, supplier_id=supplier_id))
-    template = (
-        "purchasing/worklist.html#results" if is_htmx(request) else "purchasing/worklist.html"
+    nobody = selectors.Unallocated(ctx, supplier_id=supplier_id)
+    drafts = paginate(
+        request,
+        selectors.drafts(ctx, supplier_id=supplier_id),
+        default_per_page=selectors.SECTION_PER_PAGE,
+        scope=selectors.DRAFTS_SCOPE,
+    )
+    unallocated = cursor_page(
+        request,
+        nobody.seek,
+        nobody.window,
+        default_per_page=selectors.SECTION_PER_PAGE,
+        scope=selectors.UNALLOCATED_SCOPE,
+        first_stretch=selectors.UNALLOCATED_STRETCH,
     )
     context = {
         "filters": filters,
-        "groups": selectors.by_material(rows),
-        "drafts": [(draft, selectors.is_stale(draft)) for draft in drafts],
-        "unallocated": selectors.unallocated_on_order(ctx, supplier_id=supplier_id),
+        "listing": cursor_page(
+            request,
+            worklist.seek,
+            worklist.window,
+            default_per_page=selectors.WORKLIST_PER_PAGE,
+            scope=selectors.WORKLIST_SCOPE,
+            first_stretch=selectors.WORKLIST_STRETCH,
+        ),
+        "drafts": drafts,
+        "draft_rows": [(draft, selectors.is_stale(draft)) for draft in drafts.rows],
+        "unallocated": unallocated,
         "stale_days": selectors.STALE_DRAFT_DAYS,
     }
-    return render(request, template, context)
+    return render_list(request, "purchasing/worklist.html", context)
 
 
 # --- the builder's first step -----------------------------------------------------------------
@@ -126,38 +144,53 @@ def order_new(request: HttpRequest) -> HttpResponse:
 # --- order lists -------------------------------------------------------------------------------
 
 
+def _with_progress(
+    orders: Sequence[PurchaseOrder], progress: Mapping[UUID, Any]
+) -> list[tuple[PurchaseOrder, Any]]:
+    """Each order with its receipt progress; a draft or a cancelled order has none."""
+    return [
+        (
+            found,
+            progress.get(found.pk) if found.number and found.status != Status.CANCELLED else None,
+        )
+        for found in orders
+    ]
+
+
 @require_safe
 @require_capability(VIEW)
 def order_list(request: HttpRequest) -> HttpResponse:
     """Orders to receive (issued) by default; any status and supplier by filter."""
     ctx = access_for(request)
-    filters = OrdersFilterForm(request.GET or None, ctx=ctx)
+    params = request.GET.copy()
+    if params and "status" not in params:
+        params["status"] = Status.ISSUED  # a sort or a page link keeps showing what is pending
+    filters = OrdersFilterForm(params or None, ctx=ctx)
     data = filters.cleaned_data if filters.is_valid() else {}
-    status = Status.ISSUED if "status" not in request.GET else data.get("status", "")
-    supplier = data.get("supplier")
-    rows = selectors.orders(ctx, status=status, supplier_id=supplier.pk if supplier else None)
-    page = Paginator(rows, selectors.PAGE_SIZE).get_page(request.GET.get("page"))
-    progress = selectors.progress(ctx, page.object_list)
-    template = "purchasing/orders.html#results" if is_htmx(request) else "purchasing/orders.html"
+    status = data.get("status", "") if params else Status.ISSUED
+    supplier, project = data.get("supplier"), data.get("project")
+    rows = selectors.orders(
+        ctx,
+        status=status,
+        supplier_id=supplier.pk if supplier else None,
+        project_id=project.pk if project else None,
+        q=data.get("q", ""),
+    )
+    listing = paginate(
+        request,
+        rows,
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.ORDER_SORTS,
+        sort_labels=selectors.ORDER_SORT_LABELS,
+    )
+    progress = selectors.progress(ctx, listing.rows)
     context = {
         "filters": filters,
-        "page_obj": page,
-        "entries": [
-            (
-                found,
-                progress.get(found.pk)
-                if found.number and found.status != Status.CANCELLED
-                else None,
-            )
-            for found in page.object_list
-        ],
+        "listing": listing,
+        "entries": _with_progress(listing.rows, progress),
         "can_manage": selectors.can_manage(ctx),
-        # An empty status is the "All" choice: the pager must keep it (a missing one means
-        # "pending").
-        "extra_query": _query(supplier=request.GET.get("supplier", ""))
-        + (f"&status={quote(request.GET['status'])}" if "status" in request.GET else ""),
     }
-    return render(request, template, context)
+    return render_list(request, "purchasing/orders.html", context)
 
 
 # --- the order page ----------------------------------------------------------------------------

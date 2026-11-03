@@ -1,27 +1,65 @@
-{% load i18n %}
+{% load i18n list_tags %}
 {% comment %}
-  Previous/next pager for a Django Page. Parameter: page_obj.
-  The links keep no other query string: filters add theirs with `extra_query` ("&q=...").
+  The pager of a list. Parameter: listing (the ListPage from apps.core.listing.paginate).
+  Links keep the filters, the page size and the sort (`{% page_url %}`: the section's own page parameter and anchor). From the sm
+  breakpoint: First, Previous, a numbered window with ellipses, Next, Last; on phones: Previous,
+  "Page 6 of 20", Next. Controls are at least 44 px high (.btn).
 {% endcomment %}
-{% if page_obj.has_other_pages %}
-  <nav class="mt-4 flex items-center justify-between gap-3"
-       aria-label="{% translate 'Pagination' %}">
-    {% if page_obj.has_previous %}
-      <a class="btn"
-         href="?page={{ page_obj.previous_page_number }}{{ extra_query }}"
-         rel="prev">{% translate "Previous" %}</a>
-    {% else %}
-      <span class="btn pointer-events-none opacity-50" aria-disabled="true">{% translate "Previous" %}</span>
-    {% endif %}
-    <span class="text-sm text-soft">
-      {% blocktranslate with number=page_obj.number total=page_obj.paginator.num_pages %}Page {{ number }} of {{ total }}{% endblocktranslate %}
-    </span>
-    {% if page_obj.has_next %}
-      <a class="btn"
-         href="?page={{ page_obj.next_page_number }}{{ extra_query }}"
-         rel="next">{% translate "Next" %}</a>
-    {% else %}
-      <span class="btn pointer-events-none opacity-50" aria-disabled="true">{% translate "Next" %}</span>
-    {% endif %}
-  </nav>
+{% if listing.total %}
+  <p class="mt-4 text-sm text-soft">
+    {% blocktranslate with first=listing.first last=listing.last total=listing.total %}Showing {{ first }}–{{ last }} of {{ total }}{% endblocktranslate %}
+  </p>
+{% endif %}
+{% if listing.has_other_pages %}
+  {% with page=listing.page %}
+    <nav class="mt-2 flex flex-wrap items-center justify-between gap-2"
+         aria-label="{% translate 'Pagination' %}">
+      {% if page.has_previous %}
+        <a class="btn hidden sm:inline-flex"
+           href="{% page_url listing 1 %}"
+           aria-label="{% translate 'First page' %}">«</a>
+        <a class="btn"
+           href="{% page_url listing page.previous_page_number %}"
+           rel="prev">{% translate "Previous" %}</a>
+      {% else %}
+        <span class="btn hidden pointer-events-none opacity-50 sm:inline-flex"
+              aria-disabled="true"
+              aria-label="{% translate 'First page' %}">«</span>
+        <span class="btn pointer-events-none opacity-50" aria-disabled="true">{% translate "Previous" %}</span>
+      {% endif %}
+      <span class="text-sm text-soft sm:hidden">
+        {% blocktranslate with number=listing.number total=listing.num_pages %}Page {{ number }} of {{ total }}{% endblocktranslate %}
+      </span>
+      <ul class="hidden list-none items-center gap-1 p-0 sm:flex">
+        {% for item in listing.pages %}
+          <li>
+            {% if item is None %}
+              <span aria-hidden="true" class="px-2 text-soft">…</span>
+            {% elif item == listing.number %}
+              <span class="btn btn-primary min-w-11"
+                    aria-current="page"
+                    aria-label="{% blocktranslate with number=item %}Page {{ number }}{% endblocktranslate %}">{{ item }}</span>
+            {% else %}
+              <a class="btn min-w-11"
+                 href="{% page_url listing item %}"
+                 aria-label="{% blocktranslate with number=item %}Page {{ number }}{% endblocktranslate %}">{{ item }}</a>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      {% if page.has_next %}
+        <a class="btn"
+           href="{% page_url listing page.next_page_number %}"
+           rel="next">{% translate "Next" %}</a>
+        <a class="btn hidden sm:inline-flex"
+           href="{% page_url listing listing.num_pages %}"
+           aria-label="{% translate 'Last page' %}">»</a>
+      {% else %}
+        <span class="btn pointer-events-none opacity-50" aria-disabled="true">{% translate "Next" %}</span>
+        <span class="btn hidden pointer-events-none opacity-50 sm:inline-flex"
+              aria-disabled="true"
+              aria-label="{% translate 'Last page' %}">»</span>
+      {% endif %}
+    </nav>
+  {% endwith %}
 {% endif %}

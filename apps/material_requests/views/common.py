@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 from typing import Any
-from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
@@ -37,12 +36,6 @@ REVIEW, SOURCE, CANCEL_ANY = (
 Status = MaterialRequest.Status
 
 LINES_TEMPLATE = "material_requests/draft_lines.html"
-
-
-def _query(**params: str) -> str:
-    """The filters, for the pager's links."""
-    kept = {key: value for key, value in params.items() if value}
-    return f"&{urlencode(kept)}" if kept else ""
 
 
 def _own_draft(request: HttpRequest, request_id: UUID) -> MaterialRequest:

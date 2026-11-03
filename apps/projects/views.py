@@ -6,12 +6,10 @@ capability somewhere (403), the object in scope (404), the capability on the obj
 The services authorize again inside their transaction.
 """
 
-from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -21,40 +19,43 @@ from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
 from apps.access.roles import Capability
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
-from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
+from apps.core.listing import ListScope, paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure
 from apps.projects import selectors, services
-from apps.projects.forms import AssignmentForm, ProjectCreateForm, ProjectFilterForm, ProjectForm
+from apps.projects.forms import (
+    AssignmentFilterForm,
+    AssignmentForm,
+    ProjectCreateForm,
+    ProjectFilterForm,
+    ProjectForm,
+)
 from apps.projects.models import Project
 
 VIEW, MANAGE = Capability.PROJECT_VIEW, Capability.PROJECT_MANAGE
+ASSIGNMENTS_SCOPE = ListScope(prefix="assignments_", anchor="assignments")
 
 
 @require_safe
 @require_capability(VIEW)
 def project_list(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
-    filters = ProjectFilterForm(request.GET or None)
+    filters = ProjectFilterForm(request.GET or None, ctx=ctx)
     q = status = ""
+    branch = None
     if filters.is_valid():
         q, status = filters.cleaned_data["q"], filters.cleaned_data["status"]
-    page = Paginator(selectors.projects(ctx, q=q, status=status), selectors.PAGE_SIZE).get_page(
-        request.GET.get("page")
-    )
-    template = "projects/list.html#results" if is_htmx(request) else "projects/list.html"
-    return render(
+        branch = filters.cleaned_data["branch"]
+    listing = paginate(
         request,
-        template,
-        {"filters": filters, "page_obj": page, "extra_query": _query(q, status)},
+        selectors.projects(ctx, q=q, status=status, branch_id=branch.pk if branch else None),
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.PROJECT_SORTS,
+        default_sort="code",
+        sort_labels=selectors.PROJECT_SORT_LABELS,
     )
-
-
-def _query(q: str, status: str) -> str:
-    """The filters, for the pager's links."""
-    params = {key: value for key, value in (("q", q), ("status", status)) if value}
-    return f"&{urlencode(params)}" if params else ""
+    return render_list(request, "projects/list.html", {"filters": filters, "listing": listing})
 
 
 def _manageable(request: HttpRequest, project_id: UUID) -> Project:
@@ -73,10 +74,19 @@ def _detail(
 ) -> HttpResponse:
     ctx = access_for(request)
     manageable = selectors.manageable(ctx, project)
+    filters = AssignmentFilterForm(request.GET or None, prefix=ASSIGNMENTS_SCOPE.anchor)
+    data = filters.cleaned_data if filters.is_valid() else {}
+    listing = paginate(
+        request,
+        selectors.assignments(ctx, project, kind=data.get("kind", ""), state=data.get("state", "")),
+        default_per_page=selectors.SECTION_PER_PAGE,
+        scope=ASSIGNMENTS_SCOPE,
+    )
     context = {
         "project": project,
         "manageable": manageable,
-        "assignments": selectors.assignments(ctx, project),
+        "assignment_filters": filters,
+        "assignments": listing,
         "assignment_form": assignment_form
         or (AssignmentForm(ctx=ctx, actor_id=ctx.user_id) if manageable else None),
     }

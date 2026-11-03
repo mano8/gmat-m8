@@ -43,5 +43,10 @@ def client_ip(request: HttpRequest) -> str | None:
 
 
 def is_htmx(request: HttpRequest) -> bool:
-    """The request came from htmx (``django_htmx``'s ``request.htmx``): answer with a partial."""
-    return bool(getattr(request, "htmx", False))
+    """The request came from htmx (``django_htmx``'s ``request.htmx``): answer with a partial.
+
+    Not when htmx asks again for a page it restores from history (Back after a pushed filter
+    URL; ``historyCacheSize`` is 0, so it re-requests): that one needs the whole page.
+    """
+    details = getattr(request, "htmx", None)
+    return bool(details) and not getattr(details, "history_restore_request", False)

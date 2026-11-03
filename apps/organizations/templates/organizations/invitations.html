@@ -10,12 +10,13 @@
     {% include "components/button.html" with href=invite_url label=_("Invite someone") variant="primary" %}
   </div>
   {% url 'org:invitations' as list_url %}
-  {% include "components/filter_form.html" with form=filters target="#invitation-results" action=list_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#invitation-results" action=list_url sort_always=True grid="sm:grid-cols-[1fr_10rem_12rem_auto]" %}
   {% partialdef results inline %}
     <div id="invitation-results">
-      {% if page_obj.object_list %}
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
         <ul class="divide-y divide-line">
-          {% for invitation in page_obj.object_list %}
+          {% for invitation in listing.rows %}
             <li class="flex flex-wrap items-center justify-between gap-3 py-3">
               <div>
                 <p class="font-medium">{{ invitation.email }}</p>
@@ -44,7 +45,7 @@
             </li>
           {% endfor %}
         </ul>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No pending invitations") %}
       {% endif %}

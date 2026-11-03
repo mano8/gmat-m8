@@ -1,0 +1,52 @@
+{% load i18n %}
+{% comment %}
+  The filters of a list (components/filter_form.html) plus its page size and, on phones, its
+  sort order. Parameters: form (the filter form), listing (the ListPage), target (a CSS selector
+  of the results partial), action (the list's URL), and optionally grid and sort_always
+  (the sort select stays visible above phone width: for a list without column headers).
+  The page size and sort controls join the filter form with form="list-filter", so one change
+  of either refreshes the results through htmx (and submits without JavaScript) and the page
+  number starts again at 1: a filter form never sends `page`.
+  Pair it with components/list_summary.html and components/pagination.html inside the results
+  partial.
+  A section of a page with several lists passes `scoped` (the toolbar then sits in its own
+  `.list-scope`, so its controls refresh only its results), `form_id` (unique on the page) and
+  `select` (the results' selector, taken out of the full page the server answers with) and sit
+  in a `data-list-section` element with their results (app.js announces the count there); the
+  names of its parameters come from the listing (`listing.per_page_param`).
+{% endcomment %}
+{% with fid=form_id|default:"list-filter" %}
+  {% if scoped %}<div class="list-scope">{% endif %}
+  {% include "components/filter_form.html" with form=form target=target action=action grid=grid form_id=fid scoped=scoped select=select %}
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+    {% if listing.sort_options %}
+      <div class="field{% if not sort_always %} sm:hidden{% endif %}">
+        <label for="{{ fid }}-sort">{% translate "Sort by" %}</label>
+        <select id="{{ fid }}-sort" name="{{ listing.sort_param }}" form="{{ fid }}">
+          {% for value, label in listing.sort_options %}
+            <option value="{{ value }}"{% if value == listing.sort %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    {% if listing.sizes %}
+      <div class="field ml-auto">
+        <label for="{{ fid }}-per-page">{% translate "Rows per page" %}</label>
+        <select id="{{ fid }}-per-page"
+                name="{{ listing.per_page_param }}"
+                form="{{ fid }}">
+          {% for size in listing.sizes %}
+            <option value="{{ size }}"
+                    {% if size == listing.per_page %} selected{% endif %}>{{ size }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    <p class="sr-only"
+       role="status"
+       aria-live="polite"
+       aria-atomic="true"
+       data-list-status></p>
+  </div>
+  {% if scoped %}</div>{% endif %}
+{% endwith %}

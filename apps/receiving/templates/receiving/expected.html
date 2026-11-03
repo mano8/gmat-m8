@@ -8,39 +8,49 @@
     <h1>{% translate "Expected deliveries" %}</h1>
     <p class="mt-1 text-soft" data-testid="expected-project-name">{{ project.code }} · {{ project.name }}</p>
   </div>
-  <div data-testid="expected-deliveries">
-    {% for po_id, items, receive_url in groups %}
-      {% with first=items.0 %}
-        <section class="card mb-4" data-testid="expected-order">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 data-field="order">{{ first.order_number }}</h2>
-              <p class="text-sm text-soft">
-                <span data-field="supplier">{{ first.supplier }}</span>
-                · {% translate "Expected" %}
-                <span data-field="expected-date">{{ first.expected_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</span>
-              </p>
+  {% url 'receiving:expected' project_id=project.pk as expected_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#expected-results" action=expected_url grid="sm:grid-cols-[1fr_10rem_auto]" %}
+  {% partialdef results inline %}
+    <div id="expected-results" data-testid="expected-deliveries">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% for found, receive_url in orders %}
+        {% with first=found.first items=found.items %}
+          <section class="card mb-4" data-testid="expected-order">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 data-field="order">{{ first.order_number }}</h2>
+                <p class="text-sm text-soft">
+                  <span data-field="supplier">{{ first.supplier }}</span>
+                  · {% translate "Expected" %}
+                  <span data-field="expected-date">{{ first.expected_date|date:"SHORT_DATE_FORMAT"|default:"—" }}</span>
+                </p>
+              </div>
+              {% if receive_url %}
+                {% include "components/button.html" with href=receive_url label=_("Receive these goods") variant="primary" %}
+              {% endif %}
             </div>
-            {% if receive_url %}
-              {% include "components/button.html" with href=receive_url label=_("Receive these goods") variant="primary" %}
-            {% endif %}
-          </div>
-          <ul class="mt-3 divide-y divide-line">
-            {% for item in items %}
-              <li class="flex flex-wrap items-baseline justify-between gap-2 py-2"
-                  data-testid="expected-line">
-                <span>
-                  <span class="font-medium">{{ item.material_name }}</span>
-                  <span class="block text-sm text-soft">{{ item.material_reference }} · {{ item.request_number }}</span>
-                </span>
-                <span class="font-semibold" data-field="expected">{{ item.expected|quantity }} {{ item.unit }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        </section>
-      {% endwith %}
-    {% empty %}
-      {% include "components/empty_state.html" with title=message text=_("Goods bought for this project will be listed here once the order is issued.") %}
-    {% endfor %}
-  </div>
+            <ul class="mt-3 divide-y divide-line">
+              {% for item in items %}
+                <li class="flex flex-wrap items-baseline justify-between gap-2 py-2"
+                    data-testid="expected-line">
+                  <span>
+                    <span class="font-medium">{{ item.material_name }}</span>
+                    <span class="block text-sm text-soft">{{ item.material_reference }} · {{ item.request_number }}</span>
+                  </span>
+                  <span class="font-semibold" data-field="expected">{{ item.expected|quantity }} {{ item.unit }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endwith %}
+      {% empty %}
+        {% if filtered %}
+          {% include "components/empty_state.html" with title=message text=_("No expected delivery matches the filters.") %}
+        {% else %}
+          {% include "components/empty_state.html" with title=message text=_("Goods bought for this project will be listed here once the order is issued.") %}
+        {% endif %}
+      {% endfor %}
+      {% include "components/cursor_pagination.html" with listing=listing %}
+    </div>
+  {% endpartialdef %}
 {% endblock content %}

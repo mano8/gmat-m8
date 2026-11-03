@@ -131,14 +131,15 @@ class TestViews:
         assert "<html" not in fragment.content.decode()
 
     def test_the_list_pages_keep_the_filters(self, org: Org, people: People) -> None:
-        for _ in range(selectors.PAGE_SIZE + 1):
+        for _ in range(selectors.DEFAULT_PER_PAGE + 1):
             event(org.a_mad.pk)
         html = (
             client_for(people.mm_mad)
             .get(reverse("audit:list"), {"q": "request", "since": "2020-01-01"})
             .content.decode()
         )
-        assert "page=2&amp;q=request&amp;since=2020-01-01" in html
+        link = next(part for part in html.split('href="') if "page=2" in part[:80])
+        assert all(kept in link.split('"')[0] for kept in ("q=request", "since=2020-01-01"))
 
     def test_the_empty_state(self, org: Org, people: People) -> None:
         html = client_for(people.mm_mad).get(reverse("audit:list")).content.decode()

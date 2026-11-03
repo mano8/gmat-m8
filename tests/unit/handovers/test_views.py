@@ -98,6 +98,18 @@ class TestLists:
         fragment = client_for(people.mm_mad).get(reverse("handovers:list"), HTTP_HX_REQUEST="true")
         assert b"<html" not in fragment.content
 
+    def test_a_handover_to_a_typed_name_is_listed(
+        self, org: Org, people: People, stocked: MaterialRequestLine
+    ) -> None:
+        """The receiver is a user or a typed name; the list shows either (it answered 500 for
+        a name, found on the volume dataset, M7d.4)."""
+        wo = client_for(people.wo_mad)
+        data = form_data(wo, stocked, org, people, receiver_user="", receiver_name="Pat Taker")
+        create(wo, data)
+        response = client_for(people.mm_mad).get(reverse("handovers:list"))
+        assert response.status_code == 200
+        assert "Pat Taker" in response.content.decode()
+
     def test_the_new_button_is_for_who_may_post(self, org: Org, people: People) -> None:
         new = reverse("handovers:new")
         assert new in page(client_for(people.wo_mad), "list")

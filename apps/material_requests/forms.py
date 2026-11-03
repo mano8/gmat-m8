@@ -77,8 +77,30 @@ class ProjectSearchForm(forms.Form):
     q = forms.CharField(label=_("Search"), required=False, max_length=100)
 
 
+class ProjectFilterField(forms.ModelChoiceField):  # type: ignore[type-arg]
+    """The inbox's project filter: an optional choice among the projects the user reviews."""
+
+
 class MyRequestsFilterForm(forms.Form):
+    q = forms.CharField(label=_("Number"), required=False, max_length=40)
     status = forms.ChoiceField(label=_("Status"), required=False, choices=STATUS_CHOICES)
+    project = ProjectFilterField(
+        label=_("Project"), required=False, queryset=None, empty_label=_("All")
+    )
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["project"].queryset = selectors.my_request_projects(ctx)  # type: ignore[attr-defined]
+
+
+class ProjectMaterialsFilterForm(forms.Form):
+    q = forms.CharField(
+        label=_("Search"),
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={"type": "search", "enterkeyhint": "search"}),
+    )
+    outstanding = forms.BooleanField(label=_("Outstanding only"), required=False)
 
 
 class MaterialSearchForm(forms.Form):
@@ -90,10 +112,6 @@ class MaterialSearchForm(forms.Form):
             attrs={"type": "search", "autocomplete": "off", "enterkeyhint": "search"}
         ),
     )
-
-
-class ProjectFilterField(forms.ModelChoiceField):  # type: ignore[type-arg]
-    """The inbox's project filter: an optional choice among the projects the user reviews."""
 
 
 class StartForm(IdempotentForm):

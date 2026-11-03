@@ -12,21 +12,22 @@
     {% endcan %}
   </div>
   {% url 'projects:list' as list_url %}
-  {% include "components/filter_form.html" with form=filters target="#project-results" action=list_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#project-results" action=list_url grid="sm:grid-cols-[1fr_12rem_14rem_auto]" %}
   {% partialdef results inline %}
     <div id="project-results">
-      {% if page_obj.object_list %}
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
         <table class="table-responsive">
           <thead>
             <tr>
-              <th scope="col">{% translate "Code" %}</th>
-              <th scope="col">{% translate "Name" %}</th>
+              {% include "components/sort_header.html" with listing=listing key="code" label=_("Code") %}
+              {% include "components/sort_header.html" with listing=listing key="name" label=_("Name") %}
               <th scope="col">{% translate "Branch" %}</th>
               <th scope="col">{% translate "Status" %}</th>
             </tr>
           </thead>
           <tbody>
-            {% for project in page_obj.object_list %}
+            {% for project in listing.rows %}
               <tr>
                 <td data-label="{% translate 'Code' %}">
                   <a href="{% url 'projects:detail' project_id=project.pk %}">{{ project.code }}</a>
@@ -38,7 +39,7 @@
             {% endfor %}
           </tbody>
         </table>
-        {% include "components/pagination.html" %}
+        {% include "components/pagination.html" with listing=listing %}
       {% else %}
         {% include "components/empty_state.html" with title=_("No projects") text=_("No project matches, or none is shared with you yet.") %}
       {% endif %}

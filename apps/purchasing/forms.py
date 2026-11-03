@@ -82,16 +82,21 @@ class BranchField(forms.ModelChoiceField):  # type: ignore[type-arg]
 
 
 class OrdersFilterForm(forms.Form):
+    q = forms.CharField(label=_("Search"), required=False, max_length=100)
     status = forms.ChoiceField(
         label=_("Status"), required=False, choices=ORDER_STATUS_CHOICES, initial="ISSUED"
     )
     supplier = SupplierField(label=_("Supplier"), required=False, queryset=None)
+    project: Any = forms.ModelChoiceField(label=_("Project"), required=False, queryset=None)
 
     def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         supplier = self.fields["supplier"]
         supplier.queryset = supplier_selectors.suppliers(ctx)  # type: ignore[attr-defined]
         supplier.empty_label = _("All")  # type: ignore[attr-defined]
+        project: Any = self.fields["project"]
+        project.queryset = selectors.order_projects(ctx)
+        project.empty_label = _("All")
 
 
 class WorklistFilterForm(forms.Form):

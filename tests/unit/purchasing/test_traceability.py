@@ -4,6 +4,7 @@ line's remaining and receivable quantities. Every number comes from a selector."
 import re
 from collections.abc import Iterator
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from django.test import Client
@@ -15,10 +16,14 @@ from apps.access.exceptions import NotInScope
 from apps.access.principals import SessionPrincipal
 from apps.accounts.models import User
 from apps.audit.recorder import record
+from apps.catalog.models import Material
 from apps.material_requests import selectors as request_selectors
 from apps.material_requests import services as request_services
+from apps.material_requests.models import MaterialRequestLine
+from apps.projects.models import Project
 from apps.purchasing import selectors
 from tests.org import Org, People, client_for
+from tests.support import every_key, read_all
 from tests.unit.purchasing.conftest import Buy, FakeReceipts, MakeLine, allocation, only_line
 
 pytestmark = pytest.mark.django_db
@@ -151,7 +156,7 @@ class TestProjectMaterials:
         request_services.close_line_short(mm, gone.pk, reason="Not needed")
         manager = ctx(people.mm_mad)
         project = request_selectors.project_for_overview(manager, org.hospital.pk)
-        (row,) = request_selectors.project_materials(manager, project)
+        (row,) = materials(manager, project)
         assert (row.description, row.reference, row.unit_code, row.requests) == (
             "Cable 2,5",
             "CAB-25",
@@ -161,16 +166,56 @@ class TestProjectMaterials:
         assert [row.approved, row.received, row.pending, row.delivered] == q(16, 7, 9, 2)
         assert [row.awaiting_handover, row.outstanding] == q(5, 14)
 
-    def test_the_most_outstanding_material_comes_first(
-        self, org: Org, people: People, make_line: MakeLine, breaker: object
+    def test_the_materials_come_in_alphabetical_order_a_few_at_a_time(
+        self, org: Org, people: People, make_line: MakeLine, breaker: Material
     ) -> None:
-        make_line("2", material=breaker)
-        make_line("9")
+        make_line("9", material=breaker)  # Diferencial 40A
+        make_line("2")  # Cable 2,5
+        free_text(make_line, "1", "anclajes")
+        free_text(make_line, "4", "Anclajes")  # the same words: one row
         manager = ctx(people.mm_mad)
-        rows = request_selectors.project_materials(
-            manager, request_selectors.project_for_overview(manager, org.hospital.pk)
-        )
-        assert [row.outstanding for row in rows] == q(9, 2)
+        project = request_selectors.project_for_overview(manager, org.hospital.pk)
+        rows = materials(manager, project, size=1)
+        assert [(row.description.casefold(), row.outstanding) for row in rows] == [
+            ("anclajes", D(5)),
+            ("cable 2,5", D(2)),
+            ("diferencial 40a", D(9)),
+        ]
+
+    def test_a_stretch_takes_only_its_own_material_and_unit_pairs(
+        self, org: Org, people: People, make_line: MakeLine, breaker: Material
+    ) -> None:
+        make_line("9", material=breaker)  # UD
+        make_line("2")  # cable, M
+        free_text(make_line, "1", "anclajes")  # M
+        free_text(make_line, "4", "anclajes", unit=breaker.unit_id)  # the same words in UD
+        manager = ctx(people.mm_mad)
+        project = request_selectors.project_for_overview(manager, org.hospital.pk)
+        source = request_selectors.ProjectMaterials(manager, project)
+        keys = every_key(source.seek)
+        assert len(keys) == 4  # the words in two units are two rows
+        # the stretch after the first "anclajes" holds both units and the words again: the
+        # first "anclajes" line matches the query but is not one of the stretch's pairs
+        rows = [row for _, row in source.window(keys[1:])]
+        assert [row.outstanding for row in rows] == [
+            row.outstanding for row in materials(manager, project)[1:]
+        ]
+
+    def test_the_filters_narrow_in_the_database_and_on_the_ledger(
+        self, org: Org, people: People, mm: SessionPrincipal, make_line: MakeLine, breaker: Material
+    ) -> None:
+        make_line("9", material=breaker)
+        done = make_line("2")
+        request_services.close_line_short(mm, done.pk, reason="Enough")  # no longer open
+        free_text(make_line, "3", "Tacos de expansion")
+        manager = ctx(people.mm_mad)
+        project = request_selectors.project_for_overview(manager, org.hospital.pk)
+        assert [row.reference for row in materials(manager, project, q="dif-40")] == ["DIF-40"]
+        assert [row.description for row in materials(manager, project, q="TACOS")] == [
+            "Tacos de expansion"
+        ]
+        assert [row.reference for row in materials(manager, project, q="cab")] == []
+        assert len(materials(manager, project, outstanding_only=True)) == 2
 
     def test_scope(self, org: Org, people: People, make_line: MakeLine) -> None:
         make_line("5")
@@ -179,7 +224,7 @@ class TestProjectMaterials:
         # a requester sees the lines of the requests they may see, nobody else's
         tech = ctx(people.tech_mad)
         mine = request_selectors.project_for_overview(tech, org.hospital.pk)
-        assert [row.approved for row in request_selectors.project_materials(tech, mine)] == q(5)
+        assert [row.approved for row in materials(tech, mine)] == q(5)
 
     def test_page(self, org: Org, people: People, make_line: MakeLine) -> None:
         make_line("5")
@@ -208,6 +253,24 @@ class TestOrderLine:
         html = page.content.decode()  # type: ignore[attr-defined]
         assert field(html, "remaining") == "6 M"
         assert "Receivable" in html
+
+
+def free_text(
+    make_line: MakeLine, approved: str, text: str, unit: object = None
+) -> MaterialRequestLine:
+    """An approved line described in words, served from stock (not in the catalog)."""
+    line = make_line(approved, sourcing=MaterialRequestLine.Sourcing.STOCK)
+    found = MaterialRequestLine.objects.filter(pk=line.pk)
+    found.update(material=None, free_text=text, unit_id=unit or line.unit_id)
+    return line
+
+
+def materials(
+    of: AccessContext, project: Project, *, size: int = 2, **narrow: Any
+) -> list[request_selectors.ProjectMaterial]:
+    """Every row of the project's materials, read ``size`` materials at a time."""
+    source = request_selectors.ProjectMaterials(of, project, **narrow)
+    return read_all(source.seek, source.window, size)
 
 
 def q(*values: int) -> list[Decimal]:

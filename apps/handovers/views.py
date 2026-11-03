@@ -16,7 +16,6 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -28,8 +27,8 @@ from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
 from apps.attachments import selectors as attachment_selectors
 from apps.core.forms import add_service_errors
-from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError, recorded_result
+from apps.core.listing import paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, idempotency_failure, invalid, perform
 from apps.handovers import selectors, services
@@ -63,20 +62,18 @@ def handover_list(request: HttpRequest) -> HttpResponse:
         kind=data.get("kind", ""),
         project_id=project.pk if project else None,
         q=data.get("q", ""),
+        handed_from=data.get("handed_from"),
+        handed_to=data.get("handed_to"),
     )
-    page = Paginator(rows, 25).get_page(request.GET.get("page"))
-    template = "handovers/list.html#results" if is_htmx(request) else "handovers/list.html"
-    kept = {key: data[key] for key in ("q", "status", "kind") if data.get(key)}
-    extra = "".join(f"&{key}={value}" for key, value in kept.items())
-    if project:
-        extra += f"&project={project.pk}"
-    context = {
-        "filters": filters,
-        "page_obj": page,
-        "can_post": selectors.can_post(ctx),
-        "extra_query": extra,
-    }
-    return render(request, template, context)
+    listing = paginate(
+        request,
+        rows,
+        default_per_page=selectors.DEFAULT_PER_PAGE,
+        sorts=selectors.HANDOVER_SORTS,
+        sort_labels=selectors.HANDOVER_SORT_LABELS,
+    )
+    context = {"filters": filters, "listing": listing, "can_post": selectors.can_post(ctx)}
+    return render_list(request, "handovers/list.html", context)
 
 
 @require_safe

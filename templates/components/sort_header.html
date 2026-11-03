@@ -1,0 +1,17 @@
+{% load i18n %}
+{% comment %}
+  A sortable column header. Parameters: listing (the ListPage), key (the list's sort key), label.
+  A click sorts ascending, a second one descending; the page number starts again at 1.
+{% endcomment %}
+{% with descending="-"|add:key %}
+  <th scope="col"
+      {% if listing.sort == key %}aria-sort="ascending"{% elif listing.sort == descending %}aria-sort="descending"{% endif %}>
+    {% if listing.sort == key %}
+      <a href="{% querystring sort=descending page=None %}">{{ label }}<span aria-hidden="true"> ↑</span></a>
+    {% elif listing.sort == descending %}
+      <a href="{% querystring sort=key page=None %}">{{ label }}<span aria-hidden="true"> ↓</span></a>
+    {% else %}
+      <a href="{% querystring sort=key page=None %}">{{ label }}</a>
+    {% endif %}
+  </th>
+{% endwith %}

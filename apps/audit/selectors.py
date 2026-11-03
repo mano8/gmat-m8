@@ -12,6 +12,7 @@ from uuid import UUID
 
 from django.db.models import Q, QuerySet
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
@@ -19,7 +20,9 @@ from apps.access.roles import Capability
 from apps.audit.models import AuditEvent
 
 VIEW = Capability.AUDIT_VIEW
-PAGE_SIZE = 50
+DEFAULT_PER_PAGE = 50
+EVENT_SORTS = {"time": ("occurred_at",)}
+EVENT_SORT_LABELS = {"time": _("When")}
 DISPLAY_FIELDS = (
     "id",
     "occurred_at",
@@ -36,6 +39,7 @@ class EventFilter:
     """What the list narrows to; every field is optional."""
 
     q: str = ""
+    actor: str = ""
     object_type: str = ""
     since: date | None = None
     until: date | None = None
@@ -47,7 +51,10 @@ def can_view(ctx: AccessContext) -> bool:
 
 def events(ctx: AccessContext, narrow: EventFilter | None = None) -> QuerySet[AuditEvent]:
     """The events in scope, newest first; ``q`` looks at the actor, the action and the channel."""
-    rows = AuditEvent.objects.visible_to(ctx, VIEW).only(*DISPLAY_FIELDS)
+    return _narrowed(AuditEvent.objects.visible_to(ctx, VIEW).only(*DISPLAY_FIELDS), narrow)
+
+
+def _narrowed(rows: QuerySet[AuditEvent], narrow: EventFilter | None) -> QuerySet[AuditEvent]:
     narrow = narrow or EventFilter()
     if narrow.q:
         rows = rows.filter(
@@ -55,6 +62,8 @@ def events(ctx: AccessContext, narrow: EventFilter | None = None) -> QuerySet[Au
             | Q(action__icontains=narrow.q)
             | Q(via__icontains=narrow.q)
         )
+    if narrow.actor:
+        rows = rows.filter(actor_label__icontains=narrow.actor)
     if narrow.object_type:
         rows = rows.filter(object_type=narrow.object_type)
     if narrow.since is not None:
@@ -76,12 +85,18 @@ def object_types(ctx: AccessContext) -> list[str]:
     return list(found)
 
 
-def object_history(ctx: AccessContext, object_type: str, object_id: UUID) -> QuerySet[AuditEvent]:
-    """Everything that happened to one object, oldest first; none in scope is a 404."""
+def object_history(
+    ctx: AccessContext, object_type: str, object_id: UUID, narrow: EventFilter | None = None
+) -> QuerySet[AuditEvent]:
+    """Everything that happened to one object, oldest first; none in scope is a 404.
+
+    ``narrow`` filters the events shown, never whether the object is in scope: a filter that
+    matches nothing is an empty page, not a 404.
+    """
     rows = events(ctx).filter(object_type=object_type, object_id=object_id)
     if not rows.exists():
         raise NotInScope(VIEW)
-    return rows.order_by("occurred_at", "id")
+    return _narrowed(rows, narrow).order_by("occurred_at", "id")
 
 
 def _day_start(day: date) -> datetime:

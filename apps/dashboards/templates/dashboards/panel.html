@@ -4,9 +4,9 @@
   <div class="flex items-center justify-between gap-2">
     <h2 class="card-title mb-0">{{ panel.title }}</h2>
     {% if panel.alert and content.count %}
-      {% include "components/status_chip.html" with label=content.count tone="warn" %}
+      {% include "components/status_chip.html" with label=content.label tone="warn" %}
     {% else %}
-      {% include "components/status_chip.html" with label=content.count %}
+      {% include "components/status_chip.html" with label=content.label %}
     {% endif %}
   </div>
   {% if content.rows %}

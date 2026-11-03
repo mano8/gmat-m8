@@ -5,7 +5,7 @@ prices; nobody else sees them. The worklist is the material manager's.
 """
 
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -22,6 +22,7 @@ from apps.projects.models import Project
 from apps.purchasing import selectors, services
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from tests.org import Org, People
+from tests.support import every_key, read_all
 from tests.unit.purchasing.conftest import Buy, FakeReceipts, MakeLine, allocation, only_line, q
 
 pytestmark = pytest.mark.django_db
@@ -390,3 +391,130 @@ class TestHistory:
         assert selectors.history(ctx(people.mm_mad), order)
         assert selectors.history(ctx(people.group_admin), order)
         assert selectors.history(ctx(people.wo_mad), order) == []
+
+
+# --- the lists worked out a stretch at a time (M7d.4) ------------------------------------------
+
+
+def signature(groups: list[selectors.MaterialGroup]) -> list[object]:
+    return [
+        (g.reference, [(r.line.pk, r.to_purchase, r.reserved, r.committed) for r in g.rows])
+        for g in groups
+    ]
+
+
+class TestWorklistWindow:
+    def many(self, make_line: MakeLine, buy: Buy, breaker: Material) -> None:
+        make_line("10")
+        make_line("6", priority="URGENT")
+        make_line("8", material=breaker, needed_by=date(2030, 1, 1))
+        reserved, ordered, part = (
+            make_line("10"),
+            make_line("10"),
+            make_line("10", material=breaker),
+        )
+        buy((reserved, "10"), issue=False)
+        buy((ordered, "10"))
+        buy((part, "4"))
+        make_line("5", sourcing="STOCK")  # not purchased
+
+    @pytest.mark.parametrize("size", [1, 2, 3, 100])
+    def test_it_gives_the_groups_of_the_whole_list_in_the_same_order(
+        self, people: People, buy: Buy, make_line: MakeLine, breaker: Material, size: int
+    ) -> None:
+        self.many(make_line, buy, breaker)
+        manager = ctx(people.mm_mad)
+        eager = selectors.by_material(selectors.to_purchase(manager))
+        worklist = selectors.Worklist(manager)
+        assert len(eager) == 2  # two materials, one of them with its lines spread over the list
+        assert signature(read_all(worklist.seek, worklist.window, size)) == signature(eager)
+
+    def test_a_group_shows_at_its_most_urgent_line_that_still_needs_buying(
+        self, people: People, buy: Buy, make_line: MakeLine, breaker: Material
+    ) -> None:
+        covered = make_line("10", material=breaker, priority="URGENT")
+        buy((covered, "10"))  # the urgent line is bought: the material waits for its next one
+        open_ = make_line("3", material=breaker)
+        other = make_line("4", priority="HIGH")
+        manager = ctx(people.mm_mad)
+        eager = selectors.by_material(selectors.to_purchase(manager))
+        assert [[row.line for row in group.rows] for group in eager] == [[other], [open_]]
+        worklist = selectors.Worklist(manager)
+        assert covered.pk in every_key(worklist.seek)  # a candidate, though not a row
+        assert signature(read_all(worklist.seek, worklist.window, 1)) == signature(eager)
+
+    def test_it_narrows_like_the_eager_list_and_stays_in_scope(
+        self, org: Org, people: People, make_line: MakeLine, breaker: Material
+    ) -> None:
+        urgent = make_line("2", material=breaker, priority="URGENT")
+        make_line("10")
+        make_line("10", project=org.sev_works)
+        assert every_key(selectors.Worklist(ctx(people.mm_mad), priority="URGENT").seek) == [
+            urgent.pk
+        ]
+        assert (
+            every_key(selectors.Worklist(ctx(people.mm_mad), project_id=org.sev_works.pk).seek)
+            == []
+        )
+        assert len(every_key(selectors.Worklist(ctx(people.mm_sev)).seek)) == 1
+        assert every_key(selectors.Worklist(ctx(people.wo_mad)).seek) == []  # no po.manage
+
+    def test_a_cursor_on_a_line_that_left_the_list_still_marks_its_place(
+        self, people: People, mm: SessionPrincipal, make_line: MakeLine
+    ) -> None:
+        first, second, third = (make_line("1", priority=rank) for rank in ("URGENT", "HIGH", "LOW"))
+        manager = ctx(people.mm_mad)
+        assert selectors.Worklist(manager).seek("", 1) == [first.pk]
+        assert selectors.Worklist(manager).seek(str(first.pk), 5) == [second.pk, third.pk]
+        request_services.close_line_short(mm, second.pk, reason="Not needed")
+        assert every_key(selectors.Worklist(manager).seek) == [first.pk, third.pk]
+        assert selectors.Worklist(manager).seek(str(second.pk), 5) == [third.pk]
+        assert selectors.Worklist(manager).seek("not-a-key", 1) == [first.pk]
+
+    def test_the_lines_of_a_stretch_one_by_one(
+        self, people: People, buy: Buy, make_line: MakeLine, breaker: Material
+    ) -> None:
+        self.many(make_line, buy, breaker)
+        manager = ctx(people.mm_mad)
+        eager = selectors.to_purchase(manager)
+        worklist = selectors.Worklist(manager)
+        lines = [row.line for row in read_all(worklist.seek, worklist.line_window, 2)]
+        assert lines == [row.line for row in eager]
+
+
+class TestUnallocatedWindow:
+    def test_it_gives_the_lines_of_the_whole_list(
+        self,
+        people: People,
+        mm: SessionPrincipal,
+        buy: Buy,
+        make_line: MakeLine,
+        received: FakeReceipts,
+    ) -> None:
+        for _ in range(3):
+            line = make_line("10")
+            order = buy((line, "10"))
+            received.receive(only_line(order), "6", {allocation(order, line): "6"})
+            request_services.close_line_short(mm, line.pk, reason="Enough")
+        buy((make_line("10"), "10"))  # still allocated: not listed
+        manager = ctx(people.mm_mad)
+        eager = selectors.unallocated_on_order(manager)
+        assert len(eager) == 3
+        for size in (1, 2, 50):
+            nobody = selectors.Unallocated(manager)
+            lazy = read_all(nobody.seek, nobody.window, size)
+            assert [(r.line.pk, r.unallocated) for r in lazy] == [
+                (r.line.pk, r.unallocated) for r in eager
+            ]
+
+    def test_it_narrows_to_a_supplier_and_a_scope(
+        self, org: Org, people: People, buy: Buy, make_line: MakeLine
+    ) -> None:
+        order = buy((make_line("10"), "10"))
+        manager = ctx(people.mm_mad)
+        assert every_key(selectors.Unallocated(manager).seek) == [only_line(order).pk]
+        assert every_key(selectors.Unallocated(manager, supplier_id=org.supplier.pk).seek) == [
+            only_line(order).pk
+        ]
+        assert every_key(selectors.Unallocated(manager, supplier_id=org.a.pk).seek) == []
+        assert every_key(selectors.Unallocated(ctx(people.wo_mad)).seek) == []

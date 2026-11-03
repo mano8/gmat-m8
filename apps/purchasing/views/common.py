@@ -1,7 +1,6 @@
 """Shared helpers of the purchasing screens: scope-then-capability lookups, flash, redirect."""
 
 from collections.abc import Callable
-from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
@@ -24,12 +23,6 @@ from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOr
 from apps.purchasing.selectors import MANAGE, VIEW
 
 Status = PurchaseOrder.Status
-
-
-def _query(**params: str) -> str:
-    """The filters that are set, for the pager's links."""
-    kept = {key: value for key, value in params.items() if value}
-    return f"&{urlencode(kept)}" if kept else ""
 
 
 def _on_order(request: HttpRequest, po_id: UUID, capability: str = MANAGE) -> PurchaseOrder:

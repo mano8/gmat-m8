@@ -22,12 +22,15 @@ The screens (M6.3) read the rest from here, every row through ``visible_to``:
   user who holds ``project.view`` on the project, as the service checks).
 """
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import Q, QuerySet, Sum
+from django.db.models import Q, QuerySet, Sum, Value
+from django.db.models.functions import Coalesce
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
@@ -36,6 +39,7 @@ from apps.access.roles import Capability
 from apps.access.scopes import object_in_scope
 from apps.accounts.models import User
 from apps.catalog.models import Material
+from apps.core.listing import seek_after
 from apps.handovers.models import Handover, HandoverLine
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
@@ -46,6 +50,10 @@ from apps.receiving.models import GoodsReceipt, GoodsReceiptLine
 
 VIEW, POST, VOID = Capability.HANDOVER_VIEW, Capability.HANDOVER_POST, Capability.HANDOVER_VOID
 ZERO = Decimal("0")
+
+DEFAULT_PER_PAGE = 25
+HANDOVER_SORTS = {"number": ("number",), "posted": ("handed_at",)}
+HANDOVER_SORT_LABELS = {"number": _("Handover"), "posted": _("Date")}
 
 
 @dataclass(frozen=True)
@@ -148,9 +156,11 @@ def handovers(
     kind: str = "",
     project_id: UUID | None = None,
     q: str = "",
+    handed_from: date | None = None,
+    handed_to: date | None = None,
 ) -> QuerySet[Handover]:
     """Handovers the user may see, newest first. ``q`` looks at the number, the project's
-    code or name and the receiver's typed name."""
+    code or name and the receiver's typed name; the dates are inclusive days."""
     rows = Handover.objects.visible_to(ctx, VIEW).select_related(
         "project", "branch__company", "source_location", "received_by"
     )
@@ -160,6 +170,10 @@ def handovers(
         rows = rows.filter(kind=kind)
     if project_id is not None:
         rows = rows.filter(project_id=project_id)
+    if handed_from is not None:
+        rows = rows.filter(handed_at__date__gte=handed_from)
+    if handed_to is not None:
+        rows = rows.filter(handed_at__date__lte=handed_to)
     if q:
         rows = rows.filter(
             Q(number__icontains=q)
@@ -287,16 +301,55 @@ def open_lines(
     return [row for row in rows if row.outstanding > 0]
 
 
+HANDOVER_ORDER = ("seek_number", "line_no", "pk")
+
+
+def _awaiting_handover_lines(ctx: AccessContext) -> QuerySet[MaterialRequestLine]:
+    return MaterialRequestLine.objects.visible_to(ctx, POST).filter(request_ledger.open_q())
+
+
+def _in_request_order(rows: QuerySet[MaterialRequestLine]) -> QuerySet[MaterialRequestLine]:
+    return rows.annotate(seek_number=Coalesce("request__number", Value("")))
+
+
 def awaiting_handover(ctx: AccessContext) -> list[request_ledger.LineLedger]:
     """Open lines with goods received and not yet handed over (the ledger's *awaiting
     handover*), within ``handover.post`` scope, ordered by request (M7.2 dashboard)."""
     lines = (
-        MaterialRequestLine.objects.visible_to(ctx, POST)
-        .filter(request_ledger.open_q())
+        _in_request_order(_awaiting_handover_lines(ctx))
+        .order_by(*HANDOVER_ORDER)
         .select_related("request", "project", "material", "unit")
-        .order_by("request__number", "line_no")
     )
     return [entry for entry in request_ledger.line_ledgers(lines) if entry.awaiting_handover > 0]
+
+
+class AwaitingHandover:
+    """``awaiting_handover`` a stretch at a time, for a count that stops at a cap (M7d.4):
+    ``seek`` reads the next open lines in order, ``window`` works out the ledgers of a
+    stretch."""
+
+    def __init__(self, ctx: AccessContext) -> None:
+        self._lines = _awaiting_handover_lines(ctx)
+
+    def seek(self, cursor: str, limit: int) -> list[UUID]:
+        rows = seek_after(
+            _in_request_order(self._lines),
+            _in_request_order(MaterialRequestLine.objects.all()),
+            HANDOVER_ORDER,
+            cursor,
+        )
+        return list(rows.values_list("pk", flat=True)[:limit])
+
+    def window(self, chunk: Sequence[UUID]) -> list[tuple[int, request_ledger.LineLedger]]:
+        lines = self._lines.filter(pk__in=list(chunk)).select_related(
+            "request", "project", "material", "unit"
+        )
+        found = {
+            entry.line.pk: entry
+            for entry in request_ledger.line_ledgers(lines)
+            if entry.awaiting_handover > 0
+        }
+        return [(index, found[pk]) for index, pk in enumerate(chunk) if pk in found]
 
 
 def sources(ctx: AccessContext, branch_id: UUID) -> QuerySet[Location]:

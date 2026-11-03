@@ -9,13 +9,16 @@ name only inside the expected-deliveries projection of an assigned project, plan
 from uuid import UUID
 
 from django.db.models import Q, QuerySet
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
 from apps.suppliers.models import Supplier
 
-PAGE_SIZE = 25
+DEFAULT_PER_PAGE = 25
+SUPPLIER_SORTS = {"name": ("name",)}
+SUPPLIER_SORT_LABELS = {"name": _("Name")}
 
 VIEW, MANAGE = Capability.SUPPLIER_VIEW, Capability.SUPPLIER_MANAGE
 

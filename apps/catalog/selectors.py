@@ -15,13 +15,16 @@ from uuid import UUID
 
 from django.db.models import Case, F, IntegerField, Q, QuerySet, Value, When
 from django.db.models.functions import Coalesce
+from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure, fold
 
-PAGE_SIZE = 25
+DEFAULT_PER_PAGE = 25
+MATERIAL_SORTS = {"reference": ("reference",), "name": ("name",)}
+MATERIAL_SORT_LABELS = {"reference": _("Reference"), "name": _("Name")}
 SEARCH_LIMIT = 20
 MAX_TERMS = 6
 MAX_TERM_LENGTH = 60

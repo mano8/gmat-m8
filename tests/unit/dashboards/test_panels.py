@@ -9,6 +9,7 @@ from django.utils import timezone, translation
 
 from apps.access.context import AccessContext
 from apps.dashboards import panels
+from apps.handovers import selectors as handover_selectors
 from apps.material_requests import services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.notifications.models import Kind, Status
@@ -16,7 +17,7 @@ from apps.purchasing.models import PurchaseOrder
 from tests.orders import order as make_order
 from tests.org import Org, People
 from tests.outbox import make_dispatch
-from tests.support import principal_for
+from tests.support import every_key, principal_for, read_all
 from tests.unit.purchasing.conftest import Buy, MakeLine
 from tests.unit.receiving.conftest import Receive
 
@@ -183,6 +184,23 @@ class TestSourcingAndPurchasing:
         assert content.rows[0].label.startswith(open_.request.number or "")
         assert panels.to_purchase(other).count == 0
 
+    def test_a_count_worked_out_line_by_line_stops_at_the_cap(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        ctx: AccessContext,
+        make_line: MakeLine,
+        buy: Buy,
+    ) -> None:
+        monkeypatch.setattr(panels, "COUNT_CAP", 2)
+        for _ in range(2):
+            make_line("3")
+        exactly = panels.to_purchase(ctx)
+        assert (exactly.count, exactly.more, exactly.label) == (2, False, "2")
+        make_line("3")
+        capped = panels.to_purchase(ctx)
+        assert (capped.count, capped.more, capped.label) == (2, True, "2+")
+        assert len(capped.rows) == 2
+
     def test_stale_drafts_are_the_old_ones(
         self, org: Org, ctx: AccessContext, other: AccessContext
     ) -> None:
@@ -275,6 +293,48 @@ class TestGoods:
         assert content.rows[0].detail == "6 M"
         assert content.rows[0].href.endswith(f"?request={line.request_id}")
         assert panels.to_hand_over(AccessContext.for_user(people.mm_sev)).count == 0
+
+    def test_to_hand_over_stops_at_the_cap_and_unallocated_too(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        people: People,
+        make_line: MakeLine,
+        buy: Buy,
+        receive: Receive,
+    ) -> None:
+        monkeypatch.setattr(panels, "COUNT_CAP", 1)
+        for _ in range(2):
+            receive(buy((make_line("10"), "10")), "6")
+        wo = AccessContext.for_user(people.wo_mad)
+        content = panels.to_hand_over(wo)
+        assert (content.count, content.more, content.label) == (1, True, "1+")
+        assert panels.unallocated(AccessContext.for_user(people.mm_mad)).more is False
+
+    def test_the_stretches_of_awaiting_handover_give_the_whole_list(
+        self,
+        people: People,
+        make_line: MakeLine,
+        buy: Buy,
+        receive: Receive,
+    ) -> None:
+        for _ in range(3):
+            receive(buy((make_line("10"), "10")), "6")
+        make_line("10")  # nothing received: not awaiting
+        wo = AccessContext.for_user(people.wo_mad)
+        eager = handover_selectors.awaiting_handover(wo)
+        awaiting = handover_selectors.AwaitingHandover(wo)
+        for size in (1, 2, 50):
+            lazy = read_all(awaiting.seek, awaiting.window, size)
+            assert [(e.line.pk, e.awaiting_handover) for e in lazy] == [
+                (e.line.pk, e.awaiting_handover) for e in eager
+            ]
+        assert len(eager) == 3
+        assert (
+            every_key(
+                handover_selectors.AwaitingHandover(AccessContext.for_user(people.mm_sev)).seek
+            )
+            == []
+        )
 
     def test_site_surplus_is_what_a_worksite_could_not_take(
         self,

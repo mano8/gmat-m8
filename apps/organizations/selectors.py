@@ -13,6 +13,7 @@ from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
 from apps.accounts.models import User
+from apps.core.listing import OPEN_FIRST, by_revocation
 from apps.organizations.models import Branch, Company, Membership
 
 
@@ -33,14 +34,15 @@ def companies(ctx: AccessContext) -> QuerySet[Company]:
     return Company.objects.filter(is_active=True).order_by("code")
 
 
-def memberships(ctx: AccessContext, of: User) -> QuerySet[Membership]:
-    """Every membership of ``of``, open ones first, for administrators."""
+def memberships(ctx: AccessContext, of: User, *, state: str = "") -> QuerySet[Membership]:
+    """Every membership of ``of``, open ones first, for administrators; ``state`` is
+    ``listing.ACTIVE`` or ``REVOKED`` to keep one kind."""
     if not ctx.has(Capability.ORG_MANAGE):
         return Membership.objects.none()
     return (
-        Membership.objects.filter(user=of)
+        by_revocation(Membership.objects.filter(user=of), state)
         .select_related("branch__company", "company", "revoked_by")
-        .order_by("revoked_at", "-valid_from")
+        .order_by(OPEN_FIRST, "-valid_from")
     )
 
 

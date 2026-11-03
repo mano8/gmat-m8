@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
 from apps.core.forms import IdempotentForm, datetime_field
+from apps.core.listing import REVOCATION_CHOICES
 from apps.organizations import selectors as org_selectors
 from apps.organizations.models import CODE_PATTERN
 from apps.projects import selectors
@@ -17,14 +18,32 @@ from apps.projects.models import Project, ProjectAssignment
 STATUS_CHOICES = [("", _("All statuses")), *Project.Status.choices]
 
 
-class ProjectFilterForm(forms.Form):
-    q = forms.CharField(label=_("Search"), required=False, max_length=100)
-    status = forms.ChoiceField(label=_("Status"), required=False, choices=STATUS_CHOICES)
-
-
 class BranchChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]
     def label_from_instance(self, obj: Any) -> str:
         return f"{obj.company.code}-{obj.code} · {obj.name}"
+
+
+class ProjectFilterForm(forms.Form):
+    q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    status = forms.ChoiceField(label=_("Status"), required=False, choices=STATUS_CHOICES)
+    branch = BranchChoiceField(
+        label=_("Branch"), queryset=None, required=False, empty_label=_("All branches")
+    )
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["branch"].queryset = org_selectors.branches(  # type: ignore[attr-defined]
+            ctx, Capability.PROJECT_VIEW
+        )
+
+
+class AssignmentFilterForm(forms.Form):
+    """Narrows the "Shared with" section of the project page (prefix ``assignments``)."""
+
+    kind = forms.ChoiceField(
+        label=_("Kind"), required=False, choices=[("", _("All")), *ProjectAssignment.Kind.choices]
+    )
+    state = forms.ChoiceField(label=_("State"), required=False, choices=REVOCATION_CHOICES)
 
 
 def _date(label: Any) -> forms.DateField:

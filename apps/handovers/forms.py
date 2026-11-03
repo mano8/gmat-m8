@@ -41,12 +41,25 @@ class HandoverFilterForm(forms.Form):
         label=_("Kind"), required=False, choices=[("", _("All")), *Handover.Kind.choices]
     )
     project: Any = forms.ModelChoiceField(label=_("Project"), required=False, queryset=None)
+    handed_from = forms.DateField(
+        label=_("From"), required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+    handed_to = forms.DateField(
+        label=_("Until"), required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
 
     def __init__(self, *args: Any, projects: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         project: Any = self.fields["project"]
         project.queryset = projects
         project.empty_label = _("All")
+
+    def clean(self) -> dict[str, Any]:
+        data: dict[str, Any] = super().clean() or {}
+        start, end = data.get("handed_from"), data.get("handed_to")
+        if start and end and start > end:
+            self.add_error("handed_to", _("The end date cannot be before the start date."))
+        return data
 
 
 class RequiredReasonForm(forms.Form):

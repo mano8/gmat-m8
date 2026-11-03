@@ -215,22 +215,6 @@ class TestComponents:
         assert 'data-label="Qty"' in html
         assert "&lt;b&gt;" in html
 
-    def test_pagination_only_for_several_pages(self) -> None:
-        from django.core.paginator import Paginator
-
-        single = Paginator(range(5), 10).page(1)
-        assert "<nav" not in render_to_string("components/pagination.html", {"page_obj": single})
-        paginator = Paginator(range(25), 10)
-        middle = render_to_string(
-            "components/pagination.html",
-            {"page_obj": paginator.page(2), "extra_query": "&q=cable"},
-        )
-        assert 'href="?page=1&amp;q=cable"' in middle
-        assert 'href="?page=3&amp;q=cable"' in middle
-        first = render_to_string("components/pagination.html", {"page_obj": paginator.page(1)})
-        assert 'rel="prev"' not in first
-        assert 'aria-disabled="true"' in first
-
     def test_field_group_shows_label_help_and_errors(self) -> None:
         from django import forms
 
