@@ -158,75 +158,75 @@ msgstr ""
 msgid "email change requests"
 msgstr ""
 
-#: apps/accounts/services.py:154
+#: apps/accounts/services.py:158
 msgid "The project is not active."
 msgstr ""
 
-#: apps/accounts/services.py:166
+#: apps/accounts/services.py:170
 msgid "An invitation grants at least one role."
 msgstr ""
 
-#: apps/accounts/services.py:174
+#: apps/accounts/services.py:178
 msgid "Unknown kind."
 msgstr ""
 
-#: apps/accounts/services.py:195
+#: apps/accounts/services.py:199
 msgid "You are invited to gmat-m8"
 msgstr ""
 
-#: apps/accounts/services.py:220
+#: apps/accounts/services.py:224
 msgid "Confirm your new email address"
 msgstr ""
 
-#: apps/accounts/services.py:231
+#: apps/accounts/services.py:235
 msgid "Your email address is about to change"
 msgstr ""
 
-#: apps/accounts/services.py:338
+#: apps/accounts/services.py:342
 msgid "This address already has a pending invitation: resend or revoke it."
 msgstr ""
 
-#: apps/accounts/services.py:349
+#: apps/accounts/services.py:353
 msgid "An active account keeps its employer."
 msgstr ""
 
-#: apps/accounts/services.py:387
+#: apps/accounts/services.py:391
 msgid "This invitation is no longer pending."
 msgstr ""
 
-#: apps/accounts/services.py:406
+#: apps/accounts/services.py:410
 msgid "Run bootstrap_admin again to replace a first-administrator link."
 msgstr ""
 
-#: apps/accounts/services.py:584
+#: apps/accounts/services.py:588
 msgid "You cannot offboard your own account."
 msgstr ""
 
-#: apps/accounts/services.py:587
+#: apps/accounts/services.py:591
 msgid "This account is already offboarded."
 msgstr ""
 
-#: apps/accounts/services.py:633
+#: apps/accounts/services.py:637
 msgid "This account is inactive."
 msgstr ""
 
-#: apps/accounts/services.py:636
+#: apps/accounts/services.py:640
 msgid "This is the current address."
 msgstr ""
 
-#: apps/accounts/services.py:640
+#: apps/accounts/services.py:644
 msgid "Another account uses this address."
 msgstr ""
 
-#: apps/accounts/services.py:688
+#: apps/accounts/services.py:692
 msgid "This email change is no longer open."
 msgstr ""
 
-#: apps/accounts/services.py:765
+#: apps/accounts/services.py:769
 msgid "An account with this email exists."
 msgstr ""
 
-#: apps/accounts/services.py:787 apps/organizations/grants.py:30
+#: apps/accounts/services.py:791 apps/organizations/grants.py:30
 #: apps/organizations/services.py:296 apps/organizations/services.py:509
 msgid "The company is inactive."
 msgstr ""
@@ -3208,48 +3208,56 @@ msgstr ""
 msgid "Request %(number)s: goods handed over"
 msgstr ""
 
-#: apps/notifications/selectors.py:38
+#: apps/notifications/selectors.py:42
 msgid "Waiting for the mail worker."
 msgstr ""
 
-#: apps/notifications/selectors.py:39
+#: apps/notifications/selectors.py:43
 msgid "Being handed to the mail server."
 msgstr ""
 
-#: apps/notifications/selectors.py:40
+#: apps/notifications/selectors.py:44
 msgid "The mail server refused it. Nothing was delivered."
 msgstr ""
 
-#: apps/notifications/selectors.py:41
+#: apps/notifications/selectors.py:45
 msgid "The mail server did not answer: it may or may not have arrived."
 msgstr ""
 
-#: apps/notifications/selectors.py:42
+#: apps/notifications/selectors.py:46
 msgid "Replaced by a newer message."
 msgstr ""
 
-#: apps/notifications/selectors.py:43
+#: apps/notifications/selectors.py:47
 msgid "Cancelled before it was sent."
 msgstr ""
 
-#: apps/notifications/selectors.py:44
+#: apps/notifications/selectors.py:48
 msgid "Not sent: it no longer applied when its turn came."
 msgstr ""
 
-#: apps/notifications/selectors.py:45
+#: apps/notifications/selectors.py:49
 msgid "Not sent in time: its link expired."
 msgstr ""
 
-#: apps/notifications/selectors.py:46
+#: apps/notifications/selectors.py:50
 msgid "Held back by the system. Tell the operator."
 msgstr ""
 
-#: apps/notifications/selectors.py:48
+#: apps/notifications/selectors.py:52
 msgid "Delayed"
 msgstr ""
 
-#: apps/notifications/selectors.py:49
+#: apps/notifications/selectors.py:53
 msgid "Still not sent. Tell the operator."
+msgstr ""
+
+#: apps/notifications/selectors.py:54
+msgid "Retrying"
+msgstr ""
+
+#: apps/notifications/selectors.py:55
+msgid "An attempt failed; the mail worker tries again."
 msgstr ""
 
 #: apps/notifications/templates/notifications/email/request_assigned.html:11
@@ -3743,50 +3751,50 @@ msgstr ""
 msgid "pending"
 msgstr ""
 
-#: apps/organizations/views.py:155
+#: apps/organizations/views.py:166
 msgid "Role granted."
 msgstr ""
 
-#: apps/organizations/views.py:170
+#: apps/organizations/views.py:181
 msgid "Role revoked."
 msgstr ""
 
-#: apps/organizations/views.py:194 apps/projects/views.py:211
+#: apps/organizations/views.py:205 apps/projects/views.py:211
 msgid "Validity saved."
 msgstr ""
 
-#: apps/organizations/views.py:214
+#: apps/organizations/views.py:225
 msgid "Employer saved."
 msgstr ""
 
-#: apps/organizations/views.py:224
+#: apps/organizations/views.py:235
 msgid "Tick the confirmation to offboard this account."
 msgstr ""
 
-#: apps/organizations/views.py:233
+#: apps/organizations/views.py:244
 msgid "Account offboarded."
 msgstr ""
 
-#: apps/organizations/views.py:256
+#: apps/organizations/views.py:267
 msgid ""
 "Confirmation queued for sending to the new address; the current one can "
 "cancel."
 msgstr ""
 
-#: apps/organizations/views.py:274
+#: apps/organizations/views.py:285
 msgid "Email change revoked."
 msgstr ""
 
-#: apps/organizations/views.py:327
+#: apps/organizations/views.py:338
 #, python-format
 msgid "Invitation queued for sending to %(email)s."
 msgstr ""
 
-#: apps/organizations/views.py:345
+#: apps/organizations/views.py:356
 msgid "Invitation queued for sending again; the previous link no longer works."
 msgstr ""
 
-#: apps/organizations/views.py:363
+#: apps/organizations/views.py:374
 msgid "Invitation revoked."
 msgstr ""
 

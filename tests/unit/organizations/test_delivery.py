@@ -157,6 +157,16 @@ class TestBadge:
         assert fragment.status_code == 200
         assert 'data-testid="delivery-status"' not in fragment.content.decode()  # the poll ends
 
+    def test_an_expired_invitation_has_no_badge(
+        self, org: Org, people: People, admin_client: Any
+    ) -> None:
+        invitation = invite(admin_client, org, people)
+        Invitation.objects.filter(pk=invitation.pk).update(
+            expires_at=timezone.now() - timedelta(minutes=1)
+        )
+        listed = admin_client.get(reverse("org:invitations")).content.decode()
+        assert invitation.email in listed and 'data-testid="delivery-status"' not in listed
+
     def test_polling_stops_by_itself(self, org: Org, people: People, admin_client: Any) -> None:
         invitation = invite(admin_client, org, people)
         url = reverse("org:invitation_delivery", args=[invitation.pk])
@@ -182,7 +192,35 @@ class TestDelayed:
         html = admin_client.get(url).content.decode()
         assert 'data-state="delayed"' in html
         assert t("Still not sent. Tell the operator.") in html
-        assert "every 5s" in html  # it still follows the message: the worker may resume
+        assert "every 60s" in html  # it still follows the message, slower: the worker may resume
+
+    def test_a_message_stuck_sending_is_delayed_too(
+        self, org: Org, people: People, admin_client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The worker died between its claim and the outcome, and nothing reconciles it.
+        invitation = invite(admin_client, org, people)
+        message = outbox_of(invitation)
+        set_status(message, Status.SENDING)
+        url = reverse("org:invitation_delivery", args=[invitation.pk])
+        assert 'data-state="sending"' in admin_client.get(url).content.decode()
+        monkeypatch.setattr(selectors, "now", lambda: message.created_at + timedelta(minutes=11))
+        html = admin_client.get(url).content.decode()
+        assert 'data-state="delayed"' in html and "every 60s" in html
+
+    def test_a_message_queued_again_after_a_failed_attempt_says_so(
+        self, org: Org, people: People, admin_client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        invitation = invite(admin_client, org, people)
+        message = outbox_of(invitation)
+        EmailOutbox.objects.filter(pk=message.pk).update(attempts=1)
+        url = reverse("org:invitation_delivery", args=[invitation.pk])
+        html = admin_client.get(url).content.decode()
+        assert (
+            t("Retrying") in html and t("An attempt failed; the mail worker tries again.") in html
+        )
+        assert "every 5s" in html
+        monkeypatch.setattr(selectors, "now", lambda: message.created_at + timedelta(minutes=11))
+        assert 'data-state="delayed"' in admin_client.get(url).content.decode()
 
     def test_a_paused_worker_leaves_it_queued_then_delayed(
         self,
@@ -282,6 +320,18 @@ class TestEmailChange:
         set_status(notice, Status.QUEUED)
         assert "every 5s" in admin_client.get(url).content.decode()
 
+    def test_both_messages_take_one_query(self, people: People, admin_client: Any) -> None:
+        change = self.change(people, admin_client)
+        ctx = ctx_of(people.group_admin)
+        assert ctx.has(Capability.ORG_MANAGE)
+        with CaptureQueriesContext(connection) as queries:
+            found = selectors.delivery_status(ctx, selectors.EMAIL_CHANGE, [change.pk])
+        assert len(queries) == 1
+        assert set(found) == {
+            (change.pk, "email_change.confirm"),
+            (change.pk, "email_change.cancel"),
+        }
+
 
 class TestWhatIsShown:
     def test_never_the_token_the_body_the_error_or_the_address_of_others(
@@ -309,7 +359,7 @@ class TestWhatIsShown:
         ctx = ctx_of(people.group_admin)
         found = invite(client_for(people.group_admin), org, people)
         query = selectors.delivery_status(ctx, selectors.INVITATION, [found.pk])
-        assert set(query) == {found.pk}
+        assert set(query) == {(found.pk, "invitation")}
         mm = ctx_of(people.mm_mad)
         assert selectors.delivery_status(mm, selectors.INVITATION, [found.pk]) == {}
         assert selectors.delivery_status(ctx, "accounts.user", [found.pk]) == {}
@@ -342,7 +392,7 @@ class TestWhatIsShown:
             found = selectors.delivery_status(ctx, selectors.INVITATION, ids)
         assert len(queries) == 1
         assert {status.state for status in found.values()} == {Status.SENT}
-        assert set(found) == set(ids)
+        assert set(found) == {(object_id, "") for object_id in ids}
 
     def test_the_list_costs_the_same_for_one_invitation_or_many(
         self, org: Org, people: People, admin_client: Any

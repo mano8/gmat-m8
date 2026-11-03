@@ -71,6 +71,29 @@
     }
   });
 
+  // A badge that reloads itself (data-poll, the email delivery status): only a 200 from the
+  // URL it asked may replace it. A redirect (the session ended or needs MFA again: the login
+  // page would land inside the badge) or an error keeps the badge as it is and stops the
+  // polling, which htmx does once the element has left the page.
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var element = event.detail.elt;
+    if (!element.hasAttribute || !element.hasAttribute("data-poll")) {
+      return;
+    }
+    var xhr = event.detail.xhr;
+    var asked = new URL(event.detail.requestConfig.path, window.location.href).pathname;
+    var answered = xhr.responseURL ? new URL(xhr.responseURL).pathname : asked;
+    if (xhr.status === 200 && answered === asked) {
+      return;
+    }
+    event.detail.shouldSwap = false;
+    var still = element.cloneNode(true);
+    ["hx-get", "hx-trigger", "hx-swap", "data-poll"].forEach(function (name) {
+      still.removeAttribute(name);
+    });
+    element.replaceWith(still);
+  });
+
   // The language switcher submits when the selection changes (without JavaScript the form
   // still has its button).
   document.addEventListener("change", function (event) {

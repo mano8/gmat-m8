@@ -21,11 +21,15 @@ INVITATION = "accounts.invitation"
 EMAIL_CHANGE = "accounts.emailchangerequest"
 DELIVERY_OBJECT_TYPES = frozenset({INVITATION, EMAIL_CHANGE})
 
-# A message still queued this long after it was queued: the worker is paused, outbound mail
-# is off or the worker is down. ``web`` does not know which (Q38); it tells the person to ask.
+# A message still queued or sending this long after it was queued: the worker is paused, down
+# or retrying, or outbound mail is off. ``web`` does not know which (Q38); it says to ask.
 DELAYED_AFTER = timedelta(minutes=10)
 
 IN_FLIGHT = frozenset({Status.QUEUED, Status.SENDING})
+
+# How often a badge in flight reloads itself; less often once delayed (the worker may resume).
+POLL_EVERY = "5s"
+POLL_EVERY_DELAYED = "60s"
 
 _TONES: dict[str, str] = {
     Status.QUEUED: "brand",
@@ -49,6 +53,8 @@ _HINTS: dict[str, Promise] = {
 }
 DELAYED_LABEL = _("Delayed")
 DELAYED_HINT = _("Still not sent. Tell the operator.")
+RETRYING_LABEL = _("Retrying")
+RETRYING_HINT = _("An attempt failed; the mail worker tries again.")
 
 
 @dataclass(frozen=True)
@@ -57,24 +63,33 @@ class DeliveryStatus:
 
     state: str
     at: datetime  # when it was sent; else when it was queued
-    delayed: bool
+    delayed: bool  # still in flight ``DELAYED_AFTER`` after it was queued
+    retrying: bool = False  # queued again after a failed attempt
 
     @property
     def label(self) -> str:
-        return str(DELAYED_LABEL if self.delayed else Status(self.state).label)
+        if self.delayed:
+            return str(DELAYED_LABEL)
+        return str(RETRYING_LABEL if self.retrying else Status(self.state).label)
 
     @property
     def hint(self) -> str:
-        return str(DELAYED_HINT if self.delayed else _HINTS.get(self.state, ""))
+        if self.delayed:
+            return str(DELAYED_HINT)
+        return str(RETRYING_HINT if self.retrying else _HINTS.get(self.state, ""))
 
     @property
     def tone(self) -> str:
-        return "warn" if self.delayed else _TONES.get(self.state, "")
+        return "warn" if self.delayed or self.retrying else _TONES.get(self.state, "")
 
     @property
     def polling(self) -> bool:
         """Whether the badge refreshes itself: only while the worker may still change it."""
         return self.state in IN_FLIGHT
+
+    @property
+    def poll_every(self) -> str:
+        return POLL_EVERY_DELAYED if self.delayed else POLL_EVERY
 
 
 def email_opt_out(ctx: AccessContext) -> bool:
@@ -102,36 +117,37 @@ def with_delivery_state(rows: QuerySet[Any], object_type: str) -> QuerySet[Any]:
 
 
 def delivery_status(
-    ctx: AccessContext, object_type: str, object_ids: Iterable[UUID], *, source_ref: str = ""
-) -> dict[UUID, DeliveryStatus]:
-    """The latest security email about each object, in one query (Q37).
+    ctx: AccessContext, object_type: str, object_ids: Iterable[UUID]
+) -> dict[tuple[UUID, str], DeliveryStatus]:
+    """The latest security email of each kind about each object, in one query (Q37).
 
-    The caller passes only objects it already read through its own scoped selector; a
-    group administrator's ``org.manage`` is checked again here. ``source_ref`` picks one of
-    several messages about the same object (the confirm and notice mails of an email
-    change). Only the state, the times and the kind are selected: never the body, the sealed
-    content, ``last_error`` or the recipient.
+    Keyed by ``(object id, source_ref)``: an invitation has one message (``invitation``), an
+    email change two (its confirm and notice mails). The caller passes only objects it
+    already read through its own scoped selector; a group administrator's ``org.manage`` is
+    checked again here. Only the state, the attempt count and the times are selected: never
+    the body, the sealed content, ``last_error`` or the recipient.
     """
     ids = list(object_ids)
     if not ids or object_type not in DELIVERY_OBJECT_TYPES or not ctx.has(Capability.ORG_MANAGE):
         return {}
-    rows = EmailOutbox.objects.filter(
-        kind=Kind.SECURITY, eligibility_object_type=object_type, eligibility_object_id__in=ids
-    )
-    if source_ref:
-        rows = rows.filter(source_ref=source_ref)
     latest = (
-        rows.order_by("eligibility_object_id", "-created_at", "-pk")
-        .distinct("eligibility_object_id")
-        .values_list("eligibility_object_id", "status", "sent_at", "created_at")
+        EmailOutbox.objects.filter(
+            kind=Kind.SECURITY, eligibility_object_type=object_type, eligibility_object_id__in=ids
+        )
+        .order_by("eligibility_object_id", "source_ref", "-created_at", "-pk")
+        .distinct("eligibility_object_id", "source_ref")
+        .values_list(
+            "eligibility_object_id", "source_ref", "status", "attempts", "sent_at", "created_at"
+        )
     )
     current = now()
     return {
-        object_id: DeliveryStatus(
+        (object_id, source_ref): DeliveryStatus(
             state=status,
             at=sent_at or created_at,
-            delayed=status == Status.QUEUED and current - created_at > DELAYED_AFTER,
+            delayed=status in IN_FLIGHT and current - created_at > DELAYED_AFTER,
+            retrying=status == Status.QUEUED and attempts > 0,
         )
-        for object_id, status, sent_at, created_at in latest
+        for object_id, source_ref, status, attempts, sent_at, created_at in latest
         if object_id is not None
     }

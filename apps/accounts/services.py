@@ -55,6 +55,10 @@ from apps.projects.models import Project, ProjectAssignment
 INVITATION_PENDING = "invitation.pending"
 EMAIL_CHANGE_CONFIRMABLE = "email_change.confirmable"
 EMAIL_CHANGE_CANCELLABLE = "email_change.cancellable"
+# Their ``source_ref``: which message about the invitation or change a row is (M7c.1 badges).
+INVITATION_MAIL = "invitation"
+EMAIL_CHANGE_CONFIRM_MAIL = "email_change.confirm"
+EMAIL_CHANGE_NOTICE_MAIL = "email_change.cancel"
 
 REASON_RESENT = "resent"
 REASON_REPLACED = "replaced"
@@ -197,7 +201,7 @@ def _queue_invitation_email(invitation: Invitation, raw_token: str) -> None:
             "accounts/email/invitation.txt",
             {"invitation": invitation, "link": link, "hours": _hours(tokens.INVITATION_LIFETIME)},
         ),
-        source_ref="invitation",
+        source_ref=INVITATION_MAIL,
     )
 
 
@@ -222,7 +226,7 @@ def _queue_email_change_emails(
             "accounts/email/email_change_confirm.txt",
             {**context, "link": _absolute(reverse("email_change:link", args=[confirm_token]))},
         ),
-        source_ref="email_change.confirm",
+        source_ref=EMAIL_CHANGE_CONFIRM_MAIL,
     )
     queue_security_email(
         address=change.user.email,
@@ -233,7 +237,7 @@ def _queue_email_change_emails(
             "accounts/email/email_change_notice.txt",
             {**context, "link": _absolute(reverse("email_change:link", args=[cancel_token]))},
         ),
-        source_ref="email_change.cancel",
+        source_ref=EMAIL_CHANGE_NOTICE_MAIL,
     )
 
 
