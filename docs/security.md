@@ -368,6 +368,11 @@ Templates in `templates/`, styles in `static/src/app.css`, code in `static/js/ap
 - **Error pages** 400, 403 (including the CSRF failure), 404, 405, 409, 429 and 500 show a code and a generic sentence, never a path, a query, an exception or a user. 405, 409 and 429 are produced by `ErrorPagesMiddleware` for bare responses; 500 renders without a request.
 - **Referrer policy.** `no-referrer` only on a URL that carries a token. A form page keeps `same-origin`: under `no-referrer` browsers send `Origin: null` on its POST and Django's CSRF check refuses it, so login would fail. (Found by logging in with a real browser; the M1.3 tests asserted the header, not the login.)
 
-## Still to come
+## Browser tests (step M8.2)
 
-- M8.2: the same checks in a real browser (e2e).
+`tests/e2e` drives Chromium against the compose stack (the `e2e` workflow; `uv run pytest tests/e2e -m e2e` on a fresh stack, see CLAUDE.md). Besides the role flows, it proves in a real browser what the unit and live layers can only assert about headers:
+
+- **CSP.** Every page a test opens is watched: a `securitypolicyviolation`, an uncaught script error or a 5xx answer fails the test that caused it (and one test proves the listener fires on an inline script).
+- **History.** Sign out, another person signs in at the same browser, Back through the whole history: nothing of the first person's pages is shown (`no-store` responses, htmx's empty history cache, `refreshOnHistoryMiss`).
+- **Sentinel, level 3 (plan §5).** A browser follows an invitation, a password reset and an email-change link, loads assets, makes htmx requests and goes back and forward, typing sentinel passwords on the way. No token or password appears in the Caddy, Gunicorn/Django (`web`) or worker logs, and no request carried a token in `Referer`, `HX-Current-URL` or `Origin`.
+- **Phones.** Each role's daily screens are loaded at 360 px: none scrolls sideways (this found the audit list overflowing by 14 px, fixed in `app.css`).

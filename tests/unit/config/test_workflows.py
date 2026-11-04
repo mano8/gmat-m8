@@ -164,6 +164,30 @@ def test_compose_smoke_runs_the_live_tests_against_a_fresh_stack() -> None:
     assert env["LIVE_REQUIRED"] == "1"  # an unreachable stack fails the run instead of skipping
 
 
+def test_e2e_runs_on_main_nightly_by_hand_and_on_a_labelled_pull_request() -> None:
+    workflow = _load(ROOT / ".github" / "workflows" / "e2e.yaml")
+    triggers = _triggers(workflow)
+    assert triggers.keys() == {"push", "pull_request", "schedule", "workflow_dispatch"}
+    assert triggers["push"]["branches"] == ["main"]
+    assert list(workflow["jobs"]) == ["e2e"]  # not one of the required checks (plan §8.4)
+    job = workflow["jobs"]["e2e"]
+    # A pull request is tested only with the label; any other trigger always runs.
+    assert job["if"] == (
+        "github.event_name != 'pull_request' || "
+        "contains(github.event.pull_request.labels.*.name, 'e2e')"
+    )
+    commands = "\n".join(step.get("run", "") for step in job["steps"])
+    assert "bash init.sh --ci" in commands
+    assert "docker compose up -d --build --wait" in commands
+    assert "pytest tests/e2e -m e2e" in commands
+    assert "playwright install --with-deps chromium" in commands
+    teardown = [s for s in job["steps"] if s.get("name") == "Tear down"]
+    assert teardown
+    assert teardown[0]["if"] == "always()"
+    env = next(s["env"] for s in job["steps"] if s.get("name") == "Browser tests")
+    assert env["E2E_REQUIRED"] == "1"  # an unreachable stack fails the run instead of skipping
+
+
 # ------------------------------------------------------------------ release pipeline
 
 PUBLISH = ROOT / ".github" / "workflows" / "docker-publish.yaml"

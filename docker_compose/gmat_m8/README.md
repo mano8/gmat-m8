@@ -127,3 +127,5 @@ touch flags/maintenance.on                             # public site answers 503
 ## Tests
 
 `tests/live` exercises a running stack (`LIVE_REQUIRED=1 uv run pytest -m live`, see `tests/live/conftest.py`). The `compose-smoke` workflow runs it on every pull request that touches the stack, and always on `main` and nightly.
+
+`tests/e2e` drives a browser through the same stack (`E2E_REQUIRED=1 uv run pytest tests/e2e -m e2e`, see CLAUDE.md for the one-time setup). It needs an **empty database**: it creates the first administrator through `manage bootstrap_admin` and the browser, then runs `seed_demo` in a one-off `web` container with the development settings (the stack keeps serving with the production ones), so start it fresh (`docker compose down --volumes && docker compose up -d --build --wait`; give a stack started with `-p <name>` as `E2E_COMPOSE_PROJECT`). The `e2e` workflow runs it on `main`, nightly, by hand and on a pull request labelled `e2e`.

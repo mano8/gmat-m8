@@ -1,0 +1,94 @@
+name: e2e
+
+# Browser tests (plan §8.1 layer D, §8.4; M8.2): Playwright drives Chromium against the compose
+# stack, which `tests/e2e` provisions through the application itself (the first administrator
+# accepts the one-time link in the browser, then `manage seed_demo`). Flows per role on a phone
+# and a desktop viewport, the M7b/M7c/M7d screens, the history and CSP guards and the
+# browser-level sentinel test.
+#
+# Not a PR check (plan §8.4): it runs on a push to main, nightly, by hand, and on a pull request
+# that carries the `e2e` label. A release needs a green run of this workflow on the exact commit
+# (`scripts/verify_release.py` requires it as soon as this file exists).
+#
+# Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
+# `on.paths` filter, no job that needs a secret, every action pinned by full commit SHA. A change
+# under .github/workflows/ needs the maintainer's explicit review.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+    types: [opened, reopened, synchronize, labeled]
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  UV_PYTHON_DOWNLOADS: never
+  UV_VERSION: "0.13.5"
+
+jobs:
+  e2e:
+    name: e2e
+    # A pull request is tested only when it carries the label; every other trigger always runs.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install the test dependencies and the browser
+        run: |
+          uv sync --locked --group e2e
+          uv run playwright install --with-deps chromium
+
+      - name: Prepare the env files (generated secrets, CI directory modes)
+        working-directory: docker_compose/gmat_m8
+        run: bash init.sh --ci
+
+      - name: Build and start the stack
+        working-directory: docker_compose/gmat_m8
+        run: docker compose up -d --build --wait --wait-timeout 600
+
+      - name: Browser tests
+        env:
+          E2E_REQUIRED: "1"
+          E2E_BASE_URL: https://localhost:8443
+        run: uv run pytest tests/e2e -m e2e -p no:cacheprovider
+
+      - name: Upload the screenshots of failed tests
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-screenshots
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Dump the logs of every service
+        if: failure()
+        working-directory: docker_compose/gmat_m8
+        run: docker compose ps --all && docker compose logs --no-color --timestamps --tail 300
+
+      - name: Tear down
+        if: always()
+        working-directory: docker_compose/gmat_m8
+        run: docker compose down --volumes --remove-orphans

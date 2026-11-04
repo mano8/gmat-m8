@@ -24,7 +24,7 @@ Nothing is signed or released unless every earlier step passed. Only the digests
 ## Release procedure (maintainer)
 
 1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Say there whether a migration is irreversible or needs a confirmation at deploy time. Merge it with the usual review and required checks.
-2. **Wait for `main`.** `ci.yaml` and `compose-smoke.yaml` (and later `e2e.yaml`) run on the merge commit. Rehearse the gate on it without tagging anything (needs an authenticated `gh`):
+2. **Wait for `main`.** `ci.yaml`, `compose-smoke.yaml` and `e2e.yaml` run on the merge commit. Rehearse the gate on it without tagging anything (needs an authenticated `gh`):
 
    ```bash
    git fetch origin
