@@ -193,6 +193,8 @@
     }
     .table-responsive td {
       @apply flex justify-between gap-4 border-b border-line/60 px-2 py-2 last:border-b-0;
+      /* A long identifier (an audit object type) wraps instead of widening the table. */
+      overflow-wrap: anywhere;
     }
     .table-responsive td::before {
       content: attr(data-label);
