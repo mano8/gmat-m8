@@ -82,6 +82,11 @@ django_settings_module = "config.settings.test"
 module = ["allauth", "allauth.*"]
 follow_untyped_imports = true
 
+# Playwright belongs to the optional `e2e` group, which the type-check job does not install.
+[[tool.mypy.overrides]]
+module = ["playwright", "playwright.*"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false

@@ -236,3 +236,6 @@ media/
 staticfiles/
 static/dist/
 **/db_data/
+
+# Playwright failure screenshots (tests/e2e)
+test-results/

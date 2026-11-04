@@ -25,6 +25,9 @@ from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
+# The browser layer needs Playwright, which only the optional `e2e` dependency group installs.
+collect_ignore_glob = [] if importlib.util.find_spec("playwright") else ["e2e/*"]
+
 
 @pytest.fixture(autouse=True, scope="session")
 def _tests_may_construct_principals() -> Iterator[None]:

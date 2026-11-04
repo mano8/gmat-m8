@@ -10,6 +10,7 @@ Environment:
 - ``LIVE_COMPOSE_DIR``   the compose directory (default ``docker_compose/gmat_m8``);
 - ``LIVE_COMPOSE_FILES`` space-separated ``-f`` files (default: none, so compose reads
   ``COMPOSE_FILE`` from the stack's ``.env``, as ``docker compose up`` did);
+- ``LIVE_COMPOSE_PROJECT`` the compose project name (``-p``) of a stack started under another;
 - ``LIVE_REQUIRED=1``    a stack that does not answer fails the run instead of skipping it.
 """
 
@@ -56,6 +57,7 @@ class Stack:
     base_url: str
     compose_dir: Path
     compose_files: list[str]
+    project: str = ""  # `docker compose -p`; empty: the compose file's own name
     host: str = field(init=False)
     port: int = field(init=False)
     scheme: str = field(init=False)
@@ -101,6 +103,8 @@ class Stack:
         self, *args: str, check: bool = True, timeout: float = 300.0
     ) -> subprocess.CompletedProcess[str]:
         command = ["docker", "compose"]
+        if self.project:
+            command += ["-p", self.project]
         for file in self.compose_files:
             command += ["-f", file]
         command += list(args)
@@ -160,6 +164,7 @@ def stack() -> Iterator[Stack]:
         base_url=os.environ.get("LIVE_BASE_URL", "https://localhost:8443"),
         compose_dir=compose_dir,
         compose_files=files,
+        project=os.environ.get("LIVE_COMPOSE_PROJECT", ""),
     )
     # A required stack may still be settling; an absent one should not slow a plain `pytest`.
     required = os.environ.get("LIVE_REQUIRED") == "1"
