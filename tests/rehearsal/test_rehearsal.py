@@ -872,9 +872,25 @@ def drill_world(base: dict[str, Any], name: str, subnet: str, source: World) -> 
     return drill
 
 
+QUEUED_FOR_THE_DRILL = r"""
+from datetime import timedelta
+from django.utils import timezone
+from apps.notifications.models import EmailOutbox, Kind
+from apps.purchasing.models import PurchaseOrder
+order = PurchaseOrder.objects.get(number="PED-REHEARSAL")
+EmailOutbox.objects.create(
+    kind=Kind.PO_ORDER, recipient_address="orders@supplier.example", source_po=order,
+    source_ref=f"PO:{order.pk}:rev7", from_email="g <no-reply@localhost>",
+    subject="Order rev 7", body="Please deliver.", not_before=timezone.now() + timedelta(days=1),
+)
+print(json.dumps("queued"))
+"""
+
+
 @pytest.fixture(scope="module")
 def offsite_snapshot(world: World) -> dict[str, str]:
-    """The newest snapshot of the deploys above, and a later dump to stand for the failed one."""
+    """The newest snapshot of the deploys above; a supplier dispatch is queued in it."""
+    world.python(QUEUED_FOR_THE_DRILL)
     world.compose("exec", "-T", "backup", "backup-now", "--label", "drill", timeout=600)
     newest = max(snapshots(world), key=lambda item: item["time"])
     return {"id": newest["id"]}
@@ -905,6 +921,8 @@ def run_drill(world: World, base: dict[str, Any], source: World, snapshot: str, 
     print(result.stdout)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "FAIL " not in result.stdout
+    assert "INFO  1 message(s) held in quarantine" in result.stdout, "the queued dispatch"
+    assert "PASS  nothing was sent: no new attempt" in result.stdout
     return result.stdout
 
 
