@@ -22,6 +22,7 @@ import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -159,11 +160,17 @@ def multipart(fields: dict[str, str], content: bytes, name: str = "photo.png") -
 
 
 def upload(
-    who: Technician, draft: str, content: bytes, *, origin: str | None = None, token: str = ""
+    who: Technician,
+    draft: str,
+    content: bytes,
+    *,
+    origin: str | None = None,
+    token: str = "",
+    name: str = "photo.png",
 ) -> Response:
     csrf, form_token, key = who.page(draft)
     body, content_type = multipart(
-        {"csrfmiddlewaretoken": token or form_token, "idempotency_key": key}, content
+        {"csrfmiddlewaretoken": token or form_token, "idempotency_key": key}, content, name
     )
     headers = {
         "Cookie": who.cookies(csrf),
@@ -362,7 +369,7 @@ def test_a_file_with_malware_is_refused_by_the_real_scanner(
     assert response.status == 422, response.text[:300]
     assert attachments_of(stack, draft) == stored
     audited = stack.sql(
-        "SELECT data->>'signature' FROM audit_auditevent "
+        "SELECT data->>'signature' FROM audit_auditevent "  # noqa: S608
         f"WHERE action = 'attachment.malware_refused' AND object_id = '{draft}'"
     )
     assert "Eicar" in audited or "EICAR" in audited

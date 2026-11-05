@@ -208,6 +208,13 @@ services:
       - ./clamav/freshclam.conf:/etc/gmat/freshclam.conf:ro
       - clamav_db:/var/lib/clamav
     networks: [updates]
+    # The image's own check asks for a clamd, which is not in this container.
+    healthcheck:
+      test: ["CMD", "pidof", "freshclam"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     mem_limit: 256m
     pids_limit: 32
 
