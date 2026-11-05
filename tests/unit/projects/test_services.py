@@ -174,8 +174,12 @@ class TestProjects:
 
 class TestAssignments:
     @pytest.fixture
-    def site_manager(self, make_user: Callable[..., User]) -> User:
-        return make_user("site@example.org")
+    def site_manager(self, make_user: Callable[..., User], branch: Branch) -> User:
+        """Holds both roles an assignment can match, so the kinds can be compared."""
+        user = make_user("site@example.org")
+        grant(user, Role.SITE_MANAGER, branch=branch)
+        grant(user, Role.PARTNER_REQUESTER, company=branch.company)
+        return user
 
     def test_assign_bumps_the_users_generation(
         self, admin_principal: SessionPrincipal, project: Project, site_manager: User
@@ -255,6 +259,67 @@ class TestAssignments:
                 admin_principal, assignment.pk, valid_from=end, valid_until=start
             )
 
+    @pytest.mark.parametrize(
+        ("kind", "role"),
+        [
+            (ProjectAssignment.Kind.MANAGER, Role.PARTNER_REQUESTER),
+            (ProjectAssignment.Kind.PARTNER, Role.SITE_MANAGER),
+        ],
+    )
+    def test_the_assignee_must_hold_the_matching_role(
+        self,
+        admin_principal: SessionPrincipal,
+        project: Project,
+        make_user: Callable[..., User],
+        branch: Branch,
+        kind: str,
+        role: Role,
+    ) -> None:
+        """Enforced by the service, not only by the form's choices (M8.3, R19)."""
+        user = make_user("other-role@example.org")
+        if role is Role.SITE_MANAGER:
+            grant(user, role, branch=branch)
+        else:
+            grant(user, role, company=branch.company)
+        with pytest.raises(ValidationError) as refused:
+            services.assign_to_project(
+                admin_principal, project_id=project.pk, user_id=user.pk, kind=kind
+            )
+        assert refused.value.error_dict["user"][0].code == "no_matching_role"
+        assert not ProjectAssignment.objects.exists()
+
+    def test_a_revoked_membership_does_not_count(
+        self,
+        admin_principal: SessionPrincipal,
+        project: Project,
+        make_user: Callable[..., User],
+        branch: Branch,
+    ) -> None:
+        user = make_user("gone@example.org")
+        grant(user, Role.SITE_MANAGER, branch=branch, revoked_at=timezone.now())
+        with pytest.raises(ValidationError):
+            services.assign_to_project(
+                admin_principal,
+                project_id=project.pk,
+                user_id=user.pk,
+                kind=ProjectAssignment.Kind.MANAGER,
+            )
+
+    def test_an_inactive_account_is_refused(
+        self,
+        admin_principal: SessionPrincipal,
+        project: Project,
+        site_manager: User,
+    ) -> None:
+        User.objects.filter(pk=site_manager.pk).update(is_active=False)
+        with pytest.raises(ValidationError):
+            services.assign_to_project(
+                admin_principal,
+                project_id=project.pk,
+                user_id=site_manager.pk,
+                kind=ProjectAssignment.Kind.MANAGER,
+            )
+
     def test_staff_accounts_need_a_superuser(
         self, admin_principal: SessionPrincipal, project: Project, make_user: Callable[..., User]
     ) -> None:
@@ -296,6 +361,31 @@ class TestMaterialManagerScope:
         user = make_user("mm@example.org")
         grant(user, Role.MATERIAL_MANAGER, branch=branch)
         return principal_for(user)
+
+    def test_a_site_managers_home_branch_must_be_in_the_actors_scope(
+        self,
+        admin_principal: SessionPrincipal,
+        manager: SessionPrincipal,
+        project: Project,
+        make_user: Callable[..., User],
+        sevilla: Branch,
+    ) -> None:
+        user = make_user("sevilla-site@example.org")
+        grant(user, Role.SITE_MANAGER, branch=sevilla)
+        with pytest.raises(ValidationError):
+            services.assign_to_project(
+                manager,
+                project_id=project.pk,
+                user_id=user.pk,
+                kind=ProjectAssignment.Kind.MANAGER,
+            )
+        assignment = services.assign_to_project(
+            admin_principal,
+            project_id=project.pk,
+            user_id=user.pk,
+            kind=ProjectAssignment.Kind.MANAGER,
+        )
+        assert assignment.user_id == user.pk
 
     def test_creates_in_its_branch_and_the_branches_it_manages(
         self, manager: SessionPrincipal, branch: Branch, b_mad: Branch
@@ -348,6 +438,8 @@ class TestMaterialManagerScope:
         sevilla: Branch,
     ) -> None:
         site_manager = make_user("site@example.org")
+        grant(site_manager, Role.SITE_MANAGER, branch=branch)
+        grant(site_manager, Role.PARTNER_REQUESTER, company=branch.company)
         own = services.create_project(manager, code="P-1", name="P1", branch_id=branch.pk)
         assignment = services.assign_to_project(
             manager, project_id=own.pk, user_id=site_manager.pk, kind=ProjectAssignment.Kind.MANAGER

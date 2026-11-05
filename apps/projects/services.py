@@ -9,7 +9,9 @@ their branches by material managers (S1, S3):
 - creating a project needs its branch and its procurement branch in scope;
 - changing one needs the project in scope (else ``NotInScope``, 404 for a project the
   actor cannot see), and any new branch or procurement branch too;
-- an assignment needs its project in scope.
+- an assignment needs its project in scope, and an assignee who can hold it: an active
+  account with a valid membership of the matching role, a site manager's home branch in
+  the actor's scope (S4; the same rule as the form's choices, ``selectors``).
 """
 
 from datetime import date, datetime
@@ -21,6 +23,7 @@ from django.db.models import Model
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
+from apps.access.context import AccessContext
 from apps.access.generations import lock_access_state
 from apps.access.principals import Principal
 from apps.access.roles import Capability
@@ -34,6 +37,7 @@ from apps.core.locking import LockMode, LockOrder, transactional
 from apps.locations.models import Location
 from apps.organizations.models import Branch
 from apps.organizations.services import lock_for_user_change
+from apps.projects import selectors
 from apps.projects.models import Project, ProjectAssignment
 
 PROJECT_FIELDS = frozenset(
@@ -205,6 +209,14 @@ def update_project(principal: Principal, project_id: UUID, **changes: Any) -> Pr
 # --- assignments --------------------------------------------------------------------
 
 
+def _require_assignee(actor: User, kind: str, user_id: UUID) -> None:
+    """The user row is locked, so a membership cannot change under this check (S4)."""
+    candidates = selectors.assignment_candidates(AccessContext.for_user(actor), kind)
+    if not candidates.filter(pk=user_id).exists():
+        message = _("This person does not hold the matching role.")
+        raise ValidationError({"user": ValidationError(message, code="no_matching_role")})
+
+
 @transactional
 def assign_to_project(
     principal: Principal,
@@ -218,7 +230,7 @@ def assign_to_project(
 ) -> ProjectAssignment:
     """Share a project with a site manager or a partner (S4)."""
     project = Project.objects.get(pk=project_id)
-    lock_for_user_change(
+    actor = lock_for_user_change(
         principal, user_id, Capability.PROJECT_MANAGE, project, read=Capability.PROJECT_VIEW
     )
     payload = {
@@ -238,6 +250,7 @@ def assign_to_project(
             valid_until=valid_until,
         )
         assignment.full_clean()
+        _require_assignee(actor, kind, user_id)
         assignment.save()
         record(
             principal.audit_identity,
