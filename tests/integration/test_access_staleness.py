@@ -22,6 +22,7 @@ from datetime import timedelta
 
 import pytest
 from allauth.account.forms import default_token_generator
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.access.authorization import authorize_in_txn
@@ -38,8 +39,8 @@ from apps.core.locking import LockOrder
 from apps.locations.models import Location
 from apps.organizations.models import Branch, Company, Membership
 from apps.organizations.services import grant_membership, revoke_membership
-from apps.projects.models import Project
-from apps.projects.services import update_project
+from apps.projects.models import Project, ProjectAssignment
+from apps.projects.services import assign_to_project, update_project
 from tests.integration.conftest import run_concurrently
 from tests.support import authz_generation, grant, principal_for
 
@@ -121,6 +122,40 @@ def test_a_revocation_waiting_behind_a_running_write_applies_to_every_later_writ
         with pytest.raises(DENIED):
             write(later, world, "after")
     assert Project.objects.get(pk=world.project.pk).name == "during"
+
+
+def test_an_assignment_waits_for_a_revocation_of_the_assignees_role_and_is_refused(
+    world: World, make_user: Callable[..., User]
+) -> None:
+    """M8.3, R19: the service's check reads the membership under the user-row lock, so it never
+    sees a role a transaction in progress is taking away."""
+    site = make_user("site@example.org")
+    membership = grant(site, Role.SITE_MANAGER, branch=world.branch)
+    holding = threading.Event()
+
+    def hold_the_locks(event: events.Event) -> None:
+        holding.set()
+        time.sleep(0.6)  # the assignment arrives while the revocation holds the user's row
+
+    def run(index: int) -> object:
+        if index == 0:
+            return revoke_membership(world.admin, membership.pk)
+        assert holding.wait(10)
+        return assign_to_project(
+            world.admin,
+            project_id=world.project.pk,
+            user_id=site.pk,
+            kind=ProjectAssignment.Kind.MANAGER,
+        )
+
+    undo = events.subscribe("membership.revoked", hold_the_locks)
+    try:
+        revoked, refused = run_concurrently(2, run)
+    finally:
+        undo()
+    assert isinstance(revoked, Membership)
+    assert isinstance(refused, ValidationError)
+    assert not ProjectAssignment.objects.exists()
 
 
 def reset_password(world: World) -> object:

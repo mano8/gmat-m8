@@ -54,7 +54,7 @@ CHUNK = 64 * 1024
 def _valid(request: dict[str, Any]) -> bool:
     """Only integers reach the child's command line, and only the formats it knows."""
     numbers = [request.get(name) for name in (*LIMITS, "size", "timeout")]
-    if not all(isinstance(value, int) and value > 0 for value in numbers):
+    if not all(type(value) is int and value > 0 for value in numbers):
         return False
     return (
         request.get("format") in FORMATS

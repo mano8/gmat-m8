@@ -205,6 +205,7 @@ class TestProtocol:
             header(format="SVG"),
             header(max_pixels=-1),
             header(cpu="10; rm -rf /"),
+            header(memory=True),
             header(size=decoder_service.MAX_SOURCE + 1),
             header(timeout=decoder_service.MAX_TIMEOUT + 1),
         ],

@@ -75,11 +75,24 @@ class TestASuccessfulDeploy:
             "backup run --wait 1800 --label pre-deploy-1.1.0",
             "stop backup",
             "run --rm --no-deps -T migrate",
+            "--force-recreate --wait --wait-timeout 300 clamd",
+            "--wait --wait-timeout 120 decoder",
             "up -d --no-deps --no-build --wait --wait-timeout 300 web worker",
             "web verify-internal",
             "WORKER_EXPECT_STATE=paused",
             "WORKER_EXPECT_STATE=running,outbound-off",
         )
+
+    def test_the_services_that_parse_uploads_start_behind_the_gates(self, ready: World) -> None:
+        """M8.3: and before ``web``, so ``verify-internal`` can ask them for an answer."""
+        ready.run("deploy.sh", VERSION)
+        log = ready.docker_log()
+        for fragment in (
+            "no-build freshclam",
+            "wait-timeout 300 clamd",
+            "wait-timeout 120 decoder",
+        ):
+            assert log[position(log, fragment)].startswith("MW "), fragment
 
     def test_a_changed_caddyfile_applies_behind_the_gates(self, ready: World) -> None:
         ready.run("deploy.sh", VERSION)
@@ -307,6 +320,8 @@ class TestRefused:
         ("backup run --wait", 6, "recover.sh rollback"),
         ("run --rm --no-deps -T migrate", 7, "recover.sh migrate-back"),
         ("up -d --no-deps --no-build --wait", 8, "recover.sh migrate-back"),
+        ("--wait-timeout 300 clamd", 8, "recover.sh migrate-back"),
+        ("--wait-timeout 120 decoder", 8, "recover.sh migrate-back"),
         ("web verify-internal", 9, "recover.sh migrate-back"),
     ],
 )

@@ -127,6 +127,9 @@ def test_v_n_to_v_n_plus_one(world: World) -> None:
     assert public(world, "/accounts/login/") == 200
     assert world.sql("SELECT to_regclass('public.rehearsal_a') IS NOT NULL") == "t"
     assert world.running_image("web").endswith(world.images["next"])
+    # The decoder is the same image: it moves with web, and the scanner came up with it.
+    assert world.running_image("decoder").endswith(world.images["next"])
+    assert world.compose("ps", "-q", "clamd").stdout.strip()
     assert world.running_image("worker").endswith(world.images["next"])
     row = world.deployed()[-1]
     assert row[1:4] == [V2, world.images["next"], world.images["backup"]]

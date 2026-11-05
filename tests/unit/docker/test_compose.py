@@ -189,6 +189,15 @@ def test_only_freshclam_reaches_out_and_it_sees_no_file(base: dict[str, Any]) ->
     assert users == ["freshclam"]
 
 
+def test_each_image_of_the_scanner_is_on_its_service(base: dict[str, Any]) -> None:
+    """Dependabot reads ``services.*.image``; an anchor's would quietly stay behind."""
+    clamd, freshclam = base["services"]["clamd"], base["services"]["freshclam"]
+    assert clamd["image"] == freshclam["image"]
+    assert re.fullmatch(r"clamav/clamav:[\d.]+@sha256:[0-9a-f]{64}", clamd["image"])
+    text = (STACK / "docker-compose.yml").read_text(encoding="utf-8")
+    assert text.count(clamd["image"]) == 2
+
+
 def test_what_cannot_be_scanned_is_refused() -> None:
     clamd = (STACK / "clamav" / "clamd.conf").read_text(encoding="utf-8").splitlines()
     assert "AlertExceedsMax yes" in clamd

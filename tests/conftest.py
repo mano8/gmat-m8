@@ -6,6 +6,7 @@ live in ``tests/support.py``.
 """
 
 import importlib.util
+import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import ModuleType
@@ -25,10 +26,16 @@ from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
-# The browser layer needs Playwright, which only the optional `e2e` dependency group installs.
-# The directory itself, not a glob of its contents: pytest imports a directory's conftest.py
-# as soon as it enters it, and tests/e2e/conftest.py imports Playwright.
-collect_ignore = [] if importlib.util.find_spec("playwright") else ["e2e"]
+# The browser layer runs only when asked for (`E2E_REQUIRED=1`), with Playwright installed (the
+# optional `e2e` group). Its sync API leaves an asyncio loop running in the main thread, so in a
+# plain run every database test after it fails with SynchronousOnlyOperation. The directory
+# itself, not a glob of its contents: pytest imports a directory's conftest.py as soon as it
+# enters it, and tests/e2e/conftest.py imports Playwright.
+collect_ignore = (
+    []
+    if importlib.util.find_spec("playwright") and os.environ.get("E2E_REQUIRED") == "1"
+    else ["e2e"]
+)
 
 
 @pytest.fixture(autouse=True, scope="session")

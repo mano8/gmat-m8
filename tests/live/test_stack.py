@@ -75,6 +75,15 @@ def test_health_and_login_answer(stack: Stack) -> None:
     assert stack.get("/accounts/login/").status == 200
 
 
+def test_web_says_at_startup_which_hsts_switches_are_off(stack: Stack) -> None:
+    """M8.3, X3: the local template sets a lifetime and leaves the other two off."""
+    logs = stack.compose("logs", "--no-log-prefix", "web").stdout
+    warnings = [json.loads(line) for line in logs.splitlines() if "hsts_incomplete" in line]
+    assert warnings, "no warning in web's log"
+    assert warnings[0]["level"] == "WARNING"
+    assert warnings[0]["security"]["off"] == "DJANGO_HSTS_INCLUDE_SUBDOMAINS,DJANGO_HSTS_PRELOAD"
+
+
 def test_security_headers_survive_the_proxy(stack: Stack) -> None:
     login = stack.get("/accounts/login/")
     csp = login.header("content-security-policy") or ""

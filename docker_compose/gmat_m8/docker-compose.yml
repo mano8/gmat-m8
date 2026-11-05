@@ -31,8 +31,6 @@ x-hardened: &hardened
 
 x-clamav: &clamav
   <<: *hardened
-  # x86-64 only: the Debian variant is multi-arch, but ships libxml2 flaws clamd can reach.
-  image: clamav/clamav:1.5.4@sha256:6d87c712e3391e13c1ba6e05dfb074d4b1ddb5a6834b23bb9da990d2a4ef042a
   # The image's own `clamav` user, which owns its signature files.
   user: "100:101"
   tmpfs: ["/tmp:uid=100,gid=101,mode=0700,size=128m"]
@@ -176,6 +174,8 @@ services:
   # Scans every upload before it is stored (M8.3, X7): no network, signatures read only.
   clamd:
     <<: *clamav
+    # x86-64 only: the Debian variant is multi-arch, but ships libxml2 flaws clamd can reach.
+    image: clamav/clamav:1.5.4@sha256:6d87c712e3391e13c1ba6e05dfb074d4b1ddb5a6834b23bb9da990d2a4ef042a
     entrypoint: ["clamd", "--config-file=/etc/gmat/clamd.conf"]
     volumes:
       - ./clamav/clamd.conf:/etc/gmat/clamd.conf:ro
@@ -197,6 +197,7 @@ services:
   # an uploaded file. Four checks a day, as the mirror's terms ask.
   freshclam:
     <<: *clamav
+    image: clamav/clamav:1.5.4@sha256:6d87c712e3391e13c1ba6e05dfb074d4b1ddb5a6834b23bb9da990d2a4ef042a
     entrypoint:
       - freshclam
       - --foreground
