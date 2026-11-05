@@ -20,6 +20,8 @@ def _load() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     previous = sys.dont_write_bytecode
     sys.dont_write_bytecode = True
+    # Its dataclasses and exceptions look their module up while they are defined.
+    sys.modules[spec.name] = module
     try:
         spec.loader.exec_module(module)
     finally:

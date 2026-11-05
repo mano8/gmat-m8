@@ -9,8 +9,8 @@
 #
 #   1  lock                the same flock as recover.sh and the restore drill
 #   2  verify the release  signed manifest, signed images, both pulled by digest; any mismatch aborts
-#   3  preflight           with the new image, read-only: migrate-plan, check --deploy; a flagged
-#                          irreversible migration needs typing the version
+#   3  preflight           with the new image, read-only: migrate-plan, check --deploy, the offsite
+#                          repository answers; a flagged irreversible migration needs typing the version
 #   4  gates on            flags/maintenance.on + flags/worker.paused; 503 confirmed from outside
 #   5  stop the writers    web and worker
 #   6  pre-deploy backup   dump + manifest + offsite copy; the dump id is recorded
@@ -105,7 +105,7 @@ refuse_unfinished() {
 
 require_tools() {
     local tool
-    for tool in docker curl flock cosign python3 sha256sum; do
+    for tool in docker curl flock timeout cosign python3 sha256sum; do
         command -v "$tool" >/dev/null || die "$tool is not installed"
     done
     docker compose version >/dev/null || die "the docker compose plugin is not installed"
@@ -138,8 +138,18 @@ check_checkout() {
         "this checkout is $head, the release is $RELEASE_COMMIT: git fetch --tags && git switch --detach v$VERSION"
 }
 
+# A release that follows a failed one (--resume) goes back to where the failed one started:
+# the head saved before that migration, and the dump taken before it.
 begin_state() {
+    local reached original
+    reached=$(state_get STEP)
+    original=""
+    if [ "$RESUME" = 1 ] && [ "${reached:-0}" -ge 7 ]; then
+        original=$(state_get ORIGINAL_DUMP)
+        original="${original:-$(state_get DUMP)}"
+    fi
     rm -f "$STATE_FILE"
+    [ -z "$original" ] || state_set ORIGINAL_DUMP "$original"
     state_set TARGET_VERSION "$VERSION"
     state_set TARGET_APP_DIGEST "$RELEASE_APP_DIGEST"
     state_set TARGET_BACKUP_DIGEST "$RELEASE_BACKUP_DIGEST"
@@ -149,6 +159,16 @@ begin_state() {
     state_set STARTED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     state_set STEP 2
     state_set STATUS running
+}
+
+# Before the gates: restic retries a repository that does not answer for about 15 minutes, which
+# step 6 would spend with the site closed. A first deploy's backup creates the repository.
+check_offsite() {
+    [ -n "$(env_value RESTIC_REPOSITORY)" ] || return 0
+    [ -n "$(last_deployed 2)" ] || return 0
+    timeout 180 docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps -T --entrypoint restic \
+        backup cat config </dev/null >/dev/null \
+        || die "the offsite repository does not answer: nothing changed, the site stays open"
 }
 
 # This process, not .env, carries the new digests until step 8: .env says what is running.
@@ -161,8 +181,9 @@ preflight() {
     grep -qxF "$RELEASE_BACKUP_REF" <<<"$images" \
         || die "the compose files do not run $RELEASE_BACKUP_REF: refused"
     service_running db || compose up -d --no-deps --wait db
-    compose run --rm --no-deps -T web migrate-plan
-    compose run --rm --no-deps -T web check
+    compose run --rm --no-deps -T web migrate-plan </dev/null
+    compose run --rm --no-deps -T web check </dev/null
+    check_offsite
     state_set IRREVERSIBLE 0
     if python3 ops/checks.py flagged ".release/$VERSION/notes.md" "$MARK_IRREVERSIBLE"; then
         state_set IRREVERSIBLE 1
@@ -174,7 +195,7 @@ preflight() {
 backup_before_migrating() {
     local output dump
     output=$(compose run --rm --no-deps -T backup run --wait 1800 \
-        --label "pre-deploy-$VERSION") || die "the pre-deploy backup failed"
+        --label "pre-deploy-$VERSION" </dev/null) || die "the pre-deploy backup failed"
     dump=$(printf '%s\n' "$output" | tail -n 1)
     [[ "$dump" == gmat-* ]] || die "the backup named no dump"
     state_set DUMP "$dump"
@@ -211,8 +232,9 @@ main() {
     compose stop backup
 
     step 7 "migrate"
-    migration_head >deploy.head
-    compose run --rm --no-deps -T migrate
+    # Removed at every commit point, so one that is here belongs to an unfinished migration.
+    [ -s deploy.head ] || migration_head >deploy.head
+    compose run --rm --no-deps -T migrate </dev/null
 
     step 8 "starting the new digests; traffic gated, worker paused"
     use_digests "$VERSION" "$RELEASE_APP_DIGEST" "$RELEASE_BACKUP_DIGEST"
@@ -229,6 +251,7 @@ main() {
         "$(state_get DUMP)" deploy
     state_set STATUS "done"
     state_set DEPLOYED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    rm -f deploy.head
     say "deployed $VERSION"
 }
 

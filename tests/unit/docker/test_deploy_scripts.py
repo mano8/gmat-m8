@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -169,7 +170,7 @@ class TestRefused:
         ids=["version", "tag", "repository", "schema", "commit", "image host"],
     )
     def test_a_manifest_that_is_not_this_release_is_refused(
-        self, ready: World, changes: dict[str, object]
+        self, ready: World, changes: dict[str, Any]
     ) -> None:
         ready.release(VERSION, **changes)
         result = ready.run("deploy.sh", VERSION)
@@ -219,6 +220,21 @@ class TestRefused:
         assert "offsite copy" in result.stderr
         ready.env["DEPLOY_ALLOW_NO_OFFSITE"] = "1"
         assert ready.run("deploy.sh", VERSION).returncode == 0
+
+    def test_an_offsite_repository_that_does_not_answer_stops_before_the_gates(
+        self, ready: World
+    ) -> None:
+        ready.fail_on("--entrypoint restic backup cat config")
+        result = ready.run("deploy.sh", VERSION)
+        assert result.returncode != 0
+        assert "does not answer" in result.stderr
+        assert ready.gates() == (False, False)
+        assert "nothing changed" in result.stderr
+
+    def test_a_first_deploy_has_no_repository_yet(self, world: World) -> None:
+        world.release(VERSION)
+        world.fail_on("--entrypoint restic backup cat config")
+        assert world.run("deploy.sh", VERSION).returncode == 0
 
     def test_env_files_readable_by_others(self, ready: World) -> None:
         (ready.stack / "app.env").chmod(0o644)
@@ -324,6 +340,20 @@ class TestTheCommitPoint:
         assert result.returncode != 0
         assert "the worker did not resume" in result.stderr
         assert ready.gates() == (True, True)
+
+    def test_a_slow_host_gets_its_tries_before_the_gates_close(self, ready: World) -> None:
+        """One slow call must not use up the wait: the clock alone does not end it."""
+        script = (ready.stack / "ops" / "common.sh").read_text()
+        (ready.stack / "ops" / "common.sh").write_text(
+            script.replace(
+                'wait_worker_state "$RUNNING_STATES" 90', 'wait_worker_state "$RUNNING_STATES" 0'
+            )
+        )
+        ready.fail_on("WORKER_EXPECT_STATE=running")
+        result = ready.run("deploy.sh", VERSION)
+        assert result.returncode != 0
+        tries = [line for line in ready.docker_log() if "EXPECT_STATE=running" in line]
+        assert len(tries) == 5
 
     def test_a_site_that_does_not_answer_closes_the_gates_again(self, ready: World) -> None:
         (ready.fake / "public_status").write_text("502")
@@ -545,6 +575,34 @@ class TestRestorePredeploy:
         )
         assert result.returncode != 0
         assert "is not in backups/" in result.stderr
+
+
+class TestAReleaseThatFollowsAFailedOne:
+    def test_going_back_still_means_where_the_failed_one_started(self, ready: World) -> None:
+        (ready.fake / "head").write_text("core 0001_x\n")
+        failed_deploy(ready, "web verify-internal")
+        assert (ready.stack / "deploy.head").read_text() == "core 0001_x\n\n"
+        first_dump = ready.state("DUMP")
+        # Migrated further by the failed release; its fix fails too, at the same point.
+        (ready.fake / "head").write_text("core 0002_failed\n")
+        ready.release("1.1.1")
+        ready.fail_on("web verify-internal")
+        assert ready.run("deploy.sh", "1.1.1", "--resume").returncode != 0
+        ready.recover()
+        assert (ready.stack / "deploy.head").read_text() == "core 0001_x\n\n"
+        assert ready.state("ORIGINAL_DUMP") == first_dump
+        assert ready.state("DUMP") == "gmat-20261105T000000Z-pre-deploy-1.1.1"
+        ready.clear_logs()
+        (ready.stack / "backups" / f"{first_dump}.dump").write_text("DUMP")
+        result = ready.run(
+            "recover.sh", "restore-predeploy", "--operator", "op@test", "--confirm", "RESTORE"
+        )
+        assert result.returncode == 0, result.stderr
+        assert [line for line in ready.docker_log() if f"--verify {first_dump}.dump" in line]
+
+    def test_the_saved_head_goes_with_the_commit_point(self, ready: World) -> None:
+        assert ready.run("deploy.sh", VERSION).returncode == 0
+        assert not (ready.stack / "deploy.head").exists()
 
 
 class TestRollbackImages:

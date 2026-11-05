@@ -97,6 +97,7 @@ finish() { # finish VERSION APP BACKUP DUMP KIND
     record_deployed "$1" "$2" "$3" "$4" "$5"
     state_set STATUS "done"
     state_set RECOVERED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    rm -f deploy.head
     say "recovered: $1 is running ($5)"
 }
 
@@ -171,7 +172,7 @@ migrate_back() {
         [ "$saved" != "$name" ] || continue
         say "migrating $app back to ${saved:-zero}"
         compose run --rm --no-deps -T migrate manage migrate "$app" "${saved:-zero}" --noinput \
-            || return 1
+            </dev/null || return 1
     done
 }
 
@@ -218,7 +219,8 @@ cmd_restore_predeploy() {
     require_unfinished_deploy
     previous_or_die
     local dump
-    dump=$(state_get DUMP)
+    dump=$(state_get ORIGINAL_DUMP)
+    dump="${dump:-$(state_get DUMP)}"
     [ -n "$dump" ] && [ -f "backups/$dump.dump" ] || die "the pre-deploy dump ${dump:-?} is not in backups/"
     confirm_typed RESTORE "$CONFIRM" \
         "Restoring $dump, the database as it was before this deploy. Nothing was written since."
@@ -303,7 +305,8 @@ cmd_restore() {
 # The snapshot's files arrive under backups/.offsite/backups/ with restic's absolute paths.
 fetch_snapshot() { # fetch_snapshot ID: sets FETCHED to the dump's base name
     compose run --rm --no-deps -T --entrypoint sh backup -c \
-        'rm -rf /backups/.offsite && exec restic restore "$0" --target /backups/.offsite' "$1"
+        'rm -rf /backups/.offsite && exec restic restore "$0" --target /backups/.offsite' "$1" \
+        </dev/null
     local found
     found=$(find backups/.offsite/backups -maxdepth 1 -name 'gmat-*.dump' -print -quit)
     [ -n "$found" ] || die "snapshot $1 holds no dump"

@@ -87,7 +87,12 @@ run_backup() {
     fi
     # Two backups never overlap (cron against a pre-deploy run).
     exec 9>"$BACKUP_DIR/.backup.lock"
-    flock -w "$wait" 9 || die "another backup is already running"
+    # BusyBox flock has no timeout of its own.
+    local deadline=$((SECONDS + wait))
+    until flock -n 9; do
+        [ "$SECONDS" -lt "$deadline" ] || die "another backup is already running"
+        sleep 5
+    done
 
     PARTIAL_FILES="$dump.partial $manifest.partial $media.partial"
     trap cleanup EXIT

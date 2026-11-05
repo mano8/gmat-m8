@@ -104,11 +104,17 @@ public_status() { # public_status PATH: the status Caddy answers, from outside t
         "https://$domain:$DEPLOY_PUBLIC_PORT$1" || true
 }
 
+# Waits end on the clock AND after a few tries: on a host under pressure a single slow call must
+# not use up the time and close the gates on a deploy that is fine.
+MIN_TRIES=5
+
 wait_public_status() { # wait_public_status STATUS PATH SECONDS
-    local deadline=$((SECONDS + $3)) status=""
-    while [ "$SECONDS" -lt "$deadline" ]; do
+    local deadline=$((SECONDS + $3)) status="" tries=0
+    while :; do
         status=$(public_status "$2")
         [ "$status" != "$1" ] || return 0
+        tries=$((tries + 1))
+        [ "$SECONDS" -lt "$deadline" ] || [ "$tries" -lt "$MIN_TRIES" ] || break
         sleep 2
     done
     say "$2 answers ${status:-nothing}, expected $1"
@@ -116,17 +122,20 @@ wait_public_status() { # wait_public_status STATUS PATH SECONDS
 }
 
 worker_in_state() { # worker_in_state STATES
-    compose exec -T -e "WORKER_EXPECT_STATE=$1" worker "$ENTRYPOINT" worker-healthcheck
+    timeout 60 docker compose "${COMPOSE_ARGS[@]}" exec -T -e "WORKER_EXPECT_STATE=$1" worker \
+        "$ENTRYPOINT" worker-healthcheck </dev/null
 }
 
 wait_worker_state() { # wait_worker_state STATES SECONDS
-    local deadline=$((SECONDS + $2))
-    while [ "$SECONDS" -lt "$deadline" ]; do
-        ! worker_in_state "$1" 2>/dev/null || return 0
+    local deadline=$((SECONDS + $2)) tries=0
+    until worker_in_state "$1" 2>/dev/null; do
+        tries=$((tries + 1))
+        if [ "$SECONDS" -ge "$deadline" ] && [ "$tries" -ge "$MIN_TRIES" ]; then
+            say "the worker's heartbeat is not in state $1"
+            return 1
+        fi
         sleep 3
     done
-    say "the worker's heartbeat is not in state $1"
-    return 1
 }
 
 stop_writers() { compose stop web worker; }
@@ -140,7 +149,7 @@ start_services() {
 # In a one-off container on `edge`, against web:8000, bypassing the gate; then the worker's
 # heartbeat, which lives in the worker's own /tmp.
 verify_internal() {
-    compose run --rm --no-deps -T web verify-internal
+    compose run --rm --no-deps -T web verify-internal </dev/null
     wait_worker_state paused 90
 }
 
@@ -304,11 +313,11 @@ SQL
 restore_media() { # restore_media DUMP_BASE
     [ -d "backups/$1.media" ] || return 0
     compose run --rm --no-deps -T -v "$PWD/backups/$1.media:/restored-media:ro" \
-        --entrypoint sh web -c 'cp -np /restored-media/. /srv/media/files/'
+        --entrypoint sh web -c 'cp -rp --update=none /restored-media/. /srv/media/files/' </dev/null
 }
 
 verify_dump() { # verify_dump DUMP_BASE: checksum, restore into a scratch cluster, manifest
-    compose run --rm --no-deps -T --entrypoint restore backup --verify "$1.dump"
+    compose run --rm --no-deps -T --entrypoint restore backup --verify "$1.dump" </dev/null
 }
 
 # --- reconciliation ----------------------------------------------------------------------------------

@@ -127,31 +127,52 @@ def count_differences(manifest: dict[str, Any], restored: dict[str, Any]) -> lis
     ]
 
 
-def _run(args: argparse.Namespace) -> str:
-    match args.command:
-        case "asset":
-            return asset_url(_load(args.release), args.name)
-        case "notes":
-            return str(_load(args.release).get("body") or "")
-        case "flagged":
-            if not flagged(Path(args.notes).read_text(encoding="utf-8"), args.marker):
-                raise SystemExit(1)
-            return ""
-        case "manifest":
-            values = check_manifest(
-                _load(args.file), args.version, args.repository, args.image_prefix
-            )
-            return "\n".join(f"{key}={value}" for key, value in values.items())
-        case "admin-cidrs":
-            check_admin_cidrs(args.value)
-            return ""
-        case "dump-version":
-            return str(_load(args.manifest).get("app_version") or "")
-        case _:
-            differences = count_differences(_load(args.manifest), _load(args.restored))
-            if differences:
-                raise Refused("; ".join(differences))
-            return ""
+def _asset(args: argparse.Namespace) -> str:
+    return asset_url(_load(args.release), args.name)
+
+
+def _notes(args: argparse.Namespace) -> str:
+    return str(_load(args.release).get("body") or "")
+
+
+def _flagged(args: argparse.Namespace) -> str:
+    if not flagged(Path(args.notes).read_text(encoding="utf-8"), args.marker):
+        raise SystemExit(1)
+    return ""
+
+
+def _manifest(args: argparse.Namespace) -> str:
+    if not VERSION.match(args.version):
+        raise Refused(f"not a release version: {args.version}")
+    values = check_manifest(_load(args.file), args.version, args.repository, args.image_prefix)
+    return "\n".join(f"{key}={value}" for key, value in values.items())
+
+
+def _admin_cidrs(args: argparse.Namespace) -> str:
+    check_admin_cidrs(args.value)
+    return ""
+
+
+def _dump_version(args: argparse.Namespace) -> str:
+    return str(_load(args.manifest).get("app_version") or "")
+
+
+def _compare_counts(args: argparse.Namespace) -> str:
+    differences = count_differences(_load(args.manifest), _load(args.restored))
+    if differences:
+        raise Refused("; ".join(differences))
+    return ""
+
+
+COMMANDS = {
+    "asset": _asset,
+    "notes": _notes,
+    "flagged": _flagged,
+    "manifest": _manifest,
+    "admin-cidrs": _admin_cidrs,
+    "dump-version": _dump_version,
+    "compare-counts": _compare_counts,
+}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -179,11 +200,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if args.command == "manifest" and not VERSION.match(args.version):
-        print(f"not a release version: {args.version}", file=sys.stderr)
-        return 2
     try:
-        output = _run(args)
+        output = COMMANDS[args.command](args)
     except (Refused, ValueError, OSError) as exc:
         print(exc, file=sys.stderr)
         return 2
