@@ -23,7 +23,7 @@ The full stack, ready to use. Local by default: `https://localhost:8443`, Caddy'
 
 | Service | Image | Networks | Notes |
 | --- | --- | --- | --- |
-| `caddy` | `caddy:2.11.7-alpine` (digest) | `ingress`, `edge` | The only service that publishes ports. Admin API off. |
+| `caddy` | `caddy:2.11.8-alpine` (digest) | `ingress`, `edge` | The only service that publishes ports. Admin API off. |
 | `migrate` | `gmat-m8` | `db_migrate` | One-shot `migrate` as the **owner** role; `web` waits for it. |
 | `web` | `gmat-m8` | `edge`, `db_web` | Runtime role (data access only). No route to the internet. |
 | `db` | `postgres:18-alpine` (digest) | `db_web`, `db_worker`, `db_backup`, `db_migrate` | Never published (except in the dev overlay, on 127.0.0.1). |
