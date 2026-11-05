@@ -3,6 +3,8 @@ from uuid import UUID
 
 from allauth.account.views import PasswordResetFromKeyView as AllauthPasswordResetFromKeyView
 from allauth.core.internal.ratelimit import consume_or_429
+from allauth.mfa.adapter import get_adapter as get_mfa_adapter
+from allauth.mfa.webauthn.views import RemoveWebAuthnView as AllauthRemoveWebAuthnView
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -44,6 +46,24 @@ class PasswordResetFromKeyView(AllauthPasswordResetFromKeyView):
 
 
 password_reset_from_key = PasswordResetFromKeyView.as_view()
+
+
+class RemoveWebAuthnView(AllauthRemoveWebAuthnView):
+    """allauth's passkey removal, which asks the MFA adapter first, as TOTP deactivation does.
+
+    A privileged account keeps a second factor (``MFAAdapter.can_delete_authenticator``):
+    without it, the next sign-in would be password-only and enroll a new factor.
+    """
+
+    def form_valid(self, form: Any) -> HttpResponse:
+        if not get_mfa_adapter().can_delete_authenticator(self.get_object()):
+            messages.error(self.request, _("Your role needs a second factor: add another first."))
+            return redirect("mfa_list_webauthn")
+        response: HttpResponse = super().form_valid(form)
+        return response
+
+
+remove_webauthn = RemoveWebAuthnView.as_view()
 
 
 # --- token pages (plan §5: invitations, email changes) ----------------------------------
