@@ -806,7 +806,7 @@ class DispatchRow:
 
     @property
     def confirmable(self) -> bool:
-        return self.dispatch.status == Dispatch.AMBIGUOUS
+        return self.dispatch.status in (Dispatch.AMBIGUOUS, Dispatch.QUARANTINED)
 
     @property
     def actionable(self) -> bool:

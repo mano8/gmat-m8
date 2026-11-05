@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.db.models.functions import Now
 
 from apps.access.exceptions import AccessDenied
@@ -68,6 +68,14 @@ def active_platform_operator_exists() -> bool:
     return User.objects.filter(
         is_active=True, is_superuser=True, offboarded_at__isnull=True
     ).exists()
+
+
+def privileged_accounts() -> QuerySet[User]:
+    """Active accounts ``is_privileged`` would call privileged: what a restore suspends (Q23)."""
+    holders = Membership.objects.filter(valid_now(), role__in=PRIVILEGED_ROLES).values("user_id")
+    return User.objects.filter(
+        Q(is_staff=True) | Q(is_superuser=True) | Q(pk__in=holders), is_active=True
+    )
 
 
 def is_platform_operator(user: Any) -> bool:

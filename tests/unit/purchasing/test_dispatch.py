@@ -536,6 +536,41 @@ class TestDecision:
             str(message.pk),
         )
 
+    def test_a_quarantined_dispatch_is_confirmed_resent_or_discarded(
+        self, issued: PurchaseOrder, mm: SessionPrincipal
+    ) -> None:
+        row = make_dispatch(issued, Status.QUARANTINED)
+        assert reload(services.confirm_dispatch(mm, row.pk)).status == Status.SENT
+        row = make_dispatch(issued, Status.QUARANTINED)
+        assert reload(services.resend_dispatch(mm, row.pk)).status == Status.QUEUED
+        row = make_dispatch(issued, Status.QUARANTINED)
+        assert reload(services.discard_dispatch(mm, row.pk, note=" No ")).status == Status.CANCELLED
+        event = AuditEvent.objects.get(action="purchase_order.dispatch_discarded")
+        assert (event.object_id, event.data["note"]) == (issued.pk, "No")
+
+    @pytest.mark.parametrize("status", [Status.SENT, Status.QUEUED, Status.AMBIGUOUS])
+    def test_only_a_quarantined_dispatch_is_discarded(
+        self, issued: PurchaseOrder, mm: SessionPrincipal, status: Status
+    ) -> None:
+        row = make_dispatch(issued, status)
+        assert codes(services.discard_dispatch, mm, row.pk) == {"not_held"}
+        assert reload(row).status == status
+
+    def test_a_quarantined_dispatch_of_a_later_revision_can_only_be_confirmed(
+        self, issued: PurchaseOrder, people: People
+    ) -> None:
+        make_dispatch(issued, Status.QUARANTINED, revision=issued.revision + 1)
+        rows = selectors.dispatches(ctx(people.mm_mad), issued)
+        row = next(item for item in rows if item.dispatch.status == Status.QUARANTINED)
+        assert (row.decidable, row.resendable, row.confirmable) == (True, False, True)
+
+    def test_a_cancellation_owes_the_notice_for_a_quarantined_dispatch(
+        self, issued: PurchaseOrder, mm: SessionPrincipal
+    ) -> None:
+        make_dispatch(issued, Status.QUARANTINED)
+        cancelled = dispatch.cancel_dispatches(issued)
+        assert cancelled.notice_queued is True
+
     @pytest.mark.parametrize("outcome", [Outcome.SENT, Outcome.FAILED])
     def test_only_an_ambiguous_dispatch_is_confirmed(
         self,

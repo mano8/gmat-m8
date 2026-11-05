@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.dashboards",
     "apps.exports",
+    "apps.recovery",
 ]
 
 # Order matters (plan §3.6): session auth → session epoch → MFA enforcement → access context.
