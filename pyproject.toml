@@ -106,6 +106,7 @@ markers = [
   "integration: concurrency, constraints, triggers and migrations (PostgreSQL)",
   "live: against the running compose stack",
   "e2e: Playwright against the compose stack",
+  "rehearsal: deploy and recovery against real containers (plan M8.4; REHEARSAL_REQUIRED=1)",
 ]
 
 # --- coverage -----------------------------------------------------------
