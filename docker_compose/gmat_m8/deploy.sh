@@ -9,8 +9,9 @@
 #
 #   1  lock                the same flock as recover.sh and the restore drill
 #   2  verify the release  signed manifest, signed images, both pulled by digest; any mismatch aborts
-#   3  preflight           with the new image, read-only: migrate-plan, check --deploy, the offsite
-#                          repository answers; a flagged irreversible migration needs typing the version
+#   3  preflight           the third-party images pulled; with the new image, read-only: migrate-plan,
+#                          check --deploy, the offsite repository answers; a flagged irreversible
+#                          migration needs typing the version
 #   4  gates on            flags/maintenance.on + flags/worker.paused; 503 confirmed from outside
 #   5  stop the writers    web and worker; what the release changed in db or Caddy applies now
 #   6  pre-deploy backup   dump + manifest + offsite copy; the dump id is recorded
@@ -178,6 +179,10 @@ preflight() {
         || die "the compose files do not run $RELEASE_APP_REF: refused"
     grep -qxF "$RELEASE_BACKUP_REF" <<<"$images" \
         || die "the compose files do not run $RELEASE_BACKUP_REF: refused"
+    # The third-party images are on this machine before the gates: a registry that does not answer
+    # must not stall a deploy with the site closed.
+    compose pull --quiet caddy db clamd freshclam </dev/null \
+        || die "the third-party images could not be pulled: nothing changed, the site stays open"
     service_running db || compose up -d --no-deps --wait db
     compose run --rm --no-deps -T web migrate-plan </dev/null
     compose run --rm --no-deps -T web check </dev/null

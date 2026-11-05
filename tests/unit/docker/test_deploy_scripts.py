@@ -83,6 +83,12 @@ class TestASuccessfulDeploy:
             "WORKER_EXPECT_STATE=running,outbound-off",
         )
 
+    def test_the_third_party_images_are_pulled_before_the_gates(self, ready: World) -> None:
+        ready.run("deploy.sh", VERSION)
+        log = ready.docker_log()
+        in_order(log, "pull --quiet caddy db clamd freshclam", "up -d --no-deps caddy")
+        assert not log[position(log, "pull --quiet caddy")].startswith("MW ")
+
     def test_the_services_that_parse_uploads_start_behind_the_gates(self, ready: World) -> None:
         """M8.3: and before ``web``, so ``verify-internal`` can ask them for an answer."""
         ready.run("deploy.sh", VERSION)
@@ -231,6 +237,13 @@ class TestRefused:
         result = ready.run("deploy.sh", VERSION)
         assert result.returncode != 0
         assert "open to every network" in result.stderr
+        assert ready.gates() == (False, False)
+
+    def test_a_registry_that_does_not_answer(self, ready: World) -> None:
+        ready.fail_on("pull --quiet caddy")
+        result = ready.run("deploy.sh", VERSION)
+        assert result.returncode != 0
+        assert "nothing changed" in result.stderr
         assert ready.gates() == (False, False)
 
     def test_no_admin_allowlist(self, ready: World) -> None:

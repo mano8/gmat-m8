@@ -36,7 +36,7 @@ cd docker_compose/gmat_m8
 | --- | --- | --- |
 | 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the env files (0600), the admin allowlist, the offsite repository setting and the checkout. | Nothing changed. Fix and run again. |
 | 2 | Downloads the manifest with the read-only token, verifies its **signature** and the signature of both images against the workflow identity of that tag, checks version, repository and registry, pulls both images **by digest**. | Nothing changed, the site stayed open. |
-| 3 | Preflight with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
+| 3 | Preflight: pulls the third-party images (Caddy, PostgreSQL, ClamAV), then with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
 | 4 | **Gates on**: `flags/maintenance.on` and `flags/worker.paused`. Confirms from outside that Caddy answers 503. | Gates stay on. |
 | 5 | Stops `web` and `worker`. | Gates stay on. |
 | 6 | Pre-deploy backup (`pre-deploy-X.Y.Z`) with its offsite copy. The dump id is recorded. | Gates stay on; no migration ran. |
