@@ -14,7 +14,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.urls import reverse
 
-from tests.clamd import fake_clamd, refused_socket
+from tests.clamd import UNIX_SOCKETS, fake_clamd, refused_socket
 
 CSS = "/static/dist/app.abc123.css"
 
@@ -103,6 +103,7 @@ def test_no_allowed_host_falls_back_to_localhost(web: FakeWeb, settings: Any) ->
     assert web.seen[0]["Host"] == "localhost"
 
 
+@pytest.mark.skipif(not UNIX_SOCKETS, reason="no unix sockets on this platform")
 class TestUploadServices:
     """M8.3: without a scanner or a decoder uploads are refused, so a release is not whole."""
 

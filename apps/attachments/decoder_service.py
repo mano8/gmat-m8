@@ -12,11 +12,14 @@ connection on a unix socket:
 
 - to the service: one line of JSON (``ping``, or the format, the limits and the ``size``), then
   ``size`` bytes;
-- from it: one byte, the decoder's exit status, then the WebP file if that status is 0.
+- from it: one byte, the decoder's exit status; if that is 0, the WebP file's size in 8 bytes,
+  then the file, so a connection that drops partway through never passes for a whole file.
 
 Run as ``python -I decoder_service.py SOCKET``, so nothing of the project, the current directory
-or the environment is imported: only the standard library here, and Pillow in the child.
-``--ping SOCKET`` is the container's health check.
+or the environment is imported: only the standard library here, and Pillow in the child; the exit
+statuses are repeated from ``decoder.py`` for that reason. ``--ping SOCKET`` is the container's
+health check. The application never imports this module (``decoder_client`` is its side): it needs
+unix sockets at import time, which a Windows development machine does not have.
 """
 
 import json
@@ -26,6 +29,7 @@ import signal
 import socket
 import socketserver
 import stat
+import struct
 import subprocess  # nosec B404 - a fixed command: this interpreter and the decoder script
 import sys
 import tempfile
@@ -49,6 +53,7 @@ READ_TIMEOUT = 30.0
 CONCURRENCY = 2  # the installation-wide bound on uploads in progress (ATTACHMENT_MAX_PROCESSING)
 PING_TIMEOUT = 3.0
 CHUNK = 64 * 1024
+SIZE_FORMAT = "!Q"  # the output's size, between the status and the file
 
 
 def _valid(request: dict[str, Any]) -> bool:
@@ -120,6 +125,7 @@ class Handler(socketserver.StreamRequestHandler):
     def _answer(self, status: int, result: Path | None = None) -> None:
         self.wfile.write(bytes([status]))
         if result is not None:
+            self.wfile.write(struct.pack(SIZE_FORMAT, result.stat().st_size))
             with result.open("rb") as stream:
                 shutil.copyfileobj(stream, self.wfile, CHUNK)
 

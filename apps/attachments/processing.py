@@ -29,7 +29,6 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.accounts.security_log import log_event
 from apps.attachments import decoder, decoder_client, files, scanner
-from apps.attachments.decoder_service import EXIT_TIMEOUT
 
 if TYPE_CHECKING:
     from django.utils.functional import _StrPromise as Message
@@ -80,7 +79,7 @@ _EXIT_CODES = {
     decoder.EXIT_FORMAT: "type",
     decoder.EXIT_TOO_MANY_PIXELS: "too_many_pixels",
     decoder.EXIT_TOO_LARGE: "too_large",
-    EXIT_TIMEOUT: "timeout",
+    decoder.EXIT_TIMEOUT: "timeout",
 }
 
 
@@ -116,7 +115,7 @@ def _decode_in_child(source: Path, target: Path, image_format: str) -> int:
             env={"LANG": "C.UTF-8"},
         )
     except subprocess.TimeoutExpired:
-        return EXIT_TIMEOUT
+        return decoder.EXIT_TIMEOUT
     return result.returncode
 
 

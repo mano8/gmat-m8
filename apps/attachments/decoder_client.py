@@ -1,26 +1,30 @@
 """``web``'s side of the image decoder service (``decoder_service``; M8.3, ADR-0015).
 
-What comes back is treated as untrusted: its size is bounded here, and ``processing`` checks it
-is a WebP file before it can be stored.
+What comes back is treated as untrusted: its size is bounded and read exactly, and ``processing``
+checks it is a WebP file before it can be stored. ``decoder_service`` needs unix sockets at import
+time, so this module speaks its protocol without importing it, and touches ``socket.AF_UNIX`` only
+when a decoder is configured (production; never a Windows development machine).
 """
 
 import json
 import socket
+import struct
 import time
 from pathlib import Path
 
 from django.conf import settings
 
-from apps.attachments.decoder import EXIT_TOO_LARGE
-from apps.attachments.decoder_service import CHUNK, EXIT_OK, EXIT_TIMEOUT
-from apps.attachments.decoder_service import ping as service_ping
+from apps.attachments.decoder import EXIT_OK, EXIT_TIMEOUT, EXIT_TOO_LARGE
 
 # The service kills the child at the deadline and answers: a little more than that here.
 MARGIN = 15
+CHUNK = 64 * 1024
+SIZE_FORMAT = "!Q"
+PING_TIMEOUT = 3.0
 
 
 class DecoderUnavailable(Exception):
-    """Nothing listens on the socket, or the connection broke before an answer."""
+    """Nothing listens on the socket, or the connection broke before a whole answer."""
 
 
 def _left(deadline: float) -> float:
@@ -41,20 +45,29 @@ def _request(source: Path, image_format: str) -> bytes:
     return json.dumps(header).encode("ascii") + b"\n"
 
 
+def _exactly(connection: socket.socket, size: int, deadline: float) -> bytes:
+    """``size`` bytes at most ``CHUNK``, or the answer was cut short."""
+    received = b""
+    while len(received) < size:
+        connection.settimeout(_left(deadline))
+        data = connection.recv(size - len(received))
+        if not data:
+            raise DecoderUnavailable("The answer was cut short")
+        received += data
+    return received
+
+
 def _save(connection: socket.socket, target: Path, deadline: float) -> int:
-    """Write what the service sends to ``target``, no more than a stored file may be."""
-    limit = settings.ATTACHMENT_MAX_FILE_BYTES
-    written = 0
+    """Write the announced file to ``target``, if it is no more than a stored file may be."""
+    size_bytes = _exactly(connection, struct.calcsize(SIZE_FORMAT), deadline)
+    (left,) = struct.unpack(SIZE_FORMAT, size_bytes)
+    if left > settings.ATTACHMENT_MAX_FILE_BYTES:
+        return EXIT_TOO_LARGE
     with target.open("wb") as stream:
-        while True:
-            connection.settimeout(_left(deadline))
-            data = connection.recv(CHUNK)
-            if not data:
-                return EXIT_OK
-            written += len(data)
-            if written > limit:
-                return EXIT_TOO_LARGE
-            stream.write(data)
+        while left:
+            stream.write(data := _exactly(connection, min(CHUNK, left), deadline))
+            left -= len(data)
+    return EXIT_OK
 
 
 def decode(source: Path, target: Path, image_format: str) -> int:
@@ -67,13 +80,8 @@ def decode(source: Path, target: Path, image_format: str) -> int:
             connection.sendall(_request(source, image_format))
             with source.open("rb") as stream:
                 connection.sendfile(stream)
-            connection.settimeout(_left(deadline))
-            status = connection.recv(1)
-            if not status:
-                raise DecoderUnavailable("No answer")
-            if status[0] != EXIT_OK:
-                return status[0]
-            return _save(connection, target, deadline)
+            (status,) = _exactly(connection, 1, deadline)
+            return _save(connection, target, deadline) if status == EXIT_OK else status
     except TimeoutError:
         return EXIT_TIMEOUT
     except OSError as exc:
@@ -83,4 +91,13 @@ def decode(source: Path, target: Path, image_format: str) -> int:
 def ping() -> bool:
     """Whether the service answers (``manage verify_internal``); nothing to ask without it."""
     address = settings.ATTACHMENT_DECODER_SOCKET
-    return not address or service_ping(address)
+    if not address:
+        return True
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(PING_TIMEOUT)
+            connection.connect(address)
+            connection.sendall(b'{"ping": true}\n')
+            return connection.recv(1) == bytes([EXIT_OK])
+    except OSError:
+        return False

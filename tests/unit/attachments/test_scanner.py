@@ -11,11 +11,13 @@ from apps.attachments import processing, scanner
 from apps.attachments.models import Attachment, AttachmentReservation
 from apps.audit.models import AuditEvent
 from apps.material_requests.models import MaterialRequest
-from tests.clamd import MARKER, SIGNATURE, Behaviour, fake_clamd, refused_socket
+from tests.clamd import MARKER, SIGNATURE, UNIX_SOCKETS, Behaviour, fake_clamd, refused_socket
 from tests.org import People
 from tests.org import client_for as signed_in
 from tests.unit.attachments.conftest import PDF_BYTES, Attach, png
 from tests.unit.attachments.test_views import send
+
+pytestmark = pytest.mark.skipif(not UNIX_SOCKETS, reason="no unix sockets on this platform")
 
 MALWARE_PDF = PDF_BYTES + MARKER
 

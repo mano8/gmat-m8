@@ -14,7 +14,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
+UNIX_SOCKETS = hasattr(socket, "AF_UNIX")  # not on a Windows development machine
 MARKER = b"FAKE-MALWARE"
 SIGNATURE = "Fake.Test.Signature"
 
@@ -68,7 +70,10 @@ class _Handler(socketserver.StreamRequestHandler):
         self.wfile.write(self._answer(data))
 
 
-class _Server(socketserver.ThreadingUnixStreamServer):
+_Base: Any = socketserver.ThreadingUnixStreamServer if UNIX_SOCKETS else object
+
+
+class _Server(_Base):  # type: ignore[misc]
     daemon_threads = True
     behaviour: Behaviour
     release: threading.Event

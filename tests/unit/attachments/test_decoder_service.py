@@ -1,16 +1,22 @@
 """The decoder as a service apart from ``web``: the same results, its protocol, and what comes
 back treated as untrusted (M8.3, X11; ADR-0015). A real service and real children."""
 
+import ast
 import json
 import socket
+import struct
 import tempfile
 import threading
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import pytest
 from PIL import Image
+
+if not hasattr(socket, "AF_UNIX"):  # a Windows development machine
+    pytest.skip("no unix sockets on this platform", allow_module_level=True)
 
 from apps.attachments import decoder, decoder_client, decoder_service, processing
 from apps.attachments.processing import Rejected
@@ -113,6 +119,26 @@ class TestResults:
         assert rejected(tmp_path, png()) == "undecodable"
 
 
+@contextmanager
+def answering(settings: Any, answer: bytes) -> Iterator[None]:
+    """A service that sends these bytes whatever it is asked, then closes the connection."""
+    with tempfile.TemporaryDirectory(prefix="dec-") as directory:
+        address = str(Path(directory) / "d.sock")
+        with socket.socket(socket.AF_UNIX) as listener:
+            listener.bind(address)
+            listener.listen(1)
+
+            def reply() -> None:
+                connection, _ = listener.accept()
+                with connection:
+                    connection.recv(1024 * 1024)
+                    connection.sendall(answer)
+
+            threading.Thread(target=reply, daemon=True).start()
+            settings.ATTACHMENT_DECODER_SOCKET = address
+            yield
+
+
 class TestWhatComesBackIsUntrusted:
     def _lying_service(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: bytes
@@ -135,6 +161,24 @@ class TestWhatComesBackIsUntrusted:
         self._lying_service(tmp_path, monkeypatch, b"RIFF\0\0\0\0WEBP" + b"x" * 2048)
         settings.ATTACHMENT_MAX_FILE_BYTES = 1024
         assert rejected(tmp_path, png()) == "too_large"
+
+    def test_a_connection_that_drops_partway_is_not_a_whole_file(
+        self, tmp_path: Path, settings: Any
+    ) -> None:
+        """The container killed mid-answer: not stored as a truncated image."""
+        whole = b"RIFF\0\0\0\0WEBP" + b"x" * 500
+        answer = bytes([decoder_service.EXIT_OK]) + struct.pack("!Q", len(whole)) + whole[:100]
+        with answering(settings, answer):
+            assert rejected(tmp_path, png()) == "unavailable"
+
+    def test_a_connection_that_drops_before_the_size(self, tmp_path: Path, settings: Any) -> None:
+        with answering(settings, bytes([decoder_service.EXIT_OK]) + b"\0\0"):
+            assert rejected(tmp_path, png()) == "unavailable"
+
+    def test_a_size_above_the_limit_is_not_read_at_all(self, tmp_path: Path, settings: Any) -> None:
+        answer = bytes([decoder_service.EXIT_OK]) + struct.pack("!Q", 2**62)
+        with answering(settings, answer):
+            assert rejected(tmp_path, png()) == "too_large"
 
     def test_nothing_comes_back_at_all(
         self, service: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -260,6 +304,28 @@ class TestProtocol:
             server.handle_error(None, None)
         assert "BrokenPipeError" in capsys.readouterr().err
 
-    def test_the_exit_statuses_agree_with_the_decoder(self) -> None:
+    def test_the_two_sides_agree(self) -> None:
+        """The service repeats these: run as ``python -I`` it cannot import the others."""
         assert decoder_service.EXIT_OK == decoder.EXIT_OK
         assert decoder_service.EXIT_UNDECODABLE == decoder.EXIT_UNDECODABLE
+        assert decoder_service.EXIT_TIMEOUT == decoder.EXIT_TIMEOUT
+        assert decoder_service.SIZE_FORMAT == decoder_client.SIZE_FORMAT
+        assert decoder_service.CHUNK == decoder_client.CHUNK
+
+
+def test_the_application_never_imports_the_service() -> None:
+    """It needs unix sockets at import time: a Windows development machine has none."""
+    package = Path(decoder_service.__file__).parent
+    for path in package.glob("*.py"):
+        if path.name == decoder_service.__file__.rsplit("/", 1)[-1]:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        names = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import | ast.ImportFrom)
+            for alias in node.names
+        }
+        modules = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+        assert "decoder_service" not in names, path
+        assert "apps.attachments.decoder_service" not in modules, path
