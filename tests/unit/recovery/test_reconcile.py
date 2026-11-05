@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -26,6 +27,19 @@ from apps.notifications.outbox import queue_notification, queue_security_email
 from apps.organizations.models import Branch, Company, Membership
 from apps.projects.models import Project, ProjectAssignment
 from apps.recovery import services
+from apps.recovery.replay import (
+    CONFIRMED_ACTION as CONFIRMED,
+)
+from apps.recovery.replay import (
+    EVENT_REPLAYED as REPLAYED,
+)
+from apps.recovery.replay import (
+    GAP_CREDENTIALS,
+    GAP_OFFBOARDED,
+)
+from apps.recovery.replay import (
+    SUSPENDED_ACTION as SUSPENDED,
+)
 from apps.recovery.services import Gap, post_restore_reconcile
 from tests.org import Org, People, build_sentinel_order, client_for
 from tests.outbox import make_dispatch
@@ -33,6 +47,8 @@ from tests.support import PASSWORD, error_codes, password_login, principal_for
 from tests.unit.recovery.conftest import audit_event, state_of
 
 pytestmark = pytest.mark.django_db
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def reconcile(principal: SessionPrincipal, *events: dict[str, Any], **kwargs: Any) -> Any:
@@ -590,6 +606,171 @@ class TestReplay:
             audit_event("invitation.accepted", new_id()),
         )
         assert report.not_replayed == {"membership.granted": 1, "invitation.accepted": 1}
+
+
+class TestASecondRestore:
+    """What the first restore did lives only in its own events, once the original rows did not
+    come back; restoring the same or an older dump must not give any of it back."""
+
+    def _replayed(self, source_action: str) -> dict[str, Any]:
+        return dict(AuditEvent.objects.get(action=REPLAYED, data__source_action=source_action).data)
+
+    def _again(self, operator: User) -> SessionPrincipal:
+        """The first restore ended every session, the operator's too."""
+        operator.refresh_from_db()
+        return principal_for(operator)
+
+    def test_a_revocation_replayed_once_is_replayed_again(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        membership = Membership.objects.get(user=people.mm_mad)
+        reconcile(
+            principal,
+            audit_event(
+                "membership.revoked", membership.pk, object_type="organizations.membership"
+            ),
+        )
+        data = self._replayed("membership.revoked")
+        Membership.objects.filter(pk=membership.pk).update(revoked_at=None, revoked_by=None)
+        report = reconcile(self._again(operator), audit_event(REPLAYED, None, data, object_type=""))
+        assert report.replayed == {"membership.revoked": 1}
+        membership.refresh_from_db()
+        assert membership.revoked_at is not None
+
+    def test_what_the_event_said_comes_with_it(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        """A narrowed validity is nothing without the dates of the original row."""
+        membership = Membership.objects.get(user=people.mm_mad)
+        until = timezone.now() + timedelta(days=1)
+        reconcile(
+            principal,
+            audit_event(
+                "membership.validity_changed",
+                membership.pk,
+                {"valid_until": {"from": None, "to": until.isoformat()}},
+                object_type="organizations.membership",
+            ),
+        )
+        data = self._replayed("membership.validity_changed")
+        assert data["source_data"]["valid_until"]["to"] == until.isoformat()
+        Membership.objects.filter(pk=membership.pk).update(valid_until=None)
+        report = reconcile(self._again(operator), audit_event(REPLAYED, None, data, object_type=""))
+        assert report.replayed == {"membership.validity_changed": 1}
+        membership.refresh_from_db()
+        assert membership.valid_until == until
+
+    def test_an_original_the_dump_has_is_older_than_the_snapshot(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        """A newer dump holds the original row: nothing to replay from the record of it."""
+        membership = Membership.objects.get(user=people.mm_mad)
+        restored = AuditEvent.objects.create(
+            actor_label="x",
+            action="membership.revoked",
+            object_type="organizations.membership",
+            object_id=membership.pk,
+        )
+        data = {
+            "source_event": str(restored.pk),
+            "source_action": "membership.revoked",
+            "source_actor": "x",
+            "object_type": "organizations.membership",
+            "object_id": str(membership.pk),
+            "occurred_at": timezone.now().isoformat(),
+            "source_data": {},
+        }
+        report = reconcile(principal, audit_event(REPLAYED, None, data, object_type=""))
+        assert report.replayed == {}
+        membership.refresh_from_db()
+        assert membership.revoked_at is None
+
+    def test_a_record_without_what_it_needs_is_reported_not_replayed(
+        self, principal: SessionPrincipal
+    ) -> None:
+        report = reconcile(principal, audit_event(REPLAYED, None, {"source_action": "x"}))
+        assert report.not_replayed == {REPLAYED: 1}
+
+    def test_an_account_it_suspended_comes_up_suspended(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.mm_mad
+        report = reconcile(principal, audit_event(SUSPENDED, user.pk, {"reason": "no state"}))
+        assert report.replayed == {SUSPENDED: 1}
+        assert report.suspended == [user.email]
+        user.refresh_from_db()
+        assert user.is_active is False
+
+    def test_an_account_already_suspended_or_gone_is_nothing_to_do(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        User.objects.filter(pk=people.mm_mad.pk).update(is_active=False)
+        report = reconcile(
+            principal,
+            audit_event(SUSPENDED, people.mm_mad.pk),
+            audit_event(SUSPENDED, new_id()),
+        )
+        assert report.already_so == {SUSPENDED: 2}
+
+    def test_a_confirmation_gives_nothing_back(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        """An account suspended and confirmed before the failure waits to be confirmed again."""
+        user = people.mm_mad
+        report = reconcile(
+            principal,
+            audit_event(SUSPENDED, user.pk),
+            audit_event(CONFIRMED, user.pk, {"credentials_changed": False}),
+        )
+        assert report.not_replayed == {CONFIRMED: 1}
+        user.refresh_from_db()
+        assert user.is_active is False
+
+    def test_credentials_that_started_over_stay_distrusted(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.tech_mad
+        assert user.has_usable_password()
+        report = reconcile(
+            principal,
+            audit_event(CONFIRMED, user.pk, {"credentials_changed": True}),
+            audit_event(CONFIRMED, new_id(), {"credentials_changed": True}),
+        )
+        assert report.replayed == {CONFIRMED: 1}
+        assert report.already_so == {CONFIRMED: 1}
+        user.refresh_from_db()
+        assert not user.has_usable_password()
+
+    def test_who_a_human_named_for_a_gap_is_audited_and_replayed(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        gone, changed = people.tech_mad, people.wo_mad
+        post_restore_reconcile(
+            principal,
+            failed_state=None,
+            gap=Gap(
+                offboarded=frozenset({gone.email}), credentials_changed=frozenset({changed.email})
+            ),
+        )
+        assert AuditEvent.objects.get(action=GAP_OFFBOARDED).object_id == gone.pk
+        assert AuditEvent.objects.get(action=GAP_CREDENTIALS).object_id == changed.pk
+        User.objects.filter(pk=gone.pk).update(is_active=True, offboarded_at=None)
+        changed.set_password(PASSWORD)
+        changed.save(update_fields=["password"])
+        report = reconcile(
+            self._again(operator),
+            audit_event(GAP_OFFBOARDED, gone.pk),
+            audit_event(GAP_CREDENTIALS, changed.pk),
+        )
+        assert report.replayed == {GAP_OFFBOARDED: 1, GAP_CREDENTIALS: 1}
+        gone.refresh_from_db()
+        changed.refresh_from_db()
+        assert gone.offboarded_at is not None
+        assert not changed.has_usable_password()
+
+    def test_the_export_carries_the_family(self) -> None:
+        sql = (ROOT / "docker_compose/gmat_m8/ops/failed-state.sql").read_text(encoding="utf-8")
+        assert "|recovery)" in sql
 
 
 class TestWithoutAFailedState:

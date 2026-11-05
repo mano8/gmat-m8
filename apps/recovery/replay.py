@@ -10,11 +10,16 @@ miss). In log order (UUIDv7), each one that took access or a credential away is 
 - email changes applied;
 - second factors reset or removed;
 - passwords changed: the old hash may be a stolen one, so the account gets an unusable
-  password and resets it after reopening.
+  password and resets it after reopening;
+- what an earlier restore did: an event it replayed, as the event it was (the original row did
+  not come back, so this is the only record of it), the accounts it suspended and those whose
+  credentials or access a human named for its gap.
 
 Everything else, the grants above all, is reported as not replayed and entered again by a
-human: a restore never gives anyone more access than the snapshot had. Direct writes under
-the caller's authorization and locks: the services' preconditions held when these happened.
+human: a restore never gives anyone more access than the snapshot had. That includes a
+confirmation of a suspended account: it comes up suspended again, to be confirmed again. Direct
+writes under the caller's authorization and locks: the services' preconditions held when these
+happened.
 """
 
 from collections import Counter
@@ -35,7 +40,10 @@ from apps.projects.models import Project, ProjectAssignment
 from apps.recovery.failed_state import AuditRow
 
 SUSPENDED_ACTION = "recovery.account_suspended"
+CONFIRMED_ACTION = "recovery.account_confirmed"
 EVENT_REPLAYED = "recovery.event_replayed"
+GAP_OFFBOARDED = "recovery.gap_offboarded"
+GAP_CREDENTIALS = "recovery.gap_credentials_reset"
 
 
 @dataclass
@@ -74,6 +82,13 @@ def suspend(replay: Replay, user: User, reason: str) -> None:
     User.objects.filter(pk=user.pk).update(is_active=False)
     record(replay.identity, SUSPENDED_ACTION, obj=user, data={"reason": reason})
     replay.suspended.append(user.email)
+
+
+def remove_credentials(user: User) -> None:
+    """What was restored is not trusted: the account resets its password and enrolls again."""
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
+    Authenticator.objects.filter(user=user).delete()
 
 
 def _revoke(model: type[Model], row: AuditRow, replay: Replay) -> bool:
@@ -202,6 +217,29 @@ def _stop_project(row: AuditRow, replay: Replay) -> bool:
     return bool(matching.update(status=change["to"], updated_at=replay.now))
 
 
+def _suspend_again(row: AuditRow, replay: Replay) -> bool:
+    user = _account(row.object_id)
+    if user is None or not user.is_active or user.offboarded_at is not None:
+        return False
+    suspend(replay, user, str(row.data.get("reason", "")))
+    return True
+
+
+def _start_over(row: AuditRow, replay: Replay) -> bool:
+    user = _account(row.object_id)
+    if user is None:
+        return False
+    remove_credentials(user)
+    return True
+
+
+def _confirmed_with_new_credentials(row: AuditRow, replay: Replay) -> bool:
+    """A confirmation gave access back, so only what it took away counts."""
+    if not row.data.get("credentials_changed"):
+        raise _NotRelevant
+    return _start_over(row, replay)
+
+
 HANDLERS: dict[str, Callable[[AuditRow, Replay], bool]] = {
     "membership.revoked": _revoke_membership,
     "membership.validity_changed": _narrow_membership,
@@ -215,7 +253,29 @@ HANDLERS: dict[str, Callable[[AuditRow, Replay], bool]] = {
     "company.updated": _deactivate_company,
     "branch.updated": _deactivate_branch,
     "project.updated": _stop_project,
+    SUSPENDED_ACTION: _suspend_again,
+    CONFIRMED_ACTION: _confirmed_with_new_credentials,
+    GAP_OFFBOARDED: _offboard,
+    GAP_CREDENTIALS: _start_over,
 }
+
+
+def original_of(row: AuditRow) -> AuditRow:
+    """The event an earlier restore replayed, as it was; any other row as it is."""
+    data = row.data
+    occurred = parse_datetime(str(data.get("occurred_at", "")))
+    if row.action != EVENT_REPLAYED or not data.get("source_event") or occurred is None:
+        return row
+    object_id = data.get("object_id")
+    return AuditRow(
+        id=UUID(str(data["source_event"])),
+        occurred_at=occurred,
+        actor_label=str(data.get("source_actor", "")),
+        action=str(data.get("source_action", "")),
+        object_type=str(data.get("object_type", "")),
+        object_id=UUID(str(object_id)) if object_id else None,
+        data=data.get("source_data") or {},
+    )
 
 
 def _apply(row: AuditRow, replay: Replay) -> None:
@@ -242,6 +302,7 @@ def _apply(row: AuditRow, replay: Replay) -> None:
             "object_type": row.object_type,
             "object_id": row.object_id,
             "occurred_at": row.occurred_at,
+            "source_data": dict(row.data),
         },
     )
 
@@ -249,5 +310,6 @@ def _apply(row: AuditRow, replay: Replay) -> None:
 def replay_events(rows: Iterable[AuditRow], replay: Replay, *, restored: set[UUID]) -> None:
     """Apply, in order, the events the restored audit table does not have (``restored``)."""
     for row in rows:
-        if row.id not in restored:
-            _apply(row, replay)
+        event = original_of(row)
+        if row.id not in restored and event.id not in restored:
+            _apply(event, replay)

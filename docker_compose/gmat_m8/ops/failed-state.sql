@@ -6,7 +6,8 @@
 --   outbox  the outcome of each message that reached a terminal status: after the restore that
 --           row takes it instead of being quarantined (F44);
 --   audit   the access and credential events; post_restore_reconcile replays the ones the
---           restored audit table lacks (apps.recovery.replay).
+--           restored audit table lacks (apps.recovery.replay). `recovery` too: what an earlier
+--           restore replayed lives only there once the original row did not come back.
 SELECT json_build_object(
     'format_version', 1,
     'exported_at', now(),
@@ -25,6 +26,6 @@ SELECT json_build_object(
                    'object_id', object_id,
                    'data', data) ORDER BY id)
         FROM public.audit_auditevent
-        WHERE action ~ '^(user|membership|project_assignment|company|branch|project|email_change|invitation)\.'
+        WHERE action ~ '^(user|membership|project_assignment|company|branch|project|email_change|invitation|recovery)\.'
     ), '[]'::json)
 );

@@ -56,7 +56,18 @@ from apps.notifications.models import DISPATCH_KINDS, EmailAttempt, EmailOutbox,
 from apps.organizations.services import lock_for_user_change
 from apps.purchasing.models import PurchaseOrder
 from apps.recovery.failed_state import FailedState, OutboxOutcome
-from apps.recovery.replay import SUSPENDED_ACTION, Replay, offboard, replay_events, suspend
+from apps.recovery.replay import (
+    CONFIRMED_ACTION,
+    GAP_CREDENTIALS,
+    GAP_OFFBOARDED,
+    SUSPENDED_ACTION,
+    Replay,
+    offboard,
+    original_of,
+    remove_credentials,
+    replay_events,
+    suspend,
+)
 
 REASON_RESTORE = "database restored"
 UNSETTLED = (Status.QUEUED, Status.SENDING, Status.FAILED, Status.AMBIGUOUS)
@@ -169,7 +180,7 @@ def _quarantine(report: Report, now: datetime) -> None:
 
 
 def _replay(report: Report, state: FailedState, replay: Replay) -> None:
-    ids = [row.id for row in state.audit]
+    ids = {row.id for row in state.audit} | {original_of(row).id for row in state.audit}
     restored = set(AuditEvent.objects.filter(pk__in=ids).values_list("pk", flat=True))
     replay_events(state.audit, replay, restored=restored)
     report.replayed = dict(replay.applied)
@@ -191,19 +202,16 @@ def _accounts(addresses: frozenset[str]) -> list[User]:
     return found
 
 
-def _remove_credentials(user: User) -> None:
-    user.set_unusable_password()
-    user.save(update_fields=["password"])
-    Authenticator.objects.filter(user=user).delete()
-
-
 def _apply_gap(report: Report, gap: Gap, replay: Replay) -> None:
+    """Who a human named, each in the audit trail: a later restore replays them from there."""
     gone = _accounts(gap.offboarded)
     changed = _accounts(gap.credentials_changed)
     for user in gone:
         offboard(user, when=replay.now, actor=replay.actor, now=replay.now)
+        record(replay.identity, GAP_OFFBOARDED, obj=user)
     for user in changed:
-        _remove_credentials(user)
+        remove_credentials(user)
+        record(replay.identity, GAP_CREDENTIALS, obj=user)
     report.gap_offboarded, report.gap_credentials_reset = len(gone), len(changed)
     for user in privileged_accounts().exclude(pk=replay.actor.pk).order_by("email"):
         suspend(replay, user, NO_STATE_REASON)
@@ -278,11 +286,11 @@ def confirm_suspended_account(
     lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
     user = _suspended(user_id)
     if credentials_changed:
-        _remove_credentials(user)
+        remove_credentials(user)
     User.objects.filter(pk=user.pk).update(is_active=True)
     record(
         principal.audit_identity,
-        "recovery.account_confirmed",
+        CONFIRMED_ACTION,
         obj=user,
         data={"credentials_changed": credentials_changed},
     )
