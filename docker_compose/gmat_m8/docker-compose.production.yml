@@ -1,8 +1,8 @@
 # Production overlay (human, on the VPS): a real domain with ACME, ports 80 and 443 only, and
 # both images pulled BY DIGEST from GHCR (never built here). The digests come from the signed
-# release manifest that `deploy.sh` (M8.4) verifies before it writes them to .env.
+# release manifest that `deploy.sh` verifies before it writes them to .env.
 #
-#   docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --wait
+#   ./deploy.sh X.Y.Z       # the supported way to run it (plan §9)
 #
 # Needs in .env: APP_DOMAIN (a public name), ACME_EMAIL, APP_DIGEST, BACKUP_DIGEST, and
 # app.env copied from app.env.production.example.

@@ -2,7 +2,9 @@
 # Backup of the gmat-m8 database (plan §9, "Backups and recovery points").
 #
 #   backup.sh daemon                 run the scheduler (the container's default command)
-#   backup.sh run [--label LABEL]    one backup now        (also: backup-now [--label LABEL])
+#   backup.sh run [--label LABEL] [--wait SECONDS]
+#                                    one backup now        (also: backup-now [--label LABEL])
+#                                    --wait: queue behind a backup in progress (a deploy does)
 #
 # One run:
 #   1. a psql session takes the advisory lock `gmat:media-backup`, opens a REPEATABLE READ
@@ -22,7 +24,7 @@ umask 077
 . "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/common.sh"
 
 usage() {
-    echo "usage: backup.sh {daemon|run [--label LABEL]|backup-now [--label LABEL]}" >&2
+    echo "usage: backup.sh {daemon|run [--label LABEL] [--wait SECONDS]|backup-now [--label LABEL]}" >&2
     exit 64
 }
 
@@ -47,12 +49,18 @@ cleanup() {
 
 run_backup() {
     require_env PGHOST PGDATABASE PGUSER PGPASSWORD
-    local label=""
+    local label="" wait=0
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --label)
                 [ "$#" -ge 2 ] || usage
                 label="$2"
+                shift 2
+                ;;
+            --wait)
+                [ "$#" -ge 2 ] || usage
+                [[ "$2" =~ ^[0-9]+$ ]] || usage
+                wait="$2"
                 shift 2
                 ;;
             *) usage ;;
@@ -79,7 +87,7 @@ run_backup() {
     fi
     # Two backups never overlap (cron against a pre-deploy run).
     exec 9>"$BACKUP_DIR/.backup.lock"
-    flock -n 9 || die "another backup is already running"
+    flock -w "$wait" 9 || die "another backup is already running"
 
     PARTIAL_FILES="$dump.partial $manifest.partial $media.partial"
     trap cleanup EXIT
