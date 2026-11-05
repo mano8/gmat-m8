@@ -12,9 +12,9 @@ It takes about 15 minutes once the images are cached and leaves only Docker's bu
 
 | | |
 | --- | --- |
-| Commit | `0b46f21` on `m8-hardening` |
+| Commit | `1e35ccf` on `m8-hardening` |
 | Date | 2026-11-05 |
-| Result | **37 passed in 13 min 38 s**; 38 checks of the drill script passed, none failed |
+| Result | **37 passed in 14 min 10 s**; 38 checks of the drill script passed, none failed. `tests/live` against the rebuilt local stack: 29 passed |
 | Machine | Linux, 2 cores, 16 GB, Docker 29.9.3, Compose 5.7.0 |
 | restic | 0.18.1, in the backup image |
 
@@ -38,7 +38,7 @@ Each row of the plan's list, with what the run showed.
 
 | Plan M8.4 | Shown |
 | --- | --- |
-| vN → vN+1 | First deploy from an empty database (gate window 32 s), then 1.0.0 → 1.1.0 with a migration (22 s), inside the 1–3 minute target of Q21. A real database, larger dumps and a slower VPS will take longer. Dump recorded, its offsite copy listed, new digests running, worker processing |
+| vN → vN+1 | First deploy from an empty database (gate window 35 s), then 1.0.0 → 1.1.0 with a migration (26 s), inside the 1–3 minute target of Q21. A real database, larger dumps and a slower VPS will take longer. Dump recorded, its offsite copy listed, new digests running, worker processing |
 | Forced smoke failure after migrate | A release whose `/readyz/` fails but whose `/healthz/` answers, so only `verify-internal` can notice. It stops at step 9 with both gates on. For 100 s, past the moment a queued notification fell due: GET and POST answer the 503 page, the worker's heartbeat stays `paused`, Mailpit receives nothing, no audit row or attempt is added. `recover.sh migrate-back` starts the previous digests with the schema back; the held message is then delivered |
 | Forced migration failure | A migration that fails after another that succeeded: stops at step 7. `recover.sh migrate-back`: audit count, newest audit event, attempts, users and materials all identical |
 | Other rows of the decision tree | Failed at step 6: `recover.sh rollback`, no migration ran. A release flagged irreversible: the deploy asks for the version, `migrate-back` refuses, `restore-predeploy` brings every row back. Old code on the new schema: `rollback-images` starts the previous digests |
@@ -59,13 +59,14 @@ The migration reversibility check the step also names was already in CI's `test`
 
 ## What the rehearsal found
 
-Each was fixed before this record, and the fakes in `tests/unit/docker` could not have shown any of them:
+Each was fixed before this record, and the fakes in `tests/unit/docker` could not have shown them:
 
 - **BusyBox `flock` has no `-w`**: `backup-now --wait` failed in the Alpine image, so every deploy stopped at step 6.
 - **A form post behind the gate got 405, not the maintenance page**: Caddy's file server answers only GET and HEAD. Nothing reached Django, but plan §9 promises the page for every request. Fixed for the gate and for the fallback page, and pinned in `tests/live`.
 - **restic exits 0 when a server refuses a removal.** The prune script would have printed "Pruned." with append-only credentials; it now lists the repository again.
 - **`--keep-within` is not measured from the newest snapshot**, as this tooling's first draft assumed: restic 0.18.1 measures from now. The real attack is the one plan §9 describes, on the weekly and monthly rules, and the rehearsal now demonstrates it.
 - **restic retries an unreachable repository for about 15 minutes**, which step 6 would have spent with the site closed. `deploy.sh` now asks the repository before the gates.
+- **A changed Caddyfile did not apply**: it is a bind mount, so `docker compose up` sees nothing new and Caddy keeps the old configuration. `tests/live` showed it. A deploy now restarts Caddy behind the gates and confirms the 503 again.
 - **On a host short of memory one `docker compose exec` took 20 minutes** (load average 150, swap full), which used up a 90-second wait and closed the gates on a healthy deploy. Each wait now bounds its calls and allows a minimum number of tries. A VPS of 2 vCPU and 4 GB could meet the same; watch for it.
 
 And from the tests against fakes, before the first real run: inside `cmd || die` bash ignores `set -e`, so a failed step in a function was passed over, and an unreadable migration head could have migrated every app back to zero.
