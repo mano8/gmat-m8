@@ -36,6 +36,14 @@ GOOD_DEPLOY: dict[str, Any] = {
 }
 
 
+def _relay(**options: Any) -> dict[str, dict[str, Any]]:
+    """The worker's mailer with these SMTP options."""
+    return {
+        **GOOD_MAILERS,
+        "outbound": {"BACKEND": checks.SMTP_BACKEND, "OPTIONS": {"timeout": 10, **options}},
+    }
+
+
 def ids(messages: list[Any]) -> set[str]:
     return {message.id for message in messages}
 
@@ -197,6 +205,9 @@ class TestDeploymentChecks:
             ),
             ({"OUTBOX_SEND_DEADLINE": 10}, "gmat.E019"),
             ({"OUTBOX_ABANDON_GRACE": 5}, "gmat.E019"),
+            ({"MAILERS": _relay(username="relay-user")}, "gmat.E021"),
+            ({"MAILERS": _relay(password="relay-password")}, "gmat.E021"),
+            ({"MAILERS": _relay(username="relay-user", use_tls=False, use_ssl=False)}, "gmat.E021"),
         ],
     )
     def test_unsafe_production_values_are_refused(
@@ -204,3 +215,20 @@ class TestDeploymentChecks:
     ) -> None:
         with override_settings(**{**GOOD_DEPLOY, **override}):
             assert error in ids(checks.check_deployment(None))
+
+
+class TestRelay:
+    """M8.3, X13: credentials never cross the network in clear."""
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {},  # a local sink: no credentials to protect
+            {"use_tls": False, "use_ssl": False},
+            {"username": "relay-user", "password": "relay-password", "use_tls": True},
+            {"username": "relay-user", "password": "relay-password", "use_ssl": True},
+        ],
+    )
+    def test_what_is_allowed(self, options: dict[str, Any]) -> None:
+        with override_settings(**{**GOOD_DEPLOY, "MAILERS": _relay(**options)}):
+            assert "gmat.E021" not in ids(checks.check_deployment(None))

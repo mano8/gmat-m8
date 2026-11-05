@@ -248,6 +248,21 @@ def _outbound_errors() -> list[CheckMessage]:
     return [Error(problem, id="gmat.E019") for problem in problems]
 
 
+def _relay_errors() -> list[CheckMessage]:
+    """Credentials never cross the network in clear (M8.3, X13). The password reaches only
+    the worker container, so the user name counts too: ``web`` and ``migrate`` see it."""
+    options = getattr(settings, "MAILERS", {}).get("outbound", {}).get("OPTIONS", {})
+    has_credentials = options.get("username") or options.get("password")
+    if has_credentials and not (options.get("use_tls") or options.get("use_ssl")):
+        return [
+            Error(
+                "An SMTP relay with credentials needs TLS: set EMAIL_USE_TLS or EMAIL_USE_SSL",
+                id="gmat.E021",
+            )
+        ]
+    return []
+
+
 @register(deploy=True)
 def check_deployment(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
     return [
@@ -256,4 +271,5 @@ def check_deployment(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
         *_cookie_errors(),
         *_hasher_and_mail_errors(),
         *_outbound_errors(),
+        *_relay_errors(),
     ]
