@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.utils import translation
 
 from apps.access.exceptions import AccessDenied
 from apps.access.roles import Role
@@ -28,8 +29,9 @@ pytestmark = pytest.mark.django_db
 
 
 def run(name: str, *args: Any, stdin: str | None = None) -> str:
+    """The command in English: its refusals are read below, and the active language decides."""
     out = io.StringIO()
-    with patch("sys.stdin", io.StringIO(stdin or "")):
+    with patch("sys.stdin", io.StringIO(stdin or "")), translation.override("en"):
         call_command(name, *map(str, args), stdout=out)
     return out.getvalue()
 

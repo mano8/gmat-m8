@@ -435,3 +435,11 @@ def test_image_scan_closes_the_issue_only_after_a_complete_clean_run() -> None:
     assert '[ "$SCAN_RESULT" = "success" ]' in step["run"]
     assert "gh issue close" in step["run"]
     assert step["run"].index("gh issue create") < step["run"].index("gh issue close")
+
+
+def test_the_test_job_proves_every_migration_reverses() -> None:
+    """To zero and back passes through any earlier head, which ``recover.sh migrate-back`` needs
+    (plan §9, M8.4)."""
+    workflow = _load(ROOT / ".github" / "workflows" / "ci.yaml")
+    runs = [step.get("run", "") for step in workflow["jobs"]["test"]["steps"]]
+    assert any("scripts/check_migrations_reversible.py" in run for run in runs)

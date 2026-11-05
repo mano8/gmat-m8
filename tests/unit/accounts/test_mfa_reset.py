@@ -8,6 +8,7 @@ from allauth.mfa.models import Authenticator
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.utils import translation
 
 from apps.access.exceptions import AccessDenied
 from apps.access.roles import Role
@@ -109,7 +110,7 @@ class TestCommand:
         self, people: People, lost: User, operator: str, email: str, reason: str, message: str
     ) -> None:
         args = ["--operator", getattr(people, operator).email, "--email", email, "--reason", reason]
-        with pytest.raises(CommandError, match=message):
+        with translation.override("en"), pytest.raises(CommandError, match=message):
             call_command("reset_mfa", *args)
         assert Authenticator.objects.filter(user=lost).count() == 2
 

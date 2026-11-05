@@ -83,7 +83,7 @@ class TestOthers:
     def test_the_message_appears_after_the_login(self, make_user: Callable[..., User]) -> None:
         user = make_user("plain@example.org")
         owes(user)
-        client = Client()
+        client = Client(headers={"accept-language": "en"})
         response = password_login(client, user.email, PASSWORD, follow=True)
         texts = [str(message) for message in get_messages(response.wsgi_request)]
         rendered = response.content.decode()
