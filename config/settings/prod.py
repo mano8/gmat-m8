@@ -47,7 +47,12 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = env_int("DJANGO_HSTS_SECONDS", 31536000, minimum=0)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = env_bool("DJANGO_HSTS_PRELOAD", True)
+# Preloading is the maintainer's decision once the domain is validated (plan §5): until then
+# the header carries no `preload`, and Django's deploy warning about it (security.W021, a
+# failure under `check --deploy --fail-level WARNING`) is silenced. Exception register in
+# docs/security.md.
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_HSTS_PRELOAD", False)
+SILENCED_SYSTEM_CHECKS = [] if SECURE_HSTS_PRELOAD else ["security.W021"]
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 

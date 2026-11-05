@@ -6,7 +6,7 @@ from collections.abc import Iterator
 
 import pytest
 from cryptography.fernet import Fernet
-from django.core.checks import run_checks
+from django.core.checks import CheckMessage, run_checks
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
@@ -47,6 +47,7 @@ def load_prod(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
             *SMTP_ENV,
             "DJANGO_DEBUG",
             "DJANGO_HSTS_SECONDS",
+            "DJANGO_HSTS_PRELOAD",
             "DJANGO_ADMIN_URL_PATH",
         ]
         for name in unset:
@@ -104,11 +105,33 @@ def test_admin_url_path_is_configurable_and_defaults_to_admin(load_prod) -> None
     assert load_prod(DJANGO_ADMIN_URL_PATH="ops-x7_k").ADMIN_URL_PATH == "ops-x7_k"
 
 
-def test_good_production_environment_passes_deploy_checks(load_prod) -> None:  # type: ignore[no-untyped-def]
-    prod = load_prod()
+def _deploy_messages(prod: object) -> list[CheckMessage]:
+    """The deploy checks under ``prod``, as `check --deploy` sees them (silenced ones kept)."""
     names = [name for name in dir(prod) if name.isupper() and name != "DATABASES"]
     with override_settings(**{name: getattr(prod, name) for name in names}):
-        assert run_checks(include_deployment_checks=True, databases=[]) == []
+        return run_checks(include_deployment_checks=True, databases=[])
+
+
+def test_good_production_environment_passes_deploy_checks(load_prod) -> None:  # type: ignore[no-untyped-def]
+    prod = load_prod()
+    visible = [m for m in _deploy_messages(prod) if m.id not in prod.SILENCED_SYSTEM_CHECKS]
+    assert visible == []
+
+
+def test_hsts_preload_is_off_until_the_maintainer_turns_it_on(load_prod) -> None:  # type: ignore[no-untyped-def]
+    prod = load_prod()
+    assert prod.SECURE_HSTS_PRELOAD is False
+    assert prod.SECURE_HSTS_INCLUDE_SUBDOMAINS is True
+    # Only Django's "preload is off" warning is silenced, and only while it is off.
+    assert prod.SILENCED_SYSTEM_CHECKS == ["security.W021"]
+    assert {m.id for m in _deploy_messages(prod)} == {"security.W021"}
+
+
+def test_hsts_preload_on_silences_nothing(load_prod) -> None:  # type: ignore[no-untyped-def]
+    prod = load_prod(DJANGO_HSTS_PRELOAD="true")
+    assert prod.SECURE_HSTS_PRELOAD is True
+    assert prod.SILENCED_SYSTEM_CHECKS == []
+    assert _deploy_messages(prod) == []
 
 
 def test_health_endpoints_are_exempt_from_the_https_redirect(load_prod) -> None:  # type: ignore[no-untyped-def]
