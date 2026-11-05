@@ -81,6 +81,12 @@ class TestASuccessfulDeploy:
             "WORKER_EXPECT_STATE=running,outbound-off",
         )
 
+    def test_a_changed_caddyfile_applies_behind_the_gates(self, ready: World) -> None:
+        ready.run("deploy.sh", VERSION)
+        log = ready.docker_log()
+        in_order(log, "stop web worker", "restart caddy", "backup run --wait")
+        assert log[position(log, "restart caddy")].startswith("MW ")
+
     def test_records_the_version_both_digests_and_the_dump(self, ready: World) -> None:
         ready.run("deploy.sh", VERSION)
         row = ready.deployed()[-1]

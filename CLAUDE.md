@@ -103,7 +103,7 @@ uv run python manage.py import_catalog|import_suppliers|import_projects <file.cs
 uv run python manage.py reset_mfa --operator <admin email> --email <account> --reason "…"   # M8.3: remove a lost second factor, end the sessions (audited; org.manage)
 uv run python manage.py outbox_quarantine --operator <email> list|release-notifications|discard-notifications|confirm-dispatch|release-dispatch|discard-dispatch [id] [--note …]   # M8.4: what a restore held back (notifications in bulk, dispatches one by one)
 uv run python manage.py confirm_account --operator <email> --list | --email <account> [--credentials-changed]   # M8.4: accounts a restore without a failed database suspended
-REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s   # M8.4: deploy.sh, recover.sh, the drill and the offsite rules against real containers in throwaway projects; about 30 minutes; REHEARSAL_KEEP=1 leaves them, REHEARSAL_DIR chooses where. Skips without REHEARSAL_REQUIRED=1
+REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s   # M8.4: deploy.sh, recover.sh, the drill and the offsite rules against real containers in throwaway projects; about 15 minutes; REHEARSAL_KEEP=1 leaves them, REHEARSAL_DIR chooses where. Skips without REHEARSAL_REQUIRED=1
 python scripts/offsite_prune.py [--dry-run]   # M8.4: the maintainer's machine only, with the delete-capable restic credentials; refuses forged snapshots
 uv run python manage.py seed_demo --operator <email> [--password …]   # M3.4: dev/test settings only; the A/B/C organization, people, projects, ~200 materials, 5 suppliers
 

@@ -12,7 +12,7 @@
 #   3  preflight           with the new image, read-only: migrate-plan, check --deploy, the offsite
 #                          repository answers; a flagged irreversible migration needs typing the version
 #   4  gates on            flags/maintenance.on + flags/worker.paused; 503 confirmed from outside
-#   5  stop the writers    web and worker
+#   5  stop the writers    web and worker; what the release changed in db or Caddy applies now
 #   6  pre-deploy backup   dump + manifest + offsite copy; the dump id is recorded
 #   7  migrate             with the new image, as the owner role
 #   8  start               web, worker, backup on the new digests; traffic gated, worker paused
@@ -224,8 +224,11 @@ main() {
 
     step 5 "stopping the writers"
     stop_writers
-    # A changed database or Caddy image in this release applies here, behind the gates.
+    # What this release changed in the database or Caddy applies here, behind the gates. The
+    # Caddyfile is a bind mount: only a restart reads it, and `up` does not see it changed.
     compose up -d --no-deps --wait db caddy
+    compose restart caddy
+    wait_public_status 503 /healthz/ 120 || die "the gate does not answer 503 after Caddy's restart"
 
     step 6 "pre-deploy backup"
     backup_before_migrating
