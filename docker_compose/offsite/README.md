@@ -54,4 +54,6 @@ python scripts/offsite_prune.py --dry-run
 python scripts/offsite_prune.py
 ```
 
-`scripts/offsite_prune.py` needs `restic` on PATH and only the Python standard library. It refuses to run if any snapshot has an unexpected host or tag, a timestamp in the future or an abnormal count per day: such snapshots are investigated, never pruned around. restic measures `--keep-within` from the **newest snapshot**, so one forged future timestamp would push every real snapshot out of the window; this check is what stops that. The script then keeps every snapshot of the last 90 days plus 4 weekly and 12 monthly ones, checks restic's plan against that window, and forgets exactly the snapshots it checked.
+`scripts/offsite_prune.py` needs `restic` on PATH and only the Python standard library. It refuses to run if any snapshot has an unexpected host or tag, a timestamp in the future or an abnormal count per day: such snapshots are investigated, never pruned around. Forged snapshots can fill the weekly and monthly rules, so that an older real snapshot loses its place and goes at the next prune; `--keep-within` only protects the last 90 days. The script then keeps every snapshot of the last 90 days plus 4 weekly and 12 monthly ones, checks restic's plan against that window, forgets exactly the snapshots it checked, and lists the repository again: restic exits 0 even when a server refuses the removal.
+
+To see that the VPS's credentials cannot delete, look at the 403 and at the listing, not at the exit code, for the same reason.

@@ -7,11 +7,11 @@ of the policy at the next prune. Hence, before any prune, this script lists the 
 **refuses to run** if one has an unexpected host or tag, a timestamp in the future, or an
 abnormal count per day. Such snapshots are investigated, never pruned around.
 
-restic measures ``--keep-within`` from the newest snapshot, not from today, so a single forged
-future timestamp would put every real snapshot outside the window. The refusal is what closes
-that; as a second line, restic's plan is checked against the window measured from the local
-clock, and the prune names exactly the snapshots that were checked, so one appended in between
-is never touched.
+The attack this stops: forged snapshots fill the weekly and monthly rules, so an older real one
+loses its place and goes at the next prune. ``--keep-within`` protects what is inside the window
+whatever was added, not what is beyond it. As a second line, restic's plan is checked against
+the window measured from the local clock, whatever restic version the maintainer has, and the
+prune names exactly the snapshots that were checked, so one appended in between is never touched.
 
 Needs ``restic`` on PATH and the delete-capable credentials in the environment
 (``RESTIC_REPOSITORY``, ``RESTIC_PASSWORD``, and ``RESTIC_REST_*`` or ``AWS_*``), which never
@@ -150,30 +150,44 @@ def run_restic(arguments: list[str]) -> str:
     return result.stdout
 
 
+def _refused(title: str, lines: Iterable[str]) -> int:
+    print(f"REFUSED: {title}")
+    for line in lines:
+        print(f"  {line}")
+    return 2
+
+
+def _forget(run: Runner, removals: list[Snapshot]) -> None:
+    """Forget exactly what was checked. restic exits 0 when the server refused the removal
+    (append-only credentials): only the listing says what really happened."""
+    run(["forget", "--prune", *[item.id for item in removals]])
+    left = {item.id for item in parse_snapshots(run(["snapshots", "--json"]))}
+    if left & {item.id for item in removals}:
+        raise ResticFailed(
+            "the snapshots are still listed: are these the delete-capable credentials?"
+        )
+    print("Pruned.")
+
+
 def prune(
     run: Runner, now: datetime.datetime, *, dry_run: bool, max_per_day: int = MAX_PER_DAY
 ) -> int:
     snapshots = parse_snapshots(run(["snapshots", "--json"]))
     problems = anomalies(snapshots, now, max_per_day=max_per_day)
     if problems:
-        print("REFUSED: investigate these snapshots; they are never pruned around.")
-        for problem in problems:
-            print(f"  {problem}")
-        return 2
+        return _refused("investigate these snapshots; they are never pruned around.", problems)
     removals = planned_removals(run(["forget", "--dry-run", "--json", *policy_arguments()]))
     protected = inside_the_window(removals, now)
     if protected:
-        print(f"REFUSED: restic's plan removes {len(protected)} snapshot(s) of the last 90 days:")
-        for item in protected:
-            print(f"  {item.short} {item.time.isoformat()}")
-        return 2
+        return _refused(
+            f"restic's plan removes {len(protected)} snapshot(s) of the last 90 days:",
+            [f"{item.short} {item.time.isoformat()}" for item in protected],
+        )
     print(f"{len(snapshots)} snapshots, {len(removals)} to remove.")
     for item in removals:
         print(f"  {item.short} {item.time.isoformat()}")
-    if dry_run or not removals:
-        return 0
-    run(["forget", "--prune", *[item.id for item in removals]])
-    print("Pruned.")
+    if removals and not dry_run:
+        _forget(run, removals)
     return 0
 
 

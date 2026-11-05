@@ -1,14 +1,30 @@
 """The maintainer's prune: forged snapshots stop it (plan §9, F61, F72)."""
 
 import datetime
+import importlib.util
 import json
+import sys
 from collections.abc import Callable
+from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
 
-from scripts import offsite_prune as prune
+PATH = Path(__file__).resolve().parents[3] / "scripts" / "offsite_prune.py"
 
+
+def _load() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("offsite_prune", PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    # Its dataclasses look their module up while they are defined.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+prune = _load()
 NOW = datetime.datetime(2026, 11, 5, 12, 0, tzinfo=datetime.UTC)
 
 
@@ -30,11 +46,22 @@ def snapshot(
 
 
 class Fake:
-    """restic with a repository of ``snapshots``, and a plan for ``forget --dry-run``."""
+    """restic with a repository of ``snapshots``, and a plan for ``forget --dry-run``.
 
-    def __init__(self, snapshots: list[dict[str, Any]], remove: list[dict[str, Any]] | None = None):
+    ``forget --prune`` removes what it names, unless ``append_only``: then, like the real thing
+    behind an append-only server, it removes nothing and still exits 0.
+    """
+
+    def __init__(
+        self,
+        snapshots: list[dict[str, Any]],
+        remove: list[dict[str, Any]] | None = None,
+        *,
+        append_only: bool = False,
+    ):
         self.snapshots = snapshots
         self.remove = remove or []
+        self.append_only = append_only
         self.calls: list[list[str]] = []
 
     def __call__(self, arguments: list[str]) -> str:
@@ -43,6 +70,8 @@ class Fake:
             return json.dumps(self.snapshots)
         if "--dry-run" in arguments:
             return json.dumps([{"keep": self.snapshots, "remove": self.remove}])
+        if not self.append_only:
+            self.snapshots = [item for item in self.snapshots if item["id"] not in arguments]
         return ""
 
     @property
@@ -51,7 +80,8 @@ class Fake:
 
 
 def run(fake: Fake, **kwargs: Any) -> int:
-    return prune.prune(fake, NOW, dry_run=kwargs.pop("dry_run", False), **kwargs)
+    result: int = prune.prune(fake, NOW, dry_run=kwargs.pop("dry_run", False), **kwargs)
+    return result
 
 
 class TestForged:
@@ -99,6 +129,13 @@ class TestThePlan:
         fake = Fake([snapshot(1), old], remove=[old])
         assert run(fake) == 0
         assert fake.forgot == [["forget", "--prune", "b" * 64]]
+
+    def test_a_prune_that_removed_nothing_is_not_called_a_success(self) -> None:
+        """restic exits 0 when an append-only server refuses: the listing decides."""
+        old = snapshot(200, id_="b" * 64)
+        fake = Fake([snapshot(1), old], remove=[old], append_only=True)
+        with pytest.raises(prune.ResticFailed, match="delete-capable"):
+            run(fake)
 
     def test_a_dry_run_forgets_nothing(self) -> None:
         old = snapshot(200)
