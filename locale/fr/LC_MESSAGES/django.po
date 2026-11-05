@@ -5859,3 +5859,24 @@ msgstr "%(shown)s affichés"
 
 msgid "Not revoked"
 msgstr "Non révoqué"
+
+#: apps/accounts/signals.py
+msgid "Your recovery codes stopped working after a restore. Generate a new set."
+msgstr "Vos codes de récupération ne fonctionnent plus après une restauration. Générez-en un nouveau jeu."
+
+#: apps/purchasing/services/dispatches.py
+msgid "Only a quarantined dispatch can be discarded."
+msgstr "Seul un envoi en quarantaine peut être écarté."
+
+#: apps/recovery/services.py
+#, python-format
+msgid "These addresses are not accounts of the restored database: %(addresses)s"
+msgstr "Ces adresses ne sont pas des comptes de la base de données restaurée : %(addresses)s"
+
+#: apps/recovery/services.py
+msgid "A preserved database says what happened: there is no gap to list."
+msgstr "La base de données conservée indique déjà ce qui s'est passé : il n'y a aucun intervalle à détailler."
+
+#: apps/recovery/services.py
+msgid "This account is not suspended."
+msgstr "Ce compte n'est pas suspendu."
