@@ -49,6 +49,7 @@ from apps.core import events
 from apps.core.db import db_clock, db_now
 from apps.core.idempotency import execute_once
 from apps.core.locking import LockMode, LockOrder, LockSetChanged, transactional
+from apps.notifications.eligibility import ACCOUNT_ACTIVE
 from apps.notifications.outbox import expire_security_email, queue_security_email
 from apps.organizations.grants import check_membership_target, elevate_privilege
 from apps.organizations.models import Branch, Company, Membership
@@ -63,6 +64,7 @@ EMAIL_CHANGE_CANCELLABLE = "email_change.cancellable"
 INVITATION_MAIL = "invitation"
 EMAIL_CHANGE_CONFIRM_MAIL = "email_change.confirm"
 EMAIL_CHANGE_NOTICE_MAIL = "email_change.cancel"
+MFA_RESET_MAIL = "mfa_reset"
 
 REASON_RESENT = "resent"
 REASON_REPLACED = "replaced"
@@ -629,7 +631,8 @@ def reset_user_mfa(principal: Principal, user_id: UUID, *, reason: str) -> User:
 
     An administrator's action (``org.manage``; a superuser for a staff account), audited with
     its reason. Every session of the account ends, and its next sign-in enrolls a new factor
-    where its roles need one. Nobody resets their own factors this way.
+    where its roles need one. The account's owner is told, as for a change they make
+    themselves. Nobody resets their own factors this way.
     """
     actor = _lock_and_authorize(principal, user_id)
     if actor.pk == user_id:
@@ -640,6 +643,14 @@ def reset_user_mfa(principal: Principal, user_id: UUID, *, reason: str) -> User:
     user = User.objects.get(pk=user_id)
     removed = sorted(Authenticator.objects.filter(user=user).values_list("type", flat=True))
     reset_mfa(user)
+    queue_security_email(
+        address=user.email,
+        target=user,
+        rule=ACCOUNT_ACTIVE,
+        subject=_subject(gettext("Your second factors were removed")),
+        body=render_to_string("accounts/email/mfa_reset_notice.txt"),
+        source_ref=MFA_RESET_MAIL,
+    )
     record(
         principal.audit_identity,
         "user.mfa_reset",

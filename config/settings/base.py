@@ -160,6 +160,9 @@ ACCOUNT_PASSWORD_RESET_BY_CODE_ENABLED = False
 ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
 ACCOUNT_EMAIL_SUBJECT_PREFIX = "[gmat-m8] "
+# A password or second factor that changes tells its owner, through the outbox, sealed like any
+# account mail (M8.3).
+ACCOUNT_EMAIL_NOTIFICATIONS = True
 ACCOUNT_RATE_LIMITS = {
     "change_password": "5/m/user",  # nosec B105
     "reset_password": "20/m/ip,5/m/key",  # nosec B105

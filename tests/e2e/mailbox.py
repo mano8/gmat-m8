@@ -33,19 +33,32 @@ class Mailbox:
         return list(self._get("/messages?limit=500")["messages"])
 
     def wait_for(
-        self, recipient: str, *, ignore: set[str] | None = None, timeout: float = 90.0
+        self,
+        recipient: str,
+        *,
+        ignore: set[str] | None = None,
+        containing: str = "",
+        timeout: float = 90.0,
     ) -> dict[str, Any]:
         """A message to ``recipient`` that is not in ``ignore`` (ids), once the worker has
-        delivered it; its id joins ``ignore``, so the next call waits for the next message."""
+        delivered it; its id joins ``ignore``, so the next call waits for the next message.
+
+        ``containing`` waits for the one with this text. An account also gets notices of its
+        password and second-factor changes (M8.3), so "the next message to this address" may
+        not be the link a test is after; a notice skipped here stays available to a later call.
+        """
         known = ignore if ignore is not None else set()
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             for message in self.messages():
                 if message["ID"] in known:
                     continue
-                if any(to["Address"] == recipient for to in message.get("To") or []):
+                if not any(to["Address"] == recipient for to in message.get("To") or []):
+                    continue
+                full = dict(self._get(f"/message/{message['ID']}"))
+                if containing in full["Text"]:
                     known.add(message["ID"])
-                    return dict(self._get(f"/message/{message['ID']}"))
+                    return full
             time.sleep(2)
         raise AssertionError(f"no message to {recipient} reached the mail sink in {timeout:.0f}s")
 

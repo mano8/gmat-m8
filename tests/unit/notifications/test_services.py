@@ -560,6 +560,7 @@ class TestHousekeeping:
             "security_cache": 1,
             "sensitive_bodies": 2,
             "email_changes": 0,  # apps.accounts (M2.6)
+            "sessions": 0,  # apps.accounts (M8.3)
             "attachment_reservations": 0,  # apps.attachments (M6.4)
             "attachment_media": 0,
         }

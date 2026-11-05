@@ -76,7 +76,7 @@ def test_secrets_never_reach_a_log_or_a_referer(
     # Invitation: the link leaves the address bar at once; the person sets a password and signs in.
     person = browsing.anonymous()
     traffic = Traffic(person.context)
-    link = mailbox.link(mailbox.wait_for(address, ignore=seen), "/invite/")
+    link = mailbox.link(mailbox.wait_for(address, ignore=seen, containing="/invite/"), "/invite/")
     secrets += tokens_of(link)
     person.goto(link)
     expect(person).to_have_url(re.compile(r"/invite/accept/$"))
@@ -100,13 +100,17 @@ def test_secrets_never_reach_a_log_or_a_referer(
     person.goto("/accounts/password/reset/")
     person.fill("input[name=email]", address)
     person.click("main form button[type=submit]")
-    reset = mailbox.link(mailbox.wait_for(address, ignore=seen), "/password/reset/key/")
+    key_path = "/password/reset/key/"
+    reset = mailbox.link(mailbox.wait_for(address, ignore=seen, containing=key_path), key_path)
     secrets += tokens_of(reset, after_user=True)
     person.goto(reset)
     person.fill("#id_password1", new_password)
     person.fill("#id_password2", new_password)
     person.click("main form button[type=submit]")
     person.wait_for_url(re.compile(r"/(done|login)/"))
+    # The owner is told that the password changed (M8.3); a notice holds no link to use.
+    notice = mailbox.wait_for(address, ignore=seen)
+    assert key_path not in notice["Text"]
     pages.back(person)
     pages.forward(person)
     sign_in(person, address, new_password)
@@ -116,7 +120,10 @@ def test_secrets_never_reach_a_log_or_a_referer(
     admin.get_by_role("link", name=address).click()
     admin.fill("#id_new_email", new_address)
     admin.get_by_role("button", name="Change").click()
-    change = mailbox.link(mailbox.wait_for(new_address, ignore=seen), "/account/email-change/")
+    change_path = "/account/email-change/"
+    change = mailbox.link(
+        mailbox.wait_for(new_address, ignore=seen, containing=change_path), change_path
+    )
     secrets += tokens_of(change)
     confirmer = browsing.anonymous()
     traffic_2 = Traffic(confirmer.context)
