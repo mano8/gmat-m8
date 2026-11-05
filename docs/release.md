@@ -23,7 +23,11 @@ Nothing is signed or released unless every earlier step passed. Only the digests
 
 ## Release procedure (maintainer)
 
-1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Say there whether a migration is irreversible or needs a confirmation at deploy time. Merge it with the usual review and required checks.
+1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Two statements have a line of their own, which the deploy tooling reads:
+   - `Irreversible migration: <what>` makes `deploy.sh` ask for the version to be typed, and `recover.sh migrate-back` refuse: going back then means restoring the pre-deploy dump.
+   - `Old code works on the new schema: <why>` is the only thing that lets `recover.sh rollback-images` start the previous images after the commit point.
+
+   Merge it with the usual review and required checks.
 2. **Wait for `main`.** `ci.yaml`, `compose-smoke.yaml` and `e2e.yaml` run on the merge commit. Rehearse the gate on it without tagging anything (needs an authenticated `gh`):
 
    ```bash
@@ -41,7 +45,7 @@ Nothing is signed or released unless every earlier step passed. Only the digests
 
    Never move or delete a published tag; fix forward with the next patch version.
 5. **Watch the run**, then open the GitHub Release and check the list below.
-6. **Deploy** on the VPS with `./deploy.sh X.Y.Z` (M8.4), which verifies everything in the next section before it touches anything.
+6. **Deploy** on the VPS, from a checkout of the tag: `git fetch --tags && git switch --detach vX.Y.Z && cd docker_compose/gmat_m8 && ./deploy.sh X.Y.Z`. It verifies everything in the next section before it touches anything, and its header lists the steps. If it stops, `./recover.sh status` prints the matching row of the decision tree.
 
 A release has these files: `release-manifest.json`, `release-manifest.json.sigstore.json` (the signature bundle), `sbom-<image>-<arch>.spdx.json` (four) and `trivy-<image>-<arch>-report.json` (four, every severity, exceptions not applied).
 
@@ -96,7 +100,7 @@ cosign verify --certificate-identity "<same identity>" \
 gh attestation verify "oci://<ref>" --repo <owner>/gmat-m8
 ```
 
-`deploy.sh` (M8.4) makes the first two checks and pulls both images by the digests in the verified manifest.
+`deploy.sh` makes the first two checks, compares the manifest with the version, repository and registry it expects, pulls both images by the digests in it and stops if the compose files would run anything else or the checkout is not the release's commit. It does not run `gh attestation verify`: the VPS has no `gh`, and the attestation adds nothing the two signatures do not already bind.
 
 ## When something fails
 

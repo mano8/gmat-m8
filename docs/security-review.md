@@ -83,7 +83,7 @@ Findings kept after the false-positive filter (confidence ≥ 8/10). Line number
 | Cache saturation and parallel rate limits | Ran `test_security_cache.py`, `test_security_cache_races.py` and `test_login_rate_limit.py`. Read allauth 65.20.1's MFA rate limit. | Green. MFA codes count against `login_failed` per account (5 per 5 minutes) and per IP. |
 | Outbox secrecy and eligibility | Reviewed sealing and wiping, the claim-time eligibility, the BCC fan-out, header injection (Django 6.1's email policy) and STARTTLS certificate checks. | No finding. TLS is not enforced by a check: X13. |
 | Dependency and image scans; `.trivyignore.yaml`; security floors | Trivy 0.75.0 with the database of 2026-11-04 on both images and the repository. `pip-audit` on `uv export --frozen`. bandit at medium. gitleaks v8.28.0 over the full history. Every action pin checked against GitHub. | The application image has 9 HIGH findings, all with exceptions and all still without a fix upstream; one stale exception was dropped (R14). The backup image and the repository are clean, with no secret and no high misconfiguration. `pip-audit` finds no known vulnerability. bandit: no medium or high finding (one low false positive). gitleaks: 166 commits, no leak. 13 of the 14 action pins equal their tag's commit; `trivy-action` is pinned to its verified `master` head (Dependabot #16, the Trivy binary pinned to v0.75.0). The allauth floor is 65.20.1, which is installed, with no advisory. |
-| Secrets, backup encryption and append-only offsite storage | Reviewed `init.sh` (urandom, umask 077, never printed), the secrets each container receives, and the database roles (DML-only runtime, read-only backup). Reviewed `backup.sh`: snapshot and lock, sessions and cache excluded, files 0600 in a 0700 directory, restic never prunes. | R13 fixed. Local copies are unencrypted (X12). The append-only configuration on the storage side and the prune script on the maintainer's side are M8.4 and H8.6. |
+| Secrets, backup encryption and append-only offsite storage | Reviewed `init.sh` (urandom, umask 077, never printed), the secrets each container receives, and the database roles (DML-only runtime, read-only backup). Reviewed `backup.sh`: snapshot and lock, sessions and cache excluded, files 0600 in a 0700 directory, restic never prunes. | R13 fixed. Local copies are unencrypted (X12). The append-only configuration and the prune script arrived with M8.4; the real storage is H8.6. |
 
 ### ASVS 5.0, level 2
 
@@ -174,19 +174,19 @@ The plan's review log is local to the maintainer; each id is listed here once, w
 | F15, F32, F33, F42, F47, F53 | Outbox and worker: claims, deadline, eligibility, abandoned attempts, cancellation notices | `apps/notifications`, `purchasing/dispatch.py`; `test_outbox_worker.py`, `test_po_dispatch.py` | Holds |
 | F16, F22, F49 | The publication gate and the agent identity | `docker-publish.yaml`, `verify_release.py`, rulesets; the interim setup (Q20) | Publication holds; agent boundary is exception X2 (guard tightened, R11) |
 | F17 | Trivy without `--ignore-unfixed`; dated exceptions | `ci.yaml`, `image-scan.yaml`, `check_trivyignore.py` | Holds (R14) |
-| F18, F23, F43 | Deploys: the running `web`, serialisation, the worker before verification | the maintenance gate and `worker.paused` exist; `deploy.sh` is M8.4 | Partly; the rest is M8.4 |
-| F19, F34, F63 | Backup verification; the manifest in the dump's snapshot; sessions and cache left out | `backup.sh`, `restore.sh --verify`; live backup test | Holds; the offsite drill is M8.4 and H8.6 |
+| F18, F23, F43 | Deploys: the running `web`, serialisation, the worker before verification | `deploy.sh`, `recover.sh`, one lock, both gates until the commit point; rehearsed in [deploy-rehearsal.md](deploy-rehearsal.md) | Holds (M8.4) |
+| F19, F34, F63 | Backup verification; the manifest in the dump's snapshot; sessions and cache left out | `backup.sh`, `restore.sh --verify`; live backup test; `restore-drill.sh` rehearsed (M8.4) | Holds; the first real drill is H8.7 |
 | F20 | No workflow-level path filter; the matrix covers every URL | `compose-smoke.yaml` (scope and gate); `test_acceptance_matrix.py` | Holds |
-| F24, F44, F52 | Restores: sessions, credentials, invitations, revoked access, recovery codes, re-sent mail | the drill overlay (no egress, outbound mail off) exists; `post-restore-reconcile` is M8.4 | Scheduled (M8.4) |
+| F24, F44, F52 | Restores: sessions, credentials, invitations, revoked access, recovery codes, re-sent mail | `post-restore-reconcile` (`apps/recovery`), rehearsed against real containers | Holds (M8.4) |
 | F35 | Both digests published; e2e on the exact commit | `docker-publish.yaml`, `verify_release.py` | Holds |
 | F50 | Partners of an inactive company | `scopes.py` (S9); its tests | Holds |
 | F59 | No self-service email change | the disabled allauth views; tests | Holds |
 | F60 | The admin never bypasses services | `ServiceBackedModelAdmin`, gmat.E005, the guard, the matrix | Holds (R1, R3 fixed) |
-| F61, F72 | Append-only offsite storage; retention poisoning | `backup.sh` never prunes; storage settings and the prune script are M8.4 and H8.6 | Scheduled (M8.4) |
+| F61, F72 | Append-only offsite storage; retention poisoning | `backup.sh` never prunes; `docker_compose/offsite/`, `scripts/offsite_prune.py`, rehearsed; the real storage is H8.6 | Holds (M8.4) |
 | F62 | Deactivation preconditions | `organizations/deactivation.py` | Holds |
 | F64, F74 | One database network per client; the worker off `edge` | compose networks; live tests | Holds (the worker and the backup share `egress`: the documentation is corrected) |
 | F67 | Hardening defaults | Caddy admin API off, scram-sha-256, 1 h reset tokens, no enumeration | Holds; data handling on the drill machine is runbook M8.5 |
-| F75 | The drill overlay has no way out | `docker-compose.restore-drill.yml` | Holds (file); outbound test is M8.4 |
+| F75 | The drill overlay has no way out | `docker-compose.restore-drill.yml`; `restore-drill.sh` fails unless `web` and the worker cannot reach out | Holds (M8.4) |
 | F79 | The VPS's read-only GitHub token | step H8.6 | Human step |
 | F80, F81 | Token entropy and comparison; `__Host-` cookies; `Permissions-Policy` | `accounts/tokens.py`; live headers | Holds |
 
