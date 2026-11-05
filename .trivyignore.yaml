@@ -116,3 +116,14 @@ vulnerabilities:
       filesystem. Compensating control: those container limits, plus the entry's
       expiry, which forces a re-review. Owner: maintainer (mano8).
     expired_at: 2026-12-31
+  - id: CVE-2026-76844
+    statement: >-
+      zlib (zlib1g) in the Debian 13 base image of the application image has no fixed
+      version yet (Debian tracker status 'vulnerable' on 2026-11-05; Trivy's title for
+      it names webpack-dev-middleware by mistake). Affects a heap overflow in the gz*
+      file API after a failed write(), which is not reachable from the service:
+      CPython's gzip module and Pillow use the deflate and inflate streams, never
+      gzopen or gzwrite. The application image runs as uid 1000 with every capability
+      dropped, no-new-privileges and a read-only root filesystem. Compensating control:
+      those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
