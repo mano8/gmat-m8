@@ -38,6 +38,7 @@ from apps.access.policy import platform_operator_flags, require_may_manage_accou
 from apps.access.principals import Principal, TokenPrincipal
 from apps.access.roles import PRIVILEGED_ROLES, Capability, Role
 from apps.accounts import tokens
+from apps.accounts.mfa import reset_mfa
 from apps.accounts.models import EmailChangeRequest, Invitation, User
 from apps.accounts.revocation import revoke_pending_tokens
 from apps.audit.recorder import AuditIdentity, record
@@ -616,6 +617,33 @@ def offboard_user(principal: Principal, user_id: UUID) -> User:
         },
     )
     events.publish("user.offboarded", user_id=user.pk)
+    return user
+
+
+@transactional
+def reset_user_mfa(principal: Principal, user_id: UUID, *, reason: str) -> User:
+    """Remove every second factor of an account that lost them (plan §5, M8.3).
+
+    An administrator's action (``org.manage``; a superuser for a staff account), audited with
+    its reason. Every session of the account ends, and its next sign-in enrolls a new factor
+    where its roles need one. Nobody resets their own factors this way.
+    """
+    actor = _lock_and_authorize(principal, user_id)
+    if actor.pk == user_id:
+        raise ValidationError(_("You cannot reset your own second factors."), code="self")
+    reason = reason.strip()
+    if not reason:
+        raise ValidationError({"reason": ValidationError(_("Give the reason."), code="required")})
+    user = User.objects.get(pk=user_id)
+    removed = sorted(Authenticator.objects.filter(user=user).values_list("type", flat=True))
+    reset_mfa(user)
+    record(
+        principal.audit_identity,
+        "user.mfa_reset",
+        obj=user,
+        data={"factors_removed": removed, "reason": reason},
+    )
+    events.publish("user.mfa_reset", user_id=user.pk)
     return user
 
 
