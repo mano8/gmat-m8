@@ -60,6 +60,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Bumped on password, email or MFA change and on deactivation; older sessions stop working.
     session_epoch = models.PositiveBigIntegerField(default=0)
     privilege_elevated_at = models.DateTimeField(null=True, blank=True)
+    # A restore deleted the recovery codes (plan §9, F52): privileged accounts generate a new
+    # set before anything else, others are told to. Cleared when the account has a new set.
+    recovery_codes_owed = models.BooleanField(default=False, db_default=False)
     # The company that employs the user; a partner's memberships are on this company (§3.4).
     employer_company = models.ForeignKey(
         "organizations.Company",

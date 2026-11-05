@@ -8,7 +8,12 @@ class AccountsConfig(AppConfig):
     label = "accounts"
 
     def ready(self) -> None:
-        from allauth.mfa.signals import authenticator_removed
+        from allauth.account import signals as account
+        from allauth.mfa.signals import (
+            authenticator_added,
+            authenticator_removed,
+            authenticator_reset,
+        )
         from django.contrib.auth.signals import user_logged_in
 
         from apps.accounts import eligibility, housekeeping, security_log, signals
@@ -17,6 +22,19 @@ class AccountsConfig(AppConfig):
         user_logged_in.connect(signals.on_user_logged_in, dispatch_uid="gmat-session-start")
         authenticator_removed.connect(
             signals.on_authenticator_removed, dispatch_uid="gmat-authenticator-removed"
+        )
+        for signal in (authenticator_added, authenticator_reset):
+            signal.connect(
+                signals.on_recovery_codes_changed, dispatch_uid="gmat-recovery-codes-changed"
+            )
+        account.password_changed.connect(
+            signals.on_password_changed, dispatch_uid="gmat-audit-password-changed"
+        )
+        account.password_set.connect(
+            signals.on_password_set, dispatch_uid="gmat-audit-password-set"
+        )
+        account.password_reset.connect(
+            signals.on_password_reset, dispatch_uid="gmat-audit-password-reset"
         )
         security_log.connect()
         eligibility.register()

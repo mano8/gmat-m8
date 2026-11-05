@@ -6,7 +6,13 @@ from typing import Any
 from django.contrib.auth import logout
 from django.http import HttpRequest, HttpResponseBase
 
-from apps.accounts.mfa import mfa_required_for, session_passed_mfa, step_up_response
+from apps.accounts.mfa import (
+    mfa_required_for,
+    must_generate_recovery_codes,
+    new_recovery_codes_response,
+    session_passed_mfa,
+    step_up_response,
+)
 from apps.accounts.sessions import session_is_current
 
 GetResponse = Callable[[HttpRequest], HttpResponseBase]
@@ -30,7 +36,8 @@ class SessionGuardMiddleware:
 
 
 class MFARequiredMiddleware:
-    """Privileged URLs need a session that completed MFA (``apps.accounts.mfa``)."""
+    """Privileged URLs need a session that completed MFA and, after a restore deleted the
+    account's recovery codes, a new set of them (``apps.accounts.mfa``)."""
 
     def __init__(self, get_response: GetResponse) -> None:
         self.get_response = get_response
@@ -43,6 +50,8 @@ class MFARequiredMiddleware:
     ) -> HttpResponseBase | None:
         if not request.user.is_authenticated or not mfa_required_for(request):
             return None
-        if session_passed_mfa(request):
-            return None
-        return step_up_response(request)
+        if not session_passed_mfa(request):
+            return step_up_response(request)
+        if must_generate_recovery_codes(request):
+            return new_recovery_codes_response(request)
+        return None

@@ -123,6 +123,27 @@ def step_up_response(request: HttpRequest) -> HttpResponse:
     return HttpResponseRedirect(f"{reverse(target)}?{query}")
 
 
+def must_generate_recovery_codes(request: HttpRequest) -> bool:
+    """A restore deleted this privileged account's recovery codes (plan §9, F52)."""
+    return bool(getattr(request.user, "recovery_codes_owed", False)) and is_privileged(request.user)
+
+
+def new_recovery_codes_response(request: HttpRequest) -> HttpResponse:
+    """Send a privileged session to generate its codes; a write waits until it has."""
+    if request.method not in {"GET", "HEAD"}:
+        raise PermissionDenied("Generate new recovery codes first")
+    query = urlencode({"next": request.get_full_path()})
+    return HttpResponseRedirect(f"{reverse('mfa_generate_recovery_codes')}?{query}")
+
+
+def settle_recovery_codes(user: Any) -> None:
+    """The account has a new set of codes: nothing is owed any more."""
+    if Authenticator.objects.filter(
+        user_id=user.pk, type=Authenticator.Type.RECOVERY_CODES
+    ).exists():
+        get_user_model().objects.filter(pk=user.pk).update(recovery_codes_owed=False)
+
+
 def reset_mfa(user: Any) -> None:
     """Remove every authenticator of ``user`` and end all of their sessions.
 
