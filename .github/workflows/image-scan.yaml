@@ -10,7 +10,7 @@ name: Image scan
 # is an amd64 + arm64 index, and Trivy would otherwise scan only the runner's). A failing scan
 # opens, or updates, ONE issue listing what is not covered, and a fully clean run closes it; the
 # full all-severity reports are kept as artifacts for 90 days. Before the first release there
-# are no released images yet and only Caddy and PostgreSQL are scanned.
+# are no released images yet and only the compose file's third-party images are scanned.
 #
 # Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
 # `on.paths` filter, no secret other than the run's GITHUB_TOKEN, every action pinned by full
