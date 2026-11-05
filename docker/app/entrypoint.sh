@@ -12,6 +12,8 @@
 #   verify-internal         deploy-time checks against web:8000, bypassing the gate (plan §9)
 #   post-restore-reconcile  security, MFA and outbox reconciliation after a restore (plan §9)
 #   healthcheck             exit 0 when the local web process answers /healthz/
+#   decoder                 the image decoder service: its own container, uid, no network
+#   decoder-healthcheck     exit 0 when the decoder service answers
 #   manage <args...>        any other management command
 #
 # Secrets arrive only through the environment; nothing is printed that could contain one.
@@ -92,12 +94,19 @@ except Exception:
     sys.exit(1)
 PY
         ;;
+    decoder)
+        # -I: nothing of the project, the current directory or the environment is imported.
+        exec python -I /app/apps/attachments/decoder_service.py "${ATTACHMENT_DECODER_SOCKET:?}"
+        ;;
+    decoder-healthcheck)
+        exec python -I /app/apps/attachments/decoder_service.py --ping "${ATTACHMENT_DECODER_SOCKET:?}"
+        ;;
     manage)
         exec python manage.py "$@"
         ;;
     *)
         echo "entrypoint: unknown command '$command'" >&2
-        echo "usage: entrypoint.sh {web|runserver|worker|worker-healthcheck|migrate|check|migrate-plan|verify-internal|post-restore-reconcile|healthcheck|manage <args>}" >&2
+        echo "usage: entrypoint.sh {web|runserver|worker|worker-healthcheck|migrate|check|migrate-plan|verify-internal|post-restore-reconcile|healthcheck|decoder|decoder-healthcheck|manage <args>}" >&2
         exit 64
         ;;
 esac

@@ -252,6 +252,19 @@ def _finalize(principal: Principal, upload: _Upload, processed: processing.Proce
     )
 
 
+def _audit_malware(principal: Principal, reservation_id: UUID, signature: str) -> None:
+    """On the document it was meant for. The refusal stands if this fails: it is the log's too."""
+
+    def execute() -> None:
+        parent = parent_of(AttachmentReservation.objects.get(pk=reservation_id))
+        _record(principal, "attachment.malware_refused", parent, signature=signature)
+
+    try:
+        run_in_transaction(execute)
+    except Exception:
+        logger.warning("The refused file on %s was not audited", reservation_id, exc_info=True)
+
+
 def _release_after_failure(principal: Principal, reservation_id: UUID) -> None:
     """Give the slot back now; if even that fails, the lease expiry does it (worker)."""
     try:
@@ -309,6 +322,8 @@ def finalize_upload(
         processed = processing.process(source, target)
         return run_in_transaction(lambda: _finalize(principal, upload, processed))
     except processing.Rejected as exc:
+        if exc.signature:
+            _audit_malware(principal, reservation_id, exc.signature)
         _release_after_failure(principal, reservation_id)
         raise refusal(exc.code) from exc
     except BaseException:

@@ -38,6 +38,9 @@ SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
 # Every release image is built, scanned and listed for both architectures (plan §8.4); the
 # nightly scan covers the same two.
 ARCHITECTURES = ("amd64", "arm64")
+# Third-party images published for fewer architectures than ours. clamav/clamav is x86-64 only;
+# its multi-arch Debian variant ships libxml2 flaws clamd can reach (ADR-0015).
+SINGLE_ARCHITECTURE = {"clamav": ("amd64",)}
 GATE = {"severity": "CRITICAL,HIGH", "ignore_unfixed": False}
 MANIFEST_SCHEMA_VERSION = 1
 ISSUE_ROW_LIMIT = 60
@@ -224,9 +227,9 @@ def build_manifest(
 
 
 def scan_targets(compose_text: str, manifest: dict[str, Any] | None) -> list[dict[str, str]]:
-    """The production image set, one entry per image and architecture: Caddy and PostgreSQL
-    from the compose file, plus the application and backup images of the latest release when
-    there is one.
+    """The production image set, one entry per image and architecture: Caddy, PostgreSQL and
+    ClamAV from the compose file, plus the application and backup images of the latest release
+    when there is one.
 
     An ``image:`` line that is neither digest-pinned nor a ``${VAR}`` reference (the images
     built here) is an error: a quiet skip would shrink the scan without anyone noticing."""
@@ -244,7 +247,7 @@ def scan_targets(compose_text: str, manifest: dict[str, Any] | None) -> list[dic
     return [
         {"name": f"{name}-{arch}", "ref": ref, "platform": f"linux/{arch}"}
         for name, ref in images.items()
-        for arch in ARCHITECTURES
+        for arch in SINGLE_ARCHITECTURE.get(name, ARCHITECTURES)
     ]
 
 

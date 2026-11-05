@@ -5,6 +5,7 @@ import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from io import StringIO
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -12,6 +13,8 @@ from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.urls import reverse
+
+from tests.clamd import fake_clamd, refused_socket
 
 CSS = "/static/dist/app.abc123.css"
 
@@ -63,7 +66,7 @@ def run(target: str) -> str:
 
 
 def test_a_healthy_web_passes_as_caddy_would_ask(web: FakeWeb) -> None:
-    assert "4 checks passed" in run(web.url)
+    assert "6 checks passed" in run(web.url)
     assert {headers["Host"] for headers in web.seen} == {"gmat.example.org"}
     assert {headers["X-Forwarded-Proto"] for headers in web.seen} == {"https"}
 
@@ -98,3 +101,26 @@ def test_no_allowed_host_falls_back_to_localhost(web: FakeWeb, settings: Any) ->
     settings.ALLOWED_HOSTS = []
     run(web.url)
     assert web.seen[0]["Host"] == "localhost"
+
+
+class TestUploadServices:
+    """M8.3: without a scanner or a decoder uploads are refused, so a release is not whole."""
+
+    def test_both_answer(self, web: FakeWeb, settings: Any) -> None:
+        with fake_clamd() as (address, _behaviour):
+            settings.ATTACHMENT_SCAN_SOCKET = address
+            assert "6 checks passed" in run(web.url)
+
+    def test_a_scanner_that_does_not_answer_stops_the_deploy(
+        self, web: FakeWeb, settings: Any, tmp_path: Path
+    ) -> None:
+        settings.ATTACHMENT_SCAN_SOCKET = refused_socket(tmp_path)
+        with pytest.raises(CommandError, match="malware scanner"):
+            run(web.url)
+
+    def test_a_decoder_that_does_not_answer_stops_the_deploy(
+        self, web: FakeWeb, settings: Any, tmp_path: Path
+    ) -> None:
+        settings.ATTACHMENT_DECODER_SOCKET = refused_socket(tmp_path)
+        with pytest.raises(CommandError, match="image decoder"):
+            run(web.url)

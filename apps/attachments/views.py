@@ -17,7 +17,8 @@ CSRF reads the body:
 
 Refusals answer with their status and a page that leads back to the document: 413 too
 large, 411 no length, 429 busy (``Retry-After``), 507 storage full, 409 no slot left or the
-document closed, 415 not an accepted file.
+document closed, 415 not an accepted file, 422 refused by the virus scanner, 503 no scanner or
+decoder to ask (``Retry-After``).
 
 **Download** streams a stored file to whoever can view its parent, as an attachment, with
 ``nosniff`` and a ``sandbox`` CSP. **Remove** is one POST-only URL per attachment.
@@ -71,6 +72,8 @@ STATUSES = {
     "too_many_pixels": 415,
     "undecodable": 415,
     "timeout": 422,
+    "malware": 422,
+    "unavailable": 503,
 }
 MESSAGES: dict[str, Message] = {
     "origin": gettext_lazy("The upload did not come from this site."),
@@ -90,7 +93,7 @@ def _refused(request: HttpRequest, code: str, back: str) -> HttpResponse:
         {"message": MESSAGES[code], "back": back},
         status=STATUSES[code],
     )
-    if code == "busy":
+    if code in {"busy", "unavailable"}:
         response["Retry-After"] = RETRY_AFTER
     return response
 

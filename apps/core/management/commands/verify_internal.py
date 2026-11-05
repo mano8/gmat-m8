@@ -2,8 +2,10 @@
 
 Runs in a one-off container on the ``edge`` network, against ``web:8000`` directly: the public
 site is still behind the maintenance gate. It asks for the liveness and readiness endpoints,
-the login page and a hashed static asset, and writes nothing: a commit point opens the gates
-only after these pass. ``check --deploy`` and ``migrate --check`` run in the entrypoint.
+the login page and a hashed static asset, then whether the malware scanner and the image decoder
+answer (without them an upload is refused, so a release is not whole), and writes nothing: a
+commit point opens the gates only after these pass. ``check --deploy`` and ``migrate --check``
+run in the entrypoint.
 """
 
 import http.client
@@ -15,6 +17,8 @@ from django.conf import settings
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.urls import reverse
+
+from apps.attachments import decoder_client, scanner
 
 DEFAULT_TARGET = "http://web:8000"
 ASSET = "dist/app.css"
@@ -54,6 +58,17 @@ def _problem(name: str, path: str, target: str, host: str, wanted_type: str) -> 
     return None
 
 
+def _upload_problems() -> list[str]:
+    problems = []
+    try:
+        scanner.ping()
+    except scanner.ScannerUnavailable as exc:
+        problems.append(f"malware scanner: no answer ({exc})")
+    if not decoder_client.ping():
+        problems.append("image decoder: no answer")
+    return problems
+
+
 class Command(BaseCommand):
     help = "Check the running web process directly, bypassing the maintenance gate."
     requires_system_checks: Any = []
@@ -75,6 +90,7 @@ class Command(BaseCommand):
             for name, path, wanted in checks
             if (problem := _problem(name, path, target, host, wanted)) is not None
         ]
+        problems += _upload_problems()
         if problems:
             raise CommandError("verify-internal failed: " + "; ".join(problems))
-        self.stdout.write(f"verify-internal: {len(checks)} checks passed against {target}")
+        self.stdout.write(f"verify-internal: {len(checks) + 2} checks passed against {target}")

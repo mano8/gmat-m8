@@ -11,14 +11,26 @@ BODY_AND_DATABASE = 180
 
 @register()
 def lease_outlasts_the_limits(app_configs: Any = None, **kwargs: Any) -> list[Error]:
-    needed = settings.ATTACHMENT_DECODE_TIMEOUT + BODY_AND_DATABASE
+    needed = settings.ATTACHMENT_DECODE_TIMEOUT + settings.ATTACHMENT_SCAN_TIMEOUT
+    needed += BODY_AND_DATABASE
     if needed < settings.ATTACHMENT_LEASE:
         return []
     return [
         Error(
-            f"ATTACHMENT_LEASE ({settings.ATTACHMENT_LEASE} s) must exceed the decoder's kill "
-            f"plus the body and database limits ({needed} s): an expired lease would free a "
+            f"ATTACHMENT_LEASE ({settings.ATTACHMENT_LEASE} s) must exceed the decoder's kill, "
+            f"the scan and the body and database limits ({needed} s): an expired lease frees a "
             "slot whose upload can still finish.",
             id="gmat.E020",
         )
     ]
+
+
+@register(deploy=True)
+def uploads_go_through_their_services(app_configs: Any = None, **kwargs: Any) -> list[Error]:
+    """Production scans every upload and decodes images apart from ``web`` (M8.3, ADR-0015)."""
+    missing = [
+        name
+        for name in ("ATTACHMENT_SCAN_SOCKET", "ATTACHMENT_DECODER_SOCKET")
+        if not getattr(settings, name)
+    ]
+    return [Error(f"{name} must be set in production", id="gmat.E022") for name in missing]

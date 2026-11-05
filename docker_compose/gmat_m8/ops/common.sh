@@ -140,8 +140,13 @@ wait_worker_state() { # wait_worker_state STATES SECONDS
 
 stop_writers() { compose stop web worker; }
 
+# The scanner is recreated every time: its configuration is a bind mount, which `up` does not see
+# changed. All of this is behind the gates, and verify_internal asks both services for an answer.
 start_services() {
     compose up -d --no-deps --no-build backup
+    compose up -d --no-deps --no-build freshclam
+    compose up -d --no-deps --no-build --force-recreate --wait --wait-timeout 300 clamd
+    compose up -d --no-deps --no-build --wait --wait-timeout 120 decoder
     compose up -d --no-deps --no-build --wait --wait-timeout 300 web worker
     service_running backup || die "the backup service did not stay up"
 }

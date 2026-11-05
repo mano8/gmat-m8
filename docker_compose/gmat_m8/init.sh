@@ -161,6 +161,8 @@ chmod 0600 .env app.env
 mkdir -p backups flags
 chmod 0700 backups
 chmod 0755 flags
+# Read by the scanner's containers under their own uid, whatever the checkout's umask was.
+chmod 0644 clamav/clamd.conf clamav/freshclam.conf
 if [ "$ci" = 1 ]; then
     # A CI runner is not uid 1000; the data is throwaway.
     chmod 0777 backups

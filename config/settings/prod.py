@@ -8,6 +8,7 @@ from config.env import (
     env_int,
     env_list,
     env_secret,
+    env_str,
     non_production_fernet_keys,
 )
 from config.settings.base import *  # noqa: F403
@@ -36,6 +37,15 @@ MFA_ENCRYPTION_KEYS = env_fernet_keys("MFA_ENCRYPTION_KEYS", refused=non_product
 OUTBOX_ENCRYPTION_KEYS = env_fernet_keys(
     "OUTBOX_ENCRYPTION_KEYS",
     refused=non_production_fernet_keys() | frozenset(MFA_ENCRYPTION_KEYS),
+)
+
+# The stack's fixed paths: the volumes compose mounts in `web` (M8.3, ADR-0015). gmat.E022 refuses
+# an empty value here, which would store unscanned files.
+ATTACHMENT_SCAN_SOCKET = env_str(
+    "ATTACHMENT_SCAN_SOCKET", "/run/gmat/clamd/clamd.sock", min_length=0
+)
+ATTACHMENT_DECODER_SOCKET = env_str(
+    "ATTACHMENT_DECODER_SOCKET", "/run/gmat/decoder/decoder.sock", min_length=0
 )
 
 # TLS terminates at Caddy, the only proxy in front of the app. The internal health checks

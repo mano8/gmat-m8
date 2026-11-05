@@ -32,6 +32,8 @@ ENTRYPOINT_COMMANDS = {
     "verify-internal",
     "post-restore-reconcile",
     "healthcheck",
+    "decoder",
+    "decoder-healthcheck",
     "manage",
 }
 

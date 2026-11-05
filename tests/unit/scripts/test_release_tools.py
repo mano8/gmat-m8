@@ -328,10 +328,16 @@ def test_targets_include_the_released_images(tools: ModuleType) -> None:
     }
 
 
-def test_repository_compose_file_yields_caddy_and_postgres(tools: ModuleType) -> None:
+def test_repository_compose_file_yields_caddy_postgres_and_clamav(tools: ModuleType) -> None:
     compose = (tools.ROOT / "docker_compose/gmat_m8/docker-compose.yml").read_text(encoding="utf-8")
-    names = [t["name"] for t in tools.scan_targets(compose, None)]
-    assert names == ["caddy-amd64", "caddy-arm64", "postgres-amd64", "postgres-arm64"]
+    names = {t["name"] for t in tools.scan_targets(compose, None)}
+    assert names == {
+        "caddy-amd64",
+        "caddy-arm64",
+        "postgres-amd64",
+        "postgres-arm64",
+        "clamav-amd64",
+    }
 
 
 @pytest.mark.parametrize(
@@ -560,3 +566,17 @@ def test_the_release_gate_and_the_manifest_accept_the_same_versions(
     tag_ok = not gate.check_tag(f"v{version}")
     assert tag_ok == bool(tools.VERSION_PATTERN.match(version))
     assert gate.SHA_PATTERN.pattern == tools.SHA_PATTERN.pattern
+
+
+def test_clamav_is_scanned_for_the_one_architecture_it_is_published_for(tools: ModuleType) -> None:
+    """amd64 only (ADR-0015): asking Trivy for arm64 would fail the nightly leg, not skip it."""
+    digest = "a" * 64
+    compose = (
+        f"services:\n  clamd:\n    image: clamav/clamav:1.5.4@sha256:{digest}\n"
+        f"  db:\n    image: postgres:18-alpine@sha256:{digest}\n"
+    )
+    assert [target["name"] for target in tools.scan_targets(compose, None)] == [
+        "clamav-amd64",
+        "postgres-amd64",
+        "postgres-arm64",
+    ]

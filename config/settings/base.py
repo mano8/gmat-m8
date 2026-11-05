@@ -280,6 +280,11 @@ ATTACHMENT_LEASE = 15 * 60
 ATTACHMENT_DECODE_TIMEOUT = 60  # wall time, then the child is killed
 ATTACHMENT_DECODE_CPU = 60  # RLIMIT_CPU of the child
 ATTACHMENT_DECODE_MEMORY = 512 * 1024 * 1024  # RLIMIT_AS of the child
+# Production scans every upload with clamd and decodes images in a container of its own (M8.3,
+# ADR-0015), through these unix sockets. Empty, as here: no scan, and a child process.
+ATTACHMENT_SCAN_SOCKET = env_str("ATTACHMENT_SCAN_SOCKET", "", min_length=0)
+ATTACHMENT_SCAN_TIMEOUT = 60  # seconds, the whole scan of one file
+ATTACHMENT_DECODER_SOCKET = env_str("ATTACHMENT_DECODER_SOCKET", "", min_length=0)
 ATTACHMENT_MAX_PIXELS = 40_000_000
 ATTACHMENT_MAX_SIDE = 2560
 # Removed attachments are kept this long, then purged; their files are deleted after a

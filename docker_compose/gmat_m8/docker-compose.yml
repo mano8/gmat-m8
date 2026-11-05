@@ -11,7 +11,9 @@
 # Networks (plan §7.2, F64, F74): one internal network per database client, so web, worker,
 # backup and migrate never share a network and cannot reach each other; `edge` holds only
 # Caddy and web; only Caddy publishes ports, through `ingress`. The worker and the backup
-# reach the outside through `egress` (SMTP, offsite storage); web has no way out.
+# reach the outside through `egress` (SMTP, offsite storage); web has no way out. The two services
+# that parse uploaded files, clamd and the decoder, have no network at all: web reaches each
+# through a unix socket on a volume only the two of them mount (M8.3, ADR-0015).
 name: gmat-m8
 
 x-logging: &logging
@@ -27,6 +29,14 @@ x-hardened: &hardened
   restart: unless-stopped
   logging: *logging
 
+x-clamav: &clamav
+  <<: *hardened
+  # x86-64 only: the Debian variant is multi-arch, but ships libxml2 flaws clamd can reach.
+  image: clamav/clamav:1.5.4@sha256:6d87c712e3391e13c1ba6e05dfb074d4b1ddb5a6834b23bb9da990d2a4ef042a
+  # The image's own `clamav` user, which owns its signature files.
+  user: "100:101"
+  tmpfs: ["/tmp:uid=100,gid=101,mode=0700,size=128m"]
+
 x-app: &app
   <<: *hardened
   image: ${APP_IMAGE:-gmat-m8:local}
@@ -38,7 +48,7 @@ x-app: &app
 services:
   caddy:
     <<: *hardened
-    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    image: caddy:2.11.8-alpine@sha256:f6228111e5fafa1a5238258d0858e103f10599b8d1659a146e7726681a002bb9
     # Root inside the container with every capability dropped except the one needed to bind
     # the published ports: the data and config volumes are root-owned, and a read-only root
     # filesystem plus no other capability leaves nothing to abuse. (uid 1000 would need a
@@ -117,9 +127,13 @@ services:
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
       # The same prefix Caddy restricts to ADMIN_ALLOWED_CIDRS.
       DJANGO_ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
-    # Attachments (M6.4): stored files and uploads in progress; never served from here.
+    # Attachments (M6.4): stored files and uploads in progress; never served from here. The
+    # scanner's and the decoder's sockets (read only is enough to connect, and web cannot
+    # replace them).
     volumes:
       - media:/srv/media
+      - clamd_socket:/run/gmat/clamd:ro
+      - decoder_socket:/run/gmat/decoder:ro
     networks: [edge, db_web]
     depends_on:
       migrate:
@@ -132,8 +146,70 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
-    # Gunicorn plus up to two image decoders (512 MiB address space each, plan §9 sizing).
-    mem_limit: 1536m
+    # Gunicorn, with room for Argon2 under a burst of sign-ins (100 MiB per hash).
+    mem_limit: 1024m
+
+  # Decodes uploaded images, the riskiest parsing the application does (M8.3, X11): its own uid,
+  # no network, no volume but its socket and a scratch tmpfs, and no secret in its environment.
+  # Not the `app` anchor: that one carries app.env.
+  decoder:
+    <<: *hardened
+    image: ${APP_IMAGE:-gmat-m8:local}
+    user: "1001:1001"
+    command: ["decoder"]
+    network_mode: none
+    environment:
+      ATTACHMENT_DECODER_SOCKET: /run/gmat/decoder/decoder.sock
+    volumes:
+      - decoder_socket:/run/gmat/decoder
+    tmpfs: ["/tmp:uid=1001,gid=1001,mode=0700,size=128m"]
+    healthcheck:
+      test: ["CMD", "/app/docker/app/entrypoint.sh", "decoder-healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Two children of 512 MiB address space each (plan §9 sizing), the service and their files.
+    mem_limit: 1216m
+    pids_limit: 32
+
+  # Scans every upload before it is stored (M8.3, X7): no network, signatures read only.
+  clamd:
+    <<: *clamav
+    entrypoint: ["clamd", "--config-file=/etc/gmat/clamd.conf"]
+    volumes:
+      - ./clamav/clamd.conf:/etc/gmat/clamd.conf:ro
+      - clamav_db:/var/lib/clamav:ro
+      - clamd_socket:/run/gmat/clamd
+    network_mode: none
+    healthcheck:
+      test: ["CMD", "clamdscan", "--config-file=/etc/gmat/clamd.conf", "--ping", "3"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      # Loading the signatures takes about 30 s, longer on a busy host.
+      start_period: 180s
+    # About 1 GiB with the signatures loaded, plus scratch space.
+    mem_limit: 1408m
+    pids_limit: 32
+
+  # Keeps the signature volume current; a failed update leaves clamd on the set it has. Never sees
+  # an uploaded file. Four checks a day, as the mirror's terms ask.
+  freshclam:
+    <<: *clamav
+    entrypoint:
+      - freshclam
+      - --foreground
+      - --daemon
+      - --stdout
+      - --checks=4
+      - --config-file=/etc/gmat/freshclam.conf
+    volumes:
+      - ./clamav/freshclam.conf:/etc/gmat/freshclam.conf:ro
+      - clamav_db:/var/lib/clamav
+    networks: [updates]
+    mem_limit: 256m
+    pids_limit: 32
 
   # The only process that sends email (plan §5): claims outbox rows, delivers them through
   # SMTP and runs the hourly housekeeping. Idle while flags/worker.paused exists.
@@ -172,7 +248,7 @@ services:
 
   db:
     <<: *hardened
-    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    image: postgres:18-alpine@sha256:eaef288f54a90a909e49f0121d5d047a5e974e922699de4249625cf7cde34f36
     # The entrypoint starts as root, prepares the data directory and drops to postgres.
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     command:
@@ -292,6 +368,8 @@ networks:
     internal: true
   # Outbound SMTP for the worker (M2.5) and offsite storage for the backup.
   egress: {}
+  # The signature mirror for freshclam alone: what parses files has no way out.
+  updates: {}
 
 volumes:
   pg_data:
@@ -299,3 +377,16 @@ volumes:
   caddy_config:
   # Attachments (M6.4): owned by uid 1000, created from the image's /srv/media.
   media:
+  # The scanner's signatures, seeded from its image on first use, so it starts without a download.
+  clamav_db:
+  # One socket each, in memory: gone when the service is, owned by the service's uid.
+  clamd_socket:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "uid=100,gid=101,mode=0755,size=1m,noexec,nosuid,nodev"
+  decoder_socket:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "uid=1001,gid=1001,mode=0755,size=1m,noexec,nosuid,nodev"

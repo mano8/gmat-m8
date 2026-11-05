@@ -17,6 +17,8 @@ services:
     image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
   web:
     image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
+  decoder:
+    image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
   worker:
     image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
   backup:
