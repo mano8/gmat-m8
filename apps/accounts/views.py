@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views.decorators.debug import sensitive_post_parameters
@@ -81,8 +82,9 @@ remove_webauthn = RemoveWebAuthnView.as_view()
 INVITATION_SESSION_KEY = "_gmat_invitation"
 EMAIL_CHANGE_SESSION_KEY = "_gmat_email_change"
 TOKEN_RATE_LIMITS = {"token": "20/m/ip"}
-# A link over the rate limit: its 429 is shown by the token-less page it redirects to.
-LIMITED_SESSION_KEY = "_gmat_token_limited"
+# A link over the rate limit: its 429 is shown by the token-less page it redirects to. In the
+# URL, not the session: a client without a cookie must not write a session row per request.
+LIMITED_PARAMETER = "limited"
 
 
 def _rate_limited(request: HttpRequest) -> HttpResponse | None:
@@ -94,15 +96,12 @@ def _rate_limited(request: HttpRequest) -> HttpResponse | None:
 
 def _limited_link(request: HttpRequest, page: str) -> HttpResponse:
     """Never answer a limited link where the token sits (address bar, history)."""
-    request.session[LIMITED_SESSION_KEY] = True
-    return redirect(page)
+    return redirect(f"{reverse(page)}?{LIMITED_PARAMETER}=1")
 
 
 def _limited_page(request: HttpRequest) -> HttpResponse | None:
-    """The 429 of the link that led here, once."""
-    if request.session.pop(LIMITED_SESSION_KEY, False):
-        return HttpResponse(status=429)
-    return None
+    """The 429 of the link that led here. Asking for it by hand only answers yourself."""
+    return HttpResponse(status=429) if LIMITED_PARAMETER in request.GET else None
 
 
 def _session_user_id(request: HttpRequest) -> UUID | None:

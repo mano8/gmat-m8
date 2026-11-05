@@ -6,9 +6,13 @@ token shows one generic page; the links are rate-limited.
 """
 
 from collections.abc import Callable
+from unittest import mock
 
 import pytest
+from django.conf import settings
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
 
@@ -119,10 +123,23 @@ class TestInvitationPages:
         stored = dict(client.session)
         limited = client.get(reverse(link, args=["C" * 43]))
         # Not answered where the token sits (address bar, history): the token-less page is.
-        assert limited.status_code == 302 and limited["Location"] == reverse(page)
+        assert limited.status_code == 302 and limited["Location"] == f"{reverse(page)}?limited=1"
         assert {key: value for key, value in client.session.items() if key in stored} == stored
         assert client.get(limited["Location"]).status_code == 429
-        assert client.get(limited["Location"]).status_code != 429  # once
+        assert client.get(reverse(page)).status_code != 429  # only the link's own redirect
+
+    @pytest.mark.parametrize("link", ["invitations:link", "email_change:link"])
+    def test_a_limited_link_writes_no_session_for_a_client_without_a_cookie(
+        self, link: str
+    ) -> None:
+        """Over the limit nothing may grow with the requests: no row per bot's request."""
+        with mock.patch("apps.accounts.views._rate_limited", return_value=HttpResponse(status=429)):
+            before = Session.objects.count()
+            for token in ("D" * 43, "E" * 43):
+                response = Client().get(reverse(link, args=[token]))
+                assert response.status_code == 302
+                assert settings.SESSION_COOKIE_NAME not in response.cookies
+        assert Session.objects.count() == before
 
     def test_the_language_switcher_never_returns_to_a_token_page(
         self, invite: Callable[..., Invitation]
