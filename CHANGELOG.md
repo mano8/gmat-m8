@@ -184,6 +184,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - `restore-drill.sh`: the offsite restore drill on its own project with no way out, and its checklist.
   - `docker_compose/offsite/`: the append-only offsite storage. `scripts/offsite_prune.py`: the maintainer's prune, which refuses forged snapshots and checks restic's plan against the protected window.
   - `tests/rehearsal`: the whole of it against real containers; recorded in [docs/deploy-rehearsal.md](docs/deploy-rehearsal.md).
+- Operations runbooks in [docs/runbooks/](docs/runbooks/README.md) (M8.5): VPS setup, deploy and rollback with the decision tree, backup and restore (the verification levels, the quarterly drill, reconciliation, offsite pruning), the drill log, user administration (MFA reset, key rotation and loss), email (ambiguous and quarantined dispatches), incident response and vulnerability exceptions.
 - Password changes and removed second factors reach the audit trail (`user.password_changed`, `user.authenticator_removed`), so a restore can replay them (M8.4). Migration `accounts.0005` adds `User.recovery_codes_owed`.
 - `backup-now --wait SECONDS` queues behind a backup in progress (M8.4).
 

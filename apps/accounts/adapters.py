@@ -112,7 +112,7 @@ class MFAAdapter(DefaultMFAAdapter):
     allauth's default adapter stores TOTP secrets and recovery-code seeds in plaintext. The
     newest key comes first and encrypts; every listed key decrypts, so a rotation adds a
     key in front and re-encrypts. A value no key can decrypt raises ``InvalidToken``: the
-    user cannot complete MFA until it is reset (runbook, M8.5).
+    user cannot complete MFA until it is reset (docs/runbooks/user-admin.md).
     """
 
     def _fernet(self) -> MultiFernet:

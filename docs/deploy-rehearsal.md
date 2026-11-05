@@ -74,5 +74,5 @@ And from the tests against fakes, before the first real run: inside `cmd || die`
 ## Not settled here
 
 - The first real signature, ACME certificate, GHCR pull and offsite storage are H8.6 and H8.7.
-- `cosign` and `python3` must be on the VPS; `docs/runbooks/vps-setup.md` (M8.5) says how.
+- `cosign` and `python3` must be on the VPS; [runbooks/vps-setup.md](runbooks/vps-setup.md) says how.
 - `docker compose` on the host reads `.env`, which holds `GITHUB_READ_TOKEN` and the offsite credentials: mode 0600, as `deploy.sh` checks.

@@ -114,7 +114,7 @@ touch flags/maintenance.on                             # public site answers 503
 
 ## Deploying and recovering
 
-Production only, on the VPS, by the maintainer; each script's header has the details. Needs `docker`, `curl`, `flock`, `python3` and `cosign` on the host, a `.env` and `app.env` of mode 0600, an offsite repository (`../offsite/README.md`), and `ADMIN_ALLOWED_CIDRS` set.
+Production only, on the VPS, by the maintainer; each script's header has the details, and the step-by-step runbooks are in [`docs/runbooks/`](../../docs/runbooks/README.md). Needs `docker`, `curl`, `flock`, `python3` and `cosign` on the host, a `.env` and `app.env` of mode 0600, an offsite repository (`../offsite/README.md`), and `ADMIN_ALLOWED_CIDRS` set.
 
 ```bash
 git fetch --tags && git switch --detach vX.Y.Z   # the release's own compose files

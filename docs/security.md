@@ -57,7 +57,7 @@ Who the application defends against and what it accepts (the threat model and th
   - delete or rewrite the offsite backups: the VPS holds append-only credentials, pruning runs only from the maintainer's machine with `--keep-within 90d`, and a pre-prune check refuses forged snapshots (`scripts/offsite_prune.py`);
   - publish an image or a release: the VPS holds a read-only token, and images and manifests are signed by the publish workflow;
   - change the backups taken before the compromise: they sit offsite, behind append-only credentials.
-- Recovery: rebuild from the release images and the offsite backup, rotate every secret, and run `recover.sh restore-offsite`, which ends in `post-restore-reconcile` (runbooks M8.5).
+- Recovery: rebuild from the release images and the offsite backup, rotate every secret, and run `recover.sh restore-offsite`, which ends in `post-restore-reconcile` (runbooks in [runbooks/](runbooks/README.md)).
 - Containers limit what a compromised process reaches: uid 1000, read-only root, no capabilities, one database network per client, and no route out for `web`.
 
 **The supply chain.**
@@ -85,7 +85,7 @@ What the application knowingly does not do, or does differently from a rule, wit
 | X10 | The admin prefix is open to every network unless `ADMIN_ALLOWED_CIDRS` is set | The admin still needs a group administrator or a superuser with session MFA. Production sets the allowlist (runbook M8.5). `deploy.sh` refuses an open list, unless `DEPLOY_ALLOW_OPEN_ADMIN=1` says this exception was accepted, and always one that overlaps Docker's bridge ranges | maintainer | go-live (H8.7) | proposed |
 | X11 | The image decoder runs as the same uid as `web` | rlimits (512 MiB, 60 s of CPU), a kill after 60 s, `python -I` and a clean environment; Pillow pinned, scanned and updated. An exploit in the decoder could still read what uid 1000 reads in the container | maintainer | 2027-02-01 | proposed |
 | X12 | Local backup copies are not encrypted on the host | Plan §9: files 0600 in a 0700 directory, kept 3 days; a compromised host exposes the live database anyway; the offsite copies are encrypted by restic | maintainer | 2027-02-01 | accepted (plan §9) |
-| X13 | No check refuses an SMTP relay without TLS | The production template uses STARTTLS on port 587 with the certificate checked, and the runbook (M8.5) keeps it so | maintainer | 2027-02-01 | proposed |
+| X13 | No check refuses an SMTP relay without TLS | The production template uses STARTTLS on port 587 with the certificate checked, and [the VPS runbook](runbooks/vps-setup.md) keeps it so | maintainer | 2027-02-01 | proposed |
 
 ## Authentication (`config/settings/base.py`, `apps/accounts/`)
 
@@ -111,7 +111,7 @@ What the application knowingly does not do, or does differently from a rule, wit
 - **Role-based enforcement** (`apps.accounts.mfa.mfa_required_for`, `MFARequiredMiddleware`): for a privileged user every URL needs that check, except allauth's account and MFA pages (to complete MFA or sign out), the language switch and the health checks. A GET is sent to MFA reauthentication (or enrollment, without a factor); anything else gets 403. Inside every write, `authorize_in_txn` checks it again whenever only a privileged grant covers the operation.
 - **Step-up.** Granting a privileged role sets `privilege_elevated_at` to the grant's database time (a role that starts later included), so every existing session of that user steps up before using any privileged grant.
 - **Secrets at rest**: `MFAAdapter` encrypts TOTP secrets and recovery-code seeds with `MultiFernet` over `MFA_ENCRYPTION_KEYS`. allauth's default adapter stores them in plaintext (a test proves it).
-- **Key rotation**: put a new key first in `MFA_ENCRYPTION_KEYS` and keep the old ones; new secrets use the new key and old ones still decrypt. Re-encrypting existing secrets and dropping old keys is an operator procedure (runbook, M8.5). Keep an offline copy of the keys; losing all of them means every user re-enrolls TOTP.
+- **Key rotation**: put a new key first in `MFA_ENCRYPTION_KEYS` and keep the old ones; new secrets use the new key and old ones still decrypt. No command re-encrypts existing secrets yet, so an old key stays listed until every account has been reset or has re-enrolled; rotation after a leak means resetting everyone's factors ([runbook](runbooks/user-admin.md#encryption-keys-mfa-and-outbox)). Keep an offline copy of the keys; losing all of them means every user re-enrolls TOTP.
 - Privileged accounts cannot remove their last second factor, whether they deactivate their TOTP or remove a passkey. Since M8.3 the passkey path asks too: `views.remove_webauthn` replaces allauth's view, which never did.
 - **Lost factors** (M8.3). `manage reset_mfa --operator <admin> --email <account> --reason "…"` (`services.reset_user_mfa`) removes every factor of the account and ends all its sessions, audited as `user.mfa_reset` with the reason. It needs `org.manage` (a superuser for a staff account), and nobody resets their own factors. The account's next sign-in enrolls a new factor where its roles need one. Check the person's identity first (runbook M8.5).
 
