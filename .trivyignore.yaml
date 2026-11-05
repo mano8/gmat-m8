@@ -116,13 +116,3 @@ vulnerabilities:
       filesystem. Compensating control: those container limits, plus the entry's
       expiry, which forces a re-review. Owner: maintainer (mano8).
     expired_at: 2026-12-31
-  - id: CVE-2026-119586
-    statement: >-
-      sqlite3 (libsqlite3-0) in the Debian 13 base image of the application image has
-      no fixed version yet (Debian tracker status 'affected' on 2026-11-01). Affects
-      command execution through the sqlite3 shell's .recover command, which is not reachable from the service: the application uses
-      PostgreSQL only and never loads SQLite. The application image runs as uid 1000
-      with every capability dropped, no-new-privileges and a read-only root
-      filesystem. Compensating control: those container limits, plus the entry's
-      expiry, which forces a re-review. Owner: maintainer (mano8).
-    expired_at: 2026-12-31
