@@ -149,3 +149,27 @@ def test_the_worker_healthcheck_reads_the_heartbeat(
         check=False,
     )
     assert (result.returncode == 0) is healthy
+
+
+@pytest.mark.parametrize(
+    ("state", "expected", "healthy"),
+    [
+        ("paused", "paused", True),
+        ("running", "paused", False),
+        ("running", "running,outbound-off", True),
+        ("outbound-off", "running,outbound-off", True),
+        ("paused", "running,outbound-off", False),
+        ("paused", "", True),
+    ],
+)
+def test_a_deploy_can_ask_the_heartbeat_for_a_state(
+    tmp_path: Path, state: str, expected: str, healthy: bool
+) -> None:
+    heartbeat = tmp_path / "heartbeat"
+    heartbeat.write_text(json.dumps({"state": state, "at": time.time()}))
+    result = subprocess.run(  # noqa: S603 (the interpreter running the tests)
+        [sys.executable, "-c", _healthcheck_script()],
+        env={"WORKER_HEARTBEAT_FILE": str(heartbeat), "WORKER_EXPECT_STATE": expected},
+        check=False,
+    )
+    assert (result.returncode == 0) is healthy

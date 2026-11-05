@@ -4,12 +4,13 @@
 #   web                     Gunicorn (gthread), the only long-running web process
 #   runserver               Django's development server (the `dev` target only)
 #   worker                  outbox sender + housekeeping (honours flags/worker.paused, OUTBOUND_EMAIL)
-#   worker-healthcheck      exit 0 when the worker's heartbeat is recent (paused or not)
+#   worker-healthcheck      exit 0 when the worker's heartbeat is recent (paused or not;
+#                           WORKER_EXPECT_STATE=paused|running,... also checks its state)
 #   migrate                 migrate + createcachetable, run once by the `migrate` service
 #   check                   manage.py check --deploy; any warning is a failure
 #   migrate-plan            lists pending migrations, read only
-#   verify-internal         deploy-time checks against web:8000 (arrives with M8.4)
-#   post-restore-reconcile  access reconciliation after a restore (arrives with M8.4)
+#   verify-internal         deploy-time checks against web:8000, bypassing the gate (plan §9)
+#   post-restore-reconcile  security, MFA and outbox reconciliation after a restore (plan §9)
 #   healthcheck             exit 0 when the local web process answers /healthz/
 #   manage <args...>        any other management command
 #
@@ -17,11 +18,6 @@
 set -euo pipefail
 
 cd /app
-
-not_yet() {
-    echo "entrypoint: '$1' is introduced in $2 and is not available in this build." >&2
-    exit 78
-}
 
 command="${1:-web}"
 if [ "$#" -gt 0 ]; then
@@ -49,10 +45,12 @@ import time
 
 path = os.environ.get("WORKER_HEARTBEAT_FILE", "/tmp/gmat-worker.heartbeat")
 max_age = float(os.environ.get("WORKER_HEARTBEAT_MAX_AGE", "120"))
+expected = [state for state in os.environ.get("WORKER_EXPECT_STATE", "").split(",") if state]
 try:
     with open(path, encoding="utf-8") as handle:
         beat = json.load(handle)
-    sys.exit(0 if time.time() - float(beat["at"]) <= max_age else 1)
+    fresh = time.time() - float(beat["at"]) <= max_age
+    sys.exit(0 if fresh and (not expected or beat.get("state") in expected) else 1)
 except Exception:
     sys.exit(1)
 PY
@@ -70,10 +68,12 @@ PY
         exec python manage.py migrate --plan
         ;;
     verify-internal)
-        not_yet verify-internal M8.4
+        python manage.py check --deploy --fail-level WARNING
+        python manage.py migrate --check
+        exec python manage.py verify_internal "$@"
         ;;
     post-restore-reconcile)
-        not_yet post-restore-reconcile M8.4
+        exec python manage.py post_restore_reconcile "$@"
         ;;
     healthcheck)
         # No curl in the image. Django validates the Host header, so send the first allowed
