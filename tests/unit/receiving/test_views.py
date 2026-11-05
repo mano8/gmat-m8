@@ -371,7 +371,49 @@ class TestPosting:
         data = receipt_payload(wo, order, org.warehouses["A Madrid"], **{f"qty_{line.pk}": "11"})
         response = post(wo, order, data, follow=False)
         assert response.status_code == 200
-        assert "only 10 remain to be received" in response.content.decode()
+        assert "more than remains to be received" in response.content.decode()
+        assert GoodsReceipt.objects.count() == 0
+
+    def test_a_site_manager_over_receiving_never_learns_the_order_lines_outstanding_quantity(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy
+    ) -> None:
+        # One order line of 2352: 7 for the site manager's project, 2345 for another (§3.4).
+        order = buy((make_line("7"), "7"), (make_line("2345", project=org.sev_for_mad), "2345"))
+        line = only_line(order)
+        sm = client_for(people.site_manager)
+        place = org.worksite(org.hospital)
+        data = receipt_payload(sm, order, place, **{f"qty_{line.pk}": "9000"})
+        response = post(sm, order, data, follow=False)
+        html = response.content.decode()
+        text = re.sub(r"<[^>]+>", " ", html)
+        assert response.status_code == 200
+        assert "more than remains to be received" in html
+        assert not re.search(r"2[\s.,']?352|2[\s.,']?345", text)
+        assert GoodsReceipt.objects.count() == 0
+
+    def test_whether_a_quantity_fits_the_order_line_is_judged_after_the_split(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy
+    ) -> None:
+        # The refusal is the same for a quantity that fits the line and one that does not, so
+        # the order of the checks tells nothing about the other project's 6.
+        first = make_line("4")
+        order = buy((first, "4"), (make_line("6", project=org.sev_for_mad), "6"))
+        line = only_line(order)
+        sm = client_for(people.site_manager)
+        place = org.worksite(org.hospital)
+        for qty in ("9", "11"):
+            data = receipt_payload(
+                sm,
+                order,
+                place,
+                **{
+                    f"qty_{line.pk}": qty,
+                    f"manual_{line.pk}": "on",
+                    f"split_{line.pk}_{allocation(order, first).pk}": "5",
+                },
+            )
+            html = post(sm, order, data, follow=False).content.decode()
+            assert "can take at most" in html and "more than remains" not in html
         assert GoodsReceipt.objects.count() == 0
 
     def test_an_empty_form_and_a_missing_place_are_not_posted(
