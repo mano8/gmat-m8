@@ -106,11 +106,23 @@ class TestInvitationPages:
         assert user.check_password(PASSWORD)
         assert Membership.objects.get(user=user).role == Role.WAREHOUSE_OPERATOR
 
-    def test_links_are_rate_limited(self) -> None:
+    @pytest.mark.parametrize(
+        ("link", "page"),
+        [("invitations:link", "invitations:accept"), ("email_change:link", "email_change:confirm")],
+    )
+    def test_links_are_rate_limited_and_the_429_never_shows_at_the_token_url(
+        self, link: str, page: str
+    ) -> None:
         client = Client()
-        path = reverse("invitations:link", args=["B" * 43])
-        statuses = [client.get(path).status_code for _ in range(21)]
-        assert statuses[:20] == [302] * 20 and statuses[20] == 429
+        path = reverse(link, args=["B" * 43])
+        assert [client.get(path).status_code for _ in range(20)] == [302] * 20
+        stored = dict(client.session)
+        limited = client.get(reverse(link, args=["C" * 43]))
+        # Not answered where the token sits (address bar, history): the token-less page is.
+        assert limited.status_code == 302 and limited["Location"] == reverse(page)
+        assert {key: value for key, value in client.session.items() if key in stored} == stored
+        assert client.get(limited["Location"]).status_code == 429
+        assert client.get(limited["Location"]).status_code != 429  # once
 
     def test_the_language_switcher_never_returns_to_a_token_page(
         self, invite: Callable[..., Invitation]

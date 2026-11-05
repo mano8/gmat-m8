@@ -78,6 +78,8 @@ remove_webauthn = RemoveWebAuthnView.as_view()
 INVITATION_SESSION_KEY = "_gmat_invitation"
 EMAIL_CHANGE_SESSION_KEY = "_gmat_email_change"
 TOKEN_RATE_LIMITS = {"token": "20/m/ip"}
+# A link over the rate limit: its 429 is shown by the token-less page it redirects to.
+LIMITED_SESSION_KEY = "_gmat_token_limited"
 
 
 def _rate_limited(request: HttpRequest) -> HttpResponse | None:
@@ -85,6 +87,19 @@ def _rate_limited(request: HttpRequest) -> HttpResponse | None:
         request, app="allauth.account", action="token", config=TOKEN_RATE_LIMITS, limit_get=True
     )
     return response
+
+
+def _limited_link(request: HttpRequest, page: str) -> HttpResponse:
+    """Never answer a limited link where the token sits (address bar, history)."""
+    request.session[LIMITED_SESSION_KEY] = True
+    return redirect(page)
+
+
+def _limited_page(request: HttpRequest) -> HttpResponse | None:
+    """The 429 of the link that led here, once."""
+    if request.session.pop(LIMITED_SESSION_KEY, False):
+        return HttpResponse(status=429)
+    return None
 
 
 def _session_user_id(request: HttpRequest) -> UUID | None:
@@ -104,9 +119,8 @@ def _done(request: HttpRequest, message: str) -> HttpResponse:
 
 @require_safe
 def invitation_link(request: HttpRequest, token: str) -> HttpResponse:
-    limited = _rate_limited(request)
-    if limited is not None:
-        return limited
+    if _rate_limited(request) is not None:
+        return _limited_link(request, "invitations:accept")
     request.session[INVITATION_SESSION_KEY] = hash_token(token)
     return redirect("invitations:accept")
 
@@ -139,6 +153,9 @@ def _invitation_page(
 
 @require_safe
 def invitation_accept(request: HttpRequest) -> HttpResponse:
+    limited = _limited_page(request)
+    if limited is not None:
+        return limited
     invitation = selectors.invitation_by_hash(request.session.get(INVITATION_SESSION_KEY))
     if invitation is None:
         return _invalid(request)
@@ -178,9 +195,8 @@ def invitation_submit(request: HttpRequest) -> HttpResponse:
 
 @require_safe
 def email_change_link(request: HttpRequest, token: str) -> HttpResponse:
-    limited = _rate_limited(request)
-    if limited is not None:
-        return limited
+    if _rate_limited(request) is not None:
+        return _limited_link(request, "email_change:confirm")
     token_hash = hash_token(token)
     request.session[EMAIL_CHANGE_SESSION_KEY] = token_hash
     found = selectors.email_change_by_hash(token_hash)
@@ -198,6 +214,9 @@ def _email_change(
 
 
 def _email_change_page(request: HttpRequest, action: tokens.EmailChangeAction) -> HttpResponse:
+    limited = _limited_page(request)
+    if limited is not None:
+        return limited
     change = _email_change(request, action)
     if change is None:
         return _invalid(request)
