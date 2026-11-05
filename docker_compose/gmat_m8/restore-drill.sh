@@ -187,6 +187,7 @@ for host, port in (("1.1.1.1", 443), ("1.1.1.1", 587), ("smtp.gmail.com", 587)):
 
 check_reconciled() { # check_reconciled ATTEMPTS_BEFORE
     expect_value "no session row left" "SELECT count(*) FROM django_session;" 0
+    expect_value "no row left in the session list" "SELECT count(*) FROM usersessions_usersession;" 0
     expect_value "no pending invitation" \
         "SELECT count(*) FROM accounts_invitation WHERE accepted_at IS NULL AND revoked_at IS NULL;" 0
     expect_value "no open email change" \

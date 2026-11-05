@@ -31,6 +31,7 @@ from typing import Any
 from uuid import UUID
 
 from allauth.mfa.models import Authenticator
+from allauth.usersessions.models import UserSession
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.db.models import F, Q
@@ -108,6 +109,7 @@ def _require_operator(actor: User) -> None:
 
 def _end_sessions(report: Report) -> None:
     report.sessions_deleted, _details = Session.objects.all().delete()
+    UserSession.objects.all().delete()
     report.session_epochs_bumped = User.objects.update(session_epoch=F("session_epoch") + 1)
 
 

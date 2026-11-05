@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from allauth.account.views import PasswordResetFromKeyView as AllauthPasswordResetFromKeyView
@@ -6,6 +6,7 @@ from allauth.core.internal.ratelimit import consume_or_429
 from allauth.mfa.adapter import get_adapter as get_mfa_adapter
 from allauth.mfa.webauthn.views import RemoveWebAuthnView as AllauthRemoveWebAuthnView
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.decorators import method_decorator
@@ -14,14 +15,16 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST, require_safe
 
 from apps.access.exceptions import AccessDenied
+from apps.access.middleware import access_for
 from apps.accounts import selectors, services, tokens
 from apps.accounts.adapters import PasswordResetTokenInvalid
 from apps.accounts.forms import AcceptInvitationForm, ResetPasswordKeyForm
-from apps.accounts.models import EmailChangeRequest, Invitation
+from apps.accounts.models import EmailChangeRequest, Invitation, User
+from apps.accounts.security_log import log_event
 from apps.accounts.tokens import hash_token
 from apps.core.http import client_ip
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict
+from apps.core.responses import conflict, perform
 
 
 @method_decorator(sensitive_post_parameters("password1", "password2"), name="dispatch")
@@ -273,3 +276,48 @@ def email_change_cancel(request: HttpRequest) -> HttpResponse:
 @require_POST
 def email_change_cancel_submit(request: HttpRequest) -> HttpResponse:
     return _email_change_submit(request, "cancel")
+
+
+# --- one's own sessions (M8.3, X5) ------------------------------------------------------
+
+
+@require_safe
+@login_required
+def sessions_list(request: HttpRequest) -> HttpResponse:
+    """Where the signed-in user is signed in. Theirs alone: nothing reads anyone else's."""
+    sessions = selectors.own_sessions(cast(User, request.user), _current_key(request))
+    context = {"sessions": sessions, "others": any(not item.current for item in sessions)}
+    return render(request, "accounts/sessions.html", context)
+
+
+def _current_key(request: HttpRequest) -> str:
+    """A signed-in request always has a saved session."""
+    return cast(str, request.session.session_key)
+
+
+def _log_ended(request: HttpRequest, count: int) -> None:
+    log_event("sessions_ended", request, request.user, count=str(count))
+
+
+@require_POST
+@login_required
+def session_end(request: HttpRequest, session_id: int) -> HttpResponse:
+    principal = access_for(request).principal
+
+    def call() -> None:
+        ended = services.end_own_session(principal, session_id, current_key=_current_key(request))
+        _log_ended(request, ended)
+
+    return perform(request, call, _("That session has ended."), "sessions:list")
+
+
+@require_POST
+@login_required
+def sessions_end_others(request: HttpRequest) -> HttpResponse:
+    principal = access_for(request).principal
+
+    def call() -> None:
+        ended = services.end_other_sessions(principal, current_key=_current_key(request))
+        _log_ended(request, ended)
+
+    return perform(request, call, _("Your other sessions have ended."), "sessions:list")

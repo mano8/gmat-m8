@@ -4,18 +4,20 @@ Users, invitations and email changes change through the in-app screens and their
 (M2.6), never in the admin; token hashes are never displayed.
 The third-party registrations (Django's groups, allauth's email addresses and
 authenticators) are replaced: groups are unused, and the others are read-only, with MFA
-secrets never displayed.
+secrets never displayed. allauth's session list is not in the admin at all: it holds session
+keys and each person's addresses and browsers, and only its owner reads it.
 """
 
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
+from allauth.usersessions.models import UserSession
 from django.contrib import admin
 from django.contrib.auth.models import Group
 
 from apps.accounts.models import EmailChangeRequest, Invitation, User
 from apps.core.admin import ReadOnlyModelAdmin
 
-for model in (Group, EmailAddress, Authenticator):
+for model in (Group, EmailAddress, Authenticator, UserSession):
     if admin.site.is_registered(model):
         admin.site.unregister(model)
 

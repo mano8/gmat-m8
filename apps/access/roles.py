@@ -91,6 +91,10 @@ COMPANY_ROLES = frozenset({Role.PARTNER_REQUESTER})
 # Roles that require MFA; granting one sets ``User.privilege_elevated_at`` (plan §3.6, §5).
 PRIVILEGED_ROLES = frozenset({Role.GROUP_ADMIN, Role.MATERIAL_MANAGER, Role.ENGINEER})
 
+# Not a role's capability: what any signed-in session may do to its own account, whatever its
+# memberships say (its own sessions, M8.3). ``authorize_in_txn`` checks the session itself.
+OWN_ACCOUNT = "account.own"
+
 # Roles that decide their own requests whatever ``allow_self_approval`` says (Q33,
 # ADR-0014): judged by the membership whose grant covers the request (S6). All privileged.
 SELF_DECIDING_ROLES = frozenset({Role.GROUP_ADMIN, Role.MATERIAL_MANAGER, Role.ENGINEER})

@@ -188,7 +188,7 @@ class TestBackupScripts:
         assert match
         excluded = set(match.group(1).split())
         cache_table = settings.CACHES["default"]["LOCATION"]
-        assert excluded == {"django_session", cache_table}
+        assert excluded == {"django_session", "usersessions_usersession", cache_table}
 
     def test_backup_follows_the_snapshot_protocol(self) -> None:
         backup = _text(DOCKER / "backup" / "backup.sh")

@@ -14,12 +14,13 @@ class AccountsConfig(AppConfig):
             authenticator_removed,
             authenticator_reset,
         )
-        from django.contrib.auth.signals import user_logged_in
+        from django.contrib.auth.signals import user_logged_in, user_logged_out
 
         from apps.accounts import eligibility, housekeeping, security_log, signals
         from apps.notifications.housekeeping import register_task
 
         user_logged_in.connect(signals.on_user_logged_in, dispatch_uid="gmat-session-start")
+        user_logged_out.connect(signals.on_user_logged_out, dispatch_uid="gmat-session-end")
         authenticator_removed.connect(
             signals.on_authenticator_removed, dispatch_uid="gmat-authenticator-removed"
         )
@@ -39,6 +40,7 @@ class AccountsConfig(AppConfig):
         security_log.connect()
         eligibility.register()
         register_task(housekeeping.TASK_NAME, housekeeping.apply_due_email_changes)
+        register_task(housekeeping.SESSIONS_TASK_NAME, housekeeping.purge_ended_sessions)
 
 
 class AdminConfig(DjangoAdminConfig):

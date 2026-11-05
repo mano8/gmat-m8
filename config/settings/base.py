@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "allauth",
     "allauth.account",
     "allauth.mfa",
+    "allauth.usersessions",  # the list of one's own sessions (M8.3, X5)
     # Project apps last: their admin modules replace third-party registrations.
     "apps.core",
     "apps.accounts.apps.AccountsConfig",
@@ -190,6 +191,12 @@ CACHES = {
 # --- sessions and cookies -------------------------------------------------------------
 SESSION_COOKIE_AGE = env_int("DJANGO_SESSION_AGE_SECONDS", 14 * 24 * 3600, minimum=300)
 PRIVILEGED_SESSION_AGE = env_int("DJANGO_PRIVILEGED_SESSION_AGE_SECONDS", 12 * 3600, minimum=300)
+# Inactivity ends a session long before its age does (M8.3, X6). What counts as activity:
+# apps.accounts.sessions.touch_session.
+SESSION_IDLE = env_int("DJANGO_SESSION_IDLE_SECONDS", 2 * 3600, minimum=300)
+PRIVILEGED_SESSION_IDLE = env_int("DJANGO_PRIVILEGED_SESSION_IDLE_SECONDS", 30 * 60, minimum=300)
+# Seconds between writes of the last activity to the session and to the session list.
+SESSION_TOUCH_INTERVAL = 60
 SESSION_COOKIE_NAME = "__Host-sessionid"
 CSRF_COOKIE_NAME = "__Host-csrftoken"
 SESSION_COOKIE_SECURE = True

@@ -8,9 +8,9 @@
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_SQL="$LIB_DIR/manifest.sql"
 
-# Tables whose rows are deliberately left out of every dump (plan §9): live session keys and
-# rate-limit counters must not travel in a backup.
-EXCLUDED_DATA_TABLES=(django_session django_cache)
+# Tables whose rows are deliberately left out of every dump (plan §9): live session keys, the
+# session list's keys, addresses and browsers, and rate-limit counters must not travel in a backup.
+EXCLUDED_DATA_TABLES=(django_session usersessions_usersession django_cache)
 
 # One bigint key for the media/backup coordination lock. The worker's housekeeping takes the
 # same key with pg_try_advisory_lock before purging soft-deleted media (plan §9).

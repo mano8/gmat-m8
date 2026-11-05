@@ -20,6 +20,9 @@ principal type.
    ``privilege_elevated_at`` (``MFARequired``);
 6. any denial raises, and the service's transaction rolls back.
 
+``OWN_ACCOUNT`` is not a role's capability: steps 1-2, then session MFA if the account is
+privileged. A session acts on its own account whatever its memberships say.
+
 **Operator principal**: steps 1-4 for the command's one capability; no session exists, so
 neither the epoch nor MFA applies (the audit shows ``via=cli:<command>``).
 
@@ -48,7 +51,7 @@ from apps.access.exceptions import (
     TokenRejected,
 )
 from apps.access.generations import lock_access_state, lock_users
-from apps.access.policy import mfa_satisfied, require_may_manage_account
+from apps.access.policy import is_privileged, mfa_satisfied, require_may_manage_account
 from apps.access.principals import (
     AnyPrincipal,
     OperatorPrincipal,
@@ -56,7 +59,7 @@ from apps.access.principals import (
     SystemPrincipal,
     TokenPrincipal,
 )
-from apps.access.roles import SELF_DECIDING_ROLES, Capability
+from apps.access.roles import OWN_ACCOUNT, SELF_DECIDING_ROLES, Capability
 from apps.access.scopes import Scope, object_in_scope
 from apps.accounts.models import User
 from apps.core.locking import LockMode, LockOrder, LockOutsideTransaction
@@ -126,6 +129,9 @@ def _authorize_user(
     if isinstance(principal, SessionPrincipal):
         if principal.session_epoch != user.session_epoch:
             raise StaleSession("The session predates a change to this account")
+        if capability == OWN_ACCOUNT:
+            _require_own_account_mfa(principal, user)
+            return user
     elif capability != principal.capability:
         raise AccessDenied(f"{principal.via} runs with {principal.capability} only")
     ctx = AccessContext.for_user(user)
@@ -135,6 +141,11 @@ def _authorize_user(
             raise NotInScope(read)
     _require_scope(principal, user, ctx.scope_for(capability), objects)
     return user
+
+
+def _require_own_account_mfa(principal: SessionPrincipal, user: User) -> None:
+    if is_privileged(user) and not mfa_satisfied(principal.mfa_at, user.privilege_elevated_at):
+        raise MFARequired(OWN_ACCOUNT)
 
 
 def _require_scope(

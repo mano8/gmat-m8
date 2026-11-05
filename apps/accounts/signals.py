@@ -7,6 +7,7 @@ security log has them too, but a container's log does not outlive it.
 
 from typing import Any
 
+from allauth.usersessions.models import UserSession
 from django.contrib import messages
 from django.db import transaction
 from django.http import HttpRequest
@@ -43,6 +44,13 @@ def on_user_logged_in(sender: Any, request: HttpRequest | None, user: Any, **kwa
             _("Your recovery codes stopped working after a restore. Generate a new set."),
             fail_silently=True,
         )
+
+
+def on_user_logged_out(sender: Any, request: HttpRequest | None, **kwargs: Any) -> None:
+    """The session list's row goes with its session: it holds an address and a browser."""
+    session = getattr(request, "session", None)
+    if session is not None and session.session_key:
+        UserSession.objects.filter(session_key=session.session_key).delete()
 
 
 def on_authenticator_removed(

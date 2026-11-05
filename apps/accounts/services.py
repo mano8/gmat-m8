@@ -11,6 +11,7 @@ sensitive security messages; their links carry the raw token, which nothing else
 - Token principals (``apps.accounts.tokens``) accept an invitation, or confirm or cancel an
   email change, each exactly once.
 - ``bootstrap_admin`` invites the first group administrator while none exists (F76).
+- Anyone signed in ends their own other sessions (M8.3, X5).
 - The worker applies confirmed email changes after the cooling-off
   (``apps.accounts.housekeeping``).
 """
@@ -23,7 +24,9 @@ from uuid import UUID
 
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
+from allauth.usersessions.models import UserSession
 from django.conf import settings
+from django.contrib.sessions.backends.db import SessionStore
 from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -35,8 +38,8 @@ from apps.access.authorization import authorize_in_txn
 from apps.access.exceptions import TokenRejected
 from apps.access.generations import lock_access_state, lock_users
 from apps.access.policy import platform_operator_flags, require_may_manage_account
-from apps.access.principals import Principal, TokenPrincipal
-from apps.access.roles import PRIVILEGED_ROLES, Capability, Role
+from apps.access.principals import Principal, SessionPrincipal, TokenPrincipal
+from apps.access.roles import OWN_ACCOUNT, PRIVILEGED_ROLES, Capability, Role
 from apps.accounts import tokens
 from apps.accounts.mfa import reset_mfa
 from apps.accounts.models import EmailChangeRequest, Invitation, User
@@ -645,6 +648,40 @@ def reset_user_mfa(principal: Principal, user_id: UUID, *, reason: str) -> User:
     )
     events.publish("user.mfa_reset", user_id=user.pk)
     return user
+
+
+# --- one's own sessions (M8.3, X5) ------------------------------------------------------
+
+
+def _end_sessions(principal: Principal, user: User, rows: Sequence[UserSession]) -> int:
+    """End these sessions now and audit it. A restore ends every session, so unlike what takes
+    a credential away, this needs no replay (``apps.recovery.replay``)."""
+    store = SessionStore()
+    for row in rows:
+        store.delete(row.session_key)
+        row.delete()
+    if rows:
+        record(principal.audit_identity, "user.sessions_ended", obj=user, data={"count": len(rows)})
+    return len(rows)
+
+
+@transactional
+def end_own_session(principal: SessionPrincipal, session_id: int, *, current_key: str) -> int:
+    """End one other session of the signed-in user; how many ended (0: it had ended already,
+    or it is not theirs, which looks the same)."""
+    user = authorize_in_txn(principal, OWN_ACCOUNT, locks=LockOrder())
+    rows = list(UserSession.objects.filter(user=user, pk=session_id))
+    if any(row.session_key == current_key for row in rows):
+        raise ValidationError(_("Sign out to end this session."), code="current")
+    return _end_sessions(principal, user, rows)
+
+
+@transactional
+def end_other_sessions(principal: SessionPrincipal, *, current_key: str) -> int:
+    """End every session of the signed-in user but this one; how many ended."""
+    user = authorize_in_txn(principal, OWN_ACCOUNT, locks=LockOrder())
+    rows = list(UserSession.objects.filter(user=user).exclude(session_key=current_key))
+    return _end_sessions(principal, user, rows)
 
 
 # --- email changes ---------------------------------------------------------------------
