@@ -288,6 +288,10 @@ def test_maintenance_flag_gates_the_public_site_but_not_web(stack: Stack) -> Non
         assert gated.header("retry-after")
         assert "no-store" in (gated.header("cache-control") or "")
         assert stack.get("/healthz/").status == 503
+        # A form post gets the page as well, and never reaches Django.
+        posted = stack.request("POST", "/accounts/login/", body=b"login=x&password=y")
+        assert posted.status == 503
+        assert "Mantenimiento" in posted.text
         # web itself keeps answering inside the stack, so a deploy can verify it before opening.
         internal = stack.compose(
             "exec",
@@ -312,6 +316,8 @@ def test_the_fallback_page_replaces_a_missing_web(stack: Stack) -> None:
         gone = stack.get("/accounts/login/")
         assert gone.status == 503
         assert "Mantenimiento" in gone.text
+        posted = stack.request("POST", "/accounts/login/", body=b"login=x&password=y")
+        assert posted.status == 503
     finally:
         stack.wait_healthy("web")
     assert stack.get("/accounts/login/").status == 200
