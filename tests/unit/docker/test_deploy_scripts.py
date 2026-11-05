@@ -212,12 +212,19 @@ class TestRefused:
         assert ready.run("deploy.sh", *args).returncode == 64
 
     def test_an_open_admin_allowlist(self, ready: World) -> None:
+        """No flag gets past it (M8.3): X10 was not accepted."""
         ready._set_env("ADMIN_ALLOWED_CIDRS", "0.0.0.0/0 ::/0")
+        ready.env["DEPLOY_ALLOW_OPEN_ADMIN"] = "1"
         result = ready.run("deploy.sh", VERSION)
         assert result.returncode != 0
         assert "open to every network" in result.stderr
-        ready.env["DEPLOY_ALLOW_OPEN_ADMIN"] = "1"
-        assert ready.run("deploy.sh", VERSION).returncode == 0
+        assert ready.gates() == (False, False)
+
+    def test_no_admin_allowlist(self, ready: World) -> None:
+        ready._set_env("ADMIN_ALLOWED_CIDRS", "")
+        result = ready.run("deploy.sh", VERSION)
+        assert result.returncode != 0
+        assert "ADMIN_ALLOWED_CIDRS" in result.stderr
 
     def test_no_offsite_repository(self, ready: World) -> None:
         ready._set_env("RESTIC_REPOSITORY", "")

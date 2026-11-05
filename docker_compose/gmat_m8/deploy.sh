@@ -120,10 +120,8 @@ check_env_files() {
     if [ -z "$(env_value RESTIC_REPOSITORY)" ] && [ "${DEPLOY_ALLOW_NO_OFFSITE:-0}" != 1 ]; then
         die "RESTIC_REPOSITORY is empty: the pre-deploy dump needs its offsite copy"
     fi
-    if [ "${DEPLOY_ALLOW_OPEN_ADMIN:-0}" != 1 ]; then
-        python3 ops/checks.py admin-cidrs "$(env_value ADMIN_ALLOWED_CIDRS)" \
-            || die "set ADMIN_ALLOWED_CIDRS (exception X10 in docs/security.md)"
-    fi
+    python3 ops/checks.py admin-cidrs "$(env_value ADMIN_ALLOWED_CIDRS)" \
+        || die "set ADMIN_ALLOWED_CIDRS in .env: who may reach the admin (runbook vps-setup.md)"
 }
 
 # The compose files on this machine must be the release's own. Outside a git checkout (a

@@ -116,6 +116,12 @@ def test_production_runs_the_worker_from_the_signed_digest() -> None:
     assert worker["image"] == "ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}"
 
 
+def test_production_needs_an_explicit_admin_allowlist() -> None:
+    """M8.3, X10: the base file's open default never reaches production."""
+    caddy = compose("docker-compose.production.yml")["services"]["caddy"]
+    assert caddy["environment"]["ADMIN_ALLOWED_CIDRS"].startswith("${ADMIN_ALLOWED_CIDRS:?")
+
+
 def test_the_restore_drill_never_sends() -> None:
     drill = compose("docker-compose.restore-drill.yml")
     assert drill["services"]["worker"]["environment"]["OUTBOUND_EMAIL"] == "off"
