@@ -204,6 +204,14 @@ msgstr ""
 msgid "You cannot offboard your own account."
 msgstr "Vous ne pouvez pas désactiver votre propre compte."
 
+#: apps/accounts/services.py:633
+msgid "You cannot reset your own second factors."
+msgstr "Vous ne pouvez pas réinitialiser vos propres seconds facteurs."
+
+#: apps/accounts/services.py:636
+msgid "Give the reason."
+msgstr "Indiquez le motif."
+
 #: apps/accounts/services.py:591
 msgid "This account is already offboarded."
 msgstr "Ce compte est déjà désactivé."
@@ -429,6 +437,10 @@ msgstr "Invitation acceptée. Votre nouvel accès est prêt."
 #: apps/accounts/views.py:156
 msgid "Your account is ready. Sign in to continue."
 msgstr "Votre compte est prêt. Connectez-vous pour continuer."
+
+#: apps/accounts/views.py:60
+msgid "Your role needs a second factor: add another first."
+msgstr "Votre rôle exige un second facteur : ajoutez-en un autre d'abord."
 
 #: apps/accounts/views.py:215
 msgid "Address confirmed. The change applies after the waiting period."
@@ -5251,10 +5263,10 @@ msgstr "Choisissez un incident."
 msgid "Line %(line)s has nothing left to receive."
 msgstr "La ligne %(line)s n'a plus rien à réceptionner."
 
-#: apps/receiving/services.py:232
+#: apps/receiving/services.py:237
 #, python-format
-msgid "Line %(line)s: only %(remaining)s remain to be received."
-msgstr "Ligne %(line)s : il ne reste que %(remaining)s à réceptionner."
+msgid "Line %(line)s: more than remains to be received on this order."
+msgstr "Ligne %(line)s : plus que ce qui reste à réceptionner sur cette commande."
 
 #: apps/receiving/services.py:259
 msgid "A line is not on this order."

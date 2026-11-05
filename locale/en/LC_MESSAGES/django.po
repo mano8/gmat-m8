@@ -202,6 +202,14 @@ msgstr ""
 msgid "You cannot offboard your own account."
 msgstr ""
 
+#: apps/accounts/services.py:633
+msgid "You cannot reset your own second factors."
+msgstr ""
+
+#: apps/accounts/services.py:636
+msgid "Give the reason."
+msgstr ""
+
 #: apps/accounts/services.py:591
 msgid "This account is already offboarded."
 msgstr ""
@@ -393,6 +401,10 @@ msgstr ""
 
 #: apps/accounts/views.py:156
 msgid "Your account is ready. Sign in to continue."
+msgstr ""
+
+#: apps/accounts/views.py:60
+msgid "Your role needs a second factor: add another first."
 msgstr ""
 
 #: apps/accounts/views.py:215
@@ -5061,9 +5073,9 @@ msgstr ""
 msgid "Line %(line)s has nothing left to receive."
 msgstr ""
 
-#: apps/receiving/services.py:232
+#: apps/receiving/services.py:237
 #, python-format
-msgid "Line %(line)s: only %(remaining)s remain to be received."
+msgid "Line %(line)s: more than remains to be received on this order."
 msgstr ""
 
 #: apps/receiving/services.py:259
