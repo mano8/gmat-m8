@@ -189,8 +189,8 @@ services:
       - maintenance_work_mem=64MB
       - -c
       - max_connections=60
-      - -c
-      - log_min_duration_statement=1000
+      # No slow-statement log: Django binds parameters on the client, so a logged statement
+      # would carry its values (names, addresses, notes) into the db log (M8.3).
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gmat}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}

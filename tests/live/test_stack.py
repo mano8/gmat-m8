@@ -239,6 +239,11 @@ def test_the_sentinel_never_reaches_a_log(stack: Stack) -> None:
     link_token = f"{sentinel}{'x' * (43 - len(sentinel))}"
     stack.get(f"/invite/{link_token}/", headers=hostile)
     stack.get(f"/account/email-change/{link_token}/?token={sentinel}", headers=hostile)
+    # The same links opened without their trailing slash: Django's slash-appending 301 points
+    # at the token URL, so the response's Location must stay out of the access log too.
+    for slashless in (f"/invite/{link_token}", token_path.rstrip("/")):
+        moved = stack.get(slashless, headers=hostile)
+        assert moved.status == 301 and sentinel in (moved.header("location") or "")
     stack.get(f"/accounts/login/?next=/x/{sentinel}/", headers=hostile)
     stack.get("/no-such-page/", headers=hostile)
     stack.get(f"/healthz/?probe={sentinel}", headers=hostile)

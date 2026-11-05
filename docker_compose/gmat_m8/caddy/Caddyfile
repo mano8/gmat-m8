@@ -39,6 +39,7 @@
 				request>uri regexp "^(/accounts/password/reset/key/|/account/email-change/|/invite/)[^?]*|(\?).*$" "${1}${2}REDACTED"
 				request>headers>Referer delete
 				request>headers>Hx-Current-Url delete
+				resp_headers>Location delete
 			}
 		}
 	}
@@ -111,8 +112,10 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 	}
 
 	# The only access log. Token-bearing paths and every query string are redacted, and the
-	# headers that can carry a full URL are dropped. Credential headers (Cookie,
-	# Authorization) stay redacted by Caddy's default; never enable log_credentials.
+	# headers that can carry a full URL are dropped: Referer and HX-Current-URL, and the
+	# response's Location (Django's slash-appending 301 for a token link opened without its
+	# trailing slash points at the token URL). Credential headers (Cookie, Authorization)
+	# stay redacted by Caddy's default; never enable log_credentials.
 	log {
 		output stdout
 		format filter {
@@ -121,6 +124,7 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 				request>uri regexp "^(/accounts/password/reset/key/|/account/email-change/|/invite/)[^?]*|(\?).*$" "${1}${2}REDACTED"
 				request>headers>Referer delete
 				request>headers>Hx-Current-Url delete
+				resp_headers>Location delete
 			}
 		}
 	}
