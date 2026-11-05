@@ -25,6 +25,7 @@ from uuid import UUID
 from allauth.account.models import EmailAddress
 from allauth.mfa.models import Authenticator
 from allauth.usersessions.models import UserSession
+from cryptography.fernet import InvalidToken
 from django.conf import settings
 from django.contrib.sessions.backends.db import SessionStore
 from django.core.exceptions import ValidationError
@@ -41,6 +42,7 @@ from apps.access.policy import platform_operator_flags, require_may_manage_accou
 from apps.access.principals import Principal, SessionPrincipal, TokenPrincipal
 from apps.access.roles import OWN_ACCOUNT, PRIVILEGED_ROLES, Capability, Role
 from apps.accounts import tokens
+from apps.accounts.adapters import MFAAdapter
 from apps.accounts.mfa import reset_mfa
 from apps.accounts.models import EmailChangeRequest, Invitation, User
 from apps.accounts.revocation import revoke_pending_tokens
@@ -65,6 +67,8 @@ INVITATION_MAIL = "invitation"
 EMAIL_CHANGE_CONFIRM_MAIL = "email_change.confirm"
 EMAIL_CHANGE_NOTICE_MAIL = "email_change.cancel"
 MFA_RESET_MAIL = "mfa_reset"
+# Where allauth keeps what MFA_ENCRYPTION_KEYS encrypts: a TOTP secret, a recovery-code seed.
+MFA_SECRET_FIELDS = frozenset({"secret", "seed"})
 
 REASON_RESENT = "resent"
 REASON_REPLACED = "replaced"
@@ -659,6 +663,58 @@ def reset_user_mfa(principal: Principal, user_id: UUID, *, reason: str) -> User:
     )
     events.publish("user.mfa_reset", user_id=user.pk)
     return user
+
+
+# --- the MFA encryption key (M8.5) -----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MfaReencryption:
+    """What a run did: secrets moved to the newest key, already there, and the accounts no
+    listed key opens (their owners cannot pass MFA until ``reset_user_mfa``)."""
+
+    moved: int
+    already: int
+    unreadable: tuple[UUID, ...]
+
+
+def _reencrypted(data: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """``data`` with its secret under the newest key, and whether that changed anything.
+    Passkeys hold no secret of ours."""
+    adapter = MFAAdapter()
+    for field in MFA_SECRET_FIELDS & set(data):
+        if adapter.is_under_newest_key(data[field]):
+            return data, False
+        return {**data, field: adapter.reencrypt(data[field])}, True
+    return data, False
+
+
+@transactional
+def reencrypt_mfa_secrets(principal: Principal) -> MfaReencryption:
+    """Move every stored second-factor secret to the first of ``MFA_ENCRYPTION_KEYS``, so an old
+    key can leave the list. Idempotent: run it again, and ``moved`` 0 says none is left behind
+    (a sign-in in progress may have written an old value back)."""
+    authorize_in_txn(principal, Capability.ORG_MANAGE, locks=LockOrder())
+    moved, already = 0, 0
+    unreadable: list[UUID] = []
+    for authenticator in Authenticator.objects.select_for_update().order_by("pk"):
+        try:
+            data, changed = _reencrypted(authenticator.data)
+        except InvalidToken:
+            unreadable.append(authenticator.user_id)
+            continue
+        moved += changed
+        already += not changed
+        if changed:
+            authenticator.data = data
+            authenticator.save(update_fields=["data"])
+    result = MfaReencryption(moved, already, tuple(sorted(set(unreadable), key=str)))
+    record(
+        principal.audit_identity,
+        "mfa.secrets_reencrypted",
+        data={"moved": moved, "already": already, "unreadable": len(result.unreadable)},
+    )
+    return result
 
 
 # --- one's own sessions (M8.3, X5) ------------------------------------------------------
