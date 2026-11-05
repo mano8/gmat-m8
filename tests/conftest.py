@@ -26,7 +26,9 @@ from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
 # The browser layer needs Playwright, which only the optional `e2e` dependency group installs.
-collect_ignore_glob = [] if importlib.util.find_spec("playwright") else ["e2e/*"]
+# The directory itself, not a glob of its contents: pytest imports a directory's conftest.py
+# as soon as it enters it, and tests/e2e/conftest.py imports Playwright.
+collect_ignore = [] if importlib.util.find_spec("playwright") else ["e2e"]
 
 
 @pytest.fixture(autouse=True, scope="session")
