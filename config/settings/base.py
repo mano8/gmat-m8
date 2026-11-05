@@ -217,6 +217,9 @@ SECURE_CSP = {
     "object-src": [CSP.NONE],
 }
 
+# Only production warns when an HSTS switch is off (exception X3).
+HSTS_STARTUP_WARNING = False
+
 # --- email (plan §5, "Email: outbox and worker") --------------------------------------
 # Never SMTP inside a request: the default mailer writes EmailOutbox rows (allauth's mail
 # included) and only the worker sends them, through the "outbound" mailer that dev, test and

@@ -45,14 +45,25 @@ SECURE_SSL_REDIRECT = True
 SECURE_REDIRECT_EXEMPT = [r"^healthz/$", r"^readyz/$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = env_int("DJANGO_HSTS_SECONDS", 31536000, minimum=0)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-# Preloading is the maintainer's decision once the domain is validated (plan §5): until then
-# the header carries no `preload`, and Django's deploy warning about it (security.W021, a
-# failure under `check --deploy --fail-level WARNING`) is silenced. Exception register in
-# docs/security.md.
+# HSTS is the maintainer's to turn on, one switch at a time, once the domain has proved it
+# serves HTTPS (M8.3, exception X3): a browser that has seen the header refuses plain HTTP
+# for as long as it says, and nothing here can take that back. Nothing turns on by itself. A
+# deploy check does not fail on a switch that is off (Django's warning about that switch is
+# silenced, and only while it is off); `web` logs a warning at startup instead
+# (`apps.accounts.security_log.warn_hsts_off`).
+SECURE_HSTS_SECONDS = env_int("DJANGO_HSTS_SECONDS", 0, minimum=0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_HSTS_INCLUDE_SUBDOMAINS", False)
 SECURE_HSTS_PRELOAD = env_bool("DJANGO_HSTS_PRELOAD", False)
-SILENCED_SYSTEM_CHECKS = [] if SECURE_HSTS_PRELOAD else ["security.W021"]
+SILENCED_SYSTEM_CHECKS = [
+    check
+    for check, switched_on in (
+        ("security.W004", SECURE_HSTS_SECONDS),
+        ("security.W005", SECURE_HSTS_INCLUDE_SUBDOMAINS),
+        ("security.W021", SECURE_HSTS_PRELOAD),
+    )
+    if not switched_on
+]
+HSTS_STARTUP_WARNING = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 

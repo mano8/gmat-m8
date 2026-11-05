@@ -15,7 +15,7 @@ from django.urls import reverse
 
 from apps.access.middleware import AccessContextMiddleware
 from apps.accounts.models import User
-from apps.accounts.security_log import account_hint
+from apps.accounts.security_log import account_hint, hsts_switches_off, warn_hsts_off
 from config.logging import JsonFormatter, RedactionFilter, RequestIdFilter, user_id_var
 from tests.org import People, client_for
 from tests.support import PASSWORD, enroll_totp, mfa_login, password_login, totp_authenticator
@@ -194,3 +194,40 @@ class TestLogLines:
         assert response.status_code == 403
         refused = {record.user_id for record in caplog.records if record.name == "django.request"}  # type: ignore[attr-defined]
         assert refused == {str(people.tech_mad.pk)}
+
+
+class TestHstsWarning:
+    """M8.3, X3: production says so at startup while a switch is off; a deploy never fails."""
+
+    def test_every_switch_that_is_off_is_named(
+        self, security: pytest.LogCaptureFixture, settings: Any
+    ) -> None:
+        settings.HSTS_STARTUP_WARNING = True
+        settings.SECURE_HSTS_SECONDS = 31536000
+        settings.SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+        settings.SECURE_HSTS_PRELOAD = False
+        warn_hsts_off()
+        (record,) = security.records
+        assert record.levelno == logging.WARNING
+        assert record.security == {  # type: ignore[attr-defined]
+            "event": "hsts_incomplete",
+            "off": "DJANGO_HSTS_INCLUDE_SUBDOMAINS,DJANGO_HSTS_PRELOAD",
+        }
+
+    def test_nothing_to_say_when_all_are_on(
+        self, security: pytest.LogCaptureFixture, settings: Any
+    ) -> None:
+        settings.HSTS_STARTUP_WARNING = True
+        settings.SECURE_HSTS_SECONDS = 31536000
+        settings.SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        settings.SECURE_HSTS_PRELOAD = True
+        assert hsts_switches_off() == []
+        warn_hsts_off()
+        assert not security.records
+
+    def test_outside_production_it_stays_quiet(
+        self, security: pytest.LogCaptureFixture, settings: Any
+    ) -> None:
+        settings.HSTS_STARTUP_WARNING = False
+        warn_hsts_off()
+        assert not security.records

@@ -11,6 +11,7 @@ client address is the one Caddy observed (``apps.core.http.client_ip``), as in t
 import logging
 from typing import Any
 
+from django.conf import settings
 from django.http import HttpRequest
 from django.utils.crypto import salted_hmac
 
@@ -43,6 +44,23 @@ def log_event(
     if request is not None:
         fields["ip"] = client_ip(request)
     logger.log(level, "Security event %s", event, extra={"security": fields})
+
+
+def hsts_switches_off() -> list[str]:
+    """The HSTS settings the maintainer has not turned on yet (exception X3)."""
+    switches = (
+        ("DJANGO_HSTS_SECONDS", settings.SECURE_HSTS_SECONDS),
+        ("DJANGO_HSTS_INCLUDE_SUBDOMAINS", settings.SECURE_HSTS_INCLUDE_SUBDOMAINS),
+        ("DJANGO_HSTS_PRELOAD", settings.SECURE_HSTS_PRELOAD),
+    )
+    return [name for name, value in switches if not value]
+
+
+def warn_hsts_off() -> None:
+    """At ``web``'s startup in production: which HSTS switches are still off, if any."""
+    off = hsts_switches_off() if settings.HSTS_STARTUP_WARNING else []
+    if off:
+        log_event("hsts_incomplete", None, level=logging.WARNING, off=",".join(off))
 
 
 def authentication_methods(request: HttpRequest | None) -> str:
