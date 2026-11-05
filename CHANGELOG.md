@@ -188,6 +188,16 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Password changes and removed second factors reach the audit trail (`user.password_changed`, `user.authenticator_removed`), so a restore can replay them (M8.4). Migration `accounts.0005` adds `User.recovery_codes_owed`.
 - `backup-now --wait SECONDS` queues behind a backup in progress (M8.4).
 
+- The maintainer's decisions on the M8.3 review:
+  - every upload is scanned by ClamAV before it is stored, and no verdict means no file (ADR-0015): new `clamd` and `freshclam` services, `gmat.E022`, `attachment.malware_refused`;
+  - images are decoded in a `decoder` container of their own: uid 1001, no network, no secret (ADR-0015);
+  - inactivity ends a session (30 minutes privileged, 2 hours others, `DJANGO_*_IDLE_SECONDS`); a page's own status polls do not count as activity;
+  - everyone lists and ends their own sessions at `/account/sessions/` (`allauth.usersessions`), audited as `user.sessions_ended`; the rows stay out of dumps and the admin;
+  - a password or second factor that changes tells its owner, and so does an administrator's MFA reset;
+  - `gmat.E021` refuses an SMTP relay with credentials and no TLS.
+- `manage reencrypt_mfa` moves every stored second-factor secret to the newest key, so an old key can leave `MFA_ENCRYPTION_KEYS` (M8.5).
+- The hourly `sessions` housekeeping deletes expired sessions and rows of the session list without a session: nothing purged them before.
+
 ### Changed
 
 - Pre-authentication form pages keep `Referrer-Policy: same-origin`; only a URL that carries a token is `no-referrer` (browsers send `Origin: null` on a form POST under `no-referrer`, which CSRF refuses, so login failed in a real browser).
@@ -209,6 +219,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Self-decisions (M7b.1, #23, ADR-0014): group administrators, material managers and engineers approve or reject their own requests, judged by the membership that covers the request and with session MFA; other reviewers still need the procurement branch's `allow_self_approval`. Self-decisions are marked `self_decided` in the audit.
 - `decide_lines`, `decide_line` and `approve_all` take an optional `seen_version` (M7b.3): a decision made on a page older than a reviewer's edit or a resubmit is refused, so nobody approves a line they have not seen. The component seam `material_requests.commitments` gains `allocated_lines`; `notifications.outbox` gains `waiting` and `defer` for batched notices.
 
+- **HSTS is off in production until the maintainer turns it on**, each of `DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_INCLUDE_SUBDOMAINS` and `DJANGO_HSTS_PRELOAD` on its own; `web` logs a warning at startup while one is off, and a deploy check does not fail on it (exception X3).
+- The production overlay requires `ADMIN_ALLOWED_CIDRS`, and `deploy.sh` no longer has a flag that accepts an open list.
+- Returning or reducing one's own request follows the self-decision rule and is marked `self_decided` (R18).
+- `assign_to_project` checks the assignee's matching role, home branch and active account itself, not only the form (R19).
+- **The server must be x86-64**, and needs about 1 GB more memory (ADR-0015). `web`'s limit is 1 GiB; the `decoder` has its own.
+- Caddy 2.11.8 and the newest PostgreSQL 18 digest, whose findings had never been reported: the nightly scan failed before scanning anything.
+
 ### Fixed
 
 - The admin's lists accept only the filters they offer: a query-string lookup on a hidden column (a password hash, a token hash, an MFA secret, a price) could be read back from the result count. The audit admin no longer shows event payloads or client addresses (M8.3).
@@ -216,7 +233,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Removing a passkey keeps a privileged account's last second factor, as deactivating its TOTP already did (M8.3).
 - A token link over its rate limit is answered by the token-less page, so the token never stays in the address bar (M8.3).
 - Caddy's logs drop the response's `Location`, which carried the token of a link opened without its trailing slash; PostgreSQL logs no slow statements with their values; role passwords stay off the `psql` command line (M8.3).
-- HSTS `preload` is off unless `DJANGO_HSTS_PRELOAD=true` (plan §5), and `check --deploy` stays at zero warnings either way (M8.3).
+- A checkout without Playwright no longer fails at collection: pytest entered `tests/e2e` and imported its `conftest.py` (M8.2).
 - The nightly image scan verifies the signed manifest of the latest published release before using its digests (M8.3).
 - The local agent guard denies `gh api` writes made through fields or a body, and tag pushes by refspec (M8.3).
 - A supplier dispatch held in quarantine can be confirmed or sent again from the order page like an ambiguous one, and a cancellation owes the supplier a notice for it (M8.4).

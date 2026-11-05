@@ -20,6 +20,10 @@ A dump is **snapshot-consistent**: the backup holds the advisory lock `gmat:medi
 
 The local copies are **not encrypted** (exception X12): `backups/` is mode 0700 and the files 0600. The offsite copies are encrypted by restic.
 
+Dumps leave out the rows of `django_session`, `usersessions_usersession` and `django_cache`: session keys, the addresses and browsers of the session list, and rate-limit counters do not travel. The malware scanner's signatures are not backed up either; a new server gets them from the scanner's image and `freshclam`.
+
+A backup holds second-factor secrets under the MFA key **of its day**. Keep a retired `MFA_ENCRYPTION_KEYS` key offline until the last backup that needs it has aged out, 90 days after you rotated ([user-admin.md](user-admin.md#rotating-the-mfa-key)).
+
 ## Verification: three levels
 
 | Level | When | Who | What it proves |
@@ -61,6 +65,8 @@ An isolated machine you control, with an **encrypted disk**, Docker with the Com
 You need from the offline storage: `.env` and `app.env` (or at least the database role settings and `RESTIC_*`) and the **delete-capable or read credentials** for the restic repository. Reading a snapshot needs no delete right: use the append-only credentials if you prefer.
 
 ### Run it
+
+The drill stack starts neither the scanner nor the decoder: it stores no upload, so an upload there is refused, and neither would have its updates anyway with every network internal.
 
 1. Pick the release whose images production runs now (`tail -1 deployed.log` on the VPS gives version and both digests; or the release's `release-manifest.json`). Pull both images **by digest** while you still have a network:
 
@@ -155,7 +161,7 @@ Data written after the snapshot (up to 6 hours) is gone. Tell the people; users 
 
 `post-restore-reconcile` runs inside every restore, **before** either gate opens, so it is already done when `recover.sh` finishes. Know what it did:
 
-- a new `SECRET_KEY` (no fallback), every session gone and every session epoch advanced: **everyone has to sign in again**; password-reset links and signed form keys from before are dead. The MFA and outbox keys are unchanged, so TOTP enrollments survive;
+- a new `SECRET_KEY` (no fallback), every session and the whole session list gone, and every session epoch advanced: **everyone has to sign in again**; password-reset links and signed form keys from before are dead. The MFA and outbox keys are unchanged, so TOTP enrollments survive;
 - every pending invitation and email change is revoked, and unsent security email is wiped: re-issue them ([user-admin.md](user-admin.md));
 - every set of **recovery codes** is deleted: each user generates a new set at their next sign-in; privileged accounts are made to before anything else;
 - the **outbox is quarantined**: everything `QUEUED`, `SENDING`, `FAILED` or `AMBIGUOUS` is `QUARANTINED`, unless the preserved failed database recorded a final outcome for it. Nothing is sent until you release it;

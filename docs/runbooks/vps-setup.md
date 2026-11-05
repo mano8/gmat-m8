@@ -8,9 +8,9 @@ Who does this: the maintainer, by hand. Agents never touch the server.
 
 | Thing | Notes |
 | --- | --- |
-| A VPS | Debian 13, **2 vCPU / 4 GB** (2 GB is not enough once attachments are on), x86 or ARM (the images are multi-arch), 40 GB of disk or more. |
+| A VPS | Debian 13, **x86-64**, **2 vCPU / 4 GB** with the swap of step 1, 40 GB of disk or more. **Not ARM:** the malware scanner's image is x86-64 only ([ADR-0015](../adr/0015-upload-scanning-and-decoder-isolation.md)). The stack idles at about 1.4 GB, 950 MB of it the scanner's signatures, and reaches about 3.2 GB with two images decoding, so 4 GB works with little headroom. 8 GB is the comfortable size if the price allows. |
 | A domain | An `A` (and `AAAA`) record for the public name, for example `gmat.example.org`, pointing at the VPS. Caddy gets its certificate from Let's Encrypt on the first request, so the record must resolve **before** the first deploy. |
-| An SMTP account | A relay that accepts submission on port 587 with STARTTLS and a certificate that verifies (exception X13). The address you send from must be allowed by the relay. |
+| An SMTP account | A relay that accepts submission on port 587 with STARTTLS and a certificate that verifies. `check --deploy` refuses a relay with credentials and no TLS (`gmat.E021`), so a deploy stops on that. The address you send from must be allowed by the relay. |
 | Offsite storage | Two credential sets, see [../../docker_compose/offsite/README.md](../../docker_compose/offsite/README.md): **append-only** for the VPS, **delete-capable** for the maintainer's machine only. The storage lives on a host or provider that is not this VPS. |
 | A GitHub token for the VPS | Fine-grained, **this repository only**, with *Contents: read* (release manifests) and *Packages: read* (images). Nothing else. Expires; put the renewal date in your calendar. |
 | An uptime monitor | Any external service that calls `https://<domain>/healthz/` every minute and tells you by a channel other than this server's email. |
@@ -35,6 +35,14 @@ Who does this: the maintainer, by hand. Agents never touch the server.
    ```bash
    apt-get update && apt-get install -y sudo
    usermod -aG sudo deploy
+   ```
+
+4. Add swap, so a burst of memory slows the server instead of killing a container:
+
+   ```bash
+   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+   echo '/swapfile none swap sw 0 0' >> /etc/fstab
+   sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' > /etc/sysctl.d/90-gmat.conf
    ```
 
 ## 2. Harden SSH and the firewall
@@ -102,7 +110,7 @@ timedatectl                                     # System clock synchronized: yes
    ```bash
    VER=v2.5.0
    cd "$(mktemp -d)"
-   curl -fsSLO "https://github.com/sigstore/cosign/releases/download/$VER/cosign-linux-amd64"      # arm64 on ARM
+   curl -fsSLO "https://github.com/sigstore/cosign/releases/download/$VER/cosign-linux-amd64"
    curl -fsSLO "https://github.com/sigstore/cosign/releases/download/$VER/cosign_checksums.txt"
    sha256sum --ignore-missing -c cosign_checksums.txt     # must say: cosign-linux-amd64: OK
    sudo install -m 0755 cosign-linux-amd64 /usr/local/bin/cosign
@@ -135,7 +143,7 @@ bash init.sh        # creates .env and app.env with generated secrets, mode 0600
 | `APP_DOMAIN` | the public name, for example `gmat.example.org` |
 | `ACME_EMAIL` | an address that gets Let's Encrypt's expiry notices |
 | `ADMIN_URL_PATH` | something not guessable, no slashes. Not secret, but it keeps scanners away |
-| `ADMIN_ALLOWED_CIDRS` | **required.** The addresses that may reach the admin, for example your office's fixed address: `203.0.113.7/32`. `deploy.sh` refuses `0.0.0.0/0`, and also any range that overlaps Docker's bridges (`172.16.0.0/12`, `192.168.0.0/16`), because behind Docker's proxy a visitor can look like one of them. Exception X10 |
+| `ADMIN_ALLOWED_CIDRS` | **required.** The addresses that may reach the admin, for example your office's fixed address: `203.0.113.7/32`. There is no way around this one: the production overlay needs the value, and `deploy.sh` refuses `0.0.0.0/0`, and also any range that overlaps Docker's bridges (`172.16.0.0/12`, `192.168.0.0/16`), because behind Docker's proxy a visitor can look like one of them. Exception X10 |
 | `GITHUB_READ_TOKEN` | the token from "What you need". Read only by `deploy.sh` and `recover.sh` |
 | `SMTP_PASSWORD` | the SMTP account's password. Only the worker receives it |
 | `RESTIC_REPOSITORY`, `RESTIC_PASSWORD`, `RESTIC_REST_USERNAME`, `RESTIC_REST_PASSWORD` (or `AWS_*` for S3) | the **append-only** credentials. `RESTIC_REPOSITORY` must not be empty: `deploy.sh` refuses |
@@ -164,7 +172,8 @@ Then fill it in (the application refuses to start on a missing, weak or placehol
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `DJANGO_DEFAULT_FROM_EMAIL` | the relay's host, `587`, its user, and the From address |
 | `OUTBOUND_EMAIL` | `on` (the template default). Set `off` to keep a stack silent while you test |
 | `PO_DISPATCH` | `off` at first: purchase orders are printed, not emailed to suppliers (ADR-0010 Q7). Turn on only when suppliers have agreed to receive them |
-| `DJANGO_HSTS_PRELOAD` | `false` until the domain is ready for the preload list (exception X3) |
+| `DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_INCLUDE_SUBDOMAINS`, `DJANGO_HSTS_PRELOAD` | leave `0`, `false`, `false` for the first deploy; [turn them on](#turning-on-hsts) once the domain is proven. `web` logs a warning at every start until then |
+| `DJANGO_SESSION_IDLE_SECONDS`, `DJANGO_PRIVILEGED_SESSION_IDLE_SECONDS` | how long a session may stay idle: the template's 2 hours and 30 minutes, unless you have a reason |
 
 Delete `app.env.dev-values` afterwards: it holds the development secrets.
 
@@ -205,6 +214,17 @@ On the release day follow [deploy-rollback.md](deploy-rollback.md). The very fir
 2. Run the first offsite drill ([backup-restore.md](backup-restore.md#quarterly-offsite-drill)) before real data goes in.
 3. Set up monitoring (next section).
 
+### Turning on HSTS
+
+HSTS is yours to turn on, by hand: a browser that has seen the header refuses plain HTTP for as long as the header said, **and nothing on the server can take that back**. Do it after the first deploy, once HTTPS has worked on the real domain for some days and the certificate has renewed at least once if you can wait that long. One switch at a time, in `app.env`, then `dc up -d --no-deps --force-recreate web` behind nothing (about 15 seconds):
+
+1. `DJANGO_HSTS_SECONDS=300`. Check the header with `curl -sI https://<domain>/accounts/login/ | grep -i strict`, and that the site works.
+2. Raise it, a step per week if you like: `86400`, then `31536000` (one year).
+3. `DJANGO_HSTS_INCLUDE_SUBDOMAINS=true`, **only if every subdomain of the name serves HTTPS** (a forgotten `intranet.` stops working for whoever has seen the header).
+4. `DJANGO_HSTS_PRELOAD=true`, and only then submit the domain to [the preload list](https://hstspreload.org/). Leaving the list takes months; skip this unless you mean it.
+
+`web`'s log says which switches are still off at each start (`hsts_incomplete`); no deploy fails on it. When all that you intend are on, update exception X3 in `docs/security.md`.
+
 ## 9. Monitoring and reviews
 
 | What | How | Alert when |
@@ -214,6 +234,7 @@ On the release day follow [deploy-rollback.md](deploy-rollback.md). The very fir
 | The worker | `docker compose exec worker /app/docker/app/entrypoint.sh worker-healthcheck` or `docker compose ps` (health) | unhealthy for 5 minutes. A paused worker (`flags/worker.paused`) still reports ready |
 | The outbox | see [email.md](email.md#watching-the-outbox) | `QUEUED` older than 10 minutes, any `AMBIGUOUS` or `QUARANTINED` |
 | Disk | a cron job, or the provider's alert | above 80 % (`df -h /`, `docker system df`) |
+| Uploads | `dc ps`: `clamd` and `decoder` healthy. `dc exec clamd clamdscan --version` shows the signatures' date | unhealthy: every upload is refused until they are back, everything else works. Signatures older than 3 days: read `dc logs freshclam` (the mirror answers from outside; ufw allows outgoing) |
 | The images | the nightly `image-scan` workflow opens an issue | an open issue: see [vulnerability-exceptions.md](vulnerability-exceptions.md) |
 | Backup verification | weekly, automatic (`restore --verify`, Sunday 03:30 UTC) | `docker compose logs backup` shows a failure; `backups/.last-verify-ok` is older than 8 days |
 
@@ -223,6 +244,7 @@ Reviews to put in the calendar: the GitHub token's expiry; the **quarterly** dri
 
 - You can log in as `deploy` with the key only; root and passwords are refused.
 - `ufw status` shows 22, 80, 443 only; nothing else listens (`ss -tlnp`).
+- The server is x86-64 and has swap (`uname -m`, `swapon --show`).
 - `.env` and `app.env` are mode 0600, filled in, and copied to the offline storage together with the restic password.
 - The checks of step 8 pass: DNS resolves, the admin allowlist is accepted and the token can read the repository.
 - The uptime monitor exists and you know what each alert means.

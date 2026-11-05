@@ -5660,3 +5660,68 @@ msgstr ""
 #: apps/recovery/services.py
 msgid "This account is not suspended."
 msgstr ""
+
+#: apps/attachments/processing.py
+msgid "This file was refused: the virus scanner found something in it."
+msgstr ""
+
+#: apps/attachments/processing.py
+msgid "Files cannot be checked right now. Try again in a few minutes."
+msgstr ""
+
+#: apps/accounts/services.py
+msgid "Your second factors were removed"
+msgstr ""
+
+#: apps/accounts/services.py
+msgid "Sign out to end this session."
+msgstr ""
+
+#: apps/accounts/views.py
+msgid "That session has ended."
+msgstr ""
+
+#: apps/accounts/views.py
+msgid "Your other sessions have ended."
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Sessions"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Where you are signed in. If you do not recognise one, end it and change your password."
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Unknown browser"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "This session"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+#, python-format
+msgid "Started %(started)s, last seen %(seen)s"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End this session"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "No other session is open."
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End all my other sessions"
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "An administrator removed the second factors of your gmat-m8 account, and every session of your account has ended."
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "If you did not ask for this, tell your administrator straight away and change your password."
+msgstr ""

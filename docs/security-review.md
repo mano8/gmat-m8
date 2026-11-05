@@ -37,20 +37,20 @@ follow it.
 | R6 | Low | A token link over its rate limit was answered with 429 at the token URL, which kept the token in the address bar. | Fixed in `d15f8fa` |
 | R7 | Low (ASVS V16.3) | Sign-ins, failures, sign-outs, password and factor changes were not logged, and log lines did not name the account. | Fixed in `2161284` |
 | R8 | Low | There was no supported, audited way to reset a lost second factor. | Fixed in `b266ce5` (`manage reset_mfa`) |
-| R9 | Low | HSTS `preload` was on by default, against plan §5. The production template's `false` made `check --deploy --fail-level WARNING` fail. | Fixed in `4b51ff5`; exception X3 |
+| R9 | Low | HSTS `preload` was on by default, against plan §5. The production template's `false` made `check --deploy --fail-level WARNING` fail. | Fixed in `4b51ff5`; then every HSTS switch opt-in (the maintainer's decision), exception X3 |
 | R10 | Low | The nightly scan trusted an unsigned manifest of whatever release came first, a prerelease included. | Fixed in `80decd3` |
 | R11 | Low | The local agent guard let `gh api` writes through, since `-f` implies POST (a release, a tag ref, a workflow dispatch), as well as tag pushes by refspec. | Fixed in `3b0e286` |
 | R12 | Low | PostgreSQL's slow-statement log carried literal values (names, addresses). | Fixed in `9280864` |
 | R13 | Low | Role passwords were on the `psql` command line during database initialisation. | Fixed in `33b7d65` |
 | R14 | Info | One Trivy exception was stale. | Dropped in `dec8626` |
-| R15 | Low | The admin prefix is open to every network until `ADMIN_ALLOWED_CIDRS` is set. | Exception X10 |
+| R15 | Low | The admin prefix is open to every network until `ADMIN_ALLOWED_CIDRS` is set. | Fixed: production requires it, and `deploy.sh` refuses an open list (X10 refused) |
 | R16 | Low | A receipt's files (delivery-note photos) reach the project's site manager. | Exception X8 |
 | R17 | Info | Documentation drift: <br>• the worker and the backup share `egress`; <br>• engineers may remove attachments; <br>• `seed_demo`'s guard; <br>• the purge lock's name; <br>• gmat.E020 assumes Caddy's 120 s; <br>• removed files count only until the purge; <br>• the DEBUG error page; <br>• the replay docstring of `apps/core/idempotency.py`. | Corrected in the documentation commit |
-| R18 | Question | A reviewer without a self-deciding role can return their own request for changes, or reduce its approved quantity. The service docstring says no. | Question 1 below |
-| R19 | Low | A project assignment's rules on its assignee are enforced by the form only, not by `assign_to_project`. | Question 2 below |
+| R18 | Question | A reviewer without a self-deciding role can return their own request for changes, or reduce its approved quantity. The service docstring says no. | Fixed: the self-decision rule applies, as the docstring said (question 1) |
+| R19 | Low | A project assignment's rules on its assignee are enforced by the form only, not by `assign_to_project`. | Fixed: `assign_to_project` checks them under the user-row lock (question 2) |
 | R20 | Info | The catalog and supplier services lock the master-data row before `authorize_in_txn`. This is lock order only, with no effect on access. | Noted, not changed |
 
-The ASVS gaps that remain are exceptions X4–X7, X9, X11 and X13.
+The ASVS gaps that remain are exceptions X3 and X4; the rest were refused by the maintainer and closed (see the decisions at the end).
 
 ### The `/security-review` report
 
@@ -102,14 +102,14 @@ Each row is the requirement in the project's words, its verdict and where the ev
 | | TOTP: one time step, single use, secrets encrypted at rest; recovery codes single use | Met | `MFA_TOTP_TOLERANCE = 0`, `MFAAdapter` |
 | | A privileged account always keeps a factor; a lost factor is reset by an audited administrator action | Met (M8.3) | R5, R8 |
 | | Password reset: single use, 1 h, re-validated under the user lock, never signs in, refused for inactive accounts | Met | `AccountAdapter.redeem_password_reset` |
-| | Users are told when their authentication details change | Partly: email changes only | Exception X9 |
+| | Users are told when their authentication details change | Met | allauth's notices, `reset_user_mfa` |
 | | Enrolment and recovery links: 256-bit, hashed, single use, expiring, out of the URL on first use | Met (M8.3) | `tokens.py`, R6 |
 | Sessions (V7) | Server-side sessions, random ids, rotated at sign-in, flushed at sign-out | Met | Django sessions, POST-only logout |
 | | Cookies `Secure`, `HttpOnly`, `SameSite=Lax`, `__Host-` | Met | live headers, gmat.E015 |
 | | Absolute lifetime (12 h privileged, 14 days otherwise) | Met | `SessionGuardMiddleware` |
-| | Inactivity timeout | Documented decision | Exception X6 (Q12) |
+| | Inactivity timeout | Met | 30 minutes privileged, 2 hours others, `apps/accounts/sessions.py` |
 | | Every session ends on a password change, an MFA reset, an email change or a deactivation | Met | `session_epoch` |
-| | Users can see and end their other sessions | Not met | Exception X5 |
+| | Users can see and end their other sessions | Met | `/account/sessions/` |
 | | Reauthentication before changing a factor | Met | allauth (65.20: only an explicit reauthentication counts) |
 | Access control (V8) | Capability matrix documented as data and tested against the plan | Met | `roles.py`, its test |
 | | Deny by default; checked server-side per function (views), per object (selectors) and per write (services) | Met | `require()`, `visible_to`, `authorize_in_txn`, the matrix |
@@ -117,7 +117,7 @@ Each row is the requirement in the project's words, its verdict and where the ev
 | | A revocation or an expiry applies to the next write | Met | `test_access_staleness.py` |
 | | Company, branch and partner boundaries | Met | S1–S9, the sentinel matrix |
 | | Admin interfaces need privilege and MFA, and leak no hidden column | Met (M8.3) | `SecureAdminSite`, R1, R3 |
-| | Admin reachable only from allowed networks | Configurable | Exception X10 |
+| | Admin reachable only from allowed networks | Met in production | the overlay requires it, `deploy.sh` refuses an open list |
 | Input and output (V1, V2) | Queries through the ORM; raw SQL parameterised; no `.raw()` / `.extra()` | Met | `check_access_rules.py`, area E review |
 | | Output escaped by the template engine; no `\|safe` / `mark_safe` | Met | the guard |
 | | CSP without inline script or style; htmx without eval or script tags | Met | settings, e2e CSP listener |
@@ -133,20 +133,20 @@ Each row is the requirement in the project's words, its verdict and where the ev
 | | Business audit trail append-only; the runtime role cannot alter it | Met | trigger, database roles |
 | | Generic error pages; no stack trace; DEBUG refused in production | Met | error pages, gmat.E010 |
 | Files (V5) | Size limits before the body is read; count and quota checked atomically | Met | `uploads.py`, L8 |
-| | Type from magic bytes; images re-encoded under a pixel limit in a killable, rlimited child | Met | `processing.py`, `decoder.py`; exception X11 |
+| | Type from magic bytes; images re-encoded under a pixel limit in a killable, rlimited child | Met | `processing.py`, `decoder.py`, `decoder_service.py` (its own container and uid) |
 | | Stored outside the web root under random names; never served directly | Met | `files.py`, the download view |
 | | Download as an attachment with `nosniff` and a sandbox CSP | Met | `views.download` |
-| | Malware scan of stored files | Not met for PDFs | Exception X7 |
+| | Malware scan of stored files | Met | `scanner.py`, before anything is stored (ADR-0015) |
 | Email | No SMTP in a request; the outbox is written in the business transaction | Met | gmat.E007, E017 |
 | | Recipients re-checked at the claim; BCC; frozen content | Met | `eligibility.py`, trigger |
 | | Security mail sealed, wiped once sent, expired after 1 h | Met | `crypto.py`, housekeeping |
 | | Links built from `PUBLIC_BASE_URL`, so no Host-header poisoning | Met | settings, `ALLOWED_HOSTS` |
-| | TLS to the relay, certificate checked | Met by default | Exception X13 |
+| | TLS to the relay, certificate checked | Met | `gmat.E021` refuses credentials without TLS |
 | Administration | Admin sign-in through allauth with session MFA; group administrators and superusers only | Met | `admin_site.py` |
 | | Access and documents read-only; master data saved through services; no delete | Met | gmat.E005, guard, matrix |
 | | Group administrators never act on staff accounts | Met | `require_may_manage_account`, including the MFA reset |
 | | Break-glass operations are audited operator commands | Met (M8.3) | `bootstrap_admin`, imports, `reset_mfa` |
-| Configuration and transport (V3, V12, V13) | TLS 1.2 or later only; one-year HSTS; HTTPS redirect | Met | live probe; preload off (X3) |
+| Configuration and transport (V3, V12, V13) | TLS 1.2 or later only; HTTPS redirect; HSTS once the maintainer turns it on | Met but HSTS | live probe; exception X3, to settle by go-live |
 | | Production settings fail closed; `check --deploy` gives zero warnings | Met | `config/env.py`, gmat.E010–E020 |
 | | Secrets only in env files, generated and kept 0600; MFA and outbox keys separate | Met | `init.sh`, gmat.E018 |
 | | Dependencies locked with hashes; security floors; scans in CI | Met | `uv.lock`, `ci.yaml`; exception X1 |
@@ -190,9 +190,27 @@ The plan's review log is local to the maintainer; each id is listed here once, w
 | F79 | The VPS's read-only GitHub token | step H8.6 | Human step |
 | F80, F81 | Token entropy and comparison; `__Host-` cookies; `Permissions-Policy` | `accounts/tokens.py`; live headers | Holds |
 
-### Questions for the maintainer
+### The maintainer's decisions (2026-11-05)
 
-1. **R18.** May a reviewer without a self-deciding role, such as a site manager, return their own submitted request for changes, or reduce its approved quantity? The code allows it, while the docstring of `apps/material_requests/services/__init__.py` says decisions on one's own request need self-approval. Neither action gains the requester anything. Either the docstring or the code changes; no business rule was invented here.
-2. **R19.** Should `projects.services.assign_to_project` check the assignee itself? That means the matching role's membership, a home branch in scope and an active account, which today only the form checks. A mismatched assignment grants nothing until the matching role is granted.
-3. **X9.** Should allauth's notices of password and factor changes be turned on (`ACCOUNT_EMAIL_NOTIFICATIONS`)? The e2e mailbox helper takes the next message to an address, so its flows would need to skip these notices.
-4. **R12.** The slow-statement log is off because statements carry their values. If it is wanted back, it needs server-side parameter binding, or acceptance of personal data in the database log.
+The review's questions and proposed exceptions were answered; all of it is implemented on the same branch.
+
+| Item | Decision | Done |
+| --- | --- | --- |
+| Question 1 (R18) | Returning or reducing one's own request follows the self-decision rule | `return_to_draft`, `reduce_approved_qty`, the review page, audit `self_decided` |
+| Question 2 (R19) | `assign_to_project` enforces the assignee's rules | Role, home branch in scope and active account, under the user-row lock |
+| Question 3 (X9) | allauth's credential-change notices on | Through the outbox; an administrator's MFA reset tells the owner too; the e2e mailbox helper waits for the message it means |
+| Question 4 (R12) | The slow-statement log stays off | Nothing to do |
+| X2, X4, X8, X12 | Accepted | Register |
+| X3 | All of HSTS opt-in, each switch its own, never automatic; a startup warning; no deploy failure | `prod.py`, `security_log.warn_hsts_off` |
+| X5 | Users list and end their own sessions | `/account/sessions/` |
+| X6 | Idle timeout 30 minutes privileged, 2 hours others, absolute limits unchanged | `apps/accounts/sessions.py` |
+| X7 | ClamAV scan of every upload before it is stored | ADR-0015 |
+| X10 | Production requires an explicit `ADMIN_ALLOWED_CIDRS` | The overlay, and `deploy.sh` with no flag around it |
+| X11 | Image decoder under its own uid | ADR-0015 |
+| X13 | A deploy check refuses an SMTP relay without TLS when credentials are set | `gmat.E021` |
+
+**Found while implementing them, and not by the first pass:**
+
+- The sweep had scanned the application and backup images only. Caddy, the one process facing the internet, carried 7 findings (one CRITICAL), and PostgreSQL 28 (two CRITICAL). The nightly scan never reported them because it failed before scanning anything on `v0.1.0`, a prerelease without assets (fixed in `80decd3`, so only once this branch merges). Moved to the newest digests; what is left is exception X1.
+- Nothing purged expired `django_session` rows; now the hourly `sessions` task.
+- No command could retire an old MFA key; now `manage reencrypt_mfa`.

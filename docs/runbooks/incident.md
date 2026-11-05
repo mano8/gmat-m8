@@ -31,8 +31,9 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.production.yml'
 | A deploy failed | **Failed deploy** | The script already holds both gates; follow [the decision tree](deploy-rollback.md#the-decision-tree) |
 | Wrong or missing business data | **Data problem** | Find out how far it goes before anyone fixes by hand; pause nothing yet. Take `backup-now --label before-fix`. Use the audit viewer (`/audit/`, object history) to see who did what |
 | A backup, verification or drill check failed | **Backup failure** | Same day. Run `dc exec backup backup-now --label manual` and `dc exec backup restore --verify`. Read `dc logs backup`. Check disk space and the offsite credentials |
-| A person's account may be misused, or a lost device | **Account** | [Offboard](user-admin.md#offboarding) or [reset MFA](user-admin.md#lost-second-factor) now; it ends their sessions. Then read what the account did in the audit viewer |
+| A person's account may be misused, a lost device, or a notice about a change they did not make | **Account** | [Offboard](user-admin.md#offboarding) or [reset MFA](user-admin.md#lost-second-factor) now; it ends their sessions. Then read what the account did in the audit viewer |
 | Unexpected admin or SSH logins, unknown processes, strange containers, forged offsite snapshots, a key or token leaked | **Compromise** | Go to [section 4](#4-suspected-compromise) |
+| Uploads refused with "the virus scanner found something" | **Malware upload** | The file was not stored. Find who and where: the audit viewer's `attachment.malware_refused` on the document, and `attachment_malware` in `gmat.security` (the signature, the account). Ask the person: a phone with malware, or a false alarm. A false alarm is reported to ClamAV; there is no way to let one file past the scanner |
 | Mail went to the wrong people or twice | **Email** | `touch flags/worker.paused` to stop sending while you look, then [email.md](email.md) |
 
 Gates, when you need them: `touch flags/maintenance.on` makes Caddy answer the maintenance page (503) whatever `web` is doing; `touch flags/worker.paused` stops the worker from claiming or sending. **Remove them yourself only if no deploy or recovery owns them**: `./recover.sh status` says.
@@ -73,7 +74,7 @@ Assume the worst until shown otherwise.
 | `SMTP_PASSWORD` | change at the relay |
 | The VPS's append-only offsite credentials | revoke and re-issue at the storage provider |
 | `RESTIC_PASSWORD` | `restic key passwd` (or `key add` then `key remove` of the old one), **from the maintainer's machine** with the admin credentials; update the offline copy and the VPS's `.env` |
-| `MFA_ENCRYPTION_KEYS` | a leak needs resets for everybody: [user-admin.md](user-admin.md#rotating-the-mfa-key) |
+| `MFA_ENCRYPTION_KEYS` | new key, `manage reencrypt_mfa`, and a leak needs resets for everybody: [user-admin.md](user-admin.md#rotating-the-mfa-key) |
 | `OUTBOX_ENCRYPTION_KEYS` | [user-admin.md](user-admin.md#rotating-the-outbox-key-routine-or-after-a-suspected-leak) |
 | People's passwords | after a restore, accounts that matter come up suspended or reset; after a database leak, require resets by offboarding and re-inviting the privileged accounts |
 

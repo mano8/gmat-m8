@@ -16,3 +16,4 @@ Accepted decisions. An ADR wins over the planning notes. A new decision gets the
 - [ADR-0012](0012-maintenance-gate-deploys-recovery.md): Deploys behind a maintenance gate; forward fixes; restores reconciled; append-only backups
 - [ADR-0013](0013-agent-contributions.md): Agent contributions: interim single-account setup, protected tags, signed releases
 - [ADR-0014](0014-engineer-role-review-workflow.md): Engineer role, reviewer assignment, reviewer edits and self-decisions (proposed)
+- [ADR-0015](0015-upload-scanning-and-decoder-isolation.md): Uploads are scanned by clamd, and decoded in a container of their own

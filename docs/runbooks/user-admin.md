@@ -82,8 +82,14 @@ Check the person's identity **out of band** (call a number you already had, not 
   dc run --rm --no-deps web manage reset_mfa --operator you@example.org --email person@example.org --reason "lost phone, identity checked by phone with branch manager"
   ```
 
-  It removes every second factor of the account and ends its sessions. The reason is kept in the audit trail. At the next sign-in the account enrolls a new factor where its roles need one. Tell them to keep the new recovery codes offline.
+  It removes every second factor of the account, ends its sessions and tells the owner by email (without the reason or who did it). The reason is kept in the audit trail. At the next sign-in the account enrolls a new factor where its roles need one. Tell them to keep the new recovery codes offline.
 - A staff or superuser account needs a superuser operator.
+
+## Sessions, inactivity and notices
+
+- **Inactivity.** A session ends after 30 minutes idle on a privileged account and 2 hours on the others, on top of the 12-hour and 14-day limits. Change them in `app.env` (`DJANGO_PRIVILEGED_SESSION_IDLE_SECONDS`, `DJANGO_SESSION_IDLE_SECONDS`, at least 300). A status poll on a page left open does not count as activity. A person who complains of being signed out often: that is this; look at the security log's `session_ended` lines, which give the reason (`idle`, `lifetime`, `epoch`).
+- **Their own sessions.** Everyone has **Sessions** in the menu: where they are signed in, from which address and browser, with a button to end one or all the others. Ask a person who lost a phone or suspects something to start there and change their password. You cannot see or end someone else's from it; offboarding or an MFA reset ends all of a person's sessions.
+- **Notices.** A password changed or reset, a second factor added or removed, and new recovery codes each send the owner an email with the address and browser it came from. They go through the outbox like all account mail. A person who did not do it should tell you straight away: treat it as an **Account** incident ([incident.md](incident.md)).
 
 ## Accounts a restore suspended
 
@@ -128,9 +134,18 @@ Sealed bodies live one hour at most.
 
 ### Rotating the MFA key
 
-1. Put the new key in front: `MFA_ENCRYPTION_KEYS=<new>,<old>`, recreate `web` and `worker`. New enrollments use the new key; existing ones still open with the old one.
-2. **Keep the old key listed.** There is no command yet that re-encrypts the stored secrets under the new key (a known gap, planned for a later release). Until there is one, the old key can leave the list only after every account has been reset or has re-enrolled.
-3. If the old key may have **leaked**, listing a new key in front does not help, because an attacker with the old key and a copy of the database can still read the secrets. Then: put the new key in the list *alone*, recreate the services, and reset everyone's factors with `reset_mfa` (a loop over the account list, with a reason such as "MFA key rotation after leak"). Privileged accounts re-enroll at their next sign-in; announce it before you do it.
+1. Put the new key in front: `MFA_ENCRYPTION_KEYS=<new>,<old>`, recreate `web` and `worker`. New enrollments use the new key; existing ones still open with the old one. Save the new list offline first.
+2. Move everything to the new key:
+
+   ```bash
+   dc run --rm --no-deps web manage reencrypt_mfa --operator you@example.org
+   ```
+
+   It prints how many secrets moved. It is safe to repeat, and a second run must say `0 moved`: a sign-in in progress during the first run may have written an old value back. If it lists accounts that no listed key opens, keep every old key, find the missing one or `reset_mfa` those accounts.
+3. Remove the old key: `MFA_ENCRYPTION_KEYS=<new>`, recreate `web` and `worker`. Sign in with a second factor to check.
+4. **Keep the old key offline for 90 days.** Backups taken before step 2 hold secrets under it, and a restore of one needs it listed again: put it back behind the new key, restore, and run `reencrypt_mfa` once more.
+
+If the old key may have **leaked**, moving secrets to a new key is not enough: an attacker with the old key and a copy of the database can still read them, and they are the same secrets. Rotate as above, then `reset_mfa` every account that had a factor, starting with your own operator account from a second, verified session, so that everyone enrolls a new secret.
 
 ### Losing a key
 
@@ -147,6 +162,8 @@ Sealed bodies live one hour at most.
 | Leaver | People → the person → Offboard |
 | New address | People → the person → Change email |
 | Lost phone | `manage reset_mfa` |
+| Retiring an MFA key | `manage reencrypt_mfa` |
+| A person's own sessions | Sessions, in their own menu |
 | After a restore | `manage confirm_account` |
 | First administrator | `manage bootstrap_admin` |
 | Bulk master data | `manage import_catalog | import_suppliers | import_projects <file> --operator EMAIL [--dry-run]`, templates in `docs/import-templates/` |

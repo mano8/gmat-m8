@@ -41,8 +41,8 @@ cd docker_compose/gmat_m8
 | 5 | Stops `web` and `worker`. | Gates stay on. |
 | 6 | Pre-deploy backup (`pre-deploy-X.Y.Z`) with its offsite copy. The dump id is recorded. | Gates stay on; no migration ran. |
 | 7 | Migrates, as the owner role. | Gates stay on. The migration may have partly run. |
-| 8 | Starts `web`, `worker`, `backup` on the new digests. Traffic is still gated, the worker only reports ready. | Gates stay on. |
-| 9 | `verify-internal` against `web:8000`: health, readiness, login page, a static file, `check --deploy`, `migrate --check`, the paused worker's heartbeat. | Gates stay on. |
+| 8 | Starts the scanner (`clamd`, recreated so a changed configuration applies; loading its signatures takes about a minute), `freshclam`, the `decoder`, then `web`, `worker`, `backup` on the new digests. Traffic is still gated, the worker only reports ready. | Gates stay on. |
+| 9 | `verify-internal` against `web:8000`: health, readiness, login page, a static file, that the malware scanner and the image decoder answer, `check --deploy`, `migrate --check`, the paused worker's heartbeat. | Gates stay on. |
 | 10 | **Commit point**: removes `worker.paused`, then `maintenance.on`. Checks from outside that `/healthz/` and the login page answer 200 and the worker is processing. If either fails, both gates go back on. | Gates back on. |
 | 11 | Records version, both digests, dump id and time in `deployed.log`. | — |
 
@@ -130,6 +130,7 @@ df -h /
 - Gate flags present (`ls flags/`)? Someone paused it; see `status` and [incident.md](incident.md).
 - A container restarting? Read its log; most often a full disk or an env file mistake.
 - Only `web` unhealthy: `docker compose ... restart web`. Do not restart `db` unless the logs say to.
+- Uploads refused with "cannot be checked right now" and the rest of the site fine: `clamd` or `decoder` is down. Read its log, `docker compose ... up -d --no-deps clamd decoder`. `clamd` takes about a minute to load its signatures. If it was killed for memory (`docker inspect --format '{{.State.OOMKilled}}'`), the server is too small for what it does: see the sizing in [vps-setup.md](vps-setup.md).
 - Certificate error: Caddy could not renew; `docker compose logs caddy` names the reason (DNS, port 80 blocked, rate limit).
 
 Then follow [incident.md](incident.md).

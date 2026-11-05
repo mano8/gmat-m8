@@ -5842,3 +5842,68 @@ msgstr "La base de datos conservada ya dice lo que pasó: no hay ningún interva
 #: apps/recovery/services.py
 msgid "This account is not suspended."
 msgstr "Esta cuenta no está suspendida."
+
+#: apps/attachments/processing.py
+msgid "This file was refused: the virus scanner found something in it."
+msgstr "Este archivo se ha rechazado: el antivirus ha encontrado algo en él."
+
+#: apps/attachments/processing.py
+msgid "Files cannot be checked right now. Try again in a few minutes."
+msgstr "Ahora no se pueden comprobar los archivos. Inténtalo de nuevo en unos minutos."
+
+#: apps/accounts/services.py
+msgid "Your second factors were removed"
+msgstr "Se han eliminado tus segundos factores"
+
+#: apps/accounts/services.py
+msgid "Sign out to end this session."
+msgstr "Cierra la sesión para terminar esta sesión."
+
+#: apps/accounts/views.py
+msgid "That session has ended."
+msgstr "Esa sesión ha terminado."
+
+#: apps/accounts/views.py
+msgid "Your other sessions have ended."
+msgstr "Tus otras sesiones han terminado."
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Sessions"
+msgstr "Sesiones"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Where you are signed in. If you do not recognise one, end it and change your password."
+msgstr "Dónde tienes la sesión iniciada. Si no reconoces alguna, termínala y cambia tu contraseña."
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Unknown browser"
+msgstr "Navegador desconocido"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "This session"
+msgstr "Esta sesión"
+
+#: apps/accounts/templates/accounts/sessions.html
+#, python-format
+msgid "Started %(started)s, last seen %(seen)s"
+msgstr "Iniciada %(started)s, última actividad %(seen)s"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End this session"
+msgstr "Terminar esta sesión"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "No other session is open."
+msgstr "No hay ninguna otra sesión abierta."
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End all my other sessions"
+msgstr "Terminar todas mis otras sesiones"
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "An administrator removed the second factors of your gmat-m8 account, and every session of your account has ended."
+msgstr "Un administrador ha eliminado los segundos factores de tu cuenta de gmat-m8 y todas las sesiones de tu cuenta han terminado."
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "If you did not ask for this, tell your administrator straight away and change your password."
+msgstr "Si no lo has pedido, avisa de inmediato a tu administrador y cambia tu contraseña."

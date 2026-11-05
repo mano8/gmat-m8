@@ -465,7 +465,11 @@ def test_backup_now_then_restore_verify_against_the_manifest(stack: Stack) -> No
             stack.compose("exec", "-T", "backup", "cat", f"/backups/{base}.manifest.json").stdout
         )
         assert manifest["label"] == "smoke"
-        assert manifest["excluded_data_tables"] == ["django_session", "django_cache"]
+        assert manifest["excluded_data_tables"] == [
+            "django_session",
+            "usersessions_usersession",
+            "django_cache",
+        ]
         assert manifest["row_counts"]["django_session"] >= 1  # live rows existed at dump time
         assert "accounts" in manifest["migration_head"]
 

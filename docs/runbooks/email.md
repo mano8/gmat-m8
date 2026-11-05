@@ -6,6 +6,8 @@ How mail leaves gmat-m8, what its states mean, and what a human does when a mess
 
 A request never talks to SMTP. Business code writes an `EmailOutbox` row inside its transaction, and the **worker** container is the only sender: it claims a row, re-checks that the recipient is still allowed, records an attempt **before** any network I/O, sends through the relay in `app.env`, and records the outcome. Security mail (invitations, email changes, password resets) is sealed with `OUTBOX_ENCRYPTION_KEYS` and wiped as soon as it is sent, or after an hour. Supplier purchase orders are mailed only when `PO_DISPATCH=on`.
 
+The account mail that is not an answer to something someone asked for: notices that a password or a second factor changed, and that an administrator reset an account's factors. They are sealed and wiped like a reset link, and a person who did not do what one says should tell you straight away ([user-admin.md](user-admin.md#sessions-inactivity-and-notices)).
+
 ```bash
 cd ~/gmat-m8/docker_compose/gmat_m8
 alias dc='docker compose -f docker-compose.yml -f docker-compose.production.yml'
