@@ -51,7 +51,7 @@ export RESTIC_PASSWORD=...           # the offline copy
 export RESTIC_REST_USERNAME=gmat
 export RESTIC_REST_PASSWORD=...      # the admin password, never on the VPS
 python scripts/offsite_prune.py --dry-run
-python scripts/offsite_prune.py
+python scripts/offsite_prune.py      # the first time: read the list it shows, then --baseline
 ```
 
 `scripts/offsite_prune.py` needs `restic` on PATH and only the Python standard library. It refuses to run if any snapshot has an unexpected host or tag, a timestamp in the future or an abnormal count per day: such snapshots are investigated, never pruned around. Forged snapshots can fill the weekly and monthly rules, so that an older real snapshot loses its place and goes at the next prune; `--keep-within` only protects the last 90 days. The script then keeps every snapshot of the last 90 days plus 4 weekly and 12 monthly ones, checks restic's plan against that window, forgets exactly the snapshots it checked, and lists the repository again: restic exits 0 even when a server refuses the removal.

@@ -79,7 +79,15 @@ class Fake:
         return [call for call in self.calls if call[:2] == ["forget", "--prune"]]
 
 
+@pytest.fixture(autouse=True)
+def _state_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(prune, "DEFAULT_STATE", tmp_path / "seen.json")
+
+
 def run(fake: Fake, **kwargs: Any) -> int:
+    """A run that has its baseline, unless the test says otherwise."""
+    kwargs.setdefault("state", prune.DEFAULT_STATE)
+    kwargs.setdefault("baseline", True)
     result: int = prune.prune(fake, NOW, dry_run=kwargs.pop("dry_run", False), **kwargs)
     return result
 
@@ -164,6 +172,91 @@ class TestThePlan:
         assert prune.planned_removals("null") == []
 
 
+class TestBackDated:
+    """A forgery with the right host and tags, dated in the past (security review, M8): nothing
+    about the snapshot gives it away, so this machine's memory of the last prune has to."""
+
+    def _pruned_once(self, *snapshots: dict[str, Any]) -> Fake:
+        fake = Fake(list(snapshots))
+        assert run(fake) == 0
+        return fake
+
+    def test_a_snapshot_new_since_the_last_prune_and_dated_before_it_is_refused(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        fake = self._pruned_once(snapshot(1))
+        fake.snapshots.append(snapshot(200, id_="f" * 64))
+        fake.remove = [snapshot(150, id_="e" * 64)]  # what the forgery would push out
+        assert run(fake, baseline=False) == 2
+        assert fake.forgot == []
+        out = capsys.readouterr().out
+        assert "new since the last prune but dated before it" in out
+        assert "ffffffff" in out
+
+    def test_a_baseline_flag_does_not_wave_it_through(self) -> None:
+        fake = self._pruned_once(snapshot(1))
+        fake.snapshots.append(snapshot(200, id_="f" * 64))
+        assert run(fake, baseline=True) == 2
+
+    def test_what_was_there_at_the_last_prune_is_known_however_old(self) -> None:
+        fake = self._pruned_once(snapshot(300, id_="b" * 64), snapshot(1))
+        assert run(fake, baseline=False) == 0
+
+    def test_a_new_snapshot_after_the_last_prune_passes(self) -> None:
+        fake = self._pruned_once(snapshot(1))
+        fake.snapshots.append(snapshot(-0.001, id_="c" * 64))
+        assert run(fake, baseline=False) == 0
+
+    def test_a_backup_uploaded_just_after_the_last_prune_passes(self) -> None:
+        """It started before that prune and was listed only after it."""
+        fake = self._pruned_once(snapshot(1))
+        fake.snapshots.append(snapshot(0.5, id_="c" * 64))
+        assert run(fake, baseline=False) == 0
+
+    def test_the_first_run_needs_a_baseline_and_shows_what_it_would_trust(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        fake = Fake([snapshot(1)], [snapshot(200, id_="b" * 64)])
+        assert run(fake, baseline=False) == 2
+        assert fake.forgot == []
+        out = capsys.readouterr().out
+        assert "--baseline" in out and "aaaaaaaa" in out
+        assert not prune.DEFAULT_STATE.exists()
+
+    def test_a_first_run_on_an_empty_repository_says_so(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert run(Fake([]), baseline=False) == 2
+        assert "(no snapshots)" in capsys.readouterr().out
+
+    def test_a_dry_run_records_nothing(self) -> None:
+        assert run(Fake([snapshot(1)]), dry_run=True) == 0
+        assert not prune.DEFAULT_STATE.exists()
+
+    def test_a_refused_run_records_nothing(self) -> None:
+        fake = self._pruned_once(snapshot(1))
+        before = prune.DEFAULT_STATE.read_text()
+        fake.snapshots.append(snapshot(200, id_="f" * 64))
+        assert run(fake) == 2
+        assert prune.DEFAULT_STATE.read_text() == before
+
+    def test_what_a_prune_removed_is_forgotten_and_the_file_is_private(self) -> None:
+        old = snapshot(200, id_="b" * 64)
+        fake = Fake([old, snapshot(1)], [old])
+        assert run(fake) == 0
+        recorded = json.loads(prune.DEFAULT_STATE.read_text())
+        assert recorded["ids"] == ["a" * 64]
+        assert recorded["at"] == NOW.isoformat()
+        assert prune.DEFAULT_STATE.stat().st_mode & 0o777 == 0o600
+
+    def test_a_restic_that_removes_nothing_records_nothing(self) -> None:
+        old = snapshot(200, id_="b" * 64)
+        fake = Fake([old, snapshot(1)], [old], append_only=True)
+        with pytest.raises(prune.ResticFailed):
+            run(fake)
+        assert not prune.DEFAULT_STATE.exists()
+
+
 class TestCommandLine:
     @pytest.fixture
     def restic(self, monkeypatch: pytest.MonkeyPatch) -> Callable[[list[Any]], None]:
@@ -194,16 +287,17 @@ class TestCommandLine:
                 {"returncode": 0, "stdout": "[]", "stderr": ""},
             ]
         )
-        assert prune.main([]) == 0
+        assert prune.main(["--baseline", "--state", str(prune.DEFAULT_STATE)]) == 0
         assert "1 snapshots, 0 to remove" in capsys.readouterr().out
+        assert prune.DEFAULT_STATE.exists()
 
     def test_restic_failing_is_not_a_refusal(
         self, restic: Callable[[list[Any]], None], capsys: pytest.CaptureFixture[str]
     ) -> None:
         restic([{"returncode": 1, "stdout": "", "stderr": "wrong password"}])
-        assert prune.main(["--dry-run"]) == 1
+        assert prune.main(["--dry-run", "--state", str(prune.DEFAULT_STATE)]) == 1
         assert "wrong password" in capsys.readouterr().err
 
     def test_restic_missing(self, restic: Callable[[list[Any]], None]) -> None:
         restic([FileNotFoundError("restic")])
-        assert prune.main([]) == 1
+        assert prune.main(["--state", str(prune.DEFAULT_STATE)]) == 1

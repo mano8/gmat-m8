@@ -707,8 +707,9 @@ def run_prune(world: World, *args: str) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
     )
     restic.chmod(0o755)
+    state = world.directory / "maintainer-prune-state.json"
     return subprocess.run(  # noqa: S603 (the repository's script)
-        ["python3", *PRUNE, *args],  # noqa: S607
+        ["python3", *PRUNE, "--state", str(state), *args],  # noqa: S607
         env={**world.env, "PATH": f"{wrapper}:{world.env['PATH']}"},
         capture_output=True,
         text=True,
@@ -746,7 +747,7 @@ POISON_TARGET = ("gmat-m8", "dump:gmat-20260301T000000Z")
 
 class TestForgedSnapshots:
     def test_a_clean_repository_passes_the_check(self, world: World) -> None:
-        result = run_prune(world, "--dry-run")
+        result = run_prune(world, "--dry-run", "--baseline")
         assert result.returncode == 0, result.stdout + result.stderr
         assert "0 to remove" in result.stdout
 
@@ -828,6 +829,19 @@ class TestForgedSnapshots:
             f"--keep-within keeps all {len(real_recent)} of the window; the prune refused"
         )
 
+    def test_a_back_dated_forgery_is_refused_on_what_the_last_prune_saw(self, world: World) -> None:
+        """Right host and tags, a date in the past: nothing about the snapshot gives it away, and
+        the maintainer's record of the last prune is out of the VPS's reach."""
+        assert run_prune(world, "--baseline").returncode == 0
+        forged = forge(world, "2026-03-31 23:59:59", tags=POISON_TARGET)
+        result = run_prune(world)
+        assert result.returncode == 2
+        assert "new since the last prune but dated before it" in result.stdout
+        assert forged in {item["id"] for item in snapshots(world)}
+        forget_forged(world, forged)
+        (world.directory / "maintainer-prune-state.json").unlink()
+        note("a snapshot dated months back, with the right tags: the prune refused")
+
     def test_keep_within_keeps_the_protected_window(self, world: World) -> None:
         """Monthly rules count months that have a snapshot: 13 old months leave the oldest out."""
         months = [f"{year}-{month:02d}" for year in (2025,) for month in range(1, 13)] + ["2026-01"]
@@ -842,7 +856,7 @@ class TestForgedSnapshots:
         }
         protected = {item["id"] for item in snapshots(world)} - set(old.values())
         assert recent in protected
-        result = run_prune(world)
+        result = run_prune(world, "--baseline")
         assert result.returncode == 0, result.stdout + result.stderr
         left = {item["id"] for item in snapshots(world)}
         assert protected <= left, "every snapshot of the protected window survives"
@@ -1044,3 +1058,41 @@ def test_a_new_vps_comes_up_from_the_offsite_copy_with_privileged_accounts_suspe
     note(
         "a new VPS from the offsite copy: privileged accounts suspended until confirmed one by one"
     )
+
+
+# --- a database that does not start ------------------------------------------------------------
+
+
+def test_a_database_that_does_not_start_is_restored_from_a_dump(world: World) -> None:
+    """``--db-unreadable``: the path fake containers cannot prove. The cluster is really broken,
+    so nothing may wait for it, its volume is kept, and the dump goes into an empty one. Last in
+    this file: without a failed state every privileged account comes up suspended."""
+    created = world.compose("exec", "-T", "backup", "backup-now", "--label", "before-corruption")
+    dump = created.stdout.strip().splitlines()[-1]
+    audit = int(world.sql("SELECT count(*) FROM audit_auditevent"))
+    volume = f"{PROJECT}_pg_data"
+    before = docker("volume", "ls", "-q", "--filter", f"name={volume}_failed_").split()
+    world.compose("stop", "web", "worker", "db")
+    docker(
+        "run", "--rm", "--network", "none", "--entrypoint", "sh", "-v", f"{volume}:/data",
+        world.running_image("caddy"), "-c", "find /data -name PG_VERSION -delete",
+    )  # fmt: skip
+    started = world.compose(
+        "up", "-d", "--no-deps", "--wait", "--wait-timeout", "30", "db", check=False
+    )
+    assert started.returncode != 0, "the cluster should not start any more"
+
+    result = world.recover(
+        "restore", dump, "--operator", ADMIN_EMAIL, "--incident", "rehearsal: pg_data broken",
+        "--db-unreadable", "--confirm", "RESTORE",
+    )  # fmt: skip
+
+    assert "LOSS WINDOW" in result.stderr
+    assert world.gates() == (False, False)
+    assert public(world) == 200
+    assert int(world.sql("SELECT count(*) FROM audit_auditevent")) >= audit
+    after = docker("volume", "ls", "-q", "--filter", f"name={volume}_failed_").split()
+    copies = set(after) - set(before)
+    assert len(copies) == 1, "the broken cluster is kept"
+    assert world.deployed()[-1][-1] == "restore"
+    note(f"a cluster without PG_VERSION: restored from {dump}, the old one kept in {copies.pop()}")

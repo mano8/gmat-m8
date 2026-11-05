@@ -201,9 +201,11 @@ python scripts/offsite_prune.py --dry-run
 python scripts/offsite_prune.py
 ```
 
+The **first time**, and if you ever lose its record, it has nothing to compare with: it lists the snapshots and asks you to read them and run once with `--baseline`. After each prune it remembers what it saw in `~/.config/gmat-m8/offsite-prune.json`, on your machine; back that file up with your other offline material, and run the prune from the same machine.
+
 (`scripts/offsite_prune.py` needs `restic` and only Python's standard library.) It keeps every snapshot of the last 90 days plus 4 weekly and 12 monthly ones.
 
-The script **refuses to run** when any snapshot has an unexpected host or tag, a timestamp in the future, or an abnormal count per day. That is the sign of forged snapshots appended from a compromised VPS, which could push real old snapshots out of the weekly and monthly rules. Never prune around it: treat it as a security incident ([incident.md](incident.md)), keep the repository as it is, and investigate the VPS.
+The script **refuses to run** when any snapshot has an unexpected host or tag, a timestamp in the future, an abnormal count per day, or is new since the last prune but dated before it. That is the sign of forged snapshots appended from a compromised VPS, which could push real old snapshots out of the weekly and monthly rules. Never prune around it: treat it as a security incident ([incident.md](incident.md)), keep the repository as it is, and investigate the VPS.
 
 After a prune it lists the repository again, because restic exits 0 even when a server refuses a removal. To confirm that the VPS's credentials cannot delete, look for the refusal and the listing, never at the exit code.
 
