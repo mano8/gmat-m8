@@ -14,6 +14,7 @@ from django.http import HttpRequest, HttpResponseBase, HttpResponseNotAllowed
 from apps.access.context import AccessContext
 from apps.access.exceptions import MethodNotAllowed, StaleSession
 from apps.access.principals import SessionPrincipal
+from config.logging import user_id_var
 
 GetResponse = Callable[[HttpRequest], HttpResponseBase]
 REQUEST_ATTRIBUTE = "access"
@@ -43,7 +44,13 @@ class AccessContextMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
         setattr(request, REQUEST_ATTRIBUTE, context_for_request(request))
-        return self.get_response(request)
+        # Log records name who made the request, a refused one (403, 404) included.
+        user_id = str(request.user.pk) if request.user.is_authenticated else None
+        token = user_id_var.set(user_id)
+        try:
+            return self.get_response(request)
+        finally:
+            user_id_var.reset(token)
 
     def process_exception(
         self, request: HttpRequest, exception: Exception
