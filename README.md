@@ -79,7 +79,7 @@ Coverage must stay at 90 % or more overall (100 % for `apps/access` and every `s
 | `secret-scan` | gitleaks over the full history |
 | `compose-smoke-gate` | from `compose-smoke.yaml` (M1.5) |
 
-Three more workflows are not PR checks. `e2e.yaml` (M8.2) drives a real browser through the compose stack, on a push to `main`, nightly, by hand and on a pull request labelled `e2e`. `docker-publish.yaml` publishes both images, signed, with a signed release manifest, when the maintainer pushes a `v*` tag (a manual run builds without pushing); it refuses a commit that is not on `main` or lacks green `ci.yaml`, `compose-smoke.yaml` and `e2e.yaml` runs. `image-scan.yaml` scans the released images, Caddy and PostgreSQL every night and keeps one issue up to date. Both are described in [docs/release.md](docs/release.md).
+Three more workflows are not PR checks. `e2e.yaml` (M8.2) drives a real browser through the compose stack, on a push to `main`, nightly, by hand and on a pull request labelled `e2e`. `docker-publish.yaml` publishes both images, signed, with a signed release manifest, when the maintainer pushes a `v*` tag (a manual run builds without pushing); it refuses a commit that is not on `main` or lacks green `ci.yaml`, `compose-smoke.yaml` and `e2e.yaml` runs. `image-scan.yaml` scans the released images, Caddy, PostgreSQL and ClamAV every night and keeps one issue up to date. Both are described in [docs/release.md](docs/release.md).
 
 Trivy exceptions live in `.trivyignore.yaml` (empty; the entry format is documented in the file). Each needs a statement and an expiry at most 90 days away, and is added only in a pull request the maintainer approves. Reports of the Trivy and bandit scans are kept as workflow artifacts for 90 days.
 
