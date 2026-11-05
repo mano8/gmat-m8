@@ -46,5 +46,6 @@ A vulnerability in a dependency (Django, django-allauth, htmx, PostgreSQL, Caddy
 
 ## Further reading
 
-- [docs/security.md](docs/security.md): the security baseline the application enforces (authentication, MFA, sessions, authorization, headers, logging, email, containers).
+- [docs/security.md](docs/security.md): the threat model, the exception register (what is knowingly accepted, until when) and the security baseline the application enforces (authentication, MFA, sessions, authorization, headers, logging, email, containers).
+- [docs/security-review.md](docs/security-review.md): the review passes, their findings and what became of them.
 - [docs/release.md](docs/release.md): how images are built, signed and verified.

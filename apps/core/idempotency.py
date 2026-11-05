@@ -10,8 +10,9 @@ service's transaction, right after ``authorize_in_txn``, ``idempotent()``:
 3. inserts ``IdempotencyRecord(actor, key_id, operation, payload_hash)``:
 
    - new key: runs the command and stores a reference to its result;
-   - same key and hash: a replay. ``replay`` must authorize again that the actor can still
-     see the result, then return it (the view answers 303 to the document);
+   - same key and hash: a replay. The service has just authorized the actor again for the
+     command's inputs; ``replay`` returns the recorded result and the view answers 303 to
+     its page, which reads it through the scoped selectors like any visit (S7);
    - same key, other operation or hash: 409, nothing is written;
    - concurrent duplicate: the second insert waits on the unique index until the first
      transaction ends, then takes one of the two paths above (or runs as new if the first
@@ -155,8 +156,10 @@ def idempotent[M: Model](
     """Run ``execute`` once per key; on a replay return ``replay(result_type, result_id)``.
 
     ``execute`` returns the created object (its label and primary key are recorded).
-    ``replay`` reloads that object for the actor, re-authorizing the read (S7: 404 out of
-    scope, 403 without the capability). Call this inside the service's transaction.
+    ``replay`` reloads it; the service authorized the actor for the command's inputs just
+    before, and the page the view redirects to reads the result through its scoped
+    selectors (S7: 404 out of scope, 403 without the capability). Call this inside the
+    service's transaction.
     """
     if not connections[using].in_atomic_block:
         raise IdempotencyOutsideTransaction("idempotent() must run inside the service transaction")
