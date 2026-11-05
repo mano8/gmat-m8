@@ -634,7 +634,7 @@ except IdempotencyKeyInvalid:
         preserved = sorted((world.compose_dir / "preserved").iterdir())[-1]
         assert (preserved / "failed.dump").stat().st_size > 0
         assert (preserved / "failed-state.json").stat().st_size > 0
-        assert (preserved / "written-since-deploy.json").stat().st_size > 0
+        assert (preserved / "written-since.json").stat().st_size > 0
         volumes = docker("volume", "ls", "-q", "--filter", f"name={PROJECT}_pg_data_failed_")
         assert volumes
         assert "rehearsal" in (world.compose_dir / "incident.log").read_text(encoding="utf-8")

@@ -11,6 +11,7 @@ python3). Each command prints plain text for the shell and exits non-zero on a m
                             validates a verified release-manifest.json; prints KEY=VALUE lines
   admin-cidrs VALUE         refuses an allowlist that is open or holds Docker's bridge ranges
   dump-version MANIFEST     the app version a backup manifest was taken with
+  dump-time MANIFEST        when a backup was taken (a restore's loss window starts there)
   compare-counts MANIFEST RESTORED
                             the restored row counts against a backup manifest
 """
@@ -31,7 +32,8 @@ SHA = re.compile(r"^[0-9a-f]{40}$")
 DOCKER_RANGES = tuple(
     ipaddress.ip_network(network) for network in ("172.16.0.0/12", "192.168.0.0/16")
 )
-OPEN_RANGES = ("0.0.0.0/0", "::/0")
+# The widest network an allowlist may name, by IP version: an office, a VPN, a provider's block.
+WIDEST_PREFIX = {4: 8, 6: 32}
 IMAGE_NAMES = {"app": "gmat-m8", "backup": "gmat-m8-backup"}
 
 
@@ -97,17 +99,18 @@ def check_manifest(
 
 
 def check_admin_cidrs(value: str) -> None:
-    """Production names the networks that reach the admin, and never a bridge range."""
+    """Production names the networks that reach the admin, and never a bridge range. Read as
+    networks, not strings: ``0::/0`` and ``::/1`` are as open as ``::/0``."""
     entries = value.split()
     if not entries:
         raise Refused("ADMIN_ALLOWED_CIDRS is empty")
-    if any(entry in OPEN_RANGES for entry in entries):
-        raise Refused("ADMIN_ALLOWED_CIDRS is open to every network")
     for entry in entries:
         try:
             network = ipaddress.ip_network(entry, strict=False)
         except ValueError as exc:
             raise Refused(f"ADMIN_ALLOWED_CIDRS: {entry!r} is not a network") from exc
+        if network.prefixlen < WIDEST_PREFIX[network.version]:
+            raise Refused(f"ADMIN_ALLOWED_CIDRS: {entry} is open to every network, or near it")
         overlap = any(
             network.version == docker.version and network.overlaps(docker)
             for docker in DOCKER_RANGES
@@ -157,6 +160,13 @@ def _dump_version(args: argparse.Namespace) -> str:
     return str(_load(args.manifest).get("app_version") or "")
 
 
+def _dump_time(args: argparse.Namespace) -> str:
+    created = _load(args.manifest).get("created_at")
+    if not created:
+        raise Refused("the manifest does not say when it was taken")
+    return str(created)
+
+
 def _compare_counts(args: argparse.Namespace) -> str:
     differences = count_differences(_load(args.manifest), _load(args.restored))
     if differences:
@@ -171,6 +181,7 @@ COMMANDS = {
     "manifest": _manifest,
     "admin-cidrs": _admin_cidrs,
     "dump-version": _dump_version,
+    "dump-time": _dump_time,
     "compare-counts": _compare_counts,
 }
 
@@ -192,6 +203,7 @@ def _parser() -> argparse.ArgumentParser:
     manifest.add_argument("--image-prefix", required=True)
     commands.add_parser("admin-cidrs").add_argument("value")
     commands.add_parser("dump-version").add_argument("manifest")
+    commands.add_parser("dump-time").add_argument("manifest")
     counts = commands.add_parser("compare-counts")
     counts.add_argument("manifest")
     counts.add_argument("restored")

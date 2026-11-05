@@ -179,6 +179,21 @@ commit_point() {
 state_set() { set_env_value "$STATE_FILE" "$1" "$2"; }
 state_get() { env_value "$1" "$STATE_FILE"; }
 
+# How far the deploy in progress really got. A fix-forward (--resume) counts its steps from the
+# start, but what the failed one did stays done: gates that are on, a migration that ran.
+reached_step() {
+    local reached
+    reached=$(state_get STEP)
+    reached="${reached:-0}"
+    if [ "$(state_get MIGRATION_RAN)" = 1 ] && [ "$reached" -lt 7 ]; then
+        printf '7'
+    elif { [ -e "$FLAG_MAINTENANCE" ] || [ -e "$FLAG_WORKER" ]; } && [ "$reached" -lt 4 ]; then
+        printf '4'
+    else
+        printf '%s' "$reached"
+    fi
+}
+
 last_deployed() { # last_deployed FIELD [ROWS_BACK]: fields: 1 time 2 version 3 app 4 backup 5 dump
     [ -f "$DEPLOYED_LOG" ] || return 0
     tail -n "${2:-1}" "$DEPLOYED_LOG" | head -n 1 | cut -f "$1"

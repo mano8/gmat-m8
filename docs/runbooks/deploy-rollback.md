@@ -79,7 +79,7 @@ Notes that apply to every row:
 - Every action except `status` takes the deploy lock, puts both gates on, stops the writers and ends with the internal verification and the commit point. A failure leaves both gates on: the site shows the maintenance page and no email is sent. Read the output, fix, run the action again.
 - Actions that destroy something ask you to type `RESTORE` (or pass `--confirm RESTORE` when there is no terminal). Read the question it prints first: it names the dump and states the loss window.
 - Prefer the smallest action that works. **Never** delete the gate files by hand to "get the site back" while a deploy is unresolved: that is how a half-migrated database starts taking writes.
-- A fix-forward release after a failed deploy needs `./deploy.sh X.Y.Z+1 --resume`. Both gates stay on until its own commit point, and it goes back to the dump taken before the first failed attempt.
+- A fix-forward release after a failed deploy needs `./deploy.sh X.Y.Z+1 --resume`. Both gates stay on until its own commit point, and it goes back to the dump taken before the first failed attempt. If the fix fails too, even at its first step, `./recover.sh status` still knows the failed release migrated, so `rollback` stays refused and the row is the migration's.
 
 ### Rolling back the images after the commit point
 
@@ -103,7 +103,7 @@ This loses data, so it is a decision, not a reflex:
    ./recover.sh restore gmat-<stamp>-pre-deploy-X.Y.Z --operator you@example.org --incident "short reason"
    ```
 
-   Before it changes anything it **preserves the failed state** under `preserved/<time>/` (a dump, the outbox outcomes, the access and credential events, and the documents created since the deploy, for re-entry) and a renamed copy of the `pg_data` volume, then states the loss window and asks you to type `RESTORE`. The decision is appended to `incident.log`.
+   First it states the **loss window** (everything written since that dump was taken) and asks you to type `RESTORE`; answering anything else leaves the site as it was. Then it closes both gates and **preserves the failed state** under `preserved/<time>/`: a dump, the outbox outcomes, the access and credential events, the documents written since the dump (for re-entry), and a renamed copy of the `pg_data` volume.
 4. After it ends, follow [the post-restore steps](backup-restore.md#after-any-restore) (quarantined email, suspended accounts), and tell the people who lost work what to re-enter, using `preserved/<time>/written-since-deploy.json`.
 5. Fill in [incident.md](incident.md)'s record.
 

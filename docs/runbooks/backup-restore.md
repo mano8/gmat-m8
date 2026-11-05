@@ -133,7 +133,9 @@ An explicit decision, recorded in `incident.log`:
 ./recover.sh restore gmat-<stamp> --operator you@example.org --incident "what and why"
 ```
 
-It preserves the failed state first (`preserved/<time>/`), states the loss window (dump time → now) and asks you to type `RESTORE`. Add `--db-unreadable` if the database cannot be read at all (nothing to preserve from it). Read [deploy-rollback.md](deploy-rollback.md#restoring-after-writes-were-accepted).
+It states the loss window (from when that dump was taken until now) and asks you to type `RESTORE` before it changes anything; answering anything else leaves the site as it was. Then it preserves the failed state (`preserved/<time>/`).
+
+**If the database does not start or cannot be read**, add `--db-unreadable`. It copies the `pg_data` volume aside (`gmat-m8_pg_data_failed_<time>`), **removes the original**, starts an empty cluster from the role bootstrap in `.env`, and restores into that. Nothing tells it what happened after the dump, so every privileged account comes up suspended, as after the loss of the server: confirm them with `manage confirm_account`.
 
 ### The VPS is gone
 

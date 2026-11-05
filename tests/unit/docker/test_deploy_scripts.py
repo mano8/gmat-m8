@@ -31,6 +31,9 @@ IDENTITY = (
 )
 
 
+DUMP_TIME = "2026-11-04T06:00:00Z"
+
+
 def position(log: list[str], fragment: str) -> int:
     for index, line in enumerate(log):
         if fragment in line:
@@ -667,6 +670,74 @@ class TestRollbackImages:
         assert ready.gates() == (False, False)
 
 
+class TestAResumeThatFailsEarly:
+    """What the failed release did stays done, whatever its fix then manages (code review)."""
+
+    @pytest.fixture
+    def migrated(self, ready: World) -> World:
+        """1.1.0 migrated, then failed its verification; 1.1.1 is the fix."""
+        ready.fail_on("web verify-internal")
+        assert ready.run("deploy.sh", VERSION).returncode != 0
+        ready.recover()
+        ready.release("1.1.1")
+        return ready
+
+    def _fix_fails_at(self, world: World, pattern: str) -> Any:
+        world.fail_on(pattern)
+        result = world.run("deploy.sh", "1.1.1", "--resume")
+        world.recover()
+        assert result.returncode != 0
+        return result
+
+    def test_failing_in_preflight_is_not_nothing_changed(self, migrated: World) -> None:
+        result = self._fix_fails_at(migrated, "web migrate-plan")
+        assert "nothing changed" not in result.stderr
+        assert "recover.sh migrate-back" in result.stderr
+        assert migrated.gates() == (True, True)
+        assert "failed at steps 7-9" in migrated.run("recover.sh", "status").stdout
+
+    @pytest.mark.parametrize("pattern", ["web migrate-plan", "stop web worker"])
+    def test_rollback_stays_refused_whatever_step_it_reached(
+        self, migrated: World, pattern: str
+    ) -> None:
+        self._fix_fails_at(migrated, pattern)
+        result = migrated.run("recover.sh", "rollback")
+        assert result.returncode != 0
+        assert "the migration may have run" in result.stderr
+
+    def test_the_first_dump_survives_failures_one_after_another(self, migrated: World) -> None:
+        first = migrated.state("DUMP")
+        self._fix_fails_at(migrated, "web migrate-plan")
+        assert migrated.state("ORIGINAL_DUMP") == first
+        self._fix_fails_at(migrated, "web migrate-plan")
+        assert migrated.state("ORIGINAL_DUMP") == first
+        assert migrated.state("MIGRATION_RAN") == "1"
+
+    def test_a_flagged_migration_stays_flagged(self, ready: World) -> None:
+        ready.release(VERSION, notes="Irreversible migration: yes\n")
+        ready.fail_on("web verify-internal")
+        assert ready.run("deploy.sh", VERSION, "--confirm", VERSION).returncode != 0
+        ready.recover()
+        ready.release("1.1.1")
+        assert ready.state("IRREVERSIBLE") == "1"
+        self._fix_fails_at(ready, "stop web worker")
+        assert ready.state("IRREVERSIBLE") == "1"
+        result = ready.run("recover.sh", "migrate-back")
+        assert result.returncode != 0
+        assert "irreversible" in result.stderr
+
+    def test_a_resume_after_a_deploy_that_finished_starts_clean(self, ready: World) -> None:
+        assert ready.run("deploy.sh", VERSION).returncode == 0
+        ready.release("1.1.1")
+        ready.fail_on("web migrate-plan")
+        result = ready.run("deploy.sh", "1.1.1", "--resume")
+        ready.recover()
+        assert result.returncode != 0
+        assert not ready.state("MIGRATION_RAN")
+        assert "nothing changed" in result.stderr
+        assert ready.gates() == (False, False)
+
+
 class TestRestoreAfterWrites:
     @pytest.fixture
     def dump(self, ready: World) -> str:
@@ -674,7 +745,9 @@ class TestRestoreAfterWrites:
         ready.clear_logs()
         backups = ready.stack / "backups"
         (backups / "gmat-1.dump").write_text("DUMP")
-        (backups / "gmat-1.manifest.json").write_text(json.dumps({"app_version": VERSION}))
+        (backups / "gmat-1.manifest.json").write_text(
+            json.dumps({"app_version": VERSION, "created_at": DUMP_TIME})
+        )
         return "gmat-1"
 
     def test_states_the_loss_window_keeps_the_incident_and_replays(
@@ -692,11 +765,14 @@ class TestRestoreAfterWrites:
             "RESTORE",
         )
         assert result.returncode == 0, result.stderr
-        assert "LOSS WINDOW" in result.stderr
+        assert f"LOSS WINDOW: everything written since this dump was taken ({DUMP_TIME})" in (
+            result.stderr
+        )
         incident = (ready.stack / "incident.log").read_text()
         assert "#42 bad data" in incident and "gmat-1" in incident and "op@test" in incident
+        assert f"loss-window={DUMP_TIME}..now" in incident
         preserved = next((ready.stack / "preserved").iterdir())
-        assert (preserved / "written-since-deploy.json").exists()
+        assert (preserved / "written-since.json").exists()
         log = ready.docker_log()
         in_order(log, "pg_dump -Fc", "pg_restore", "--failed-state -", "web verify-internal")
         assert ready.env_value("APP_DIGEST") == APP_DIGEST
@@ -707,9 +783,10 @@ class TestRestoreAfterWrites:
             "recover.sh", "restore", dump, "--operator", "op@test", "--incident", "x"
         )
         assert result.returncode != 0
-        assert not [line for line in ready.docker_log() if "pg_restore" in line]
-        assert [line for line in ready.docker_log() if "pg_dump -Fc" in line]
-        assert ready.gates() == (True, True), "the gates stay on while the human thinks"
+        assert "LOSS WINDOW" in result.stderr
+        log = ready.docker_log()
+        assert not [line for line in log if "pg_restore" in line or "stop " in line]
+        assert ready.gates() == (False, False), "declining leaves the site as it was"
 
     @pytest.mark.parametrize("args", [["--operator", "op@test"], ["--incident", "x"]])
     def test_needs_an_operator_and_an_incident(
@@ -717,6 +794,30 @@ class TestRestoreAfterWrites:
     ) -> None:
         assert ready.run("recover.sh", "restore", dump, *args).returncode != 0
         assert ready.gates() == (False, False)
+
+    def test_a_manifest_that_does_not_say_when_is_refused(self, ready: World, dump: str) -> None:
+        (ready.stack / "backups" / f"{dump}.manifest.json").write_text(
+            json.dumps({"app_version": VERSION})
+        )
+        result = ready.run(
+            "recover.sh", "restore", dump, "--operator", "o@t", "--incident", "x",
+            "--confirm", "RESTORE",
+        )  # fmt: skip
+        assert result.returncode != 0
+        assert "does not say when" in result.stderr
+        assert ready.gates() == (False, False)
+
+    def test_the_compose_files_must_name_a_database_image(self, ready: World, dump: str) -> None:
+        """Read from the compose files: a container that does not start may be gone."""
+        fake = ready.fake / "bin" / "docker"
+        fake.write_text(fake.read_text().replace('print("postgres:fake@sha256:bbbb")', "pass"))
+        result = ready.run(
+            "recover.sh", "restore", dump, "--operator", "o@t", "--incident", "x",
+            "--confirm", "RESTORE",
+        )  # fmt: skip
+        assert result.returncode != 0
+        assert "no PostgreSQL image" in result.stderr
+        assert ready.gates() == (True, True)
 
     def test_a_database_that_cannot_be_read_still_gets_its_volume_copied(
         self, ready: World, dump: str
@@ -736,11 +837,24 @@ class TestRestoreAfterWrites:
         assert result.returncode == 0, result.stderr
         log = ready.docker_log()
         assert not [line for line in log if "pg_dump" in line]
-        in_order(log, "cp -a /from/. /to/", "pg_restore", "--no-failed-state")
+        # The cluster does not start, so nothing waits for it before its volume is copied; the
+        # copy comes first, and only then an empty cluster to restore into.
+        assert not [line for line in log[: position(log, "cp -a /from/.")] if "--wait db" in line]
+        in_order(
+            log,
+            "postgres:fake@sha256:bbbb -c cp -a /from/. /to/",
+            "rm -fsv db",
+            "volume rm",
+            "up -d --no-deps --wait db",
+            "pg_restore",
+            "--no-failed-state",
+        )
 
     def test_an_older_version_is_verified_as_a_release(self, ready: World, dump: str) -> None:
         backups = ready.stack / "backups"
-        (backups / "gmat-1.manifest.json").write_text(json.dumps({"app_version": "unknown"}))
+        (backups / "gmat-1.manifest.json").write_text(
+            json.dumps({"app_version": "unknown", "created_at": DUMP_TIME})
+        )
         result = ready.run("recover.sh", "restore", dump, "--operator", "o@t", "--incident", "x")
         assert result.returncode != 0
         assert "pass --version" in result.stderr

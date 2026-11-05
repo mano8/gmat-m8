@@ -47,6 +47,8 @@ sql = sys.stdin.read() if ("exec -T db" in line and not sys.stdin.isatty()) else
 if "config --images" in line:
     print(f"{os.environ['FAKE_PREFIX']}/gmat-m8@{os.environ['APP_DIGEST']}")
     print(f"{os.environ['FAKE_PREFIX']}/gmat-m8-backup@{os.environ['BACKUP_DIGEST']}")
+    print("caddy:fake@sha256:aaaa")
+    print("postgres:fake@sha256:bbbb")
 elif line.startswith("compose ps") or line.startswith("volume create"):
     print("container")
 elif line.startswith("image inspect"):

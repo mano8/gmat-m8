@@ -16,8 +16,10 @@
 #       Forward-fix first (./deploy.sh X.Y.Z+1).
 #   ./recover.sh restore DUMP --operator EMAIL --incident TEXT [--version V] [--db-unreadable]
 #                             [--confirm WORD]
-#       only a restore can fix it and writes were accepted: an explicit decision. Preserves the
-#       failed state and what was written since the deploy, states the loss window, asks.
+#       only a restore can fix it and writes were accepted: an explicit decision. States the loss
+#       window and asks before it changes anything; preserves the failed state and what was written
+#       since the dump. --db-unreadable: the database does not start or cannot be read, so it keeps
+#       a copy of the volume, starts from an empty cluster, and suspends privileged accounts.
 #   ./recover.sh restore-offsite --snapshot ID --version V --operator EMAIL --incident TEXT
 #                                [--gap-offboarded FILE] [--gap-credentials-changed FILE]
 #                                [--confirm WORD]
@@ -85,7 +87,8 @@ begin() {
     service_running caddy || compose up -d --no-deps caddy
     stop_writers
     compose stop backup
-    service_running db || compose up -d --no-deps --wait db
+    # A database that does not start is dealt with by preserve_failed_state.
+    [ "$DB_UNREADABLE" = 1 ] || service_running db || compose up -d --no-deps --wait db
 }
 
 # Starts the digests chosen, verifies and opens. KIND goes to deployed.log.
@@ -115,8 +118,6 @@ require_unfinished_deploy() {
     [ "$(reached_step)" -ge 4 ] || die "that deploy stopped before the gates: nothing changed"
 }
 
-reached_step() { state_get STEP; }
-
 cmd_status() {
     local status reached
     status=$(state_get STATUS)
@@ -126,14 +127,14 @@ cmd_status() {
     printf 'maintenance gate:  %s\n' "$([ -e "$FLAG_MAINTENANCE" ] && echo on || echo off)"
     printf 'worker gate:       %s\n' "$([ -e "$FLAG_WORKER" ] && echo on || echo off)"
     printf 'last deploy:       %s, target %s, stopped at step %s\n' \
-        "${status:-none}" "$(state_get TARGET_VERSION)" "${reached:-0}"
+        "${status:-none}" "$(state_get TARGET_VERSION)" "$reached"
     printf 'pre-deploy dump:   %s\n' "$(state_get DUMP)"
     printf '\nDecision tree:\n'
-    if [ "$status" = failed ] && [ "${reached:-0}" -lt 4 ]; then
+    if [ "$status" = failed ] && [ "$reached" -lt 4 ]; then
         printf '  -> it stopped before the gates: nothing changed, nothing to recover\n'
-    elif [ "$status" = failed ] && [ "${reached:-0}" -lt 7 ]; then
+    elif [ "$status" = failed ] && [ "$reached" -lt 7 ]; then
         printf '  -> failed before step 7: ./recover.sh rollback (no data loss)\n'
-    elif [ "$status" = failed ] && [ "${reached:-0}" -lt 10 ]; then
+    elif [ "$status" = failed ] && [ "$reached" -lt 10 ]; then
         printf '  -> failed at steps 7-9 (irreversible flag: %s):\n' "$(state_get IRREVERSIBLE)"
         printf '     ./recover.sh migrate-back, or ./recover.sh restore-predeploy --operator EMAIL (no data loss)\n'
     else
@@ -199,18 +200,27 @@ preserve_failed_state() { # preserve_failed_state SINCE
         compose exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" exec pg_dump -Fc -h 127.0.0.1 \
             -U "$POSTGRES_USER" "$POSTGRES_DB"' >"$PRESERVED/failed.dump"
         db_sql -t -A <ops/failed-state.sql >"$PRESERVED/failed-state.json"
-        db_sql -t -A -v "since=$since" <ops/documents-since.sql >"$PRESERVED/written-since-deploy.json"
+        db_sql -t -A -v "since=$since" <ops/documents-since.sql >"$PRESERVED/written-since.json"
     fi
-    local volume copy db_image
+    local volume copy images db_image
     volume="$(project_name)_pg_data"
     copy="${volume}_failed_$stamp"
-    db_image=$(docker inspect --format '{{.Config.Image}}' "$(compose ps -aq db)")
+    # From the compose files, not a container: one that does not start may be gone.
+    images=$(compose config --images)
+    db_image=$(sed -n -E '/(^|\/)postgres[:@]/{p;q;}' <<<"$images")
+    [ -n "$db_image" ] || die "the compose files name no PostgreSQL image"
     compose stop db
     docker volume create "$copy" >/dev/null
     docker run --rm --network none --entrypoint sh -v "$volume:/from:ro" -v "$copy:/to" \
         "$db_image" -c 'cp -a /from/. /to/'
-    compose up -d --no-deps --wait db
     say "the failed pg_data is kept in volume $copy"
+    if [ "$DB_UNREADABLE" = 1 ]; then
+        # Nothing can be restored into a cluster that does not start: an empty one, created by the
+        # role bootstrap from .env. The old one is the copy just made.
+        compose rm -fsv db
+        docker volume rm "$volume" >/dev/null
+    fi
+    compose up -d --no-deps --wait db
 }
 
 cmd_restore_predeploy() {
@@ -280,16 +290,18 @@ cmd_restore() {
         || die "backups/$dump.dump and its manifest are needed"
     version="${RESTORE_VERSION:-$(python3 ops/checks.py dump-version "backups/$dump.manifest.json")}"
     [ -n "$version" ] && [ "$version" != unknown ] || die "the dump names no version: pass --version"
+    since=$(python3 ops/checks.py dump-time "backups/$dump.manifest.json") \
+        || die "the manifest of $dump does not say when it was taken"
     take_lock
-    since=$(last_deployed 1)
     digests_for "$version"
+    # Before anything changes: declining leaves the site as it was.
+    say "LOSS WINDOW: everything written since this dump was taken ($since), unless re-entered."
+    confirm_typed RESTORE "$CONFIRM" "Restore $dump over the current database?"
     begin
     export APP_VERSION="$version" APP_DIGEST="$TARGET_APP" BACKUP_DIGEST="$TARGET_BACKUP"
     verify_dump "$dump"
-    preserve_failed_state "${since:-1970-01-01T00:00:00Z}"
-    say "LOSS WINDOW: everything written from ${since:-the dump} until now, unless re-entered."
-    say "What was written since the deploy, for re-entry: $PRESERVED/written-since-deploy.json"
-    confirm_typed RESTORE "$CONFIRM" "Restore $dump over the current database?"
+    preserve_failed_state "$since"
+    [ "$DB_UNREADABLE" = 1 ] || say "Written since the dump, for re-entry: $PRESERVED/written-since.json"
     note_incident restore "$dump" "$since"
     restore_database "backups/$dump.dump"
     restore_media "$dump"

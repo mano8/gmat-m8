@@ -66,9 +66,9 @@ step() { # step N TEXT
 
 decision_row() {
     local reached
-    reached=$(state_get STEP)
-    if [ "${reached:-0}" -lt 4 ]; then
-        say "Stopped at step ${reached:-0}, before the gates: nothing changed and the site stayed open."
+    reached=$(reached_step)
+    if [ "$reached" -lt 4 ]; then
+        say "Stopped at step $reached, before the gates: nothing changed and the site stayed open."
         return 0
     fi
     say "Stopped at step $reached with both gates on: no public write and no email since step 5."
@@ -96,10 +96,8 @@ on_exit() {
 
 refuse_unfinished() {
     [ "$RESUME" = 0 ] || return 0
-    local reached
-    reached=$(state_get STEP)
     if [ -e "$FLAG_MAINTENANCE" ] || [ -e "$FLAG_WORKER" ] \
-        || { [ "$(state_get STATUS)" = failed ] && [ "${reached:-0}" -ge 4 ]; }; then
+        || { [ "$(state_get STATUS)" = failed ] && [ "$(reached_step)" -ge 4 ]; }; then
         die "an earlier deploy or recovery did not finish (see ./recover.sh status); decide there, or pass --resume"
     fi
 }
@@ -137,18 +135,22 @@ check_checkout() {
         "this checkout is $head, the release is $RELEASE_COMMIT: git fetch --tags && git switch --detach v$VERSION"
 }
 
-# A release that follows a failed one (--resume) goes back to where the failed one started:
-# the head saved before that migration, and the dump taken before it.
+# A release that follows a failed one (--resume) goes back to where the failed one started: the
+# head saved before that migration and the dump taken before it. Whatever this one then does, even
+# failing at its first step, the record keeps that a migration ran and whether it was reversible,
+# so recover.sh never takes a resumed deploy for one that changed nothing.
 begin_state() {
-    local reached original
-    reached=$(state_get STEP)
-    original=""
-    if [ "$RESUME" = 1 ] && [ "${reached:-0}" -ge 7 ]; then
+    local original="" ran=0 irreversible=0
+    if [ "$RESUME" = 1 ] && [ "$(state_get STATUS)" != "done" ] && [ "$(reached_step)" -ge 7 ]; then
+        ran=1
         original=$(state_get ORIGINAL_DUMP)
         original="${original:-$(state_get DUMP)}"
+        [ "$(state_get IRREVERSIBLE)" != 1 ] || irreversible=1
     fi
     rm -f "$STATE_FILE"
     [ -z "$original" ] || state_set ORIGINAL_DUMP "$original"
+    [ "$ran" = 0 ] || state_set MIGRATION_RAN 1
+    [ "$irreversible" = 0 ] || state_set IRREVERSIBLE 1
     state_set TARGET_VERSION "$VERSION"
     state_set TARGET_APP_DIGEST "$RELEASE_APP_DIGEST"
     state_set TARGET_BACKUP_DIGEST "$RELEASE_BACKUP_DIGEST"
@@ -187,7 +189,8 @@ preflight() {
     compose run --rm --no-deps -T web migrate-plan </dev/null
     compose run --rm --no-deps -T web check </dev/null
     check_offsite
-    state_set IRREVERSIBLE 0
+    # Set above if a migration of the failed release was flagged: this one cannot unflag it.
+    [ "$(state_get IRREVERSIBLE)" = 1 ] || state_set IRREVERSIBLE 0
     if python3 ops/checks.py flagged ".release/$VERSION/notes.md" "$MARK_IRREVERSIBLE"; then
         state_set IRREVERSIBLE 1
         confirm_typed "$VERSION" "$CONFIRM" \
@@ -238,6 +241,7 @@ main() {
     compose stop backup
 
     step 7 "migrate"
+    state_set MIGRATION_RAN 1
     # Removed at every commit point, so one that is here belongs to an unfinished migration.
     [ -s deploy.head ] || migration_head >deploy.head
     compose run --rm --no-deps -T migrate </dev/null

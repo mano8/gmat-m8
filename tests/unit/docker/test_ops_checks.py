@@ -176,6 +176,12 @@ class TestAdminCidrs:
             "172.0.0.0/8",
             "192.168.1.0/24",
             "128.0.0.0/1",
+            "0::/0",  # as open as ::/0, spelled differently
+            "::0/0",
+            "::/1",
+            "2000::/3",
+            "0.0.0.0/1",
+            "10.0.0.0/7",
             "not-a-network",
         ],
     )
@@ -184,6 +190,14 @@ class TestAdminCidrs:
 
 
 class TestBackupManifest:
+    def test_the_dump_time(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        path = tmp_path / "m.json"
+        path.write_text(json.dumps({"created_at": "2026-11-04T06:00:00Z"}), encoding="utf-8")
+        assert run("dump-time", str(path)) == 0
+        assert capsys.readouterr().out.strip() == "2026-11-04T06:00:00Z"
+        path.write_text("{}", encoding="utf-8")
+        assert run("dump-time", str(path)) == 2
+
     def test_the_dump_version(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         path = tmp_path / "m.json"
         path.write_text(json.dumps({"app_version": "1.2.3"}), encoding="utf-8")
