@@ -38,6 +38,9 @@ BAD_MIGRATION = "1.2.1"
 FIX_A = "1.3.0"
 FIX_B = "1.3.1"
 UNSIGNED = "1.4.0"
+BAD_BACKUP = "1.5.0"
+IRREVERSIBLE = "1.6.0"
+COMPATIBLE = "1.7.0"
 INVALID_LINK = "This link is not valid"
 WANT = "rehearsal evidence:"
 
@@ -287,6 +290,61 @@ def test_a_recovery_waits_for_a_deploys_lock(world: World) -> None:
     assert world.gates() == (False, False)
     assert public(world) == 200
     note("a recovery started during a deploy waited for its lock and read how it ended")
+
+
+# --- the other rows of the decision tree ---------------------------------------------------------
+
+
+def test_failed_before_the_migration_starts_the_previous_digests(world: World) -> None:
+    world.release(BAD_BACKUP, "fix-a", backup_image="bad-backup")
+    before = world.deployed()[-1]
+    frozen = world.sql("SELECT count(*) FROM django_migrations")
+    result = world.deploy(BAD_BACKUP, check=False)
+    assert result.returncode != 0
+    assert "recover.sh rollback" in result.stderr
+    assert world.gates() == (True, True)
+    assert public(world) == 503
+    world.recover("rollback")
+    assert world.gates() == (False, False)
+    assert public(world) == 200
+    assert world.running_image("web").endswith(before[2])
+    assert world.running_image("backup").endswith(before[3])
+    assert world.sql("SELECT count(*) FROM django_migrations") == frozen
+    note("failed at step 6: recover.sh rollback started the previous digests, no migration ran")
+
+
+def test_an_irreversible_release_goes_back_through_its_dump(world: World) -> None:
+    notes = "Irreversible migration: the rehearsal's table\n"
+    world.release(IRREVERSIBLE, "bad-smoke", notes=notes)
+    unconfirmed = world.deploy(IRREVERSIBLE, check=False)
+    assert unconfirmed.returncode != 0
+    assert world.gates() == (False, False), "nobody typed the version: nothing changed"
+    before = counts(world)
+    result = world.deploy(IRREVERSIBLE, "--confirm", IRREVERSIBLE, check=False)
+    assert result.returncode != 0
+    assert world.gates() == (True, True)
+    refused = world.recover("migrate-back", check=False)
+    assert refused.returncode != 0
+    assert "restore-predeploy" in refused.stderr
+    world.recover("restore-predeploy", "--operator", ADMIN_EMAIL, "--confirm", "RESTORE")
+    assert world.gates() == (False, False)
+    assert public(world) == 200
+    assert world.sql("SELECT to_regclass('public.rehearsal_b') IS NOT NULL") == "f"
+    after = counts(world)
+    assert (after["users"], after["materials"]) == (before["users"], before["materials"])
+    note("irreversible release: migrate-back refused, restore-predeploy brought back every row")
+
+
+def test_old_code_on_the_new_schema_rolls_back_the_images(world: World) -> None:
+    before = world.deployed()[-1]
+    world.release(COMPATIBLE, "fix-a", notes="Old code works on the new schema: no change\n")
+    world.deploy(COMPATIBLE)
+    world.recover("rollback-images")
+    assert world.gates() == (False, False)
+    assert public(world) == 200
+    assert world.running_image("web").endswith(before[2])
+    assert world.deployed()[-1][-1] == "rollback-images"
+    note("the notes say the old code works: rollback-images started the previous digests")
 
 
 # --- a restore followed by reconciliation -----------------------------------------------------

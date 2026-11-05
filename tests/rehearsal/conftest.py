@@ -198,10 +198,18 @@ class World:
         signed.append(f"{identity} {subject}")
         self.signed_file.write_text(json.dumps(signed), encoding="utf-8")
 
-    def release(self, version: str, image: str, *, notes: str = "", signed: bool = True) -> None:
+    def release(
+        self,
+        version: str,
+        image: str,
+        *,
+        notes: str = "",
+        signed: bool = True,
+        backup_image: str = "backup",
+    ) -> None:
         """Publish ``image`` as ``version``: its manifest on the fake GitHub, signed or not."""
         app = self.images[image]
-        backup = self.images["backup"]
+        backup = self.images[backup_image]
         manifest = json.dumps(
             {
                 "schema_version": 1,
@@ -554,6 +562,9 @@ def build_images() -> dict[str, str]:
         tag = f"gmat-rehearsal-app:{name}"
         _build(tag, dockerfile_text)
         images[name] = _publish(tag, "gmat-m8", name)
+    # Its dumps cannot start: a deploy stops at step 6, before the migration.
+    _build("gmat-rehearsal-backup:bad", _variant(backup, "RUN rm /usr/local/bin/pg_dump\n"))
+    images["bad-backup"] = _publish("gmat-rehearsal-backup:bad", "gmat-m8-backup", "bad")
     return images
 
 
