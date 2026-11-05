@@ -18,8 +18,9 @@ notes of an own approved request), ``request.withdraw`` (own submitted request b
 draft, or cancelled, before any decision), ``request.cancel_any`` (anyone's, nothing
 allocated or delivered), ``request.review`` (decide lines, return for changes, reduce an
 approved quantity; on one's own request only where the procurement branch allows
-self-approval or through a self-deciding role's grant, with MFA) and ``request.source`` (sourcing, non-catalog resolution, priority and
-needed-by, closing and reopening). A reviewer is assigned at submit by the requester or
+self-approval or through a self-deciding role's grant, with MFA) and ``request.source``
+(sourcing, non-catalog resolution, priority and needed-by, closing and reopening). A
+reviewer is assigned at submit by the requester or
 afterwards by any reviewer in scope (``assignment``, M7b.2); the assignee's ``User`` row is
 locked at L0 with the actor's, before ``authorize_in_txn``. A requester changes material,
 unit and quantity only in ``DRAFT`` (§4.4); ``request.edit`` holders edit the lines of
