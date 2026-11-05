@@ -414,6 +414,17 @@ def test_image_scan_gate_and_issue_flow() -> None:
     assert jobs["scan"]["permissions"] == {"contents": "read", "packages": "read"}
 
 
+def test_image_scan_trusts_only_the_signed_manifest_of_a_published_release() -> None:
+    targets = _load(IMAGE_SCAN)["jobs"]["targets"]
+    assert any(_uses(step, "sigstore/cosign-installer") for step in targets["steps"])
+    script = next(step for step in targets["steps"] if step.get("id") == "matrix")["run"]
+    assert "(.draft or .prerelease) | not" in script
+    verify = script.index("cosign verify-blob")
+    assert verify < script.index("--manifest latest/release-manifest.json")
+    assert "docker-publish.yaml@refs/tags/${tag}" in script
+    assert "--certificate-oidc-issuer https://token.actions.githubusercontent.com" in script
+
+
 def test_image_scan_closes_the_issue_only_after_a_complete_clean_run() -> None:
     step = next(
         s
