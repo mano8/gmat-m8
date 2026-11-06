@@ -10,7 +10,7 @@ but GitHub and the keyless signatures, which only a tag push in Actions can prod
 
     sg docker -c "REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s"
 
-Without ``REHEARSAL_REQUIRED=1`` everything skips. It takes about 15 minutes, more on a machine
+Without ``REHEARSAL_REQUIRED=1`` everything skips. It takes about 25 minutes, more on a machine
 short of memory, and leaves only Docker's build cache behind unless ``REHEARSAL_KEEP=1``.
 """
 
@@ -610,7 +610,7 @@ def _clean() -> None:
 @pytest.fixture(scope="session")
 def base() -> Iterator[dict[str, Any]]:
     if os.environ.get("REHEARSAL_REQUIRED") != "1":
-        pytest.skip("the deploy rehearsal needs REHEARSAL_REQUIRED=1 and Docker (about 15 minutes)")
+        pytest.skip("the deploy rehearsal needs REHEARSAL_REQUIRED=1 and Docker (about 25 minutes)")
     _clean()
     root = Path(tempfile.mkdtemp(prefix="gmat-rehearsal-", dir=os.environ.get("REHEARSAL_DIR")))
     docker(
