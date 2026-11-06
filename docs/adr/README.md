@@ -17,3 +17,5 @@ Accepted decisions. An ADR wins over the planning notes. A new decision gets the
 - [ADR-0013](0013-agent-contributions.md): Agent contributions: interim single-account setup, protected tags, signed releases
 - [ADR-0014](0014-engineer-role-review-workflow.md): Engineer role, reviewer assignment, reviewer edits and self-decisions (proposed)
 - [ADR-0015](0015-upload-scanning-and-decoder-isolation.md): Uploads are scanned by clamd, and decoded in a container of their own
+- [ADR-0016](0016-restores-hold-what-can-hand-over-an-account.md): A restore holds what can hand over an account
+- [ADR-0017](0017-signed-release-facts-and-public-image-packages.md): The VPS decides only on the signed manifest; image packages are public

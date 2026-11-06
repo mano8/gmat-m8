@@ -12,7 +12,7 @@ Who does this: the maintainer, by hand. Agents never touch the server.
 | A domain | An `A` (and `AAAA`) record for the public name, for example `gmat.example.org`, pointing at the VPS. Caddy gets its certificate from Let's Encrypt on the first request, so the record must resolve **before** the first deploy. |
 | An SMTP account | A relay that accepts submission on port 587 with STARTTLS and a certificate that verifies. `check --deploy` refuses a relay with credentials and no TLS (`gmat.E021`), so a deploy stops on that. The address you send from must be allowed by the relay. |
 | Offsite storage | Two credential sets, see [../../docker_compose/offsite/README.md](../../docker_compose/offsite/README.md): **append-only** for the VPS, **delete-capable** for the maintainer's machine only. The storage lives on a host or provider that is not this VPS. |
-| Access to the images | GHCR creates the two packages **private** at the first publish, and takes only a **classic** personal access token: a fine-grained one logs in, then is denied on the pull. Choose one (H8.6). **Public packages:** change the visibility of both after the first publish (package settings; it cannot be undone) and leave `GITHUB_READ_TOKEN` empty, which keeps a credential off the server. The source is public already. **Or a classic token with only `read:packages`:** GitHub cannot limit it to this repository, so it reads every private package the account can. It expires, and an expired one stops a deploy or a recovery at the pull, so put the renewal date in your calendar. The release manifests are read from the public repository and need no token. |
+| Access to the images | **No token: both image packages are public** ([ADR-0017](../adr/0017-signed-release-facts-and-public-image-packages.md)). GHCR creates them private at the first publish, so the release-day steps below make them public. The release manifests come from the public repository, so they need no token either. |
 | An uptime monitor | Any external service that calls `https://<domain>/healthz/` every minute and tells you by a channel other than this server's email. |
 | Offline storage | A password manager or encrypted drive that is not on the VPS, for the keys in step 7. |
 
@@ -144,7 +144,7 @@ bash init.sh        # creates .env and app.env with generated secrets, mode 0600
 | `ACME_EMAIL` | an address that gets Let's Encrypt's expiry notices |
 | `ADMIN_URL_PATH` | something not guessable, no slashes. Not secret, but it keeps scanners away |
 | `ADMIN_ALLOWED_CIDRS` | **required.** The addresses that may reach the admin, for example your office's fixed address: `203.0.113.7/32`. There is no way around this one: the production overlay needs the value, and `deploy.sh` refuses `0.0.0.0/0`, and also any range that overlaps Docker's bridges (`172.16.0.0/12`, `192.168.0.0/16`), because behind Docker's proxy a visitor can look like one of them. Exception X10 |
-| `GITHUB_READ_TOKEN` | empty with public packages, otherwise the classic token from "What you need". Read only by `deploy.sh` and `recover.sh` |
+| `GITHUB_READ_TOKEN` | leave empty. Only a fork with private packages sets it, to a **classic** token with only `read:packages`: GHCR refuses a fine-grained one after a successful login |
 | `SMTP_PASSWORD` | the SMTP account's password. Only the worker receives it |
 | `RESTIC_REPOSITORY`, `RESTIC_PASSWORD`, `RESTIC_REST_USERNAME`, `RESTIC_REST_PASSWORD` (or `AWS_*` for S3) | the **append-only** credentials. `RESTIC_REPOSITORY` must not be empty: `deploy.sh` refuses |
 | `BACKUP_HEARTBEAT_URL` | optional: a dead-man's-switch URL (healthchecks-style) pinged after every successful dump |
@@ -189,7 +189,7 @@ The following exist only on the VPS right now. Copy each to the offline storage 
 | `DJANGO_SECRET_KEY` | `app.env` | Sessions and signed links end. Replaceable at will; a restore replaces it anyway. |
 | `POSTGRES_PASSWORD` and the role passwords | `.env` | Reset by recreating the roles; keep them for a restore onto the same compose project. |
 | The append-only and the delete-capable offsite credentials | `.env` / maintainer's machine | Issue new ones at the storage provider. |
-| `GITHUB_READ_TOKEN`, `SMTP_PASSWORD` | `.env` | Issue new ones. |
+| `SMTP_PASSWORD` | `.env` | Issue a new one. |
 
 A full copy of `.env` and `app.env` in the offline storage is the simplest way to cover all rows. The offsite restic repository holds the data but **not** these files, by design.
 
@@ -204,9 +204,14 @@ ls -ld backups flags                               # owned by deploy (uid 1000);
 python3 ops/checks.py admin-cidrs "$(sed -n 's/^ADMIN_ALLOWED_CIDRS=//p' .env)" && echo ok
 dig +short gmat.example.org                        # the VPS's address
 cosign version && docker compose version && flock --version | head -1
-# Only with a token. A fine-grained one prints nothing here: GHCR would refuse it.
-curl -fsSI -H "Authorization: Bearer $(sed -n 's/^GITHUB_READ_TOKEN=//p' .env)" \
-  https://api.github.com/user | grep -i '^x-oauth-scopes: read:packages'
+```
+
+**Before the first deploy, make the images public.** The first publish creates both packages private. On GitHub, open each of `gmat-m8` and `gmat-m8-backup` under the owner's packages → **Package settings** → **Change visibility** → **Public**. It cannot be undone. Then check from the VPS, without logging in:
+
+```bash
+docker logout ghcr.io
+docker manifest inspect ghcr.io/<owner>/gmat-m8:X.Y.Z >/dev/null && \
+docker manifest inspect ghcr.io/<owner>/gmat-m8-backup:X.Y.Z >/dev/null && echo "both public"
 ```
 
 On the release day follow [deploy-rollback.md](deploy-rollback.md). The very first deploy has no previous version: `deploy.sh` skips the checks that need one, takes the pre-deploy backup (which also creates the offsite repository), and records the first line in `deployed.log`. Then:
@@ -239,7 +244,7 @@ HSTS is yours to turn on, by hand: a browser that has seen the header refuses pl
 | The images | the nightly `image-scan` workflow opens an issue | an open issue: see [vulnerability-exceptions.md](vulnerability-exceptions.md) |
 | Backup verification | weekly, automatic (`restore --verify`, Sunday 03:30 UTC) | `docker compose logs backup` shows a failure; `backups/.last-verify-ok` is older than 8 days |
 
-Reviews to put in the calendar: the GitHub token's expiry; the **quarterly** drill; the exception register and `.trivyignore.yaml` (**every 90 days at most**); the `sudo` right of `deploy` (remove it once setup is done: `deluser deploy sudo`, using root's console when you need it again).
+Reviews to put in the calendar: the **quarterly** drill; the exception register and `.trivyignore.yaml` (**every 90 days at most**); the `sudo` right of `deploy` (remove it once setup is done: `deluser deploy sudo`, using root's console when you need it again).
 
 ## Done when
 
@@ -247,5 +252,5 @@ Reviews to put in the calendar: the GitHub token's expiry; the **quarterly** dri
 - `ufw status` shows 22, 80, 443 only; nothing else listens (`ss -tlnp`).
 - The server is x86-64 and has swap (`uname -m`, `swapon --show`).
 - `.env` and `app.env` are mode 0600, filled in, and copied to the offline storage together with the restic password.
-- The checks of step 8 pass: DNS resolves, the admin allowlist is accepted and the token can read the repository.
+- The checks of step 8 pass: DNS resolves, and the admin allowlist is accepted.
 - The uptime monitor exists and you know what each alert means.

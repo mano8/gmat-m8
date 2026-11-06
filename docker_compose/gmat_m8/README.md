@@ -34,7 +34,7 @@ The full stack, ready to use. Local by default: `https://localhost:8443`, Caddy'
 | `freshclam` | `clamav/clamav` (digest; x86-64) | `updates` | Keeps the signature volume current. Sees no uploaded file. |
 | `mailpit` | `axllent/mailpit` (digest) | `egress` | Local and CI stacks only (`docker-compose.local-mail.yml`, loaded through `COMPOSE_FILE` in `.env`): the worker delivers here, nothing leaves the host. |
 
-Every container drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem. `web`, `worker`, `migrate`, `backup` and Mailpit run as uid 1000, `decoder` as uid 1001, `clamd` and `freshclam` as their image's `clamav` user (uid 100); Caddy runs as root inside its container with only `NET_BIND_SERVICE` (its data volumes are root-owned).
+Every container drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem. `web`, `worker`, `migrate`, `backup` and Mailpit run as uid 1000, `decoder` as uid 1001, `clamd` and `freshclam` as their image's `clamav` user (uid 100), `db` as its image's `postgres` user (uid 70); Caddy runs as root inside its container with only `NET_BIND_SERVICE` (its data volumes are root-owned).
 
 ## First start
 
@@ -130,7 +130,7 @@ git fetch --tags && git switch --detach vX.Y.Z   # the release's own compose fil
 | Failed before step 7 | `./recover.sh rollback` | None |
 | Failed at steps 7-9, a reversible release | `./recover.sh migrate-back` | None |
 | Failed at steps 7-9, otherwise | `./recover.sh restore-predeploy --operator EMAIL` | None |
-| A defect after the commit point | Forward-fix first (`./deploy.sh X.Y.Z+1`). `./recover.sh rollback-images` only if the notes say `Old code works on the new schema` | None |
+| A defect after the commit point | Forward-fix first (`./deploy.sh X.Y.Z+1`). `./recover.sh rollback-images` only if the signed manifest says `Old code works on the new schema` | None |
 | Only a restore can fix it, after writes were accepted | `./recover.sh restore DUMP --operator EMAIL --incident TEXT`: an explicit decision. It keeps the failed state and states the loss window first | Everything since the deploy, unless re-entered |
 | The VPS is gone | On the new one: `./recover.sh restore-offsite --snapshot ID --version V --operator EMAIL --incident TEXT` | Up to the RPO (6 h) |
 
@@ -143,7 +143,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm -
 # notifications in bulk: release-notifications | discard-notifications
 # supplier dispatches one by one, after checking with the supplier: confirm-dispatch | release-dispatch | discard-dispatch ID
 docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm --no-deps web manage confirm_account --operator EMAIL --list
-# each account once its owner confirmed it: --email ADDRESS [--credentials-changed] [--email-change accept|reject]
+# each account once its owner confirmed it: --email ADDRESS [--credentials-changed] [--email-change accept|reject] [--factor-removal accept|reject]
 ```
 
 Files the tooling keeps here, all git-ignored: `deployed.log` (one line per deploy or recovery: time, version, both digests, dump, kind), `deploy.state` and `deploy.head` (the deploy in progress), `.release/` (verified manifests and notes), `preserved/` (the failed states, with personal data: delete them when the incident is closed), `incident.log`, and the renamed `pg_data` volumes (`docker volume ls`).

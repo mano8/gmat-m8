@@ -93,14 +93,14 @@ Check the person's identity **out of band** (call a number you already had, not 
 
 ## Accounts a restore suspended
 
-After a restore without a preserved failed database, every privileged account is suspended until confirmed. After any restore, so is an account whose address changed since the snapshot, shown as `old -> new (email change)`:
+After a restore without a preserved failed database, every privileged account is suspended until confirmed. After any restore, so is an account whose address changed or whose second factor was removed since the snapshot, shown as `old -> new (email change)` or `(totp removal)`:
 
 ```bash
 dc run --rm --no-deps web manage confirm_account --operator you@example.org --list
-dc run --rm --no-deps web manage confirm_account --operator you@example.org --email person@example.org [--credentials-changed] [--email-change accept|reject]
+dc run --rm --no-deps web manage confirm_account --operator you@example.org --email person@example.org [--credentials-changed] [--email-change accept|reject] [--factor-removal accept|reject]
 ```
 
-For a listed email change, check with the person by a channel other than either address, then `accept` to move the account or `reject` to keep the restored address. The command refuses to confirm the account without one of them.
+For a listed change, check with the person by a channel other than the account's email. Then `--email-change accept` moves the account and `reject` keeps the restored address; `--factor-removal accept` removes the factors and `reject` keeps them. The command refuses to confirm the account until each listed change is answered.
 
 Ask each person whether their password or authenticator changed since the snapshot. If it did, or you are not sure, use `--credentials-changed`: the account gets an unusable password and loses its authenticators, and the person resets through a fresh invitation. See [backup-restore.md](backup-restore.md#after-any-restore).
 

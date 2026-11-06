@@ -226,11 +226,14 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - **The server must be x86-64**, and needs about 1 GB more memory (ADR-0015). `web`'s limit is 1 GiB; the `decoder` has its own.
 - Caddy 2.11.9, and the newest PostgreSQL 18 and Python 3.14 digests; the findings of the first two had never been reported: the nightly scan failed before scanning anything.
 - The application image no longer ships SQLite (PostgreSQL only), which also removes its findings.
-- After a restore, an email change newer than the backup no longer moves the account by itself: the account stays suspended under its restored address until an operator accepts or rejects the change (`manage confirm_account --email-change`).
+- After a restore, an email change or a removed second factor newer than the backup is no longer applied by itself: the account stays suspended until an operator accepts or rejects it (`manage confirm_account --email-change`, `--factor-removal`; ADR-0016).
+- The database container runs as its image's `postgres` user from the start, with no capability, so `gosu` never runs.
+- The deploy tooling reads what a release states about its migrations only from the signed manifest, never from the unsigned release notes (ADR-0017).
+- The image packages are public and the VPS holds no GitHub token (ADR-0017).
 
 ### Fixed
 
-- The VPS runbook asked for a fine-grained token to pull the images, which GHCR refuses after a successful login. It now asks for public packages or a classic token with only `read:packages`.
+- The VPS runbook asked for a fine-grained token to pull the images, which GHCR refuses after a successful login.
 - The admin's lists accept only the filters they offer: a query-string lookup on a hidden column (a password hash, a token hash, an MFA secret, a price) could be read back from the result count. The audit admin no longer shows event payloads or client addresses (M8.3).
 - An over-receipt at a worksite no longer tells a site manager how much the order line holds for other projects, through the message or the order of the refusals (M8.3).
 - Removing a passkey keeps a privileged account's last second factor, as deactivating its TOTP already did (M8.3).

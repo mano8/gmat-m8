@@ -70,7 +70,7 @@ Assume the worst until shown otherwise.
 | SSH keys of `deploy` | new key pair, remove the old from `authorized_keys` (or on the new server only) |
 | `DJANGO_SECRET_KEY` | new value in `app.env`; ends every session and signed link. A restore does this by itself |
 | Database role passwords and `POSTGRES_PASSWORD` | change the roles in PostgreSQL (`ALTER ROLE …`) and `.env` together, then recreate the services. On a rebuilt server, initialise with new values |
-| `GITHUB_READ_TOKEN` | revoke at GitHub, create a new classic one with only `read:packages` (none if the packages are public) |
+| `GITHUB_READ_TOKEN` | empty here, as the packages are public. A fork with private packages revokes it at GitHub and creates a new classic one with only `read:packages` |
 | `SMTP_PASSWORD` | change at the relay |
 | The VPS's append-only offsite credentials | revoke and re-issue at the storage provider |
 | `RESTIC_PASSWORD` | `restic key passwd` (or `key add` then `key remove` of the old one), **from the maintainer's machine** with the admin credentials; update the offline copy and the VPS's `.env` |

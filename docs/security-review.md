@@ -211,7 +211,7 @@ The review's questions and proposed exceptions were answered; all of it is imple
 
 **Found by the phase's R3 review, and fixed:** a forged snapshot with the right host and tags, dated in the past, passed the pre-prune check, so a compromised VPS could get real offsite snapshots older than 90 days removed (Medium, 8/10): the script now compares against what the maintainer's machine saw at the last prune.
 
-**The maintainer's decision on what R3 left open (2026-11-06):** a row planted in the failed database with the runtime credentials could have moved an account to an attacker's address on a later restore (6/10, below the review's bar). An email change in the failed state now only suspends the account, and a human accepts or rejects it. The other replayed events only take access away. One residual, reported to the maintainer and left as is: a planted `user.mfa_reset` or `user.authenticator_removed` still strips a second factor. That helps only someone who also has the account's password, who could then enroll a factor of their own.
+**The maintainer's decision on what R3 left open (2026-11-06):** a row planted in the failed database with the runtime credentials could have moved an account to an attacker's address on a later restore (6/10, below the review's bar). An email change in the failed state now only suspends the account, and a human accepts or rejects it. So does anything that would remove a second factor, which a planted row could otherwise do for someone who also has the password (ADR-0016). The other replayed events only take access away.
 
 **Found while implementing them, and not by the first pass:**
 

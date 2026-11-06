@@ -7,7 +7,7 @@ The rule behind all of it: **a human decides, the script executes.** A failed de
 ## Before a deploy
 
 1. The release exists: the tag `vX.Y.Z` was pushed by the maintainer, `docker-publish` finished, and the GitHub Release has `release-manifest.json` and its `.sigstore.json` bundle ([../release.md](../release.md)).
-2. Read the release notes (the `## [X.Y.Z]` section of `CHANGELOG.md`). Look for two lines:
+2. Read the release notes (the `## [X.Y.Z]` section of `CHANGELOG.md`). Look for two lines, which the signed manifest carries too; the scripts go by the manifest:
    - `Irreversible migration: …` — going back will mean restoring the pre-deploy dump. `deploy.sh` makes you type the version to continue.
    - `Old code works on the new schema: …` — the only thing that allows `rollback-images` after the commit point.
 3. Pick a time **outside working hours**. The window is about 1–3 minutes of maintenance page; a release with a large migration takes longer.
@@ -35,7 +35,7 @@ cd docker_compose/gmat_m8
 | Step | What | If it fails |
 | --- | --- | --- |
 | 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the env files (0600), the admin allowlist, the offsite repository setting and the checkout. | Nothing changed. Fix and run again. |
-| 2 | Downloads the manifest with the read-only token, verifies its **signature** and the signature of both images against the workflow identity of that tag, checks version, repository and registry, pulls both images **by digest**. | Nothing changed, the site stayed open. |
+| 2 | Downloads the manifest, verifies its **signature** and the signature of both images against the workflow identity of that tag, checks version, repository and registry, pulls both images **by digest**. | Nothing changed, the site stayed open. |
 | 3 | Preflight: pulls the third-party images (Caddy, PostgreSQL, ClamAV), then with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
 | 4 | **Gates on**: `flags/maintenance.on` and `flags/worker.paused`. Confirms from outside that Caddy answers 503. | Gates stay on. |
 | 5 | Stops `web` and `worker`. | Gates stay on. |
@@ -83,13 +83,13 @@ Notes that apply to every row:
 
 ### Rolling back the images after the commit point
 
-Only when the release notes say the old code works on the new schema:
+Only when the release's signed manifest says the old code works on the new schema:
 
 ```bash
 ./recover.sh rollback-images
 ```
 
-It starts the previous digests with the new schema, behind the gates. Users keep every write made since the deploy. If the notes do not say it, **do not**: old code on a changed schema can corrupt data. Forward-fix.
+It starts the previous digests with the new schema, behind the gates. Users keep every write made since the deploy. If it does not say so, the script refuses, and **do not** work around it: old code on a changed schema can corrupt data. Forward-fix.
 
 ### Restoring after writes were accepted
 

@@ -29,4 +29,4 @@ Written for the maintainer, who runs the production VPS alone. Each page can be 
 | Every month or two | prune offsite from the maintainer's machine |
 | **Every quarter** | the offsite restore drill, then a line in [drill-log.md](drill-log.md) |
 | **At most every 90 days** | review `.trivyignore.yaml` and the exception register ([vulnerability-exceptions.md](vulnerability-exceptions.md)) |
-| Before they expire | the GitHub read-only token, the SMTP and offsite credentials |
+| Before they expire | the SMTP and offsite credentials |

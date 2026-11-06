@@ -23,7 +23,7 @@ Nothing is signed or released unless every earlier step passed. Only the digests
 
 ## Release procedure (maintainer)
 
-1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Two statements have a line of their own, which the deploy tooling reads:
+1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Two statements have a line of their own. The publish workflow copies them into the signed manifest, and the deploy tooling reads them only from there (ADR-0017):
    - `Irreversible migration: <what>` makes `deploy.sh` ask for the version to be typed, and `recover.sh migrate-back` refuse: going back then means restoring the pre-deploy dump.
    - `Old code works on the new schema: <why>` is the only thing that lets `recover.sh rollback-images` start the previous images after the commit point.
 
@@ -73,7 +73,8 @@ A release has these files: `release-manifest.json`, `release-manifest.json.sigst
   "scan_gate": {
     "severity": "CRITICAL,HIGH", "ignore_unfixed": false,
     "ignorefile": ".trivyignore.yaml", "ignorefile_sha256": "<hex>"
-  }
+  },
+  "migration": {"irreversible": "", "old_code_works": ""}
 }
 ```
 
@@ -108,7 +109,7 @@ gh attestation verify "oci://<ref>" --repo <owner>/gmat-m8
 - **The Trivy gate fails.** Fix it (new base image digest, dependency bump) or accept it in a pull request the maintainer approves: an entry in `.trivyignore.yaml` with the component, the compensating control, the owner and an expiry at most 90 days away (`scripts/check_trivyignore.py` enforces the format). Then release the next version; never skip the gate.
 - **Failure after the push** (signature, attestation, manifest). Images may already be on GHCR. No release exists, and nothing trusts a digest that is not in a signed manifest, so there is nothing to undo: fix the cause and use "Re-run failed jobs", or release the next patch version.
 - **"release already exists".** The workflow never overwrites a release. Delete the release (not the tag) in the GitHub UI and re-run the `release` job, or release the next patch version.
-- **First publish.** GHCR creates the packages private. They are linked to this repository through the `org.opencontainers.image.source` label, so the run's token can push and the nightly scan can pull. Package visibility and the VPS's read-only token are the maintainer's (H8.6).
+- **First publish.** GHCR creates the packages private. They are linked to this repository through the `org.opencontainers.image.source` label, so the run's token can push and the nightly scan can pull. The maintainer then makes both public, before the first deploy (ADR-0017, [vps-setup.md](runbooks/vps-setup.md)); the VPS holds no token.
 
 ## Pipeline verification record
 
