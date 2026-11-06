@@ -296,7 +296,7 @@ class TestRefused:
         assert "cosign is not installed" in result.stderr
 
     def test_an_irreversible_release_needs_the_version_typed(self, ready: World) -> None:
-        ready.release(VERSION, notes="## Notes\n**Irreversible migration:** drops a column\n")
+        ready.release(VERSION, irreversible="drops a column")
         result = ready.run("deploy.sh", VERSION)
         assert result.returncode != 0
         assert "irreversible" in result.stderr
@@ -304,6 +304,19 @@ class TestRefused:
         assert ready.run("deploy.sh", VERSION, "--confirm", "9.9.9").returncode != 0
         assert ready.run("deploy.sh", VERSION, "--confirm", VERSION).returncode == 0
         assert ready.state("IRREVERSIBLE") == "1"
+
+    def test_the_unsigned_notes_flag_nothing(self, ready: World) -> None:
+        """Anyone who can edit a release can edit its notes: only the signed manifest counts."""
+        ready.release(VERSION, notes="Irreversible migration: drops a column\n")
+        assert ready.run("deploy.sh", VERSION).returncode == 0
+        assert ready.state("IRREVERSIBLE") == "0"
+
+    def test_a_manifest_that_does_not_state_its_migrations_is_refused(self, ready: World) -> None:
+        ready.release(VERSION, migration=None)
+        result = ready.run("deploy.sh", VERSION)
+        assert result.returncode != 0
+        assert "does not match this release" in result.stderr
+        assert ready.gates() == (False, False)
 
     def test_a_checkout_of_another_commit(self, ready: World) -> None:
         subprocess.run(["git", "init", "-q"], cwd=ready.stack, check=True)  # noqa: S607
@@ -503,7 +516,7 @@ class TestMigrateBack:
         assert ready.deployed()[-1][-1] == "migrate-back"
 
     def test_an_irreversible_release_cannot(self, ready: World) -> None:
-        ready.release(VERSION, notes="Irreversible migration: yes")
+        ready.release(VERSION, irreversible="yes")
         ready.fail_on("web verify-internal")
         ready.run("deploy.sh", VERSION, "--confirm", VERSION)
         ready.recover()
@@ -650,20 +663,26 @@ class TestAReleaseThatFollowsAFailedOne:
 
 
 class TestRollbackImages:
-    def deployed_twice(self, world: World, notes: str) -> World:
-        world.release(VERSION, notes=notes)
+    def deployed_twice(self, world: World, **statements: str) -> World:
+        world.release(VERSION, **statements)
         assert world.run("deploy.sh", VERSION).returncode == 0
         return world
 
-    def test_when_the_notes_say_the_old_code_works(self, ready: World) -> None:
-        self.deployed_twice(ready, "Old code works on the new schema: yes")
+    def test_when_the_manifest_says_the_old_code_works(self, ready: World) -> None:
+        self.deployed_twice(ready, old_code_works="no schema change")
         result = ready.run("recover.sh", "rollback-images")
         assert result.returncode == 0, result.stderr
         assert ready.env_value("APP_DIGEST") == OLD_APP
         assert ready.deployed()[-1][-1] == "rollback-images"
 
+    def test_the_unsigned_notes_saying_so_are_not_enough(self, ready: World) -> None:
+        self.deployed_twice(ready, notes="Old code works on the new schema: trust me")
+        result = ready.run("recover.sh", "rollback-images")
+        assert result.returncode != 0
+        assert "forward-fix or restore" in result.stderr
+
     def test_refused_otherwise(self, ready: World) -> None:
-        self.deployed_twice(ready, "Nothing about it.")
+        self.deployed_twice(ready)
         result = ready.run("recover.sh", "rollback-images")
         assert result.returncode != 0
         assert "forward-fix or restore" in result.stderr
@@ -714,7 +733,7 @@ class TestAResumeThatFailsEarly:
         assert migrated.state("MIGRATION_RAN") == "1"
 
     def test_a_flagged_migration_stays_flagged(self, ready: World) -> None:
-        ready.release(VERSION, notes="Irreversible migration: yes\n")
+        ready.release(VERSION, irreversible="yes")
         ready.fail_on("web verify-internal")
         assert ready.run("deploy.sh", VERSION, "--confirm", VERSION).returncode != 0
         ready.recover()

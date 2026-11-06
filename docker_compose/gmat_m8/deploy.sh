@@ -191,10 +191,10 @@ preflight() {
     check_offsite
     # Set above if a migration of the failed release was flagged: this one cannot unflag it.
     [ "$(state_get IRREVERSIBLE)" = 1 ] || state_set IRREVERSIBLE 0
-    if python3 ops/checks.py flagged ".release/$VERSION/notes.md" "$MARK_IRREVERSIBLE"; then
+    if [ "$RELEASE_IRREVERSIBLE" = 1 ]; then
         state_set IRREVERSIBLE 1
         confirm_typed "$VERSION" "$CONFIRM" \
-            "The notes of $VERSION flag an irreversible migration: going back means restoring the dump."
+            "The manifest of $VERSION flags an irreversible migration: going back means restoring the dump."
     fi
 }
 

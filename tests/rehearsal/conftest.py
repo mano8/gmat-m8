@@ -129,13 +129,12 @@ class Gh:
             return json.dumps(self.releases[found[1]]).encode()
         return self.assets.get(path)
 
-    def publish(self, version: str, manifest: bytes, notes: str) -> None:
+    def publish(self, version: str, manifest: bytes) -> None:
         names = ("release-manifest.json", "release-manifest.json.sigstore.json")
         self.assets[f"/assets/{version}/{names[0]}"] = manifest
         self.assets[f"/assets/{version}/{names[1]}"] = b"{}"
         self.releases[version] = {
             "tag_name": f"v{version}",
-            "body": notes,
             "assets": [
                 {"name": name, "url": f"{self.url}/assets/{version}/{name}"} for name in names
             ],
@@ -203,7 +202,8 @@ class World:
         version: str,
         image: str,
         *,
-        notes: str = "",
+        irreversible: str = "",
+        old_code_works: str = "",
         signed: bool = True,
         backup_image: str = "backup",
     ) -> None:
@@ -229,9 +229,10 @@ class World:
                         "ref": f"{PREFIX}/gmat-m8-backup@{backup}",
                     },
                 },
+                "migration": {"irreversible": irreversible, "old_code_works": old_code_works},
             }
         ).encode()
-        self.gh.publish(version, manifest, notes)
+        self.gh.publish(version, manifest)
         if signed:
             identity = identity_of(version)
             self.sign(identity, hashlib.sha256(manifest).hexdigest())

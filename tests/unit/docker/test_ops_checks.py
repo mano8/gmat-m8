@@ -1,4 +1,4 @@
-"""``docker_compose/gmat_m8/ops/checks.py``: what the host scripts read from JSON and notes."""
+"""``docker_compose/gmat_m8/ops/checks.py``: what the host scripts read from JSON."""
 
 import importlib.util
 import json
@@ -51,6 +51,7 @@ def manifest(**changes: Any) -> dict[str, Any]:
                 "ref": f"ghcr.io/o/gmat-m8-backup@{DIGEST_B}",
             },
         },
+        "migration": {"irreversible": "", "old_code_works": ""},
         **changes,
     }
 
@@ -116,46 +117,49 @@ class TestManifest:
 class TestRelease:
     RELEASE = {"body": "Notes", "assets": [{"name": "a", "url": "https://x/a"}, {"name": "b"}]}
 
-    def test_asset_and_notes(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_asset(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         path = tmp_path / "release.json"
         path.write_text(json.dumps(self.RELEASE), encoding="utf-8")
         assert run("asset", str(path), "a") == 0
         assert "https://x/a" in capsys.readouterr().out
         assert run("asset", str(path), "b") == 2
-        assert run("notes", str(path)) == 0
-        assert "Notes" in capsys.readouterr().out
-
-    def test_empty_notes_print_nothing(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        path = tmp_path / "release.json"
-        path.write_text(json.dumps({"body": None}), encoding="utf-8")
-        assert run("notes", str(path)) == 0
-        assert capsys.readouterr().out == ""
 
 
-class TestFlagged:
-    @pytest.mark.parametrize(
-        "line",
-        [
-            "Irreversible migration: drops x",
-            "**Irreversible migration:** drops x",
-            "- irreversible migration",
-            "### Irreversible Migration",
-        ],
-    )
-    def test_a_line_of_its_own(self, line: str, tmp_path: Path) -> None:
-        path = tmp_path / "notes.md"
-        path.write_text(f"Intro\n{line}\nEnd\n", encoding="utf-8")
-        assert run("flagged", str(path), "Irreversible migration") == 0
+class TestMigrationStatements:
+    def _file(self, tmp_path: Path, **changes: Any) -> str:
+        path = tmp_path / "manifest.json"
+        path.write_text(json.dumps(manifest(**changes)), encoding="utf-8")
+        return str(path)
 
-    @pytest.mark.parametrize("text", ["", "This release has no irreversible migration.\n"])
-    def test_anything_else_is_not_a_flag(self, text: str, tmp_path: Path) -> None:
-        path = tmp_path / "notes.md"
-        path.write_text(text, encoding="utf-8")
+    def _exit_code(self, *args: str) -> int:
         with pytest.raises(SystemExit) as caught:
-            run("flagged", str(path), "Irreversible migration")
-        assert caught.value.code == 1
+            run(*args)
+        assert isinstance(caught.value.code, int)
+        return caught.value.code
+
+    def test_what_the_manifest_states(self, tmp_path: Path) -> None:
+        path = self._file(tmp_path, migration={"irreversible": "", "old_code_works": "no change"})
+        assert run("states", path, "old_code_works") == 0
+        assert self._exit_code("states", path, "irreversible") == 1
+
+    @pytest.mark.parametrize(
+        "statements",
+        [None, "yes", {}, {"irreversible": ""}, {"irreversible": "", "old_code_works": True}],
+    )
+    def test_a_manifest_that_does_not_say_is_refused_not_read_as_no(
+        self, tmp_path: Path, statements: Any
+    ) -> None:
+        path = self._file(tmp_path, migration=statements)
+        assert run("states", path, "old_code_works") == 2
+
+    @pytest.mark.parametrize(("value", "flag"), [("", "0"), ("drops x", "1")])
+    def test_the_deploy_gets_the_irreversible_flag(self, value: str, flag: str) -> None:
+        statements = {"irreversible": value, "old_code_works": ""}
+        checked = checks.check_manifest(manifest(migration=statements), "1.2.3", "o/n", "ghcr.io/o")
+        assert checked["RELEASE_IRREVERSIBLE"] == flag
+
+    def test_an_unknown_statement_is_a_usage_error(self, tmp_path: Path) -> None:
+        assert self._exit_code("states", self._file(tmp_path), "other") == 2
 
 
 class TestAdminCidrs:

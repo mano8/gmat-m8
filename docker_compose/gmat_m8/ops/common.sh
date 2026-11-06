@@ -31,8 +31,7 @@ INCIDENT_LOG=incident.log
 OIDC_ISSUER=https://token.actions.githubusercontent.com
 RUNNING_STATES=running,outbound-off
 ROLES_SCRIPT=/docker-entrypoint-initdb.d/10-roles.sh
-# Markers a release's notes carry on a line of their own (docs/release.md).
-MARK_IRREVERSIBLE="Irreversible migration"
+# What a release must state for rollback-images (the signed manifest's migration.old_code_works).
 MARK_OLD_CODE_WORKS="Old code works on the new schema"
 
 say() { printf '%s %s\n' "$(date -u +%H:%M:%SZ)" "$*" >&2; }
@@ -244,7 +243,7 @@ signature_identity() { # signature_identity VERSION
 }
 
 # Downloads, verifies and pulls a release; RELEASE_* hold what it vouches for and $2 keeps its
-# files (notes.md among them). Anything off stops here, before the first gate.
+# files (the signed manifest among them). Anything off stops here, before the first gate.
 verify_release() { # verify_release VERSION DIRECTORY
     local version="$1" directory="$2" identity manifest bundle url
     mkdir -p "$directory"
@@ -260,7 +259,6 @@ verify_release() { # verify_release VERSION DIRECTORY
         github_get "$url" "$directory/$name" application/octet-stream \
             || die "$name could not be downloaded"
     done
-    python3 ops/checks.py notes "$directory/release.json" >"$directory/notes.md"
 
     say "verifying the manifest's signature"
     cosign verify-blob --bundle "$bundle" --certificate-identity "$identity" \

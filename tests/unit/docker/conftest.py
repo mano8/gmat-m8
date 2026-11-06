@@ -169,8 +169,17 @@ class World:
     def state(self, key: str) -> str:
         return self.env_value(key, "deploy.state")
 
-    def release(self, version: str, /, *, notes: str = "Notes", **changes: Any) -> None:
-        """What the fake GitHub serves for the next run."""
+    def release(
+        self,
+        version: str,
+        /,
+        *,
+        notes: str = "Notes",
+        irreversible: str = "",
+        old_code_works: str = "",
+        **changes: Any,
+    ) -> None:
+        """What the fake GitHub serves for the next run: signed manifest and unsigned notes."""
         release = self.fake / "release"
         release.mkdir(exist_ok=True)
         manifest = {
@@ -191,6 +200,7 @@ class World:
                     "ref": f"{PREFIX}/gmat-m8-backup@{BACKUP_DIGEST}",
                 },
             },
+            "migration": {"irreversible": irreversible, "old_code_works": old_code_works},
             **changes,
         }
         (release / "release-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")

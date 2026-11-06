@@ -317,8 +317,7 @@ def test_failed_before_the_migration_starts_the_previous_digests(world: World) -
 
 
 def test_an_irreversible_release_goes_back_through_its_dump(world: World) -> None:
-    notes = "Irreversible migration: the rehearsal's table\n"
-    world.release(IRREVERSIBLE, "bad-smoke", notes=notes)
+    world.release(IRREVERSIBLE, "bad-smoke", irreversible="the rehearsal's table")
     unconfirmed = world.deploy(IRREVERSIBLE, check=False)
     assert unconfirmed.returncode != 0
     assert world.gates() == (False, False), "nobody typed the version: nothing changed"
@@ -340,14 +339,16 @@ def test_an_irreversible_release_goes_back_through_its_dump(world: World) -> Non
 
 def test_old_code_on_the_new_schema_rolls_back_the_images(world: World) -> None:
     before = world.deployed()[-1]
-    world.release(COMPATIBLE, "fix-a", notes="Old code works on the new schema: no change\n")
+    world.release(COMPATIBLE, "fix-a", old_code_works="no change")
     world.deploy(COMPATIBLE)
     world.recover("rollback-images")
     assert world.gates() == (False, False)
     assert public(world) == 200
     assert world.running_image("web").endswith(before[2])
     assert world.deployed()[-1][-1] == "rollback-images"
-    note("the notes say the old code works: rollback-images started the previous digests")
+    note(
+        "the signed manifest says the old code works: rollback-images started the previous digests"
+    )
 
 
 # --- a restore followed by reconciliation -----------------------------------------------------

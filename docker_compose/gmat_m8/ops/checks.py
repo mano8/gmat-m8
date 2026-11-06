@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""What deploy.sh, recover.sh and restore-drill.sh read from JSON and notes (plan §9).
+"""What deploy.sh, recover.sh and restore-drill.sh read from JSON (plan §9).
 
 Standard library only: this runs on the host, before any image is trusted (Debian ships
 python3). Each command prints plain text for the shell and exits non-zero on a mismatch.
 
   asset RELEASE NAME        the download URL of one asset of a GitHub release (JSON file)
-  notes RELEASE             the release's notes
-  flagged NOTES MARKER      exit 0 when a line of the notes starts with the marker
   manifest FILE --version V --repository OWNER/NAME --image-prefix PREFIX
                             validates a verified release-manifest.json; prints KEY=VALUE lines
+  states MANIFEST KEY       exit 0 when the signed manifest states this about its migrations
   admin-cidrs VALUE         refuses an allowlist that is open or holds Docker's bridge ranges
   dump-version MANIFEST     the app version a backup manifest was taken with
   dump-time MANIFEST        when a backup was taken (a restore's loss window starts there)
@@ -35,6 +34,7 @@ DOCKER_RANGES = tuple(
 # The widest network an allowlist may name, by IP version: an office, a VPN, a provider's block.
 WIDEST_PREFIX = {4: 8, 6: 32}
 IMAGE_NAMES = {"app": "gmat-m8", "backup": "gmat-m8-backup"}
+MIGRATION_KEYS = ("irreversible", "old_code_works")
 
 
 class Refused(Exception):
@@ -52,10 +52,16 @@ def asset_url(release: dict[str, Any], name: str) -> str:
     raise Refused(f"the release has no asset {name}")
 
 
-def flagged(notes: str, marker: str) -> bool:
-    """A release flags something with a line of its own (docs/release.md, step 1)."""
-    wanted = marker.casefold()
-    return any(line.strip(" \t*_-#").casefold().startswith(wanted) for line in notes.splitlines())
+def migration_statements(manifest: dict[str, Any]) -> dict[str, str]:
+    """What a release states about its migrations. Only the signed manifest counts, never the
+    release notes (ADR-0017); one that does not say is refused, not read as "no"."""
+    statements = manifest.get("migration")
+    if not isinstance(statements, dict):
+        raise Refused("the manifest does not state its migrations")
+    for key in MIGRATION_KEYS:
+        if not isinstance(statements.get(key), str):
+            raise Refused(f"the manifest does not state {key}")
+    return statements
 
 
 def _check_image(manifest: dict[str, Any], key: str, prefix: str) -> dict[str, str]:
@@ -89,7 +95,9 @@ def check_manifest(
         raise Refused(f"malformed commit {commit!r}")
     app = _check_image(manifest, "app", prefix)
     backup = _check_image(manifest, "backup", prefix)
+    statements = migration_statements(manifest)
     return {
+        "RELEASE_IRREVERSIBLE": "1" if statements["irreversible"] else "0",
         "RELEASE_COMMIT": commit,
         "RELEASE_APP_DIGEST": app["digest"],
         "RELEASE_APP_REF": app["ref"],
@@ -134,12 +142,8 @@ def _asset(args: argparse.Namespace) -> str:
     return asset_url(_load(args.release), args.name)
 
 
-def _notes(args: argparse.Namespace) -> str:
-    return str(_load(args.release).get("body") or "")
-
-
-def _flagged(args: argparse.Namespace) -> str:
-    if not flagged(Path(args.notes).read_text(encoding="utf-8"), args.marker):
+def _states(args: argparse.Namespace) -> str:
+    if not migration_statements(_load(args.manifest))[args.key]:
         raise SystemExit(1)
     return ""
 
@@ -176,9 +180,8 @@ def _compare_counts(args: argparse.Namespace) -> str:
 
 COMMANDS = {
     "asset": _asset,
-    "notes": _notes,
-    "flagged": _flagged,
     "manifest": _manifest,
+    "states": _states,
     "admin-cidrs": _admin_cidrs,
     "dump-version": _dump_version,
     "dump-time": _dump_time,
@@ -192,15 +195,14 @@ def _parser() -> argparse.ArgumentParser:
     asset = commands.add_parser("asset")
     asset.add_argument("release")
     asset.add_argument("name")
-    commands.add_parser("notes").add_argument("release")
-    marked = commands.add_parser("flagged")
-    marked.add_argument("notes")
-    marked.add_argument("marker")
     manifest = commands.add_parser("manifest")
     manifest.add_argument("file")
     manifest.add_argument("--version", required=True)
     manifest.add_argument("--repository", required=True)
     manifest.add_argument("--image-prefix", required=True)
+    states = commands.add_parser("states")
+    states.add_argument("manifest")
+    states.add_argument("key", choices=MIGRATION_KEYS)
     commands.add_parser("admin-cidrs").add_argument("value")
     commands.add_parser("dump-version").add_argument("manifest")
     commands.add_parser("dump-time").add_argument("manifest")

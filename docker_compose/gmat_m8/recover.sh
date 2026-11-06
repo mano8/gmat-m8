@@ -12,7 +12,8 @@
 #       failed at steps 7-9, otherwise: preserve the failed state, restore the pre-deploy dump,
 #       reconcile, start the previous digests. No data loss: nothing was written since step 5.
 #   ./recover.sh rollback-images
-#       a defect after the commit point, and the notes say the old code works on the new schema.
+#       a defect after the commit point, and the signed manifest says the old code works on the
+#       new schema.
 #       Forward-fix first (./deploy.sh X.Y.Z+1).
 #   ./recover.sh restore DUMP --operator EMAIL --incident TEXT [--version V] [--db-unreadable]
 #                             [--confirm WORD]
@@ -139,7 +140,7 @@ cmd_status() {
         printf '     ./recover.sh migrate-back, or ./recover.sh restore-predeploy --operator EMAIL (no data loss)\n'
     else
         printf '  -> a defect after the commit point: forward-fix first (./deploy.sh X.Y.Z+1);\n'
-        printf '     ./recover.sh rollback-images only if the notes say "%s"\n' "$MARK_OLD_CODE_WORKS"
+        printf '     ./recover.sh rollback-images only if the release states "%s"\n' "$MARK_OLD_CODE_WORKS"
         printf '  -> only a restore can fix it, after writes were accepted: an explicit decision:\n'
         printf '     ./recover.sh restore DUMP --operator EMAIL --incident TEXT\n'
         printf '  -> the VPS is gone: on the new one, ./recover.sh restore-offsite ...\n'
@@ -180,7 +181,7 @@ migrate_back() {
 cmd_migrate_back() {
     take_lock
     require_unfinished_deploy
-    [ "$(state_get IRREVERSIBLE)" = 0 ] || die "the notes flag an irreversible migration: restore-predeploy"
+    [ "$(state_get IRREVERSIBLE)" = 0 ] || die "the release flags an irreversible migration: restore-predeploy"
     previous_or_die
     begin
     migrate_back || die "the migration cannot go back: ./recover.sh restore-predeploy --operator EMAIL"
@@ -248,14 +249,14 @@ cmd_restore_predeploy() {
 
 cmd_rollback_images() {
     take_lock
-    local version app backup notes
+    local version app backup manifest
     version=$(last_deployed 2 2)
     app=$(last_deployed 3 2)
     backup=$(last_deployed 4 2)
     [ "$(wc -l <"$DEPLOYED_LOG")" -ge 2 ] && [ -n "$app" ] || die "no earlier release in deployed.log"
-    notes=".release/$(last_deployed 2)/notes.md"
-    [ -f "$notes" ] && python3 ops/checks.py flagged "$notes" "$MARK_OLD_CODE_WORKS" \
-        || die "the notes of $(last_deployed 2) do not say \"$MARK_OLD_CODE_WORKS\": forward-fix or restore"
+    manifest=".release/$(last_deployed 2)/release-manifest.json"
+    [ -f "$manifest" ] && python3 ops/checks.py states "$manifest" old_code_works \
+        || die "the manifest of $(last_deployed 2) does not state \"$MARK_OLD_CODE_WORKS\": forward-fix or restore"
     begin
     finish "$version" "$app" "$backup" "$(last_deployed 5)" rollback-images
 }
