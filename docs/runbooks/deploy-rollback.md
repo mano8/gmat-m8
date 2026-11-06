@@ -68,7 +68,7 @@ It shows the running release, both gates, the step where the last deploy stopped
 | Steps 4–6 | Gates on; no migration has run | `./recover.sh rollback` — starts the **previous digests**, verifies, commit point. Or fix the cause and `./deploy.sh X.Y.Z --resume` | None |
 | Steps 7–9 and the release is **reversible** | Migrations ran (maybe partly) | `./recover.sh migrate-back` — migrates back to the previous head with the new image, then starts the previous digests | None: nothing was written since step 5 |
 | Steps 7–9 and the release is **irreversible** (or `migrate-back` refuses) | | `./recover.sh restore-predeploy --operator EMAIL` — keeps the failed state, restores the pre-deploy dump, reconciles, starts the previous digests | None: nothing was written since step 5 |
-| After the commit point: a defect | Users are working | **Forward-fix first**: merge a fix, release `X.Y.Z+1`, `./deploy.sh X.Y.Z+1`. Use `./recover.sh rollback-images` only if the notes carry `Old code works on the new schema` | None |
+| After the commit point: a defect | Users are working | **Forward-fix first**: merge a fix, release `X.Y.Z+1`, `./deploy.sh X.Y.Z+1`. Use `./recover.sh rollback-images` only if the signed manifest states `Old code works on the new schema` | None |
 | After the commit point: only a restore can fix it | Data is wrong in a way no code fixes | `./recover.sh restore DUMP --operator EMAIL --incident "TEXT"` — **an explicit human decision**, see below | Everything written since the deploy, unless re-entered |
 | The VPS is gone | | [backup-restore.md](backup-restore.md#the-vps-is-gone) | Up to the RPO (6 h) |
 
