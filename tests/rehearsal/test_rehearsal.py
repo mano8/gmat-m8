@@ -7,6 +7,7 @@ import json
 import re
 import subprocess
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -1015,6 +1016,16 @@ print(json.dumps("ok"))
 # --- the VPS is gone --------------------------------------------------------------------------
 
 
+@pytest.fixture
+def one_scanner(world: World) -> Iterator[None]:
+    """The new installation starts its own clamd; two at once hold about 2 GB, which has run a
+    desktop out of memory (docs/deploy-rehearsal.md)."""
+    world.compose("stop", "clamd", "freshclam")
+    yield
+    world.compose("up", "-d", "--no-deps", "--no-build", "--wait", "clamd", "freshclam")
+
+
+@pytest.mark.usefixtures("one_scanner")
 def test_a_new_vps_comes_up_from_the_offsite_copy_with_privileged_accounts_suspended(
     world: World, base: dict[str, Any], offsite_snapshot: dict[str, str]
 ) -> None:
