@@ -88,6 +88,14 @@ def test_the_media_volume_is_private_to_web_worker_and_backup(base: dict[str, An
     assert "media" in base["volumes"]
 
 
+def test_one_service_seeds_a_new_media_volume(base: dict[str, Any]) -> None:
+    """Created together, two containers race to copy /srv/media into it, and one fails to start."""
+    services = base["services"]
+    for name in ("worker", "backup"):
+        assert services[name]["depends_on"]["web"]["condition"] == "service_started", name
+    assert not {"worker", "backup"} & set(services["web"]["depends_on"])
+
+
 def test_the_database_runs_without_root_or_a_capability(base: dict[str, Any]) -> None:
     """Its entrypoint then never calls gosu, and nothing here could change a file's owner."""
     db = base["services"]["db"]

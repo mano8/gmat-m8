@@ -244,6 +244,9 @@ services:
         condition: service_completed_successfully
       db:
         condition: service_healthy
+      # Created after web, see `media` below.
+      web:
+        condition: service_started
     healthcheck:
       test: ["CMD", "/app/docker/app/entrypoint.sh", "worker-healthcheck"]
       interval: 30s
@@ -344,6 +347,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      # Created after web, see `media` below.
+      web:
+        condition: service_started
     # Alive, and the last successful backup (if any) is younger than 7 hours.
     healthcheck:
       test:
@@ -384,7 +390,9 @@ volumes:
   pg_data:
   caddy_data:
   caddy_config:
-  # Attachments (M6.4): owned by uid 1000, created from the image's /srv/media.
+  # Attachments (M6.4): owned by uid 1000, created from the image's /srv/media. Docker copies that
+  # into a new volume when a container is created, and two created at once can both try: the loser
+  # fails with "file exists". So web is created first, and the others depend on it.
   media:
   # The scanner's signatures, seeded from its image on first use, so it starts without a download.
   clamav_db:
