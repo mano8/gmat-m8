@@ -230,6 +230,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- The VPS runbook asked for a fine-grained token to pull the images, which GHCR refuses after a successful login. It now asks for public packages or a classic token with only `read:packages`.
 - The admin's lists accept only the filters they offer: a query-string lookup on a hidden column (a password hash, a token hash, an MFA secret, a price) could be read back from the result count. The audit admin no longer shows event payloads or client addresses (M8.3).
 - An over-receipt at a worksite no longer tells a site manager how much the order line holds for other projects, through the message or the order of the refusals (M8.3).
 - Removing a passkey keeps a privileged account's last second factor, as deactivating its TOTP already did (M8.3).

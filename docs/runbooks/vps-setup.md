@@ -12,7 +12,7 @@ Who does this: the maintainer, by hand. Agents never touch the server.
 | A domain | An `A` (and `AAAA`) record for the public name, for example `gmat.example.org`, pointing at the VPS. Caddy gets its certificate from Let's Encrypt on the first request, so the record must resolve **before** the first deploy. |
 | An SMTP account | A relay that accepts submission on port 587 with STARTTLS and a certificate that verifies. `check --deploy` refuses a relay with credentials and no TLS (`gmat.E021`), so a deploy stops on that. The address you send from must be allowed by the relay. |
 | Offsite storage | Two credential sets, see [../../docker_compose/offsite/README.md](../../docker_compose/offsite/README.md): **append-only** for the VPS, **delete-capable** for the maintainer's machine only. The storage lives on a host or provider that is not this VPS. |
-| A GitHub token for the VPS | Fine-grained, **this repository only**, with *Contents: read* (release manifests) and *Packages: read* (images). Nothing else. Expires; put the renewal date in your calendar. |
+| Access to the images | GHCR creates the two packages **private** at the first publish, and takes only a **classic** personal access token: a fine-grained one logs in, then is denied on the pull. Choose one (H8.6). **Public packages:** change the visibility of both after the first publish (package settings; it cannot be undone) and leave `GITHUB_READ_TOKEN` empty, which keeps a credential off the server. The source is public already. **Or a classic token with only `read:packages`:** GitHub cannot limit it to this repository, so it reads every private package the account can. It expires, and an expired one stops a deploy or a recovery at the pull, so put the renewal date in your calendar. The release manifests are read from the public repository and need no token. |
 | An uptime monitor | Any external service that calls `https://<domain>/healthz/` every minute and tells you by a channel other than this server's email. |
 | Offline storage | A password manager or encrypted drive that is not on the VPS, for the keys in step 7. |
 
@@ -144,7 +144,7 @@ bash init.sh        # creates .env and app.env with generated secrets, mode 0600
 | `ACME_EMAIL` | an address that gets Let's Encrypt's expiry notices |
 | `ADMIN_URL_PATH` | something not guessable, no slashes. Not secret, but it keeps scanners away |
 | `ADMIN_ALLOWED_CIDRS` | **required.** The addresses that may reach the admin, for example your office's fixed address: `203.0.113.7/32`. There is no way around this one: the production overlay needs the value, and `deploy.sh` refuses `0.0.0.0/0`, and also any range that overlaps Docker's bridges (`172.16.0.0/12`, `192.168.0.0/16`), because behind Docker's proxy a visitor can look like one of them. Exception X10 |
-| `GITHUB_READ_TOKEN` | the token from "What you need". Read only by `deploy.sh` and `recover.sh` |
+| `GITHUB_READ_TOKEN` | empty with public packages, otherwise the classic token from "What you need". Read only by `deploy.sh` and `recover.sh` |
 | `SMTP_PASSWORD` | the SMTP account's password. Only the worker receives it |
 | `RESTIC_REPOSITORY`, `RESTIC_PASSWORD`, `RESTIC_REST_USERNAME`, `RESTIC_REST_PASSWORD` (or `AWS_*` for S3) | the **append-only** credentials. `RESTIC_REPOSITORY` must not be empty: `deploy.sh` refuses |
 | `BACKUP_HEARTBEAT_URL` | optional: a dead-man's-switch URL (healthchecks-style) pinged after every successful dump |
@@ -204,8 +204,9 @@ ls -ld backups flags                               # owned by deploy (uid 1000);
 python3 ops/checks.py admin-cidrs "$(sed -n 's/^ADMIN_ALLOWED_CIDRS=//p' .env)" && echo ok
 dig +short gmat.example.org                        # the VPS's address
 cosign version && docker compose version && flock --version | head -1
-curl -fsS -H "Authorization: Bearer $(sed -n 's/^GITHUB_READ_TOKEN=//p' .env)" \
-  https://api.github.com/repos/<owner>/gmat-m8 >/dev/null && echo "token reads the repository"
+# Only with a token. A fine-grained one prints nothing here: GHCR would refuse it.
+curl -fsSI -H "Authorization: Bearer $(sed -n 's/^GITHUB_READ_TOKEN=//p' .env)" \
+  https://api.github.com/user | grep -i '^x-oauth-scopes: read:packages'
 ```
 
 On the release day follow [deploy-rollback.md](deploy-rollback.md). The very first deploy has no previous version: `deploy.sh` skips the checks that need one, takes the pre-deploy backup (which also creates the offsite repository), and records the first line in `deployed.log`. Then:
