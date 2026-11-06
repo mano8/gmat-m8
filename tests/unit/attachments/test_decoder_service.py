@@ -130,8 +130,10 @@ def answering(settings: Any, answer: bytes) -> Iterator[None]:
 
             def reply() -> None:
                 connection, _ = listener.accept()
-                with connection:
-                    connection.recv(1024 * 1024)
+                with connection, connection.makefile("rb") as stream:
+                    # The whole request first: closing on a client still sending would break its
+                    # pipe, and the answer under test would never be read.
+                    stream.read(json.loads(stream.readline())["size"])
                     connection.sendall(answer)
 
             threading.Thread(target=reply, daemon=True).start()
