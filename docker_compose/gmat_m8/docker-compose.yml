@@ -46,7 +46,7 @@ x-app: &app
 services:
   caddy:
     <<: *hardened
-    image: caddy:2.11.8-alpine@sha256:f6228111e5fafa1a5238258d0858e103f10599b8d1659a146e7726681a002bb9
+    image: caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
     # Root inside the container with every capability dropped except the one needed to bind
     # the published ports: the data and config volumes are root-owned, and a read-only root
     # filesystem plus no other capability leaves nothing to abuse. (uid 1000 would need a
@@ -256,7 +256,7 @@ services:
 
   db:
     <<: *hardened
-    image: postgres:18-alpine@sha256:eaef288f54a90a909e49f0121d5d047a5e974e922699de4249625cf7cde34f36
+    image: postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
     # The entrypoint starts as root, prepares the data directory and drops to postgres.
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     command:

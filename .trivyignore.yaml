@@ -24,7 +24,11 @@
 # Added in M8.3 (2026-11-05), at the end of the list: the third-party images of the compose file.
 # The nightly scan covers them but failed before it scanned anything (a prerelease without assets,
 # fixed in M8.3), so these surfaced only now. Caddy and PostgreSQL were moved to their newest digests
-# first; what is listed has no fix either published image ships. ClamAV's image has no finding.
+# first (again on 2026-11-06, which cleared brotli-libs and libcurl); what is listed has no fix either
+# published image ships. ClamAV's image has no finding. gosu will not clear by itself: its maintainer
+# keeps it on Go 1.24.6 on purpose and does not rebuild for CVEs in code it never calls (its
+# SECURITY.md); `govulncheck -mode=binary` on the image's binary agrees for all 26 (2026-11-06). The
+# backup image deletes gosu, and SQLite left the application image, so neither is listed for those.
 
 vulnerabilities:
   - id: CVE-2026-76642
@@ -111,16 +115,6 @@ vulnerabilities:
       read-only root filesystem, and the service never calls the affected tool.
       Compensating control: those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
     expired_at: 2027-01-20
-  - id: CVE-2026-119373
-    statement: >-
-      sqlite3 (libsqlite3-0) in the Debian 13 base image of the application image has
-      no fixed version yet (Debian tracker status 'affected' on 2026-11-01). Affects
-      a heap-based buffer overflow in SQLite's FTS5 extension, which is not reachable from the service: the application uses
-      PostgreSQL only and never loads SQLite. The application image runs as uid 1000
-      with every capability dropped, no-new-privileges and a read-only root
-      filesystem. Compensating control: those container limits, plus the entry's
-      expiry, which forces a re-review. Owner: maintainer (mano8).
-    expired_at: 2026-12-31
   - id: CVE-2026-76844
     statement: >-
       zlib (zlib1g) in the Debian 13 base image of the application image has no fixed
@@ -418,27 +412,22 @@ vulnerabilities:
       Compensating control: those limits, plus the entry's expiry, which forces a re-review
       against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
-  - id: CVE-2026-111497
+  - id: CVE-2026-85091
     statement: >-
-      brotli-libs in the Alpine base of the official postgres:18-alpine image; fixed in 1.2.1-r0, which
-      the published image does not ship yet. PostgreSQL's server never calls it: it makes no
-      outbound HTTP request, and the db service has only internal networks, so nothing can
-      reach it from outside. Compensating control: those limits, plus the entry's expiry, which
-      forces moving to the next image. Owner: maintainer (mano8).
-    expired_at: 2027-01-20
-  - id: CVE-2026-92392
-    statement: >-
-      libcurl in the Alpine base of the official postgres:18-alpine image; fixed in 8.23.0-r0, which
-      the published image does not ship yet. PostgreSQL's server never calls it: it makes no
-      outbound HTTP request, and the db service has only internal networks, so nothing can
-      reach it from outside. Compensating control: those limits, plus the entry's expiry, which
-      forces moving to the next image. Owner: maintainer (mano8).
+      zlib (zlib1g) in the Debian 13 base image of the application image has no fixed version yet
+      (Debian tracker status 'affected' on 2026-11-06). Affects a heap overflow in gz_vacate() on
+      gzprintf() or gzvprintf() after a non-blocking write stall, which is not reachable from the
+      service: CPython's gzip module and Pillow use the deflate and inflate streams, never the gz*
+      file API. The application image runs as uid 1000 with every capability dropped,
+      no-new-privileges and a read-only root filesystem. Compensating control: those container
+      limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-116587
     statement: >-
-      go-jose inside the Caddy 2.11.8 binary has no fixed version yet (Trivy status 'affected'
-      on 2026-11-05). A denial of service on parsing crafted JOSE objects, which Caddy handles
-      only in its ACME conversation with the certificate authority it was configured for, never
-      from a client of the site. Caddy is limited to 128 MiB and restarts by itself. Compensating
-      control: those limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+      The go-jose v3 copy inside the Caddy 2.11.9 binary has no fixed version yet (Trivy status
+      'affected' on 2026-11-06; 2.11.9 moved the v4 copy to the fixed 4.1.6). A denial of service on
+      parsing crafted JOSE objects, which Caddy handles only in its ACME conversation with the
+      certificate authority it was configured for, never from a client of the site. Caddy is limited
+      to 128 MiB and restarts by itself. Compensating control: those limits, plus the entry's expiry,
+      which forces a re-review. Owner: maintainer (mano8).
     expired_at: 2027-01-20

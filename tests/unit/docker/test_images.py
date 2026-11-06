@@ -107,6 +107,7 @@ def test_downloaded_binaries_are_verified() -> None:
 def test_app_image_ships_no_pip_and_collects_static_without_secrets() -> None:
     text = _text(DOCKER / "app" / "Dockerfile")
     assert "pip uninstall" in text
+    assert "dpkg --purge --force-depends libsqlite3-0" in text
     assert "DJANGO_SETTINGS_MODULE=config.settings.build" in text
     assert "uv sync --frozen --no-dev" in text
 

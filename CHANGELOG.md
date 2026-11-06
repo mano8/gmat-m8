@@ -224,7 +224,9 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Returning or reducing one's own request follows the self-decision rule and is marked `self_decided` (R18).
 - `assign_to_project` checks the assignee's matching role, home branch and active account itself, not only the form (R19).
 - **The server must be x86-64**, and needs about 1 GB more memory (ADR-0015). `web`'s limit is 1 GiB; the `decoder` has its own.
-- Caddy 2.11.8 and the newest PostgreSQL 18 digest, whose findings had never been reported: the nightly scan failed before scanning anything.
+- Caddy 2.11.9, and the newest PostgreSQL 18 and Python 3.14 digests; the findings of the first two had never been reported: the nightly scan failed before scanning anything.
+- The application image no longer ships SQLite (PostgreSQL only), which also removes its findings.
+- After a restore, an email change newer than the backup no longer moves the account by itself: the account stays suspended under its restored address until an operator accepts or rejects the change (`manage confirm_account --email-change`).
 
 ### Fixed
 
