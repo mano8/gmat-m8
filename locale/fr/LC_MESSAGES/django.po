@@ -5878,6 +5878,20 @@ msgid "A preserved database says what happened: there is no gap to list."
 msgstr "La base de données conservée indique déjà ce qui s'est passé : il n'y a aucun intervalle à détailler."
 
 #: apps/recovery/services.py
+#, python-format
+msgid "Another account has the address %(address)s."
+msgstr "Un autre compte a l'adresse %(address)s."
+
+#: apps/recovery/services.py
+msgid "This account has no email change to decide on."
+msgstr "Ce compte n'a aucun changement d'adresse à trancher."
+
+#: apps/recovery/services.py
+#, python-format
+msgid "This account's email change to %(address)s must be accepted or rejected."
+msgstr "Le changement d'adresse de ce compte vers %(address)s doit être accepté ou refusé."
+
+#: apps/recovery/services.py
 msgid "This account is not suspended."
 msgstr "Ce compte n'est pas suspendu."
 

@@ -167,20 +167,23 @@ Data written after the snapshot (up to 6 hours) is gone. Tell the people; users 
 - every pending invitation and email change is revoked, and unsent security email is wiped: re-issue them ([user-admin.md](user-admin.md));
 - every set of **recovery codes** is deleted: each user generates a new set at their next sign-in; privileged accounts are made to before anything else;
 - the **outbox is quarantined**: everything `QUEUED`, `SENDING`, `FAILED` or `AMBIGUOUS` is `QUARANTINED`, unless the preserved failed database recorded a final outcome for it. Nothing is sent until you release it;
-- with a preserved failed state, the access-reducing and credential events after the snapshot are **replayed** (revocations, shortened validity, offboardings, deactivations, projects stopped, email changes, MFA resets, removed factors, password changes). What *gave* access is only reported, never replayed: enter it again by hand;
+- with a preserved failed state, the access-reducing and credential events after the snapshot are **replayed** (revocations, shortened validity, offboardings, deactivations, projects stopped, MFA resets, removed factors, password changes). What *gave* access is only reported, never replayed: enter it again by hand;
+- an **email change** after the snapshot is not applied: the account comes up suspended under its restored address until you accept or reject the change, because whoever broke in could have written that row of the failed database;
 - without one, privileged accounts (`GROUP_ADMIN`, `MATERIAL_MANAGER`, `ENGINEER`, staff, and superusers except the operator) are **suspended**.
 
 Your to-do list, in order:
 
 1. **Read the reconciliation report** (`preserved/<time>/reconcile-report.json`).
-2. **Confirm suspended accounts** one by one. Ask the owner whether their password or authenticator changed during the gap, then:
+2. **Confirm suspended accounts** one by one. Ask the owner whether their password or authenticator changed during the gap and, for an account listed as `old -> new (email change)`, whether that change is theirs, by a channel other than either address. Then:
 
    ```bash
    dc run --rm --no-deps web manage confirm_account --operator you@example.org --list
-   dc run --rm --no-deps web manage confirm_account --operator you@example.org --email person@example.org [--credentials-changed]
+   dc run --rm --no-deps web manage confirm_account --operator you@example.org --email person@example.org [--credentials-changed] [--email-change accept|reject]
    ```
 
-   `--credentials-changed` gives the account an unusable password and removes its authenticators, so it resets through an invitation link from an administrator.
+   `--credentials-changed` gives the account an unusable password and removes its authenticators, so it resets through an invitation link from an administrator. `--email-change` is required when a change is listed: `accept` moves the account to the new address, `reject` keeps the restored one. Name the account by its restored address.
+
+   If the report's `own_email_change` is set, the change was on the account you ran this with. You stay signed in under the old address, so that you can confirm the others, and nothing was applied. If the change was really yours, have it made again ([user-admin.md](user-admin.md)); if not, treat it as a sign of the compromise.
 3. **Release or discard the held email** ([email.md](email.md#after-a-restore-quarantined-messages)). Supplier dispatches **one by one, after checking with the supplier**.
 4. **Re-issue** invitations and email changes that were revoked.
 5. **Check the data**: open the dashboard, a recent request, a recent receipt, an attachment. Compare the newest document numbers with what people remember.

@@ -16,7 +16,8 @@ is nothing to race, but the locks are the usual ones.
    terminal outcome for the same row, which it then takes. A human releases what is left
    (``manage outbox_quarantine``); nothing is sent automatically.
 5. With a failed state: its later access and credential events are replayed
-   (``apps.recovery.replay``).
+   (``apps.recovery.replay``), and an account with an email change among them waits, suspended,
+   for a human to accept or reject the change (``confirm_suspended_account``).
 6. Without one (the VPS is gone), the accounts in the gap cannot be known (Q23): every
    privileged account but the operator's is suspended until the maintainer confirms it
    (``confirm_suspended_account``), and the ones the maintainer knows about are offboarded or
@@ -78,6 +79,8 @@ TERMINAL = frozenset(
 )
 ATTEMPT_ERROR = "restored from a backup"
 NO_STATE_REASON = "restored without a preserved database (Q23)"
+ACCEPT_EMAIL = "accept"
+REJECT_EMAIL = "reject"
 
 
 @dataclass(frozen=True)
@@ -106,6 +109,8 @@ class Report:
     gap_offboarded: int = 0
     gap_credentials_reset: int = 0
     suspended: list[str] = field(default_factory=list)
+    email_changes_held: dict[str, str] = field(default_factory=dict)
+    own_email_change: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -259,6 +264,8 @@ def post_restore_reconcile(
     else:
         _apply_gap(report, gap or Gap(), replay)
     report.suspended = replay.suspended
+    report.email_changes_held = replay.email_changes_held
+    report.own_email_change = replay.own_email_change
     _invalidate_recovery_codes(report)
     record(principal.audit_identity, "recovery.reconciled", data=report.as_dict())
     return report
@@ -274,17 +281,75 @@ def _suspended(user_id: UUID) -> User:
     return user
 
 
+def held_email_change(user: User) -> str:
+    """The address an email change of this suspended account asks for, if a human has to decide.
+
+    The latest one a restore held since the account was last confirmed; a change back to the
+    address it has now leaves nothing to decide.
+    """
+    events = AuditEvent.objects.filter(object_type=user._meta.label_lower, object_id=user.pk)
+    held = events.filter(action=SUSPENDED_ACTION, data__has_key="email_to")
+    confirmed = events.filter(action=CONFIRMED_ACTION).order_by("-pk").first()
+    if confirmed is not None:
+        held = held.filter(pk__gt=confirmed.pk)
+    latest = held.order_by("-pk").first()
+    target = latest.data["email_to"] if latest is not None else ""
+    return "" if target == user.email else target
+
+
+def _move_address(user: User, target: str) -> None:
+    if User.objects.exclude(pk=user.pk).filter(email=target).exists():
+        raise ValidationError(
+            _("Another account has the address %(address)s."),
+            code="email_taken",
+            params={"address": target},
+        )
+    user.email = target
+    user.save(update_fields=["email"])
+    user.emailaddress_set.all().delete()
+    user.emailaddress_set.create(email=target, primary=True, verified=True)
+
+
+def _settle_email_change(user: User, decision: str) -> dict[str, str]:
+    """Apply the human's decision on a held email change; what the audit event says about it."""
+    target = held_email_change(user)
+    if not target:
+        if decision:
+            raise ValidationError(
+                _("This account has no email change to decide on."), code="no_email_change"
+            )
+        return {}
+    if decision not in (ACCEPT_EMAIL, REJECT_EMAIL):
+        raise ValidationError(
+            _("This account's email change to %(address)s must be accepted or rejected."),
+            code="email_change_undecided",
+            params={"address": target},
+        )
+    settled = {"email_change": decision, "email_from": user.email, "email_to": target}
+    if decision == ACCEPT_EMAIL:
+        _move_address(user, target)
+    return settled
+
+
 @transactional
 def confirm_suspended_account(
-    principal: Principal, user_id: UUID, *, credentials_changed: bool = False
+    principal: Principal,
+    user_id: UUID,
+    *,
+    credentials_changed: bool = False,
+    email_change: str = "",
 ) -> User:
     """The maintainer vouches for an account a restore suspended (Q23): it signs in again.
 
     ``credentials_changed``: its password or factors changed in the gap, so what was restored
     is not trusted; it resets the password and enrolls again.
+
+    ``email_change``: ``ACCEPT_EMAIL`` moves the account to the address a held change asks for,
+    ``REJECT_EMAIL`` keeps the restored one. Required when a change is held, refused otherwise.
     """
     lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
     user = _suspended(user_id)
+    settled = _settle_email_change(user, email_change)
     if credentials_changed:
         remove_credentials(user)
     User.objects.filter(pk=user.pk).update(is_active=True)
@@ -292,7 +357,7 @@ def confirm_suspended_account(
         principal.audit_identity,
         CONFIRMED_ACTION,
         obj=user,
-        data={"credentials_changed": credentials_changed},
+        data={"credentials_changed": credentials_changed} | settled,
     )
     return User.objects.get(pk=user_id)
 

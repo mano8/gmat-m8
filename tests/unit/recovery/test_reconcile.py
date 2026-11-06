@@ -67,6 +67,16 @@ def invitation(email: str = "new@example.org", **fields: Any) -> Invitation:
     )
 
 
+def moved(user: User, target: str | None) -> dict[str, Any]:
+    """The audit row of an email change the failed database says was applied."""
+    return audit_event(
+        "email_change.applied",
+        new_id(),
+        {"user_id": str(user.pk), "from": user.email, "to": target},
+        object_type="accounts.emailchangerequest",
+    )
+
+
 def email_change(user: User, requested_by: User) -> EmailChangeRequest:
     return EmailChangeRequest.objects.create(
         user=user,
@@ -504,55 +514,112 @@ class TestReplay:
         people.tech_mad.refresh_from_db()
         assert not people.tech_mad.has_usable_password()
 
-    def test_an_email_change_moves_the_account_and_its_address(
+    def test_an_email_change_moves_nothing_and_waits_for_a_human(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        """A row planted with the runtime credentials must not hand the account to its address,
+        and the restored address must not get the account back either."""
+        user = people.tech_mad
+        old = user.email
+        EmailAddress.objects.create(user=user, email=old, primary=True, verified=True)
+        report = reconcile(principal, moved(user, "moved@example.org"))
+        user.refresh_from_db()
+        assert user.email == old
+        assert not user.is_active
+        assert user.offboarded_at is None
+        assert list(EmailAddress.objects.filter(user=user).values_list("email", flat=True)) == [old]
+        assert report.replayed == {"email_change.applied": 1}
+        assert report.suspended == [old]
+        assert report.email_changes_held == {old: "moved@example.org"}
+        assert services.held_email_change(user) == "moved@example.org"
+
+    def test_while_it_waits_neither_address_signs_in_or_gets_a_reset(
+        self, principal: SessionPrincipal, people: People, client: Client
+    ) -> None:
+        user = people.tech_mad
+        old = user.email
+        EmailAddress.objects.create(user=user, email=old, primary=True, verified=True)
+        reconcile(principal, moved(user, "moved@example.org"))
+        queued = EmailOutbox.objects.count()
+        for address in (old, "moved@example.org"):
+            password_login(client, address, PASSWORD)
+            assert "_auth_user_id" not in client.session
+            client.post(reverse("account_reset_password"), {"email": address})
+        assert EmailOutbox.objects.count() == queued
+
+    def test_the_latest_change_is_the_one_to_decide_and_one_report_line_is_enough(
         self, principal: SessionPrincipal, people: People
     ) -> None:
         user = people.tech_mad
-        EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
         report = reconcile(
             principal,
-            audit_event(
-                "email_change.applied",
-                new_id(),
-                {"user_id": str(user.pk), "from": user.email, "to": "moved@example.org"},
-                object_type="accounts.emailchangerequest",
-            ),
+            moved(user, "first@example.org"),
+            moved(user, "second@example.org"),
         )
+        assert report.suspended == [user.email]
+        assert report.email_changes_held == {user.email: "second@example.org"}
+        assert services.held_email_change(user) == "second@example.org"
+
+    def test_a_change_there_and_back_still_waits_but_leaves_nothing_to_decide(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.tech_mad
+        reconcile(principal, moved(user, "away@example.org"), moved(user, user.email))
         user.refresh_from_db()
-        assert user.email == "moved@example.org"
-        assert list(EmailAddress.objects.filter(user=user).values_list("email", "verified")) == [
-            ("moved@example.org", True)
-        ]
-        assert report.replayed == {"email_change.applied": 1}
+        assert not user.is_active
+        assert services.held_email_change(user) == ""
 
     def test_an_email_change_already_so_is_nothing_to_do(
         self, principal: SessionPrincipal, people: People
     ) -> None:
         user = people.tech_mad
-        report = reconcile(
-            principal,
-            audit_event(
-                "email_change.applied", new_id(), {"user_id": str(user.pk), "to": user.email}
-            ),
-        )
+        report = reconcile(principal, moved(user, user.email))
         assert report.already_so == {"email_change.applied": 1}
+        user.refresh_from_db()
+        assert user.is_active
 
-    def test_an_email_change_that_cannot_apply_suspends_the_account(
+    def test_the_operator_stays_in_and_the_report_says_what_is_held(
+        self, principal: SessionPrincipal, operator: User
+    ) -> None:
+        """Suspending them could leave nobody to confirm anyone, and applying it would hand the
+        account most worth taking to whoever planted the row."""
+        old = operator.email
+        report = reconcile(principal, moved(operator, "operator-moved@example.org"))
+        operator.refresh_from_db()
+        assert operator.is_active
+        assert operator.email == old
+        assert report.own_email_change == "operator-moved@example.org"
+        assert report.email_changes_held == {old: "operator-moved@example.org"}
+        assert report.suspended == []
+
+    def test_an_offboarded_account_has_nothing_to_hold(
         self, principal: SessionPrincipal, people: People
     ) -> None:
         user = people.tech_mad
+        User.objects.filter(pk=user.pk).update(is_active=False, offboarded_at=timezone.now())
+        report = reconcile(principal, moved(user, "gone@example.org"))
+        assert report.already_so == {"email_change.applied": 1}
+        assert report.email_changes_held == {}
+
+    @pytest.mark.parametrize("target", ["", "not an address", "a@b\x1b[31m.example", None])
+    def test_an_address_that_is_not_one_is_reported_and_touches_nothing(
+        self, principal: SessionPrincipal, people: People, target: str | None
+    ) -> None:
+        user = people.tech_mad
+        report = reconcile(principal, moved(user, target))
+        assert report.not_replayed == {"email_change.applied": 1}
+        user.refresh_from_db()
+        assert user.is_active
+
+    def test_an_account_id_that_is_not_one_touches_nothing(
+        self, principal: SessionPrincipal
+    ) -> None:
         report = reconcile(
             principal,
-            audit_event(
-                "email_change.applied",
-                new_id(),
-                {"user_id": str(user.pk), "from": user.email, "to": people.mm_mad.email},
-            ),
+            audit_event("email_change.applied", new_id(), {"user_id": "x", "to": "a@example.org"}),
+            audit_event("email_change.applied", new_id(), {"to": "a@example.org"}),
         )
-        user.refresh_from_db()
-        assert not user.is_active
-        assert user.offboarded_at is None
-        assert report.suspended == [user.email]
+        assert report.already_so == {"email_change.applied": 2}
 
     @pytest.mark.parametrize(
         ("action", "model", "attribute"),
@@ -726,6 +793,49 @@ class TestASecondRestore:
         user.refresh_from_db()
         assert user.is_active is False
 
+    @pytest.mark.parametrize("decision", [services.ACCEPT_EMAIL, services.REJECT_EMAIL])
+    def test_a_decided_email_change_is_decided_again(
+        self, principal: SessionPrincipal, operator: User, people: People, decision: str
+    ) -> None:
+        """A second restore goes back before the decision: only a human can make it again."""
+        user = people.tech_mad
+        old = user.email
+        change = moved(user, "moved@example.org")
+        reconcile(principal, change)
+        services.confirm_suspended_account(self._again(operator), user.pk, email_change=decision)
+        User.objects.filter(pk=user.pk).update(is_active=True, email=old)
+        report = reconcile(
+            self._again(operator),
+            change,
+            audit_event(
+                CONFIRMED, user.pk, {"credentials_changed": False, "email_change": decision}
+            ),
+        )
+        user.refresh_from_db()
+        assert not user.is_active
+        assert user.email == old
+        assert report.email_changes_held == {old: "moved@example.org"}
+        assert services.held_email_change(user) == "moved@example.org"
+
+    def test_an_account_suspended_over_an_email_change_keeps_it_when_suspended_again(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.tech_mad
+        reconcile(
+            principal,
+            audit_event(SUSPENDED, user.pk, {"reason": "held", "email_to": "moved@example.org"}),
+        )
+        assert services.held_email_change(user) == "moved@example.org"
+
+    def test_a_suspension_with_no_state_does_not_lose_a_held_email_change(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        """A later restore without a failed database suspends the account for another reason."""
+        user = people.mm_mad
+        reconcile(principal, moved(user, "moved@example.org"))
+        post_restore_reconcile(self._again(operator), failed_state=None)
+        assert services.held_email_change(user) == "moved@example.org"
+
     def test_credentials_that_started_over_stay_distrusted(
         self, principal: SessionPrincipal, people: People
     ) -> None:
@@ -892,6 +1002,108 @@ class TestConfirm:
     def test_who_lacks_the_capability_cannot(self, suspended: User, people: People) -> None:
         with pytest.raises(AccessDenied):
             services.confirm_suspended_account(principal_for(people.tech_mad), suspended.pk)
+
+
+class TestAHeldEmailChange:
+    @pytest.fixture
+    def held(self, principal: SessionPrincipal, people: People) -> User:
+        user = people.tech_mad
+        EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
+        reconcile(principal, moved(user, "moved@example.org"))
+        user.refresh_from_db()
+        return user
+
+    def _operator(self, operator: User) -> SessionPrincipal:
+        operator.refresh_from_db()
+        return principal_for(operator)
+
+    def test_accepting_moves_the_account_and_its_address(self, operator: User, held: User) -> None:
+        old = held.email
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator), held.pk, email_change=services.ACCEPT_EMAIL
+        )
+        assert confirmed.is_active
+        assert confirmed.email == "moved@example.org"
+        assert list(EmailAddress.objects.filter(user=held).values_list("email", "verified")) == [
+            ("moved@example.org", True)
+        ]
+        assert confirmed not in services.suspended_accounts()
+        assert AuditEvent.objects.get(action=CONFIRMED).data == {
+            "credentials_changed": False,
+            "email_change": services.ACCEPT_EMAIL,
+            "email_from": old,
+            "email_to": "moved@example.org",
+        }
+
+    def test_rejecting_keeps_the_restored_address(self, operator: User, held: User) -> None:
+        old = held.email
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator), held.pk, email_change=services.REJECT_EMAIL
+        )
+        assert confirmed.is_active
+        assert confirmed.email == old
+        assert list(EmailAddress.objects.filter(user=held).values_list("email", flat=True)) == [old]
+        assert AuditEvent.objects.get(action=CONFIRMED).data["email_change"] == "reject"
+        assert services.held_email_change(confirmed) == ""
+
+    def test_it_cannot_be_confirmed_without_a_decision(self, operator: User, held: User) -> None:
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(self._operator(operator), held.pk)
+        assert error_codes(caught.value) == {"email_change_undecided"}
+        held.refresh_from_db()
+        assert not held.is_active
+
+    def test_a_decision_must_be_one_of_the_two(self, operator: User, held: User) -> None:
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(
+                self._operator(operator), held.pk, email_change="maybe"
+            )
+        assert error_codes(caught.value) == {"email_change_undecided"}
+
+    def test_an_address_another_account_has_is_refused_and_changes_nothing(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        user = people.tech_mad
+        old = user.email
+        reconcile(principal, moved(user, people.mm_mad.email))
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(
+                self._operator(operator), user.pk, email_change=services.ACCEPT_EMAIL
+            )
+        assert error_codes(caught.value) == {"email_taken"}
+        user.refresh_from_db()
+        assert (user.email, user.is_active) == (old, False)
+
+    def test_nothing_held_nothing_to_decide(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        post_restore_reconcile(principal, failed_state=None)
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(
+                self._operator(operator), people.mm_mad.pk, email_change=services.ACCEPT_EMAIL
+            )
+        assert error_codes(caught.value) == {"no_email_change"}
+
+    def test_a_new_change_after_a_decision_is_a_new_decision(
+        self, operator: User, held: User
+    ) -> None:
+        services.confirm_suspended_account(
+            self._operator(operator), held.pk, email_change=services.REJECT_EMAIL
+        )
+        reconcile(self._operator(operator), moved(held, "again@example.org"))
+        held.refresh_from_db()
+        assert not held.is_active
+        assert services.held_email_change(held) == "again@example.org"
+
+    def test_credentials_can_start_over_in_the_same_step(self, operator: User, held: User) -> None:
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator),
+            held.pk,
+            credentials_changed=True,
+            email_change=services.ACCEPT_EMAIL,
+        )
+        assert confirmed.email == "moved@example.org"
+        assert not confirmed.has_usable_password()
 
 
 def test_a_grant_keeps_its_row(principal: SessionPrincipal, people: People) -> None:

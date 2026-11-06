@@ -211,6 +211,8 @@ The review's questions and proposed exceptions were answered; all of it is imple
 
 **Found by the phase's R3 review, and fixed:** a forged snapshot with the right host and tags, dated in the past, passed the pre-prune check, so a compromised VPS could get real offsite snapshots older than 90 days removed (Medium, 8/10): the script now compares against what the maintainer's machine saw at the last prune.
 
+**The maintainer's decision on what R3 left open (2026-11-06):** a row planted in the failed database with the runtime credentials could have moved an account to an attacker's address on a later restore (6/10, below the review's bar). An email change in the failed state now only suspends the account, and a human accepts or rejects it. The other replayed events only take access away. One residual, reported to the maintainer and left as is: a planted `user.mfa_reset` or `user.authenticator_removed` still strips a second factor. That helps only someone who also has the account's password, who could then enroll a factor of their own.
+
 **Found while implementing them, and not by the first pass:**
 
 - The sweep had scanned the application and backup images only. Caddy, the one process facing the internet, carried 7 findings (one CRITICAL), and PostgreSQL 28 (two CRITICAL). The nightly scan never reported them because it failed before scanning anything on `v0.1.0`, a prerelease without assets (fixed in `80decd3`, so only once this branch merges). Moved to the newest digests; what is left is exception X1.

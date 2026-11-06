@@ -176,6 +176,42 @@ class TestConfirmAccount:
         people.mm_mad.refresh_from_db()
         assert not people.mm_mad.has_usable_password()
 
+    def test_a_held_email_change_is_shown_and_must_be_decided(
+        self, operator: User, people: People
+    ) -> None:
+        user = people.tech_mad
+        old = user.email
+        run(
+            "post_restore_reconcile",
+            "--operator",
+            operator.email,
+            "--failed-state",
+            "-",
+            stdin=state_file(
+                audit_event(
+                    "email_change.applied",
+                    new_id(),
+                    {"user_id": str(user.pk), "from": old, "to": "moved@example.org"},
+                )
+            ),
+        )
+        listed = run("confirm_account", "--operator", operator.email, "--list")
+        assert f"{old} -> moved@example.org (email change)" in listed
+        with pytest.raises(CommandError, match="must be accepted or rejected"):
+            run("confirm_account", "--operator", operator.email, "--email", old)
+        out = run(
+            "confirm_account",
+            "--operator",
+            operator.email,
+            "--email",
+            old,
+            "--email-change",
+            "accept",
+        )
+        assert "moved@example.org can sign in again" in out
+        user.refresh_from_db()
+        assert (user.email, user.is_active) == ("moved@example.org", True)
+
     def test_nobody_has_that_address(self, operator: User) -> None:
         with pytest.raises(CommandError, match="No account"):
             run("confirm_account", "--operator", operator.email, "--email", "x@example.org")

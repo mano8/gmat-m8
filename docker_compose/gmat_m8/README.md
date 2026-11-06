@@ -143,7 +143,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm -
 # notifications in bulk: release-notifications | discard-notifications
 # supplier dispatches one by one, after checking with the supplier: confirm-dispatch | release-dispatch | discard-dispatch ID
 docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm --no-deps web manage confirm_account --operator EMAIL --list
-# after a lost VPS, each privileged account once its owner confirmed it: --email ADDRESS [--credentials-changed]
+# each account once its owner confirmed it: --email ADDRESS [--credentials-changed] [--email-change accept|reject]
 ```
 
 Files the tooling keeps here, all git-ignored: `deployed.log` (one line per deploy or recovery: time, version, both digests, dump, kind), `deploy.state` and `deploy.head` (the deploy in progress), `.release/` (verified manifests and notes), `preserved/` (the failed states, with personal data: delete them when the incident is closed), `incident.log`, and the renamed `pg_data` volumes (`docker volume ls`).

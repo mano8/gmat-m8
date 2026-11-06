@@ -93,12 +93,14 @@ Check the person's identity **out of band** (call a number you already had, not 
 
 ## Accounts a restore suspended
 
-After a restore without a preserved failed database, every privileged account is suspended until confirmed:
+After a restore without a preserved failed database, every privileged account is suspended until confirmed. After any restore, so is an account whose address changed since the snapshot, shown as `old -> new (email change)`:
 
 ```bash
 dc run --rm --no-deps web manage confirm_account --operator you@example.org --list
-dc run --rm --no-deps web manage confirm_account --operator you@example.org --email person@example.org [--credentials-changed]
+dc run --rm --no-deps web manage confirm_account --operator you@example.org --email person@example.org [--credentials-changed] [--email-change accept|reject]
 ```
+
+For a listed email change, check with the person by a channel other than either address, then `accept` to move the account or `reject` to keep the restored address. The command refuses to confirm the account without one of them.
 
 Ask each person whether their password or authenticator changed since the snapshot. If it did, or you are not sure, use `--credentials-changed`: the account gets an unusable password and loses its authenticators, and the person resets through a fresh invitation. See [backup-restore.md](backup-restore.md#after-any-restore).
 

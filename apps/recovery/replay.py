@@ -7,13 +7,18 @@ miss). In log order (UUIDv7), each one that took access or a credential away is 
 
 - memberships and project assignments revoked, or their validity narrowed;
 - accounts offboarded, companies and branches deactivated, projects put on hold or closed;
-- email changes applied;
 - second factors reset or removed;
 - passwords changed: the old hash may be a stolen one, so the account gets an unusable
   password and resets it after reopening;
 - what an earlier restore did: an event it replayed, as the event it was (the original row did
   not come back, so this is the only record of it), the accounts it suspended and those whose
   credentials or access a human named for its gap.
+
+An email change is the one event that is not applied. The restored address must not get the
+account back, but the failed database's word is not enough to hand it to the new one either:
+whoever held the runtime credentials could have planted the row. So the account waits, suspended
+under its restored address, until a human accepts or rejects the change
+(``apps.recovery.services.confirm_suspended_account``).
 
 Everything else, the grants above all, is reported as not replayed and entered again by a
 human: a restore never gives anyone more access than the snapshot had. That includes a
@@ -30,6 +35,8 @@ from typing import Any
 from uuid import UUID
 
 from allauth.mfa.models import Authenticator
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db.models import Model
 from django.utils.dateparse import parse_datetime
 
@@ -44,6 +51,7 @@ CONFIRMED_ACTION = "recovery.account_confirmed"
 EVENT_REPLAYED = "recovery.event_replayed"
 GAP_OFFBOARDED = "recovery.gap_offboarded"
 GAP_CREDENTIALS = "recovery.gap_credentials_reset"
+HOLD_REASON = "email change after the snapshot: a human validates it"
 
 
 @dataclass
@@ -57,6 +65,8 @@ class Replay:
     already: Counter[str] = field(default_factory=Counter)
     not_replayed: Counter[str] = field(default_factory=Counter)
     suspended: list[str] = field(default_factory=list)
+    email_changes_held: dict[str, str] = field(default_factory=dict)
+    own_email_change: str = ""
 
 
 class _NotRelevant(Exception):
@@ -77,11 +87,16 @@ def offboard(user: User, *, when: datetime, actor: User, now: datetime) -> None:
     revoke_grants(user.pk, when=when, actor=actor, now=now)
 
 
-def suspend(replay: Replay, user: User, reason: str) -> None:
-    """Inactive, not offboarded, until the maintainer confirms the account (Q23)."""
+def suspend(replay: Replay, user: User, reason: str, *, email_to: str = "") -> None:
+    """Inactive, not offboarded, until the maintainer confirms the account (Q23).
+
+    ``email_to``: an email change the confirmation has to decide on.
+    """
     User.objects.filter(pk=user.pk).update(is_active=False)
-    record(replay.identity, SUSPENDED_ACTION, obj=user, data={"reason": reason})
-    replay.suspended.append(user.email)
+    data = {"reason": reason} | ({"email_to": email_to} if email_to else {})
+    record(replay.identity, SUSPENDED_ACTION, obj=user, data=data)
+    if user.email not in replay.suspended:
+        replay.suspended.append(user.email)
 
 
 def remove_credentials(user: User) -> None:
@@ -141,7 +156,21 @@ def _narrow_assignment(row: AuditRow, replay: Replay) -> bool:
 
 
 def _account(user_id: Any) -> User | None:
-    return User.objects.filter(pk=user_id).first() if user_id else None
+    """The account a row names; the row comes from a database nobody trusts any more."""
+    try:
+        return User.objects.filter(pk=UUID(str(user_id))).first()
+    except ValueError:
+        return None
+
+
+def _address(value: Any) -> str:
+    """A well-formed address in lower case, or nothing, for the same reason."""
+    address = str(value or "").strip().lower()
+    try:
+        validate_email(address)
+    except ValidationError:
+        return ""
+    return address
 
 
 def _offboard(row: AuditRow, replay: Replay) -> bool:
@@ -173,20 +202,23 @@ def _distrust_password(row: AuditRow, replay: Replay) -> bool:
     return True
 
 
-def _apply_email_change(row: AuditRow, replay: Replay) -> bool:
-    """The old address must lose the account. If another restored account holds the new one
-    the change cannot be applied, so the account waits for the maintainer."""
+def _hold_email_change(row: AuditRow, replay: Replay) -> bool:
+    """Nobody signs in until a human decides (module note). Whoever runs the reconciliation stays
+    in, or nobody may be left to confirm anyone: their own change goes in the report, not applied.
+    """
     user = _account(row.data.get("user_id"))
-    target = str(row.data.get("to", ""))
-    if user is None or user.email == target:
+    if user is None or user.offboarded_at is not None:
         return False
-    if User.objects.exclude(pk=user.pk).filter(email=target).exists():
-        suspend(replay, user, "email change after the snapshot could not be applied")
-        return True
-    user.email = target
-    user.save(update_fields=["email"])
-    user.emailaddress_set.all().delete()
-    user.emailaddress_set.create(email=target, primary=True, verified=True)
+    target = _address(row.data.get("to"))
+    if not target:
+        raise _NotRelevant
+    if user.email == target and user.email not in replay.email_changes_held:
+        return False
+    replay.email_changes_held[user.email] = target
+    if user.pk == replay.actor.pk:
+        replay.own_email_change = target
+    else:
+        suspend(replay, user, HOLD_REASON, email_to=target)
     return True
 
 
@@ -221,7 +253,8 @@ def _suspend_again(row: AuditRow, replay: Replay) -> bool:
     user = _account(row.object_id)
     if user is None or not user.is_active or user.offboarded_at is not None:
         return False
-    suspend(replay, user, str(row.data.get("reason", "")))
+    email_to = _address(row.data.get("email_to"))
+    suspend(replay, user, str(row.data.get("reason", "")), email_to=email_to)
     return True
 
 
@@ -249,7 +282,7 @@ HANDLERS: dict[str, Callable[[AuditRow, Replay], bool]] = {
     "user.mfa_reset": _reset_factors,
     "user.authenticator_removed": _remove_factor,
     "user.password_changed": _distrust_password,
-    "email_change.applied": _apply_email_change,
+    "email_change.applied": _hold_email_change,
     "company.updated": _deactivate_company,
     "branch.updated": _deactivate_branch,
     "project.updated": _stop_project,
