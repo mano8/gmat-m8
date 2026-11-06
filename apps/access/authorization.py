@@ -123,9 +123,7 @@ def _authorize_user(
 ) -> User:
     lock_access_state(locks)
     lock_users(locks, [principal.user_id])
-    user = User.objects.filter(pk=principal.user_id).first()
-    if user is None or not user.is_active or user.offboarded_at is not None:
-        raise AccessDenied(capability)
+    user = _active_user(principal, capability)
     if isinstance(principal, SessionPrincipal):
         if principal.session_epoch != user.session_epoch:
             raise StaleSession("The session predates a change to this account")
@@ -136,11 +134,22 @@ def _authorize_user(
         raise AccessDenied(f"{principal.via} runs with {principal.capability} only")
     ctx = AccessContext.for_user(user)
     if read is not None:
-        visible = ctx.scope_for(read)
-        if not all(object_in_scope(obj, visible) for obj in objects):
-            raise NotInScope(read)
+        _require_readable(ctx, read, objects)
     _require_scope(principal, user, ctx.scope_for(capability), objects)
     return user
+
+
+def _active_user(principal: SessionPrincipal | OperatorPrincipal, capability: str) -> User:
+    user = User.objects.filter(pk=principal.user_id).first()
+    if user is None or not user.is_active or user.offboarded_at is not None:
+        raise AccessDenied(capability)
+    return user
+
+
+def _require_readable(ctx: AccessContext, read: str, objects: tuple[Model, ...]) -> None:
+    visible = ctx.scope_for(read)
+    if not all(object_in_scope(obj, visible) for obj in objects):
+        raise NotInScope(read)
 
 
 def _require_own_account_mfa(principal: SessionPrincipal, user: User) -> None:
