@@ -97,12 +97,16 @@ def test_one_service_seeds_a_new_media_volume(base: dict[str, Any]) -> None:
 
 
 def test_the_database_runs_without_root_or_a_capability(base: dict[str, Any]) -> None:
-    """Its entrypoint then never calls gosu, and nothing here could change a file's owner."""
+    """Its entrypoint then never calls gosu, and nothing here could change a file's owner. So it
+    reads its role script as uid 70, whatever the checkout's umask was."""
     db = base["services"]["db"]
     assert db["user"] == "70:70"
     assert db["cap_drop"] == ["ALL"]
     assert "cap_add" not in db
     assert "/run/postgresql:uid=70,gid=70" in db["tmpfs"]
+    assert "../../docker/postgres/initdb:/docker-entrypoint-initdb.d:ro" in db["volumes"]
+    init = (STACK / "init.sh").read_text(encoding="utf-8")
+    assert "chmod -R a+rX ../../docker/postgres/initdb" in init
 
 
 def test_the_smtp_password_reaches_the_worker_only(base: dict[str, Any]) -> None:

@@ -126,6 +126,8 @@ git clone https://github.com/<owner>/gmat-m8.git ~/gmat-m8        # a public rep
 cd ~/gmat-m8/docker_compose/gmat_m8
 ```
 
+Keep the `deploy` user's default umask (022): the database and the scanner read their files from this checkout under their own uids. `init.sh` opens them up once, but a later `git switch` writes changed files with whatever umask is set.
+
 The tooling assumes the owner `mano8` and images under `ghcr.io/mano8` (`ops/common.sh`, `docker-compose.production.yml`). A fork must change both.
 
 ## 6. Create the env files
