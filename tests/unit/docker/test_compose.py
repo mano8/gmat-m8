@@ -88,6 +88,15 @@ def test_the_media_volume_is_private_to_web_worker_and_backup(base: dict[str, An
     assert "media" in base["volumes"]
 
 
+def test_the_database_runs_without_root_or_a_capability(base: dict[str, Any]) -> None:
+    """Its entrypoint then never calls gosu, and nothing here could change a file's owner."""
+    db = base["services"]["db"]
+    assert db["user"] == "70:70"
+    assert db["cap_drop"] == ["ALL"]
+    assert "cap_add" not in db
+    assert "/run/postgresql:uid=70,gid=70" in db["tmpfs"]
+
+
 def test_the_smtp_password_reaches_the_worker_only(base: dict[str, Any]) -> None:
     for name, service in base["services"].items():
         environment = service.get("environment", {})

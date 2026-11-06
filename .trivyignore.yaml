@@ -130,287 +130,261 @@ vulnerabilities:
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2025-61729
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2025-68121
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-111943
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-25679
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-27145
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-32280
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-32281
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-32283
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-33811
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-33814
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-33818
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-39820
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-39821
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-39822
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-39836
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-42499
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-42504
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-56853
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-56858
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-56859
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-56860
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-56862
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-78667
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-78669
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-97031
     paths:
       - "usr/local/bin/gosu"
     statement: >-
-      The Go standard library built into gosu in the official postgres:18-alpine image.
-      gosu runs once at the database container's start, to change user and exec PostgreSQL;
-      it opens no connection and parses no certificate, URL or request, so the affected Go
-      code is not reachable. The db service has no published port and only internal networks.
-      Compensating control: those limits, plus the entry's expiry, which forces a re-review
-      against the next image. Owner: maintainer (mano8).
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
     expired_at: 2027-01-20
   - id: CVE-2026-85091
     statement: >-

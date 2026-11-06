@@ -422,6 +422,13 @@ def test_the_worker_cannot_reach_web(stack: Stack) -> None:
     assert resolve.returncode != 0
 
 
+def test_the_database_runs_without_root_or_a_capability(stack: Stack) -> None:
+    result = stack.compose("exec", "-T", "db", "sh", "-c", "id -u; grep CapEff /proc/1/status")
+    uid, capabilities = result.stdout.split("\n", 1)
+    assert uid == "70"
+    assert capabilities.split()[1].strip("0") == ""
+
+
 def _as_role(stack: Stack, role: str, statement: str) -> tuple[int, str]:
     result = stack.compose(
         "exec",

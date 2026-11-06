@@ -257,8 +257,9 @@ services:
   db:
     <<: *hardened
     image: postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
-    # The entrypoint starts as root, prepares the data directory and drops to postgres.
-    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    # The image's own postgres user from the start, with no capability: its entrypoint calls gosu
+    # only to drop from root, so gosu never runs. A new volume takes this owner from the image.
+    user: "70:70"
     command:
       - postgres
       - -c
@@ -291,7 +292,7 @@ services:
       - ../../docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
     tmpfs:
       - /tmp
-      - /run/postgresql
+      - /run/postgresql:uid=70,gid=70
     # The database is never published. Every client has its own internal network.
     networks: [db_web, db_worker, db_backup, db_migrate]
     healthcheck:
