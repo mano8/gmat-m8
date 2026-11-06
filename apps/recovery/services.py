@@ -16,8 +16,8 @@ is nothing to race, but the locks are the usual ones.
    terminal outcome for the same row, which it then takes. A human releases what is left
    (``manage outbox_quarantine``); nothing is sent automatically.
 5. With a failed state: its later access and credential events are replayed
-   (``apps.recovery.replay``), and an account with an email change among them waits, suspended,
-   for a human to accept or reject the change (``confirm_suspended_account``).
+   (``apps.recovery.replay``). An account with an email change or a removed second factor among
+   them waits, suspended, for a human to accept or reject it (``confirm_suspended_account``).
 6. Without one (the VPS is gone), the accounts in the gap cannot be known (Q23): every
    privileged account but the operator's is suspended until the maintainer confirms it
    (``confirm_suspended_account``), and the ones the maintainer knows about are offboarded or
@@ -35,7 +35,7 @@ from allauth.mfa.models import Authenticator
 from allauth.usersessions.models import UserSession
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
-from django.db.models import F, Q
+from django.db.models import F, Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
@@ -66,7 +66,9 @@ from apps.recovery.replay import (
     offboard,
     original_of,
     remove_credentials,
+    remove_factors,
     replay_events,
+    restored_factors,
     suspend,
 )
 
@@ -79,8 +81,8 @@ TERMINAL = frozenset(
 )
 ATTEMPT_ERROR = "restored from a backup"
 NO_STATE_REASON = "restored without a preserved database (Q23)"
-ACCEPT_EMAIL = "accept"
-REJECT_EMAIL = "reject"
+ACCEPT = "accept"
+REJECT = "reject"
 
 
 @dataclass(frozen=True)
@@ -111,6 +113,8 @@ class Report:
     suspended: list[str] = field(default_factory=list)
     email_changes_held: dict[str, str] = field(default_factory=dict)
     own_email_change: str = ""
+    factor_removals_held: dict[str, list[str]] = field(default_factory=dict)
+    own_factor_removal: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -266,6 +270,8 @@ def post_restore_reconcile(
     report.suspended = replay.suspended
     report.email_changes_held = replay.email_changes_held
     report.own_email_change = replay.own_email_change
+    report.factor_removals_held = replay.factor_removals_held
+    report.own_factor_removal = replay.own_factor_removal
     _invalidate_recovery_codes(report)
     record(principal.audit_identity, "recovery.reconciled", data=report.as_dict())
     return report
@@ -281,20 +287,28 @@ def _suspended(user_id: UUID) -> User:
     return user
 
 
+def _holds(user: User, key: str) -> QuerySet[AuditEvent]:
+    """What restores held on this account under ``key``, since a human last confirmed it."""
+    events = AuditEvent.objects.filter(object_type=user._meta.label_lower, object_id=user.pk)
+    held = events.filter(action=SUSPENDED_ACTION, data__has_key=key)
+    confirmed = events.filter(action=CONFIRMED_ACTION).order_by("-pk").first()
+    return held if confirmed is None else held.filter(pk__gt=confirmed.pk)
+
+
 def held_email_change(user: User) -> str:
     """The address an email change of this suspended account asks for, if a human has to decide.
 
-    The latest one a restore held since the account was last confirmed; a change back to the
-    address it has now leaves nothing to decide.
+    The latest one held; a change back to the address it has now leaves nothing to decide.
     """
-    events = AuditEvent.objects.filter(object_type=user._meta.label_lower, object_id=user.pk)
-    held = events.filter(action=SUSPENDED_ACTION, data__has_key="email_to")
-    confirmed = events.filter(action=CONFIRMED_ACTION).order_by("-pk").first()
-    if confirmed is not None:
-        held = held.filter(pk__gt=confirmed.pk)
-    latest = held.order_by("-pk").first()
+    latest = _holds(user, "email_to").order_by("-pk").first()
     target = latest.data["email_to"] if latest is not None else ""
     return "" if target == user.email else target
+
+
+def held_factor_removal(user: User) -> list[str]:
+    """The kinds of second factor a human has to decide on: held, and the account still has."""
+    names = [name for event in _holds(user, "factors") for name in event.data["factors"]]
+    return sorted(set(restored_factors(user, names).values_list("type", flat=True)))
 
 
 def _move_address(user: User, target: str) -> None:
@@ -319,16 +333,46 @@ def _settle_email_change(user: User, decision: str) -> dict[str, str]:
                 _("This account has no email change to decide on."), code="no_email_change"
             )
         return {}
-    if decision not in (ACCEPT_EMAIL, REJECT_EMAIL):
+    if decision not in (ACCEPT, REJECT):
         raise ValidationError(
             _("This account's email change to %(address)s must be accepted or rejected."),
             code="email_change_undecided",
             params={"address": target},
         )
     settled = {"email_change": decision, "email_from": user.email, "email_to": target}
-    if decision == ACCEPT_EMAIL:
+    if decision == ACCEPT:
         _move_address(user, target)
     return settled
+
+
+def _settle_factor_removal(
+    user: User, decision: str, *, credentials_changed: bool
+) -> dict[str, Any]:
+    """The same for a held removal of second factors. ``credentials_changed`` removes them all, so
+    it answers the question, and contradicts a rejection."""
+    held = held_factor_removal(user)
+    if not held:
+        if decision:
+            raise ValidationError(
+                _("This account has no second-factor removal to decide on."),
+                code="no_factor_removal",
+            )
+        return {}
+    if credentials_changed and decision == REJECT:
+        raise ValidationError(
+            _("Starting over removes every second factor: it cannot go with a rejection."),
+            code="factor_removal_contradiction",
+        )
+    decided = ACCEPT if credentials_changed else decision
+    if decided not in (ACCEPT, REJECT):
+        raise ValidationError(
+            _("This account's removal of %(factors)s must be accepted or rejected."),
+            code="factor_removal_undecided",
+            params={"factors": ", ".join(held)},
+        )
+    if decided == ACCEPT:
+        remove_factors(user, held)
+    return {"factor_removal": decided, "factors": held}
 
 
 @transactional
@@ -338,18 +382,22 @@ def confirm_suspended_account(
     *,
     credentials_changed: bool = False,
     email_change: str = "",
+    factor_removal: str = "",
 ) -> User:
     """The maintainer vouches for an account a restore suspended (Q23): it signs in again.
 
     ``credentials_changed``: its password or factors changed in the gap, so what was restored
     is not trusted; it resets the password and enrolls again.
 
-    ``email_change``: ``ACCEPT_EMAIL`` moves the account to the address a held change asks for,
-    ``REJECT_EMAIL`` keeps the restored one. Required when a change is held, refused otherwise.
+    ``email_change``: ``ACCEPT`` moves the account to the address a held change asks for,
+    ``REJECT`` keeps the restored one. ``factor_removal``: ``ACCEPT`` removes the second factors a
+    restore held, ``REJECT`` keeps them. Each is required when something is held, refused otherwise.
     """
     lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
     user = _suspended(user_id)
-    settled = _settle_email_change(user, email_change)
+    settled = _settle_email_change(user, email_change) | _settle_factor_removal(
+        user, factor_removal, credentials_changed=credentials_changed
+    )
     if credentials_changed:
         remove_credentials(user)
     User.objects.filter(pk=user.pk).update(is_active=True)

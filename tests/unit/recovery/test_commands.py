@@ -212,6 +212,35 @@ class TestConfirmAccount:
         user.refresh_from_db()
         assert (user.email, user.is_active) == ("moved@example.org", True)
 
+    def test_a_held_factor_removal_is_shown_and_must_be_decided(
+        self, operator: User, people: People
+    ) -> None:
+        user = people.tech_mad
+        run(
+            "post_restore_reconcile",
+            "--operator",
+            operator.email,
+            "--failed-state",
+            "-",
+            stdin=state_file(audit_event("user.mfa_reset", user.pk)),
+        )
+        listed = run("confirm_account", "--operator", operator.email, "--list")
+        assert f"{user.email} (totp removal)" in listed
+        with pytest.raises(CommandError, match="must be accepted or rejected"):
+            run("confirm_account", "--operator", operator.email, "--email", user.email)
+        run(
+            "confirm_account",
+            "--operator",
+            operator.email,
+            "--email",
+            user.email,
+            "--factor-removal",
+            "reject",
+        )
+        user.refresh_from_db()
+        assert user.is_active
+        assert user.authenticator_set.exists()
+
     def test_nobody_has_that_address(self, operator: User) -> None:
         with pytest.raises(CommandError, match="No account"):
             run("confirm_account", "--operator", operator.email, "--email", "x@example.org")

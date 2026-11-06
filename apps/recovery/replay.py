@@ -7,18 +7,17 @@ miss). In log order (UUIDv7), each one that took access or a credential away is 
 
 - memberships and project assignments revoked, or their validity narrowed;
 - accounts offboarded, companies and branches deactivated, projects put on hold or closed;
-- second factors reset or removed;
 - passwords changed: the old hash may be a stolen one, so the account gets an unusable
   password and resets it after reopening;
 - what an earlier restore did: an event it replayed, as the event it was (the original row did
   not come back, so this is the only record of it), the accounts it suspended and those whose
   credentials or access a human named for its gap.
 
-An email change is the one event that is not applied. The restored address must not get the
-account back, but the failed database's word is not enough to hand it to the new one either:
-whoever held the runtime credentials could have planted the row. So the account waits, suspended
-under its restored address, until a human accepts or rejects the change
-(``apps.recovery.services.confirm_suspended_account``).
+Two events are not applied, because they can hand an account over and whoever held the runtime
+credentials could have planted the row (ADR-0016). An email change would give it to an address;
+a removed second factor would leave only the password between it and an attacker who has that.
+The restored state is not to be trusted either, so the account waits, suspended, until a human
+accepts or rejects the change (``apps.recovery.services.confirm_suspended_account``).
 
 Everything else, the grants above all, is reported as not replayed and entered again by a
 human: a restore never gives anyone more access than the snapshot had. That includes a
@@ -28,7 +27,7 @@ happened.
 """
 
 from collections import Counter
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -37,7 +36,7 @@ from uuid import UUID
 from allauth.mfa.models import Authenticator
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 from django.utils.dateparse import parse_datetime
 
 from apps.accounts.models import User
@@ -51,7 +50,9 @@ CONFIRMED_ACTION = "recovery.account_confirmed"
 EVENT_REPLAYED = "recovery.event_replayed"
 GAP_OFFBOARDED = "recovery.gap_offboarded"
 GAP_CREDENTIALS = "recovery.gap_credentials_reset"
-HOLD_REASON = "email change after the snapshot: a human validates it"
+EMAIL_HOLD_REASON = "email change after the snapshot: a human validates it"
+FACTOR_HOLD_REASON = "second factor removed after the snapshot: a human validates it"
+ALL_FACTORS = "all"
 
 
 @dataclass
@@ -67,6 +68,8 @@ class Replay:
     suspended: list[str] = field(default_factory=list)
     email_changes_held: dict[str, str] = field(default_factory=dict)
     own_email_change: str = ""
+    factor_removals_held: dict[str, list[str]] = field(default_factory=dict)
+    own_factor_removal: list[str] = field(default_factory=list)
 
 
 class _NotRelevant(Exception):
@@ -87,23 +90,47 @@ def offboard(user: User, *, when: datetime, actor: User, now: datetime) -> None:
     revoke_grants(user.pk, when=when, actor=actor, now=now)
 
 
-def suspend(replay: Replay, user: User, reason: str, *, email_to: str = "") -> None:
+def suspend(
+    replay: Replay, user: User, reason: str, *, email_to: str = "", factors: Sequence[str] = ()
+) -> None:
     """Inactive, not offboarded, until the maintainer confirms the account (Q23).
 
-    ``email_to``: an email change the confirmation has to decide on.
+    ``email_to`` and ``factors``: what the confirmation has to decide on.
     """
     User.objects.filter(pk=user.pk).update(is_active=False)
-    data = {"reason": reason} | ({"email_to": email_to} if email_to else {})
+    data: dict[str, Any] = {"reason": reason}
+    if email_to:
+        data["email_to"] = email_to
+    if factors:
+        data["factors"] = list(factors)
     record(replay.identity, SUSPENDED_ACTION, obj=user, data=data)
     if user.email not in replay.suspended:
         replay.suspended.append(user.email)
+
+
+def restored_factors(user: User, names: Iterable[str]) -> QuerySet[Authenticator]:
+    """The factors of ``user`` these names cover. Recovery codes are no question: a restore
+    deletes every set anyway (F52)."""
+    factors = Authenticator.objects.filter(user=user).exclude(
+        type=Authenticator.Type.RECOVERY_CODES
+    )
+    wanted = set(names)
+    return factors if ALL_FACTORS in wanted else factors.filter(type__in=wanted)
+
+
+def remove_factors(user: User, names: Iterable[str]) -> None:
+    """On a human's word. With no factor left no codes are owed: enrolling gives it some."""
+    restored_factors(user, names).delete()
+    if not restored_factors(user, [ALL_FACTORS]).exists():
+        Authenticator.objects.filter(user=user).delete()
+        User.objects.filter(pk=user.pk).update(recovery_codes_owed=False)
 
 
 def remove_credentials(user: User) -> None:
     """What was restored is not trusted: the account resets its password and enrolls again."""
     user.set_unusable_password()
     user.save(update_fields=["password"])
-    Authenticator.objects.filter(user=user).delete()
+    remove_factors(user, [ALL_FACTORS])
 
 
 def _revoke(model: type[Model], row: AuditRow, replay: Replay) -> bool:
@@ -181,16 +208,31 @@ def _offboard(row: AuditRow, replay: Replay) -> bool:
     return True
 
 
+def _hold_factors(user: User | None, names: list[str], replay: Replay) -> bool:
+    """Nobody signs in until a human decides (module note). Whoever runs the reconciliation stays
+    in, or nobody may be left to confirm anyone: theirs goes in the report, and stays."""
+    if user is None or user.offboarded_at is not None:
+        return False
+    if not restored_factors(user, names).exists():
+        return False
+    held = replay.factor_removals_held.setdefault(user.email, [])
+    held.extend(name for name in names if name not in held)
+    if user.pk == replay.actor.pk:
+        replay.own_factor_removal = held
+    else:
+        suspend(replay, user, FACTOR_HOLD_REASON, factors=names)
+    return True
+
+
 def _reset_factors(row: AuditRow, replay: Replay) -> bool:
-    removed, _ = Authenticator.objects.filter(user_id=row.object_id).delete()
-    return removed > 0
+    return _hold_factors(_account(row.object_id), [ALL_FACTORS], replay)
 
 
 def _remove_factor(row: AuditRow, replay: Replay) -> bool:
-    removed, _ = Authenticator.objects.filter(
-        user_id=row.object_id, type=row.data.get("type")
-    ).delete()
-    return removed > 0
+    kind = str(row.data.get("type", ""))
+    if kind not in Authenticator.Type.values:
+        raise _NotRelevant
+    return _hold_factors(_account(row.object_id), [kind], replay)
 
 
 def _distrust_password(row: AuditRow, replay: Replay) -> bool:
@@ -200,6 +242,12 @@ def _distrust_password(row: AuditRow, replay: Replay) -> bool:
     user.set_unusable_password()
     user.save(update_fields=["password"])
     return True
+
+
+def _factor_names(value: Any) -> list[str]:
+    """The names a row may hold, and nothing else from a database nobody trusts."""
+    known = {ALL_FACTORS, *Authenticator.Type.values}
+    return [str(name) for name in value if str(name) in known] if isinstance(value, list) else []
 
 
 def _hold_email_change(row: AuditRow, replay: Replay) -> bool:
@@ -218,7 +266,7 @@ def _hold_email_change(row: AuditRow, replay: Replay) -> bool:
     if user.pk == replay.actor.pk:
         replay.own_email_change = target
     else:
-        suspend(replay, user, HOLD_REASON, email_to=target)
+        suspend(replay, user, EMAIL_HOLD_REASON, email_to=target)
     return True
 
 
@@ -253,16 +301,24 @@ def _suspend_again(row: AuditRow, replay: Replay) -> bool:
     user = _account(row.object_id)
     if user is None or not user.is_active or user.offboarded_at is not None:
         return False
-    email_to = _address(row.data.get("email_to"))
-    suspend(replay, user, str(row.data.get("reason", "")), email_to=email_to)
+    suspend(
+        replay,
+        user,
+        str(row.data.get("reason", "")),
+        email_to=_address(row.data.get("email_to")),
+        factors=_factor_names(row.data.get("factors")),
+    )
     return True
 
 
 def _start_over(row: AuditRow, replay: Replay) -> bool:
+    """The password goes, which hands nothing to anyone; the factors wait for a human like any."""
     user = _account(row.object_id)
     if user is None:
         return False
-    remove_credentials(user)
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
+    _hold_factors(user, [ALL_FACTORS], replay)
     return True
 
 

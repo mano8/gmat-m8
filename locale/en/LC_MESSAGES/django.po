@@ -5672,6 +5672,19 @@ msgid "This account's email change to %(address)s must be accepted or rejected."
 msgstr ""
 
 #: apps/recovery/services.py
+msgid "This account has no second-factor removal to decide on."
+msgstr ""
+
+#: apps/recovery/services.py
+msgid "Starting over removes every second factor: it cannot go with a rejection."
+msgstr ""
+
+#: apps/recovery/services.py
+#, python-format
+msgid "This account's removal of %(factors)s must be accepted or rejected."
+msgstr ""
+
+#: apps/recovery/services.py
 msgid "This account is not suspended."
 msgstr ""
 

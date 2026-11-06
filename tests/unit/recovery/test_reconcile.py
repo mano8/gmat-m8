@@ -481,28 +481,108 @@ class TestReplay:
         assert people.tech_mad.offboarded_at == when
         assert report.already_so == {"user.offboarded": 1}
 
-    def test_an_mfa_reset_removes_every_restored_factor(
+    def test_an_mfa_reset_removes_nothing_and_waits_for_a_human(
         self, principal: SessionPrincipal, people: People
     ) -> None:
-        assert Authenticator.objects.filter(user=people.tech_mad).exists()
-        report = reconcile(principal, audit_event("user.mfa_reset", people.tech_mad.pk))
-        assert not Authenticator.objects.filter(user=people.tech_mad).exists()
+        """A planted row must not leave only the password between the account and an attacker."""
+        user = people.tech_mad
+        assert Authenticator.objects.filter(user=user).exists()
+        report = reconcile(principal, audit_event("user.mfa_reset", user.pk))
+        assert Authenticator.objects.filter(user=user).exists()
+        user.refresh_from_db()
+        assert not user.is_active
+        assert user.offboarded_at is None
         assert report.replayed == {"user.mfa_reset": 1}
-        people.tech_mad.refresh_from_db()
-        assert not people.tech_mad.recovery_codes_owed
+        assert report.suspended == [user.email]
+        assert report.factor_removals_held == {user.email: ["all"]}
+        assert services.held_factor_removal(user) == [Authenticator.Type.TOTP]
 
-    def test_a_removed_factor_removes_only_that_kind(
+    def test_a_removed_factor_holds_only_that_kind(
         self, principal: SessionPrincipal, people: People
     ) -> None:
-        Authenticator.objects.create(
-            user=people.tech_mad, type=Authenticator.Type.WEBAUTHN, data={}
+        user = people.tech_mad
+        Authenticator.objects.create(user=user, type=Authenticator.Type.WEBAUTHN, data={})
+        report = reconcile(
+            principal, audit_event("user.authenticator_removed", user.pk, {"type": "totp"})
         )
-        reconcile(
+        assert Authenticator.objects.filter(user=user).count() == 2
+        assert report.factor_removals_held == {user.email: ["totp"]}
+        assert services.held_factor_removal(user) == [Authenticator.Type.TOTP]
+
+    def test_several_removals_make_one_report_line_and_one_question(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.tech_mad
+        Authenticator.objects.create(user=user, type=Authenticator.Type.WEBAUTHN, data={})
+        report = reconcile(
             principal,
-            audit_event("user.authenticator_removed", people.tech_mad.pk, {"type": "totp"}),
+            audit_event("user.authenticator_removed", user.pk, {"type": "totp"}),
+            audit_event("user.authenticator_removed", user.pk, {"type": "totp"}),
+            audit_event("user.authenticator_removed", user.pk, {"type": "webauthn"}),
         )
-        left = Authenticator.objects.filter(user=people.tech_mad).values_list("type", flat=True)
-        assert list(left) == [Authenticator.Type.WEBAUTHN]
+        assert report.suspended == [user.email]
+        assert report.factor_removals_held == {user.email: ["totp", "webauthn"]}
+        assert services.held_factor_removal(user) == ["totp", "webauthn"]
+
+    def test_a_factor_the_account_no_longer_has_is_nothing_to_do(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.tech_mad
+        report = reconcile(
+            principal, audit_event("user.authenticator_removed", user.pk, {"type": "webauthn"})
+        )
+        assert report.already_so == {"user.authenticator_removed": 1}
+        user.refresh_from_db()
+        assert user.is_active
+
+    def test_recovery_codes_are_no_question(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        """Every restored set goes anyway; nobody is suspended over one."""
+        user = people.tech_mad
+        report = reconcile(
+            principal,
+            audit_event("user.authenticator_removed", user.pk, {"type": "recovery_codes"}),
+        )
+        assert report.already_so == {"user.authenticator_removed": 1}
+        user.refresh_from_db()
+        assert user.is_active
+
+    @pytest.mark.parametrize("kind", ["", "evil\x1b[31m", None])
+    def test_a_kind_that_is_not_one_is_reported_and_touches_nothing(
+        self, principal: SessionPrincipal, people: People, kind: str | None
+    ) -> None:
+        user = people.tech_mad
+        report = reconcile(
+            principal, audit_event("user.authenticator_removed", user.pk, {"type": kind})
+        )
+        assert report.not_replayed == {"user.authenticator_removed": 1}
+        user.refresh_from_db()
+        assert user.is_active
+
+    def test_an_offboarded_account_has_no_factor_to_hold(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.tech_mad
+        User.objects.filter(pk=user.pk).update(is_active=False, offboarded_at=timezone.now())
+        report = reconcile(principal, audit_event("user.mfa_reset", user.pk))
+        assert report.already_so == {"user.mfa_reset": 1}
+        assert report.factor_removals_held == {}
+
+    def test_the_operator_keeps_their_factors_and_stays_in(
+        self, principal: SessionPrincipal, operator: User
+    ) -> None:
+        """Suspending them could leave nobody to confirm anyone; the report says what is held."""
+        Authenticator.objects.get_or_create(
+            user=operator, type=Authenticator.Type.TOTP, defaults={"data": {}}
+        )
+        report = reconcile(principal, audit_event("user.mfa_reset", operator.pk))
+        operator.refresh_from_db()
+        assert operator.is_active
+        assert Authenticator.objects.filter(user=operator).exists()
+        assert report.own_factor_removal == ["all"]
+        assert report.factor_removals_held == {operator.email: ["all"]}
+        assert report.suspended == []
 
     def test_a_changed_password_cannot_be_used_any_more(
         self, principal: SessionPrincipal, people: People, client: Client
@@ -793,7 +873,7 @@ class TestASecondRestore:
         user.refresh_from_db()
         assert user.is_active is False
 
-    @pytest.mark.parametrize("decision", [services.ACCEPT_EMAIL, services.REJECT_EMAIL])
+    @pytest.mark.parametrize("decision", [services.ACCEPT, services.REJECT])
     def test_a_decided_email_change_is_decided_again(
         self, principal: SessionPrincipal, operator: User, people: People, decision: str
     ) -> None:
@@ -826,6 +906,58 @@ class TestASecondRestore:
             audit_event(SUSPENDED, user.pk, {"reason": "held", "email_to": "moved@example.org"}),
         )
         assert services.held_email_change(user) == "moved@example.org"
+
+    def test_an_account_suspended_over_its_factors_keeps_them_held_when_suspended_again(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        user = people.tech_mad
+        reconcile(
+            principal, audit_event(SUSPENDED, user.pk, {"reason": "held", "factors": ["totp"]})
+        )
+        assert services.held_factor_removal(user) == [Authenticator.Type.TOTP]
+
+    @pytest.mark.parametrize("factors", [["evil"], "totp", 3, None])
+    def test_a_suspension_row_holds_only_what_is_a_factor(
+        self, principal: SessionPrincipal, people: People, factors: Any
+    ) -> None:
+        user = people.tech_mad
+        reconcile(principal, audit_event(SUSPENDED, user.pk, {"reason": "x", "factors": factors}))
+        assert services.held_factor_removal(user) == []
+        assert not AuditEvent.objects.filter(
+            action=SUSPENDED, object_id=user.pk, data__has_key="factors"
+        ).exists()
+
+    def test_a_row_saying_credentials_started_over_takes_the_password_and_holds_the_factors(
+        self, principal: SessionPrincipal, people: People
+    ) -> None:
+        """Planted, it must not remove a second factor; and a password makes nobody an owner."""
+        user = people.tech_mad
+        assert Authenticator.objects.filter(user=user).exists()
+        report = reconcile(principal, audit_event(GAP_CREDENTIALS, user.pk))
+        user.refresh_from_db()
+        assert not user.has_usable_password()
+        assert not user.is_active
+        assert Authenticator.objects.filter(user=user).exists()
+        assert report.factor_removals_held == {user.email: ["all"]}
+
+    @pytest.mark.parametrize("decision", [services.ACCEPT, services.REJECT])
+    def test_a_decided_factor_removal_is_decided_again(
+        self, principal: SessionPrincipal, operator: User, people: People, decision: str
+    ) -> None:
+        user = people.tech_mad
+        change = audit_event("user.mfa_reset", user.pk)
+        reconcile(principal, change)
+        services.confirm_suspended_account(self._again(operator), user.pk, factor_removal=decision)
+        # The second restore brings back the snapshot: active, with its factor.
+        User.objects.filter(pk=user.pk).update(is_active=True)
+        Authenticator.objects.get_or_create(
+            user=user, type=Authenticator.Type.TOTP, defaults={"data": {}}
+        )
+        report = reconcile(self._again(operator), change)
+        user.refresh_from_db()
+        assert not user.is_active
+        assert report.factor_removals_held == {user.email: ["all"]}
+        assert services.held_factor_removal(user) == [Authenticator.Type.TOTP]
 
     def test_a_suspension_with_no_state_does_not_lose_a_held_email_change(
         self, principal: SessionPrincipal, operator: User, people: People
@@ -1020,7 +1152,7 @@ class TestAHeldEmailChange:
     def test_accepting_moves_the_account_and_its_address(self, operator: User, held: User) -> None:
         old = held.email
         confirmed = services.confirm_suspended_account(
-            self._operator(operator), held.pk, email_change=services.ACCEPT_EMAIL
+            self._operator(operator), held.pk, email_change=services.ACCEPT
         )
         assert confirmed.is_active
         assert confirmed.email == "moved@example.org"
@@ -1030,7 +1162,7 @@ class TestAHeldEmailChange:
         assert confirmed not in services.suspended_accounts()
         assert AuditEvent.objects.get(action=CONFIRMED).data == {
             "credentials_changed": False,
-            "email_change": services.ACCEPT_EMAIL,
+            "email_change": services.ACCEPT,
             "email_from": old,
             "email_to": "moved@example.org",
         }
@@ -1038,7 +1170,7 @@ class TestAHeldEmailChange:
     def test_rejecting_keeps_the_restored_address(self, operator: User, held: User) -> None:
         old = held.email
         confirmed = services.confirm_suspended_account(
-            self._operator(operator), held.pk, email_change=services.REJECT_EMAIL
+            self._operator(operator), held.pk, email_change=services.REJECT
         )
         assert confirmed.is_active
         assert confirmed.email == old
@@ -1068,7 +1200,7 @@ class TestAHeldEmailChange:
         reconcile(principal, moved(user, people.mm_mad.email))
         with pytest.raises(ValidationError) as caught:
             services.confirm_suspended_account(
-                self._operator(operator), user.pk, email_change=services.ACCEPT_EMAIL
+                self._operator(operator), user.pk, email_change=services.ACCEPT
             )
         assert error_codes(caught.value) == {"email_taken"}
         user.refresh_from_db()
@@ -1080,7 +1212,7 @@ class TestAHeldEmailChange:
         post_restore_reconcile(principal, failed_state=None)
         with pytest.raises(ValidationError) as caught:
             services.confirm_suspended_account(
-                self._operator(operator), people.mm_mad.pk, email_change=services.ACCEPT_EMAIL
+                self._operator(operator), people.mm_mad.pk, email_change=services.ACCEPT
             )
         assert error_codes(caught.value) == {"no_email_change"}
 
@@ -1088,7 +1220,7 @@ class TestAHeldEmailChange:
         self, operator: User, held: User
     ) -> None:
         services.confirm_suspended_account(
-            self._operator(operator), held.pk, email_change=services.REJECT_EMAIL
+            self._operator(operator), held.pk, email_change=services.REJECT
         )
         reconcile(self._operator(operator), moved(held, "again@example.org"))
         held.refresh_from_db()
@@ -1100,10 +1232,134 @@ class TestAHeldEmailChange:
             self._operator(operator),
             held.pk,
             credentials_changed=True,
-            email_change=services.ACCEPT_EMAIL,
+            email_change=services.ACCEPT,
         )
         assert confirmed.email == "moved@example.org"
         assert not confirmed.has_usable_password()
+
+
+class TestAHeldFactorRemoval:
+    @pytest.fixture
+    def held(self, principal: SessionPrincipal, people: People) -> User:
+        user = people.tech_mad
+        reconcile(principal, audit_event("user.mfa_reset", user.pk))
+        user.refresh_from_db()
+        return user
+
+    def _operator(self, operator: User) -> SessionPrincipal:
+        operator.refresh_from_db()
+        return principal_for(operator)
+
+    def test_while_it_waits_the_account_cannot_sign_in(
+        self, people: People, client: Client, held: User
+    ) -> None:
+        password_login(client, held.email, PASSWORD)
+        assert "_auth_user_id" not in client.session
+
+    def test_accepting_removes_them_and_owes_no_codes(self, operator: User, held: User) -> None:
+        assert held.recovery_codes_owed
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator), held.pk, factor_removal=services.ACCEPT
+        )
+        assert confirmed.is_active
+        assert confirmed.has_usable_password()
+        assert not Authenticator.objects.filter(user=held).exists()
+        assert not confirmed.recovery_codes_owed
+        assert AuditEvent.objects.get(action=CONFIRMED).data == {
+            "credentials_changed": False,
+            "factor_removal": services.ACCEPT,
+            "factors": [Authenticator.Type.TOTP],
+        }
+        assert services.held_factor_removal(confirmed) == []
+
+    def test_rejecting_keeps_them(self, operator: User, held: User) -> None:
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator), held.pk, factor_removal=services.REJECT
+        )
+        assert confirmed.is_active
+        assert Authenticator.objects.filter(user=held, type=Authenticator.Type.TOTP).exists()
+        assert confirmed.recovery_codes_owed
+        assert AuditEvent.objects.get(action=CONFIRMED).data["factor_removal"] == services.REJECT
+        assert services.held_factor_removal(confirmed) == []
+
+    def test_accepting_one_kind_keeps_the_others_and_their_debt(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        user = people.tech_mad
+        Authenticator.objects.create(user=user, type=Authenticator.Type.WEBAUTHN, data={})
+        reconcile(principal, audit_event("user.authenticator_removed", user.pk, {"type": "totp"}))
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator), user.pk, factor_removal=services.ACCEPT
+        )
+        left = Authenticator.objects.filter(user=user).values_list("type", flat=True)
+        assert list(left) == [Authenticator.Type.WEBAUTHN]
+        assert confirmed.recovery_codes_owed
+
+    @pytest.mark.parametrize("decision", ["", "maybe"])
+    def test_it_cannot_be_confirmed_without_a_decision(
+        self, operator: User, held: User, decision: str
+    ) -> None:
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(
+                self._operator(operator), held.pk, factor_removal=decision
+            )
+        assert error_codes(caught.value) == {"factor_removal_undecided"}
+        held.refresh_from_db()
+        assert not held.is_active
+
+    def test_nothing_held_nothing_to_decide(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        post_restore_reconcile(principal, failed_state=None)
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(
+                self._operator(operator), people.mm_mad.pk, factor_removal=services.ACCEPT
+            )
+        assert error_codes(caught.value) == {"no_factor_removal"}
+
+    def test_starting_over_answers_the_question(self, operator: User, held: User) -> None:
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator), held.pk, credentials_changed=True
+        )
+        assert not confirmed.has_usable_password()
+        assert not Authenticator.objects.filter(user=held).exists()
+        assert not confirmed.recovery_codes_owed
+        assert AuditEvent.objects.get(action=CONFIRMED).data["factor_removal"] == services.ACCEPT
+
+    def test_starting_over_contradicts_a_rejection(self, operator: User, held: User) -> None:
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(
+                self._operator(operator),
+                held.pk,
+                credentials_changed=True,
+                factor_removal=services.REJECT,
+            )
+        assert error_codes(caught.value) == {"factor_removal_contradiction"}
+        assert Authenticator.objects.filter(user=held).exists()
+
+    def test_both_questions_are_answered_together_or_not_at_all(
+        self, principal: SessionPrincipal, operator: User, people: People
+    ) -> None:
+        user = people.tech_mad
+        old = user.email
+        reconcile(
+            principal, moved(user, "moved@example.org"), audit_event("user.mfa_reset", user.pk)
+        )
+        with pytest.raises(ValidationError) as caught:
+            services.confirm_suspended_account(
+                self._operator(operator), user.pk, email_change=services.ACCEPT
+            )
+        assert error_codes(caught.value) == {"factor_removal_undecided"}
+        user.refresh_from_db()
+        assert (user.email, user.is_active) == (old, False), "the email move rolled back"
+        confirmed = services.confirm_suspended_account(
+            self._operator(operator),
+            user.pk,
+            email_change=services.ACCEPT,
+            factor_removal=services.REJECT,
+        )
+        assert (confirmed.email, confirmed.is_active) == ("moved@example.org", True)
+        assert Authenticator.objects.filter(user=user).exists()
 
 
 def test_a_grant_keeps_its_row(principal: SessionPrincipal, people: People) -> None:

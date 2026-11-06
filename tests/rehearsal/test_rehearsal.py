@@ -588,16 +588,33 @@ except IdempotencyKeyInvalid:
         assert scene.report["replayed"]["membership.revoked"] == 1
         note("membership revoked after the snapshot: revoked again")
 
-    def test_the_mfa_reset_after_the_snapshot_is_applied_again(
+    def test_the_mfa_reset_after_the_snapshot_waits_for_a_human(
         self, world: World, scene: Scene
     ) -> None:
-        count = world.sql(
+        account = "eng-mad@demo.example"
+        factors = (
             "SELECT count(*) FROM mfa_authenticator a JOIN accounts_user u ON u.id = a.user_id "
-            "WHERE u.email = 'eng-mad@demo.example'"
+            "WHERE u.email = 'eng-mad@demo.example' AND a.type <> 'recovery_codes'"
         )
-        assert count == "0"
+        active = "SELECT is_active FROM accounts_user WHERE email = 'eng-mad@demo.example'"
         assert scene.report["replayed"]["user.mfa_reset"] == 1
-        note("MFA reset after the snapshot: factors removed again")
+        assert scene.report["factor_removals_held"][account] == ["all"]
+        assert world.sql(active) == "f"
+        assert world.sql(factors) != "0"
+        listed = world.manage("confirm_account", "--operator", ADMIN_EMAIL, "--list")
+        assert f"{account} (totp removal)" in listed
+        world.manage(
+            "confirm_account",
+            "--operator",
+            ADMIN_EMAIL,
+            "--email",
+            account,
+            "--factor-removal",
+            "accept",
+        )
+        assert world.sql(active) == "t"
+        assert world.sql(factors) == "0"
+        note("MFA reset after the snapshot: account held until a human accepted it, factors gone")
 
     def test_the_password_changed_after_the_snapshot_cannot_be_used(
         self, world: World, scene: Scene

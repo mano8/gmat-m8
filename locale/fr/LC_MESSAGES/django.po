@@ -5892,6 +5892,19 @@ msgid "This account's email change to %(address)s must be accepted or rejected."
 msgstr "Le changement d'adresse de ce compte vers %(address)s doit être accepté ou refusé."
 
 #: apps/recovery/services.py
+msgid "This account has no second-factor removal to decide on."
+msgstr "Ce compte n'a aucun retrait de second facteur à trancher."
+
+#: apps/recovery/services.py
+msgid "Starting over removes every second factor: it cannot go with a rejection."
+msgstr "Repartir de zéro retire tous les seconds facteurs : c'est incompatible avec un refus."
+
+#: apps/recovery/services.py
+#, python-format
+msgid "This account's removal of %(factors)s must be accepted or rejected."
+msgstr "Le retrait de %(factors)s de ce compte doit être accepté ou refusé."
+
+#: apps/recovery/services.py
 msgid "This account is not suspended."
 msgstr "Ce compte n'est pas suspendu."
 

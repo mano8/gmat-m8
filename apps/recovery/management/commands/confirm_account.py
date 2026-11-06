@@ -1,10 +1,10 @@
 """``manage confirm_account --operator <email> --list | --email <account>`` (plan §9, Q23).
 
 A restore without a preserved database suspends every privileged account, and any restore
-suspends an account with an email change after the snapshot. The maintainer checks each with its
-owner, including whether its password or factors changed during the gap
-(``--credentials-changed``) and whether a held email change is genuine (``--email-change``), and
-confirms it here.
+suspends an account with an email change or a removed second factor after the snapshot. The
+maintainer checks each with its owner, including whether its password or factors changed during
+the gap (``--credentials-changed``) and whether what was held is genuine (``--email-change``,
+``--factor-removal``), and confirms it here.
 """
 
 from typing import Any
@@ -36,9 +36,15 @@ class Command(OperatorCommand):
         )
         parser.add_argument(
             "--email-change",
-            choices=(services.ACCEPT_EMAIL, services.REJECT_EMAIL),
+            choices=(services.ACCEPT, services.REJECT),
             default="",
             help="A held email change: accept moves the account, reject keeps its address",
+        )
+        parser.add_argument(
+            "--factor-removal",
+            choices=(services.ACCEPT, services.REJECT),
+            default="",
+            help="A held removal of second factors: accept removes them, reject keeps them",
         )
 
     def handle_operator(self, principal: OperatorPrincipal, *args: Any, **options: Any) -> None:
@@ -49,8 +55,17 @@ class Command(OperatorCommand):
 
     def _list(self) -> None:
         for user in services.suspended_accounts():
-            target = services.held_email_change(user)
-            self.stdout.write(f"{user.email} -> {target} (email change)" if target else user.email)
+            self.stdout.write(self._line(user))
+
+    def _line(self, user: User) -> str:
+        parts = [user.email]
+        target = services.held_email_change(user)
+        if target:
+            parts.append(f"-> {target} (email change)")
+        factors = services.held_factor_removal(user)
+        if factors:
+            parts.append(f"({', '.join(factors)} removal)")
+        return " ".join(parts)
 
     def _confirm(self, principal: OperatorPrincipal, options: dict[str, Any]) -> None:
         account = User.objects.filter(email=options["email"].strip().lower()).first()
@@ -62,6 +77,7 @@ class Command(OperatorCommand):
                 account.pk,
                 credentials_changed=options["credentials_changed"],
                 email_change=options["email_change"],
+                factor_removal=options["factor_removal"],
             )
         except AccessDenied as exc:
             raise CommandError("The operator may not confirm this account.") from exc
