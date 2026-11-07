@@ -6018,3 +6018,12 @@ msgstr "No puedes cambiar tu propio correo electrónico; puede hacerlo otro admi
 #: apps/organizations/templates/organizations/person.html
 msgid "Your email address and roles are changed by another administrator."
 msgstr "Tu correo electrónico y tus roles los cambia otro administrador."
+
+#: apps/material_requests/procurement.py
+#, python-format
+msgid ""
+"These requests are already on purchase orders of the current procurement "
+"branch: %(requests)s"
+msgstr ""
+"Estas solicitudes ya están en pedidos de compra de la delegación de compras "
+"actual: %(requests)s"

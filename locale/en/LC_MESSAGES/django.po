@@ -5836,3 +5836,10 @@ msgstr ""
 #: apps/organizations/templates/organizations/person.html
 msgid "Your email address and roles are changed by another administrator."
 msgstr ""
+
+#: apps/material_requests/procurement.py
+#, python-format
+msgid ""
+"These requests are already on purchase orders of the current procurement "
+"branch: %(requests)s"
+msgstr ""

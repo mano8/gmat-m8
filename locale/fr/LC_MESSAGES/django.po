@@ -6056,3 +6056,12 @@ msgstr "Vous ne pouvez pas modifier votre propre adresse e-mail ; un autre admin
 #: apps/organizations/templates/organizations/person.html
 msgid "Your email address and roles are changed by another administrator."
 msgstr "Votre adresse e-mail et vos rôles sont modifiés par un autre administrateur."
+
+#: apps/material_requests/procurement.py
+#, python-format
+msgid ""
+"These requests are already on purchase orders of the current procurement "
+"branch: %(requests)s"
+msgstr ""
+"Ces demandes figurent déjà sur des commandes de l'agence d'achat actuelle : "
+"%(requests)s"
