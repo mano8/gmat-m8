@@ -63,7 +63,7 @@ Who the application defends against and what it accepts (the threat model and th
 **The supply chain.**
 - Dependencies come from `uv.lock` with hashes, with security floors (allauth), `pip-audit` and Dependabot.
 - Base images are pinned by digest and scanned by Trivy on every PR and every night, Caddy, PostgreSQL and ClamAV included, with dated exceptions (X1).
-- Actions are pinned by commit SHA, and gitleaks scans the whole history.
+- Actions are pinned by commit SHA, and gitleaks scans the whole history. One action fetches code when it runs, whatever its pin says (X14). The only repository secrets CI reads are the two coverage tokens, in a job that runs nothing of the project's and that no required check depends on.
 
 **Out of scope.** The security of users' devices and mailboxes; the email provider (which sees every mail; supplier dispatches carry prices by design); DNS and the domain's mail authentication (SPF, DKIM, DMARC: H8.6). Unrelated customer groups get separate deployments (ADR-0003).
 
@@ -79,6 +79,7 @@ What the application knowingly does not do, or does differently from a rule, wit
 | X4 | No check of new passwords against breached-password sets | `web` has no route out. 12 characters minimum, the common-password list, Argon2id, sign-in rate limits, MFA for every privileged role | maintainer | 2027-02-01 | accepted 2026-11-05 |
 | X8 | A receipt's files reach whoever may see the receipt, the project's site manager included. A delivery-note photo can show prices or supplier contacts, which §3.4's projection cannot filter inside a file | Only who views the receipt; the site manager usually took the photo; material managers remove a file with a reason | maintainer | 2027-02-01 | accepted 2026-11-05 |
 | X12 | Local backup copies are not encrypted on the host | Plan §9: files 0600 in a 0700 directory, kept 3 days; a compromised host exposes the live database anyway; the offsite copies are encrypted by restic | maintainer | 2027-02-01 | accepted (plan §9) |
+| X14 | Codacy's coverage action, pinned by SHA, fetches `get.sh` from Codacy's `master` branch and the reporter it names each time it runs, so that code is not pinned | The maintainer's choice of the two services (2026-11-07). It runs in `coverage-upload` only, last, with nothing on disk (`persist-credentials: false`) and a read-only run token; what it can reach is the Codacy project token, which posts coverage. No required check depends on it, and nothing runs after it. A checksum-pinned download of the reporter would remove the exception | maintainer | 2027-02-01 | to accept in PR #33 |
 
 **Refused by the maintainer on 2026-11-05, so they are no longer exceptions.** Each number stays retired:
 
@@ -241,7 +242,7 @@ Code in `apps/material_requests/services/` and `ledger.py`; plan §3.4, §4.3–
 
 ## Material requests: the requester's screens (step M4.3)
 
-Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templates/material_requests/`; plan §3.4–3.6, §5 (Web), §11 M4.3.
+Code in `apps/material_requests/views.py`, `selectors/`, `forms.py` and `templates/material_requests/`; plan §3.4–3.6, §5 (Web), §11 M4.3.
 
 - **Same checks as every screen.** Reads go through `selectors` (`visible_to`), writes through the M4.1 services from POST-only views (`@mutating`) on their own URLs; the order is S7: the capability somewhere (403), the request or line in scope (404), the capability on it (403 for a reviewer who sees a draft that is not theirs). Every URL and method has rows in the acceptance matrix, including the partner's and the technician's own request, an unknown id and the revoked and expired actors. `{% can %}` only hides buttons.
 - **Choices are never trusted.** The project of a new request, the material and the unit are hidden or select fields checked against selector querysets (`creatable_projects`: active projects in the user's `request.create` scope; active catalog materials; units): a forged id is a form error, not an object.
@@ -251,7 +252,7 @@ Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templ
 
 ## Material requests: the reviewer's screens (step M4.4)
 
-Code in `apps/material_requests/views.py`, `selectors.py`, `forms.py` and `templates/material_requests/`; plan §3.4, §4.3, §4.4, §4.9, §11 M4.4.
+Code in `apps/material_requests/views.py`, `selectors/`, `forms.py` and `templates/material_requests/`; plan §3.4, §4.3, §4.4, §4.9, §11 M4.4.
 
 - **Capabilities per screen.** The inbox and the review page need `request.review` (group administrators, material managers, and site managers on their assigned projects); the sourcing, schedule, closing, resolution and link actions `request.source` (not site managers); cancelling another user's request `request.cancel_any`. Each action is its own POST-only URL (`@mutating`), checked in S7 order (capability somewhere 403, request in scope 404, capability on it 403) and then again by the service in its transaction; the buttons shown (`can_decide`, `can_source`, `can_cancel_any`) only hide.
 - **Self-approval.** A reviewer's own request shows no decision controls unless the reviewer may decide it (`can_decide`: a self-deciding role's grant on the request, or the procurement branch allows it); then a notice says the decisions are recorded as self-decisions. The service checks again (403).
@@ -272,7 +273,7 @@ Code in `apps/purchasing/`; plan §3.4, §3.5 (S5, S9), §4.2-4.9.
 
 ## Purchasing: the screens (step M5.2)
 
-Code in `apps/purchasing/views/`, `forms.py`, `selectors.py` and `templates/purchasing/`; plan §3.4, §4.4, §4.5, §8.2, §11 M5.2.
+Code in `apps/purchasing/views/`, `forms.py`, `selectors/` and `templates/purchasing/`; plan §3.4, §4.4, §4.5, §8.2, §11 M5.2.
 
 - **Capabilities per screen.** The worklist, the builder and every action need `po.manage` (group administrators, material managers); the orders list, the order page and the printable page need `po.view` (also warehouse operators). Every action is its own POST-only URL (`@mutating`), checked in S7 order (capability somewhere 403, order in scope 404, `po.manage` on it 403); the services authorize again. The amendment page is for `po.manage`; a draft has none and a draft has no printable page (both redirect with a message).
 - **Prices.** The order page, the amendment form and the printable page show a price, discount or total only to who holds `price.view` on the order; the price fields do not exist in the forms of anyone else (a forged `unit_price` is ignored). The acceptance matrix allows the price sentinel per actor (`Route.allowed_for`): a warehouse operator reading the sentinel order is checked priceless, in the page and in the print.
@@ -373,14 +374,14 @@ Code in `apps/audit` (viewer) and `apps/exports`; plan M7.3, Q13, Q17.
 
 ## Engineer role and self-decisions (step M7b.1)
 
-Code in `apps/access/roles.py`, `apps/access/authorization.py`, `apps/material_requests/services/review.py` and `selectors.py`; ADR-0014, plan Q30, Q33.
+Code in `apps/access/roles.py`, `apps/access/authorization.py`, `apps/material_requests/services/review.py` and `selectors/`; ADR-0014, plan Q30, Q33.
 
 - **`ENGINEER`.** A branch-level role scoped like a material manager (S1), ranked below the group administrator and above every other role: it holds every material-manager capability in its scope (requests incl. `request.edit`, used from M7b.3, sourcing, purchasing, prices, suppliers, receipts, handovers, projects, catalog, audit, exports). Only `org.manage` stays the group administrators'; a test keeps every non-admin role's capabilities a subset of the engineer's. It is privileged: session MFA on every page and in every write, the 12-hour session, and `privilege_elevated_at` moved at the grant. Only `org.manage` (group administrators) grants it.
 - **Self-decisions.** Group administrators, material managers and engineers (`SELF_DECIDING_ROLES`) decide their own requests whatever `allow_self_approval` says. The check uses the role of the membership whose `request.review` grant covers that request, never a role held through another membership (S6). `is_superuser` adds nothing. The session must have passed MFA after the last elevation, even when an ordinary grant (a site manager's) let the review itself through. Other reviewers keep the procurement branch's `allow_self_approval`. Each self-decided line and the final approval or rejection carry `self_decided: true` in the audit.
 
 ## Reviewer assignment (step M7b.2)
 
-Code in `apps/material_requests/reviewers.py`, `services/assignment.py`, `services/requester.py` (`submit`) and `selectors.py`; `apps/notifications/notices.py`; ADR-0014 §4, plan Q31, Q35.
+Code in `apps/material_requests/reviewers.py`, `services/assignment.py`, `services/requester.py` (`submit`) and `selectors/`; `apps/notifications/notices.py`; ADR-0014 §4, plan Q31, Q35.
 
 - **Who can be assigned.** Only a user holding `request.review` through a group administrator's, material manager's or engineer's membership whose scope covers the request's procurement branch (S6: a role held elsewhere counts for nothing). Validity and organization state are evaluated at the database clock (S8, S9): a revoked or expired membership, a deactivated account or an inactive branch or company qualifies nobody. An unknown user id is refused with the same error as an ineligible one.
 - **Who assigns.** The requester at submit (`request.create`), then any reviewer in scope (`request.review`, with session MFA where only a privileged grant covers the request), in `SUBMITTED` and `APPROVED`, with a required note. Every reassignment is audited (`request.reviewer_assigned`: previous and new assignee, note).
@@ -390,7 +391,7 @@ Code in `apps/material_requests/reviewers.py`, `services/assignment.py`, `servic
 
 ## Reviewer edits and the as-submitted copy (step M7b.3)
 
-Code in `apps/material_requests/services/editing.py`, `services/common.py`, `revisions.py`, `models.py`, `selectors.py` and migration `0004`; `apps/notifications/notices.py` and `outbox.py`; ADR-0014 §5-§6, plan Q32-Q34, Q36.
+Code in `apps/material_requests/services/editing.py`, `services/common.py`, `revisions.py`, `models.py`, `selectors/` and migration `0004`; `apps/notifications/notices.py` and `outbox.py`; ADR-0014 §5-§6, plan Q32-Q34, Q36.
 
 - **Who edits.** Only `request.edit` holders (group administrators, material managers and engineers, all privileged: session MFA after the last elevation) in their scope, in `SUBMITTED` and `APPROVED`; every other state refuses. A decision in the same step also needs `request.review` on the request. The requester's own request follows the self-decision rule of M7b.1, checked against the grant that covers it.
 - **Write order.** Each edit runs `authorize_in_txn`, the idempotency record, then locks the request's whole allocation component (L2-L5) before any line, validates, writes, closes or reopens automatically and reconciles, like the other ledger services. Quantities never go below max(D, R) + P + Q; a material change is made in place only while the line has no live allocation (closed orders included) and nothing received or delivered, otherwise the line is closed short (allocations trimmed to what they received) and a new approved line takes the rest. Threaded tests in `tests/integration/test_edit_races.py`; a property test mixes edits with orders, receipts and handovers.
@@ -400,7 +401,7 @@ Code in `apps/material_requests/services/editing.py`, `services/common.py`, `rev
 
 ## Review workflow screens (step M7b.4)
 
-Code in `apps/material_requests/views/editing.py`, `views/reviewer.py`, `forms.py`, `selectors.py`, `templates/material_requests/` and `apps/dashboards/panels.py`; ADR-0014 §7, plan Q31-Q34.
+Code in `apps/material_requests/views/editing.py`, `views/reviewer.py`, `forms.py`, `selectors/`, `templates/material_requests/` and `apps/dashboards/panels.py`; ADR-0014 §7, plan Q31-Q34.
 
 - **Every action is its own POST-only URL** (`assign/`, `lines/<id>/apply-edit/`, `<id>/lines/apply-add/`, `lines/<id>/remove-reviewed/`); the dialogs that prepare them are GET-only pages (`lines/<id>/edit/`, `<id>/lines/new/`) that call no service. The order of the checks is the other reviewer screens': capability somewhere (403), request in scope (404), capability on it (403); the services authorize again. Assigning takes `request.review`, editing `request.edit`; the matrix has a row for each of the six URLs and every actor, including the revoked ones.
 - **Choices come from selectors.** The reviewer picker and the reassign dialog offer `eligible_reviewers` and nothing else (a forged id is an invalid choice); the material of an edit is checked against `catalog.selectors.materials`, its unit against `units`; the service judges the assignee, the material and the unit again.

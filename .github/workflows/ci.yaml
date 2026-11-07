@@ -4,8 +4,9 @@ name: CI
 # trivy-image, secret-scan (and compose-smoke-gate from compose-smoke.yaml).
 #
 # Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
-# `on.paths` filter (a skipped required workflow stays "Pending"), no job that needs a
-# secret on a PR, every action pinned by full commit SHA, least-privilege permissions.
+# `on.paths` filter (a skipped required workflow stays "Pending"), no required job that needs
+# a secret on a PR, every action pinned by full commit SHA, least-privilege permissions.
+# Only `coverage-upload` reads repository secrets, and it passes without them.
 # A change under .github/workflows/ needs the maintainer's explicit review.
 
 on:
@@ -210,8 +211,9 @@ jobs:
         run: >-
           uv run pytest -m "not live and not e2e"
           --cov --cov-report=term-missing --cov-report=json:coverage.json
+          --cov-report=xml:coverage.xml
 
-      - name: Coverage gate (100 % for apps/access, services.py, selectors.py)
+      - name: Coverage gate (100 % for apps/access, services, selectors)
         run: uv run python scripts/check_coverage_gates.py coverage.json
 
       - name: Migrations apply, reverse to zero and apply again
@@ -222,9 +224,63 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-report
-          path: coverage.json
+          path: |
+            coverage.json
+            coverage.xml
           retention-days: 14
           if-no-files-found: ignore
+
+  # Not a required check. The tokens stay out of `test`, which runs the pull request's code: here
+  # nothing of the repository runs, only third-party actions on the report `test` left. A fork's
+  # or Dependabot's pull request has no token, nor has a repository that never set one: that
+  # service is skipped with a notice and the job passes. Without a green `test`, nothing is sent.
+  coverage-upload:
+    name: coverage-upload
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Which services have a token
+        id: tokens
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: |
+          set -euo pipefail
+          for entry in "codecov CODECOV_TOKEN" "codacy CODACY_PROJECT_TOKEN"; do
+            read -r service token <<< "$entry"
+            if [ -n "${!token}" ]; then
+              echo "${service}=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::notice::No ${token} here (a fork, Dependabot or not set): ${service} is skipped"
+            fi
+          done
+
+      # Both services match the report's paths against these files.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-report
+
+      - name: Upload coverage to Codecov
+        if: steps.tokens.outputs.codecov == 'true'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+
+      # Codacy's action fetches its reporter from Codacy's own branch when it runs, whatever this
+      # pin says: exception X14 in docs/security.md. It runs last, and has only its own token.
+      - name: Upload coverage to Codacy
+        if: ${{ !cancelled() && steps.tokens.outputs.codacy == 'true' }}
+        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: coverage.xml
 
   # Builds both releasable images (amd64), proves the app image's run-time posture and holds
   # each to the Trivy gate of plan §8.3: HIGH and CRITICAL, no --ignore-unfixed, exceptions

@@ -112,7 +112,10 @@ markers = [
 # --- coverage -----------------------------------------------------------
 [tool.coverage.run]
 branch = true
-source = ["apps", "config"]
+# Packages, not directories (`source`): coverage.xml then names each file from the repository's
+# root, which is how Codecov and Codacy find it. With `source` it writes accounts/services.py,
+# and the two __init__.py of apps/ and config/ become one entry.
+source_pkgs = ["apps", "config"]
 omit = ["*/migrations/*", "config/settings/build.py", "config/asgi.py", "config/wsgi.py"]
 
 [tool.coverage.report]

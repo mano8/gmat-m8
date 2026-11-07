@@ -5,6 +5,7 @@ review. The banned triggers themselves are checked by ``scripts/check_access_rul
 """
 
 import re
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.y*ml"))
 SHA_PIN = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 REQUIRED_JOBS = {"lint", "typecheck", "security", "test", "trivy-image", "secret-scan"}
+COVERAGE_JOB = "coverage-upload"
+COVERAGE_TOKENS = {"CODECOV_TOKEN", "CODACY_PROJECT_TOKEN"}
 
 
 def _load(path: Path) -> dict[Any, Any]:
@@ -32,6 +35,10 @@ def _triggers(workflow: dict[Any, Any]) -> dict[str, Any]:
         return dict.fromkeys(triggers)
     assert isinstance(triggers, dict)
     return triggers
+
+
+def _uses(step: dict[str, Any], action: str) -> bool:
+    return str(step.get("uses", "")).startswith(f"{action}@")
 
 
 def _steps(workflow: dict[Any, Any]) -> list[dict[str, Any]]:
@@ -63,10 +70,54 @@ def test_permissions_are_declared_and_read_only_by_default(path: Path) -> None:
     assert workflow.get("permissions") == {"contents": "read"}
 
 
+def _secrets(part: Any) -> set[str]:
+    return set(re.findall(r"secrets\.(\w+)", yaml.safe_dump(part)))
+
+
 @pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
 def test_only_the_run_token_is_used_as_a_secret(path: Path) -> None:
-    used = set(re.findall(r"secrets\.(\w+)", path.read_text(encoding="utf-8")))
-    assert used <= {"GITHUB_TOKEN"}, f"{path.name} reads {sorted(used - {'GITHUB_TOKEN'})}"
+    """The coverage tokens are the one exception, in one job (the test below says why it may)."""
+    workflow = _load(path)
+    assert not _secrets({key: value for key, value in workflow.items() if key != "jobs"})
+    for job_id, job in workflow["jobs"].items():
+        tokens = COVERAGE_TOKENS if (path.name, job_id) == ("ci.yaml", COVERAGE_JOB) else set()
+        assert _secrets(job) <= {"GITHUB_TOKEN"} | tokens, f"{path.name}: {job_id}"
+
+
+def test_the_coverage_tokens_stay_away_from_the_code_and_from_the_required_checks() -> None:
+    job = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"][COVERAGE_JOB]
+    assert COVERAGE_JOB not in REQUIRED_JOBS
+    assert job["needs"] == "test"  # a failed run sends nothing
+    assert _secrets(job) == COVERAGE_TOKENS
+    assert "env" not in job  # each token reaches only the steps that use it
+    steps = job["steps"]
+    checkout = next(step for step in steps if _uses(step, "actions/checkout"))
+    assert checkout["with"]["persist-credentials"] is False
+    # Nothing of the repository runs: the one script only asks whether a token exists.
+    scripts = [step["run"] for step in steps if "run" in step]
+    assert len(scripts) == 1
+    assert not re.search(r"\b(uv|python|pytest|manage\.py|bash|scripts/)", scripts[0])
+    assert 'echo "${!token}' not in scripts[0]
+    # Without its token a service is skipped, so a fork's or Dependabot's pull request passes.
+    codecov = next(step for step in steps if _uses(step, "codecov/codecov-action"))
+    codacy = next(step for step in steps if _uses(step, "codacy/codacy-coverage-reporter-action"))
+    assert codecov["if"] == "steps.tokens.outputs.codecov == 'true'"
+    assert "steps.tokens.outputs.codacy == 'true'" in codacy["if"]
+    assert codecov["with"]["files"] == codacy["with"]["coverage-reports"] == "coverage.xml"
+    assert steps[-1] is codacy  # the one that fetches code at run time (X14) goes last
+
+
+def test_the_report_names_files_from_the_repository_root() -> None:
+    """With ``source`` a path starts inside ``apps/``: neither service could find the file."""
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    run = pyproject["tool"]["coverage"]["run"]
+    assert run["source_pkgs"] == ["apps", "config"]
+    assert "source" not in run
+    steps = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["test"]["steps"]
+    tests = next(step for step in steps if str(step.get("name")).startswith("Tests with coverage"))
+    assert "--cov-report=xml:coverage.xml" in tests["run"]
+    report = next(step for step in steps if step.get("name") == "Upload coverage report")
+    assert "coverage.xml" in report["with"]["path"]
 
 
 def test_ci_defines_the_required_checks() -> None:
@@ -193,10 +244,6 @@ def test_e2e_runs_on_main_nightly_by_hand_and_on_a_labelled_pull_request() -> No
 PUBLISH = ROOT / ".github" / "workflows" / "docker-publish.yaml"
 IMAGE_SCAN = ROOT / ".github" / "workflows" / "image-scan.yaml"
 ONLY_ON_PUSH = "needs.verify.outputs.push == 'true'"
-
-
-def _uses(step: dict[str, Any], action: str) -> bool:
-    return str(step.get("uses", "")).startswith(f"{action}@")
 
 
 def _write_permissions(workflow: dict[Any, Any]) -> dict[str, set[str]]:
