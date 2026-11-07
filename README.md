@@ -1,5 +1,10 @@
 # gmat-m8
 
+![CI/CD](https://github.com/mano8/gmat-m8/actions/workflows/CI.yaml/badge.svg?branch=main)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/31d22f109bda423081a6ba90684ab55e)](https://app.codacy.com/gh/mano8/gmat-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![codecov](https://codecov.io/gh/mano8/gmat-m8/graph/badge.svg?token=QT7EDP4EMY)](https://codecov.io/gh/mano8/gmat-m8)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/mano8/fa-auth-m8/blob/main/LICENSE)
+
 Materials app for a group of electrical-installation companies and their branches. Technicians request materials for worksites, managers approve, purchasing orders from suppliers, and goods are received at a warehouse or on site and handed over.
 
 It is a modular Django monolith: Django 6.1, HTMX 2.x and PostgreSQL 18, deployed with Docker Compose on one VPS. Decisions are recorded in [docs/adr](docs/adr/README.md).
