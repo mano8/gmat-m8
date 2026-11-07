@@ -65,18 +65,18 @@ Assume the worst until shown otherwise.
    - *Offsite storage or its credentials* (see forged snapshots below).
 4. **Rotate.** Anything that was on the machine, or that the attacker could read, is burnt:
 
-| Secret | How |
-| --- | --- |
-| SSH keys of `deploy` | new key pair, remove the old from `authorized_keys` (or on the new server only) |
-| `DJANGO_SECRET_KEY` | new value in `app.env`; ends every session and signed link. A restore does this by itself |
-| Database role passwords and `POSTGRES_PASSWORD` | change the roles in PostgreSQL (`ALTER ROLE …`) and `.env` together, then recreate the services. On a rebuilt server, initialise with new values |
-| `GITHUB_READ_TOKEN` | empty here, as the packages are public. A fork with private packages revokes it at GitHub and creates a new classic one with only `read:packages` |
-| `SMTP_PASSWORD` | change at the relay |
-| The VPS's append-only offsite credentials | revoke and re-issue at the storage provider |
-| `RESTIC_PASSWORD` | `restic key passwd` (or `key add` then `key remove` of the old one), **from the maintainer's machine** with the admin credentials; update the offline copy and the VPS's `.env` |
-| `MFA_ENCRYPTION_KEYS` | new key, `manage reencrypt_mfa`, and a leak needs resets for everybody: [user-admin.md](user-admin.md#rotating-the-mfa-key) |
-| `OUTBOX_ENCRYPTION_KEYS` | [user-admin.md](user-admin.md#rotating-the-outbox-key-routine-or-after-a-suspected-leak) |
-| People's passwords | after a restore, accounts that matter come up suspended or reset; after a database leak, require resets by offboarding and re-inviting the privileged accounts |
+   | Secret | How |
+   | --- | --- |
+   | SSH keys of `deploy` | new key pair, remove the old from `authorized_keys` (or on the new server only) |
+   | `DJANGO_SECRET_KEY` | new value in `app.env`; ends every session and signed link. A restore does this by itself |
+   | Database role passwords and `POSTGRES_PASSWORD` | change the roles in PostgreSQL (`ALTER ROLE …`) and `.env` together, then recreate the services. On a rebuilt server, initialise with new values |
+   | `GITHUB_READ_TOKEN` | empty here, as the packages are public. A fork with private packages revokes it at GitHub and creates a new classic one with only `read:packages` |
+   | `SMTP_PASSWORD` | change at the relay |
+   | The VPS's append-only offsite credentials | revoke and re-issue at the storage provider |
+   | `RESTIC_PASSWORD` | `restic key passwd` (or `key add` then `key remove` of the old one), **from the maintainer's machine** with the admin credentials; update the offline copy and the VPS's `.env` |
+   | `MFA_ENCRYPTION_KEYS` | new key, `manage reencrypt_mfa`, and a leak needs resets for everybody: [user-admin.md](user-admin.md#rotating-the-mfa-key) |
+   | `OUTBOX_ENCRYPTION_KEYS` | [user-admin.md](user-admin.md#rotating-the-outbox-key-routine-or-after-a-suspected-leak) |
+   | People's passwords | after a restore, accounts that matter come up suspended or reset; after a database leak, require resets by offboarding and re-inviting the privileged accounts |
 
 5. **Forged offsite snapshots.** If `scripts/offsite_prune.py` refused ("unexpected host or tag", "timestamp in the future", "abnormal count per day", "new since the last prune but dated before it"), do **not** prune and do not delete by hand to make it pass. Keep the repository, list the snapshots (`restic snapshots`), compare them with `deployed.log` and the backup schedule, treat the VPS as compromised and rebuild. Restore only from a snapshot you can tie to a real backup run.
 6. **Redeploy** only from a release whose signatures `deploy.sh` verifies, never from images built or pulled by hand.

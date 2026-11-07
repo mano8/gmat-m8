@@ -56,39 +56,37 @@ CHUNK = 64 * 1024
 SIZE_FORMAT = "!Q"  # the output's size, between the status and the file
 
 
-def _valid(request: dict[str, Any]) -> bool:
+def _valid(job: dict[str, Any]) -> bool:
     """Only integers reach the child's command line, and only the formats it knows."""
-    numbers = [request.get(name) for name in (*LIMITS, "size", "timeout")]
+    numbers = [job.get(name) for name in (*LIMITS, "size", "timeout")]
     if not all(type(value) is int and value > 0 for value in numbers):
         return False
     return (
-        request.get("format") in FORMATS
-        and request["size"] <= MAX_SOURCE
-        and request["timeout"] <= MAX_TIMEOUT
+        job.get("format") in FORMATS and job["size"] <= MAX_SOURCE and job["timeout"] <= MAX_TIMEOUT
     )
 
 
-def command_for(request: dict[str, Any], source: Path, target: Path) -> list[str]:
-    limits = [str(request[name]) for name in LIMITS]
+def command_for(job: dict[str, Any], source: Path, target: Path) -> list[str]:
+    limits = [str(job[name]) for name in LIMITS]
     return [
         sys.executable,
         "-I",
         str(DECODER),
         str(source),
         str(target),
-        request["format"],
+        job["format"],
         *limits,
     ]
 
 
-def run_decoder(request: dict[str, Any], source: Path, target: Path) -> int:
+def run_decoder(job: dict[str, Any], source: Path, target: Path) -> int:
     """The child's exit status; the same clean environment as ``processing``'s child."""
     try:
         result = subprocess.run(  # noqa: S603  # nosec B603 - see command_for
-            command_for(request, source, target),
+            command_for(job, source, target),
             stdin=subprocess.DEVNULL,
             capture_output=True,
-            timeout=request["timeout"],
+            timeout=job["timeout"],
             check=False,
             env={"LANG": "C.UTF-8"},
         )
@@ -106,10 +104,10 @@ class Handler(socketserver.StreamRequestHandler):
         if len(line) > MAX_HEADER or not line.endswith(b"\n"):
             return None
         try:
-            request = json.loads(line)
+            job = json.loads(line)
         except ValueError:
             return None
-        return request if isinstance(request, dict) else None
+        return job if isinstance(job, dict) else None
 
     def _receive(self, path: Path, size: int) -> bool:
         left = size
@@ -129,31 +127,31 @@ class Handler(socketserver.StreamRequestHandler):
             with result.open("rb") as stream:
                 shutil.copyfileobj(stream, self.wfile, CHUNK)
 
-    def _convert(self, request: dict[str, Any], directory: Path) -> None:
+    def _convert(self, job: dict[str, Any], directory: Path) -> None:
         source, target = directory / "in", directory / "out"
-        if not self._receive(source, request["size"]):
+        if not self._receive(source, job["size"]):
             self._answer(EXIT_REFUSED)
             return
         if not self.server.slots.acquire(timeout=READ_TIMEOUT):
             self._answer(EXIT_TIMEOUT)
             return
         try:
-            status = run_decoder(request, source, target)
+            status = run_decoder(job, source, target)
         finally:
             self.server.slots.release()
         self._answer(status, target if status == EXIT_OK else None)
 
     def handle(self) -> None:
-        request = self._header()
-        if request is None:
+        job = self._header()
+        if job is None:
             self._answer(EXIT_REFUSED)
-        elif request.get("ping") is True:
+        elif job.get("ping") is True:
             self._answer(EXIT_OK)
-        elif not _valid(request):
+        elif not _valid(job):
             self._answer(EXIT_REFUSED)
         else:
             with tempfile.TemporaryDirectory(prefix="decode-") as directory:
-                self._convert(request, Path(directory))
+                self._convert(job, Path(directory))
 
 
 class DecoderServer(socketserver.ThreadingUnixStreamServer):
@@ -163,7 +161,9 @@ class DecoderServer(socketserver.ThreadingUnixStreamServer):
         self.slots = threading.BoundedSemaphore(CONCURRENCY)
         _remove_stale(address)
         super().__init__(address, Handler)
-        # The directory is a volume only this service and ``web`` (another uid) mount.
+        # The directory is a volume only this service and ``web`` (another uid) mount. Connecting
+        # takes write permission, so any narrower mode web could still use needs a shared group.
+        # nosemgrep
         os.chmod(address, 0o666)  # noqa: S103  # nosec B103
 
     def handle_error(self, request: Any, client_address: Any) -> None:

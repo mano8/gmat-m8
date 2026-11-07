@@ -21,24 +21,28 @@ Who the application defends against and what it accepts (the threat model and th
 ### Actors and boundaries
 
 **Anonymous visitors on the internet.** They reach only the sign-in and reset pages, the token links, the health checks and static files. Caddy terminates TLS (1.2 or later), limits headers and bodies, and is the only published port. Against them:
+
 - every page carries the CSP and the other headers;
 - sign-in, MFA codes, resets and token links are rate-limited on a cache that fails closed;
 - no response tells whether an account exists;
 - tokens are 256-bit, hashed at rest and single use.
 
 **Roles inside the group.** Every user is one of the seven roles of plan §3.4, each limited to a scope: a branch and the branches it manages, assigned projects, or their own requests.
+
 - Scope is checked three times: by the view (403 without the capability, 404 outside the scope), by the selectors (`visible_to`) and inside every write (`authorize_in_txn`, with the transaction's clock and locks). A revocation therefore applies to the next write.
 - Capabilities never mix across memberships.
 - The acceptance matrix calls every URL and method as every actor, and checks each response for the sentinels it must not show.
 - Residual risk: a page that is already loading when a revocation lands still renders (plan §3.6).
 
 **The partner boundary.** `PARTNER_REQUESTER` users belong to another company (C). They see their assigned, active projects and their own requests, and never a price, a supplier, an order or another person's request.
+
 - The matrix checks their pages for every sentinel.
 - Their email (notices of their own requests) is filtered the same way.
 - Deactivating their company ends their access (S9).
 - Residual: they see the group's catalog (`catalog.view` is every role's, so that they can request materials) and the names of their projects' reviewers.
 
 **Insiders.**
+
 - **Technicians and site managers.** A technician sees only their own requests. A site manager sees the expected-deliveries projection of their assigned projects. That projection carries no prices, no supplier contacts and no other project's quantities; M8.3 closed a path that leaked the latter (security-review.md, R2).
 - **Material managers and engineers.** They buy and receive in their branches, and may decide their own requests (ADR-0014). Such a decision is marked `self_decided: true` in the append-only audit, and returning or reducing their own request counts as one (M8.3). Their sessions need MFA, last 12 hours, and end after 30 minutes idle.
 - **Group administrators.** They see and manage everything in the installation: people, roles, invitations, email changes. They cannot act on staff or superuser accounts, cannot take over an account without notice (an email change waits 24 hours, and the old address can cancel), and cannot read a password hash, a token or an MFA secret (the admin hides them and refuses lookups on them, M8.3). Everything they change is audited, and the runtime database role cannot alter the audit.
@@ -46,6 +50,7 @@ Who the application defends against and what it accepts (the threat model and th
 - **Residual.** A group administrator, or a privileged role within its branches, can still abuse what the business gives it: approve and buy for its own requests, or read every document in its scope. Detection rests on the audit trail and the security log (`gmat.security`, M8.3), which a group administrator can read but not alter.
 
 **The agent boundary.** AI coding agents write code, push branches and open PRs.
+
 - In the interim setup (Q20) they use the maintainer's GitHub account. That account is an administrator and the bypass actor of the tag ruleset, so GitHub would not stop it from merging, tagging or releasing.
 - What stops an agent: the rules of `CLAUDE.md`, the deny list of `.claude/settings.json` (tightened in M8.3 and kept by a policy test), the `main` ruleset (no direct push, force push or deletion), the workflow policy tests, and the human review of every PR, `.github/workflows` changes in particular.
 - Publishing needs a maintainer-pushed `v*` tag, a commit on `main` and green CI, compose-smoke and e2e runs on that exact commit; `deploy.sh` verifies both signatures and the manifest before it touches anything.
@@ -53,6 +58,7 @@ Who the application defends against and what it accepts (the threat model and th
 - Accepted until the dedicated agent account and fork exist: exception X2.
 
 **A compromised VPS.** Root on the server holds the live database, the media volume, the local backups and every runtime secret (`SECRET_KEY`, the MFA and outbox keys, the database and SMTP passwords, the restic password and the append-only offsite credentials). Such an attacker can read everything, sign sessions, and send mail as the application.
+
 - What they cannot do:
   - delete or rewrite the offsite backups: the VPS holds append-only credentials, pruning runs only from the maintainer's machine with `--keep-within 90d`, and a pre-prune check refuses forged snapshots (`scripts/offsite_prune.py`), judged also against what the maintainer's machine saw at the last prune, which the VPS cannot reach;
   - publish an image or a release: the VPS holds a read-only token, and images and manifests are signed by the publish workflow;
@@ -61,6 +67,7 @@ Who the application defends against and what it accepts (the threat model and th
 - Containers limit what a compromised process reaches: uid 1000, read-only root, no capabilities, one database network per client, and no route out for `web`. What parses uploaded files, `clamd` and the image decoder, has no network at all and none of these secrets (ADR-0015): an exploit there starts with nothing.
 
 **The supply chain.**
+
 - Dependencies come from `uv.lock` with hashes, with security floors (allauth), `pip-audit` and Dependabot.
 - Base images are pinned by digest and scanned by Trivy on every PR and every night, Caddy, PostgreSQL and ClamAV included, with dated exceptions (X1).
 - Actions are pinned by commit SHA, and gitleaks scans the whole history. One action fetches code when it runs, whatever its pin says (X14). The only repository secrets CI reads are the two coverage tokens, in a job that runs nothing of the project's and that no required check depends on.
@@ -73,13 +80,13 @@ What the application knowingly does not do, or does differently from a rule, wit
 
 | Id | What is accepted | Why, and what limits the risk | Owner | Review by | Status |
 | --- | --- | --- | --- | --- | --- |
-| X1 | HIGH and CRITICAL findings in third-party image contents that no published image fixes yet: 10 in the Debian 13 base of the application image (util-linux, acl, ncurses, systemd, perl-base, zlib), 26 in the official PostgreSQL image's `gosu`, which never runs here (its Go standard library; its maintainer does not rebuild for these, and `govulncheck` finds none called), 1 in Caddy (go-jose v3) | Nothing the services run reaches them; each entry in `.trivyignore.yaml` has its statement. uid 1000 or no capabilities, read-only root, no route in for the database. ClamAV's image has none | maintainer | 2027-01-20 | accepted (M1.4, re-reviewed M8.3; the maintainer, 2026-11-06) |
+| X1 | HIGH and CRITICAL findings in third-party image contents that no published image fixes yet: 10 in the Debian 13 base of the application image (util-linux, acl, ncurses, systemd, perl-base, zlib), 26 in the official PostgreSQL image's `gosu`, which never runs here (its Go standard library; its maintainer does not rebuild for these, and `govulncheck` finds none called), 2 in Caddy (go-jose v3, and the x/net HTML parser until a Caddy release has its fix) | Nothing the services run reaches them; each entry in `.trivyignore.yaml` has its statement. uid 1000 or no capabilities, read-only root, no route in for the database. ClamAV's image has none | maintainer | 2027-01-20 | accepted (M1.4, re-reviewed M8.3; the maintainer, 2026-11-06) |
 | X2 | Agents work through the maintainer's GitHub account (interim setup, Q20) | `CLAUDE.md`, the `.claude/settings.json` deny list and its policy test, the `main` ruleset, the workflow policy tests and human review; a release needs a maintainer tag and green runs on the exact commit | maintainer | 2027-02-01, or once the agent account and fork exist | accepted 2026-11-05 |
 | X3 | HSTS is off in production until the maintainer turns it on, one switch at a time (`DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_INCLUDE_SUBDOMAINS`, `DJANGO_HSTS_PRELOAD`), against plan §5's one year with subdomains | The maintainer's decision: a browser that has seen the header refuses plain HTTP for as long as it said, and that cannot be taken back, so it follows a domain proven to serve HTTPS. Caddy redirects HTTP to HTTPS meanwhile, but a first visit over HTTP can be intercepted. `web` logs `hsts_incomplete` at every start while a switch is off, and a deploy check does not fail on it | maintainer | go-live (H8.7); [the VPS runbook](runbooks/vps-setup.md#turning-on-hsts) | accepted 2026-11-05 |
 | X4 | No check of new passwords against breached-password sets | `web` has no route out. 12 characters minimum, the common-password list, Argon2id, sign-in rate limits, MFA for every privileged role | maintainer | 2027-02-01 | accepted 2026-11-05 |
 | X8 | A receipt's files reach whoever may see the receipt, the project's site manager included. A delivery-note photo can show prices or supplier contacts, which §3.4's projection cannot filter inside a file | Only who views the receipt; the site manager usually took the photo; material managers remove a file with a reason | maintainer | 2027-02-01 | accepted 2026-11-05 |
 | X12 | Local backup copies are not encrypted on the host | Plan §9: files 0600 in a 0700 directory, kept 3 days; a compromised host exposes the live database anyway; the offsite copies are encrypted by restic | maintainer | 2027-02-01 | accepted (plan §9) |
-| X14 | Codacy's coverage action, pinned by SHA, fetches `get.sh` from Codacy's `master` branch and the reporter it names each time it runs, so that code is not pinned | The maintainer's choice of the two services (2026-11-07). It runs in `coverage-upload` only, last, with nothing on disk (`persist-credentials: false`) and a read-only run token; what it can reach is the Codacy project token, which posts coverage. No required check depends on it, and nothing runs after it. A checksum-pinned download of the reporter would remove the exception | maintainer | 2027-02-01 | to accept in PR #33 |
+| X14 | Codacy's coverage action, pinned by SHA, fetches `get.sh` from Codacy's `master` branch and the reporter it names each time it runs, so that code is not pinned | The maintainer's choice of the two services (2026-11-07). It runs in `coverage-upload` only, last, with nothing on disk (`persist-credentials: false`) and a read-only run token; what it can reach is the Codacy project token, which posts coverage. No required check depends on it, and nothing runs after it. A checksum-pinned download of the reporter would remove the exception | maintainer | 2027-02-01 | accepted on merging PR #34 |
 
 **Refused by the maintainer on 2026-11-05, so they are no longer exceptions.** Each number stays retired:
 

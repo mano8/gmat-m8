@@ -168,4 +168,4 @@ If the old key may have **leaked**, moving secrets to a new key is not enough: a
 | A person's own sessions | Sessions, in their own menu |
 | After a restore | `manage confirm_account` |
 | First administrator | `manage bootstrap_admin` |
-| Bulk master data | `manage import_catalog | import_suppliers | import_projects <file> --operator EMAIL [--dry-run]`, templates in `docs/import-templates/` |
+| Bulk master data | `manage import_catalog`, `manage import_suppliers` or `manage import_projects`, each with `FILE --operator EMAIL [--dry-run]`; templates in `docs/import-templates/` |

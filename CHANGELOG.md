@@ -201,6 +201,8 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Changed
 
+- The README and the project's descriptions say what the application is: for any company that buys materials for its projects and worksites, not for one trade. The README now starts from what it does and who uses it, and how to try it.
+- Trivy exception for CVE-2026-78661 in the Caddy image, until a Caddy release has the fix.
 - Codacy's complexity and size findings are cleared. `apps/accounts/services`, `apps/purchasing/selectors` and `apps/material_requests/selectors` are packages that keep their public names; `scripts/check_access_rules.py` keeps its rules in `access_rules_parsed.py` on `access_rules_ast.py`, and now follows a write across the modules of a service package and through a package's re-exports. `create_branch` and `create_project` take a `NewBranch` and a `NewProject`; `queue_notification` lost `from_email` and `using`, and `queue_security_email` lost `using`, which nothing passed. Idempotency hashes are unchanged. The 100 % coverage gate also covers `selectors/` packages. The token pages' rate limit is now the action `link`, so counters restart at the deploy that brings this.
 - Pre-authentication form pages keep `Referrer-Policy: same-origin`; only a URL that carries a token is `no-referrer` (browsers send `Origin: null` on a form POST under `no-referrer`, which CSRF refuses, so login failed in a real browser).
 - Production settings now also require `DJANGO_CSRF_TRUSTED_ORIGINS` (https only) and `MFA_ENCRYPTION_KEYS`.
@@ -235,6 +237,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- A nightly image scan that does not finish now says so in the scan issue; a failed `targets` used to stay silent. The remaining Codacy findings are cleared.
 - The VPS runbook asked for a fine-grained token to pull the images, which GHCR refuses after a successful login.
 - The admin's lists accept only the filters they offer: a query-string lookup on a hidden column (a password hash, a token hash, an MFA secret, a price) could be read back from the result count. The audit admin no longer shows event payloads or client addresses (M8.3).
 - An over-receipt at a worksite no longer tells a site manager how much the order line holds for other projects, through the message or the order of the refusals (M8.3).

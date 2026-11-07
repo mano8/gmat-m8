@@ -76,7 +76,7 @@ FROM ${PYTHON_IMAGE} AS runtime
 ARG APP_VERSION=dev
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="gmat-m8" \
-      org.opencontainers.image.description="Materials app for electrical-installation companies" \
+      org.opencontainers.image.description="Materials app for companies that buy for projects and worksites" \
       org.opencontainers.image.source="https://github.com/mano8/gmat-m8" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"

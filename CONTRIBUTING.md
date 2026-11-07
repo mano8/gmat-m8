@@ -1,6 +1,6 @@
 # Contributing to gmat-m8
 
-Thanks for your interest. gmat-m8 is the materials application of one group of electrical-installation companies, built in planned phases (M1, M2, …) by its maintainer. Contributions are welcome, but they have to fit that plan and its rules, so please read this page first.
+Thanks for your interest. gmat-m8 is a materials application for companies that buy for projects and worksites, built in planned phases (M1, M2, …) by its maintainer. Contributions are welcome, but they have to fit that plan and its rules, so please read this page first.
 
 By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
