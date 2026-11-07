@@ -5825,6 +5825,18 @@ msgstr ""
 msgid "See what is to purchase"
 msgstr ""
 
+#: apps/organizations/services.py
+msgid "You cannot change your own roles; another administrator can."
+msgstr ""
+
+#: apps/accounts/services/email_changes.py
+msgid "You cannot change your own email address; another administrator can."
+msgstr ""
+
+#: apps/organizations/templates/organizations/person.html
+msgid "Your email address and roles are changed by another administrator."
+msgstr ""
+
 #: apps/material_requests/procurement.py
 #, python-format
 msgid ""

@@ -180,7 +180,7 @@ The plan's review log is local to the maintainer; each id is listed here once, w
 | F24, F44, F52 | Restores: sessions, credentials, invitations, revoked access, recovery codes, re-sent mail | `post-restore-reconcile` (`apps/recovery`), rehearsed against real containers | Holds (M8.4) |
 | F35 | Both digests published; e2e on the exact commit | `docker-publish.yaml`, `verify_release.py` | Holds |
 | F50 | Partners of an inactive company | `scopes.py` (S9); its tests | Holds |
-| F59 | No self-service email change | the disabled allauth views; tests | Holds |
+| F59 | No self-service email change | the disabled allauth views; `request_email_change` refuses the actor's own account (`self`); tests | Holds |
 | F60 | The admin never bypasses services | `ServiceBackedModelAdmin`, gmat.E005, the guard, the matrix | Holds (R1, R3 fixed) |
 | F61, F72 | Append-only offsite storage; retention poisoning | `backup.sh` never prunes; `docker_compose/offsite/`, `scripts/offsite_prune.py`, rehearsed; the real storage is H8.6 | Holds (M8.4) |
 | F62 | Deactivation preconditions | `organizations/deactivation.py` | Holds |

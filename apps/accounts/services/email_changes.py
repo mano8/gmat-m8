@@ -70,9 +70,15 @@ def request_email_change(
 ) -> EmailChangeRequest:
     """Start an email change: the new address confirms, the old one may cancel (Q26, Q28).
 
-    A previous open request of the account is replaced.
+    A previous open request of the account is replaced. Nobody changes their own address
+    (F59: a stolen session would redirect password resets); another administrator does.
     """
     actor = _lock_and_authorize(principal, user_id)
+    if actor.pk == user_id:
+        raise ValidationError(
+            _("You cannot change your own email address; another administrator can."),
+            code="self",
+        )
     user = User.objects.get(pk=user_id)
     new_email = _normalize_email(new_email)
     if not user.is_active or user.offboarded_at is not None:
