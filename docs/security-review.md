@@ -45,7 +45,7 @@ follow it.
 | R14 | Info | One Trivy exception was stale. | Dropped in `dec8626` |
 | R15 | Low | The admin prefix is open to every network until `ADMIN_ALLOWED_CIDRS` is set. | Fixed: production requires it, and `deploy.sh` refuses an open list (X10 refused) |
 | R16 | Low | A receipt's files (delivery-note photos) reach the project's site manager. | Exception X8 |
-| R17 | Info | Documentation drift: <br>• the worker and the backup share `egress`; <br>• engineers may remove attachments; <br>• `seed_demo`'s guard; <br>• the purge lock's name; <br>• gmat.E020 assumes Caddy's 120 s; <br>• removed files count only until the purge; <br>• the DEBUG error page; <br>• the replay docstring of `apps/core/idempotency.py`. | Corrected in the documentation commit |
+| R17 | Info | Documentation drift: the worker and the backup share `egress`; engineers may remove attachments; `seed_demo`'s guard; the purge lock's name; gmat.E020 assumes Caddy's 120 s; removed files count only until the purge; the DEBUG error page; the replay docstring of `apps/core/idempotency.py`. | Corrected in the documentation commit |
 | R18 | Question | A reviewer without a self-deciding role can return their own request for changes, or reduce its approved quantity. The service docstring says no. | Fixed: the self-decision rule applies, as the docstring said (question 1) |
 | R19 | Low | A project assignment's rules on its assignee are enforced by the form only, not by `assign_to_project`. | Fixed: `assign_to_project` checks them under the user-row lock (question 2) |
 | R20 | Info | The catalog and supplier services lock the master-data row before `authorize_in_txn`. This is lock order only, with no effect on access. | Noted, not changed |

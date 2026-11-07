@@ -21,24 +21,28 @@ Who the application defends against and what it accepts (the threat model and th
 ### Actors and boundaries
 
 **Anonymous visitors on the internet.** They reach only the sign-in and reset pages, the token links, the health checks and static files. Caddy terminates TLS (1.2 or later), limits headers and bodies, and is the only published port. Against them:
+
 - every page carries the CSP and the other headers;
 - sign-in, MFA codes, resets and token links are rate-limited on a cache that fails closed;
 - no response tells whether an account exists;
 - tokens are 256-bit, hashed at rest and single use.
 
 **Roles inside the group.** Every user is one of the seven roles of plan §3.4, each limited to a scope: a branch and the branches it manages, assigned projects, or their own requests.
+
 - Scope is checked three times: by the view (403 without the capability, 404 outside the scope), by the selectors (`visible_to`) and inside every write (`authorize_in_txn`, with the transaction's clock and locks). A revocation therefore applies to the next write.
 - Capabilities never mix across memberships.
 - The acceptance matrix calls every URL and method as every actor, and checks each response for the sentinels it must not show.
 - Residual risk: a page that is already loading when a revocation lands still renders (plan §3.6).
 
 **The partner boundary.** `PARTNER_REQUESTER` users belong to another company (C). They see their assigned, active projects and their own requests, and never a price, a supplier, an order or another person's request.
+
 - The matrix checks their pages for every sentinel.
 - Their email (notices of their own requests) is filtered the same way.
 - Deactivating their company ends their access (S9).
 - Residual: they see the group's catalog (`catalog.view` is every role's, so that they can request materials) and the names of their projects' reviewers.
 
 **Insiders.**
+
 - **Technicians and site managers.** A technician sees only their own requests. A site manager sees the expected-deliveries projection of their assigned projects. That projection carries no prices, no supplier contacts and no other project's quantities; M8.3 closed a path that leaked the latter (security-review.md, R2).
 - **Material managers and engineers.** They buy and receive in their branches, and may decide their own requests (ADR-0014). Such a decision is marked `self_decided: true` in the append-only audit, and returning or reducing their own request counts as one (M8.3). Their sessions need MFA, last 12 hours, and end after 30 minutes idle.
 - **Group administrators.** They see and manage everything in the installation: people, roles, invitations, email changes. They cannot act on staff or superuser accounts, cannot take over an account without notice (an email change waits 24 hours, and the old address can cancel), and cannot read a password hash, a token or an MFA secret (the admin hides them and refuses lookups on them, M8.3). Everything they change is audited, and the runtime database role cannot alter the audit.
@@ -46,6 +50,7 @@ Who the application defends against and what it accepts (the threat model and th
 - **Residual.** A group administrator, or a privileged role within its branches, can still abuse what the business gives it: approve and buy for its own requests, or read every document in its scope. Detection rests on the audit trail and the security log (`gmat.security`, M8.3), which a group administrator can read but not alter.
 
 **The agent boundary.** AI coding agents write code, push branches and open PRs.
+
 - In the interim setup (Q20) they use the maintainer's GitHub account. That account is an administrator and the bypass actor of the tag ruleset, so GitHub would not stop it from merging, tagging or releasing.
 - What stops an agent: the rules of `CLAUDE.md`, the deny list of `.claude/settings.json` (tightened in M8.3 and kept by a policy test), the `main` ruleset (no direct push, force push or deletion), the workflow policy tests, and the human review of every PR, `.github/workflows` changes in particular.
 - Publishing needs a maintainer-pushed `v*` tag, a commit on `main` and green CI, compose-smoke and e2e runs on that exact commit; `deploy.sh` verifies both signatures and the manifest before it touches anything.
@@ -53,6 +58,7 @@ Who the application defends against and what it accepts (the threat model and th
 - Accepted until the dedicated agent account and fork exist: exception X2.
 
 **A compromised VPS.** Root on the server holds the live database, the media volume, the local backups and every runtime secret (`SECRET_KEY`, the MFA and outbox keys, the database and SMTP passwords, the restic password and the append-only offsite credentials). Such an attacker can read everything, sign sessions, and send mail as the application.
+
 - What they cannot do:
   - delete or rewrite the offsite backups: the VPS holds append-only credentials, pruning runs only from the maintainer's machine with `--keep-within 90d`, and a pre-prune check refuses forged snapshots (`scripts/offsite_prune.py`), judged also against what the maintainer's machine saw at the last prune, which the VPS cannot reach;
   - publish an image or a release: the VPS holds a read-only token, and images and manifests are signed by the publish workflow;
@@ -61,6 +67,7 @@ Who the application defends against and what it accepts (the threat model and th
 - Containers limit what a compromised process reaches: uid 1000, read-only root, no capabilities, one database network per client, and no route out for `web`. What parses uploaded files, `clamd` and the image decoder, has no network at all and none of these secrets (ADR-0015): an exploit there starts with nothing.
 
 **The supply chain.**
+
 - Dependencies come from `uv.lock` with hashes, with security floors (allauth), `pip-audit` and Dependabot.
 - Base images are pinned by digest and scanned by Trivy on every PR and every night, Caddy, PostgreSQL and ClamAV included, with dated exceptions (X1).
 - Actions are pinned by commit SHA, and gitleaks scans the whole history. One action fetches code when it runs, whatever its pin says (X14). The only repository secrets CI reads are the two coverage tokens, in a job that runs nothing of the project's and that no required check depends on.
