@@ -7,6 +7,7 @@ first, so the two serialize whichever starts first.
 
 import time
 from collections.abc import Callable
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -17,6 +18,8 @@ from apps.access.roles import Role
 from apps.accounts import services, tokens
 from apps.accounts.models import Invitation, User
 from apps.accounts.services import MembershipGrant
+from apps.accounts.services import invitations as invitation_services
+from apps.accounts.services import offboarding as offboarding_services
 from apps.organizations.models import Branch, Membership
 from tests.integration.conftest import run_concurrently
 from tests.support import grant
@@ -28,16 +31,16 @@ PASSWORDS = ["first-password-1234", "second-password-1234"]
 HOLD = 0.4  # seconds the first transaction keeps its locks
 
 
-def slow(monkeypatch: pytest.MonkeyPatch, target: str) -> None:
-    """Make ``target`` (a function of ``apps.accounts.services``) hold its locks a while."""
-    original = getattr(services, target)
+def slow(monkeypatch: pytest.MonkeyPatch, module: ModuleType, target: str) -> None:
+    """Make ``target``, as ``module`` calls it, hold its locks a while."""
+    original = getattr(module, target)
 
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         result = original(*args, **kwargs)
         time.sleep(HOLD)
         return result
 
-    monkeypatch.setattr(services, target, wrapper)
+    monkeypatch.setattr(module, target, wrapper)
 
 
 def test_two_concurrent_redemptions_one_succeeds(
@@ -49,7 +52,7 @@ def test_two_concurrent_redemptions_one_succeeds(
         memberships=[MembershipGrant(role=Role.TECHNICIAN, branch_id=branch.pk)],
     )
     digest = tokens.hash_token(last_token("new@example.org"))
-    slow(monkeypatch, "_verified_email")
+    slow(monkeypatch, invitation_services, "_verified_email")
 
     def redeem(index: int) -> str:
         principal = tokens.invitation_principal(digest)
@@ -82,7 +85,10 @@ def test_offboarding_racing_an_acceptance_leaves_the_user_out(
         memberships=[MembershipGrant(role=Role.WAREHOUSE_OPERATOR, branch_id=branch.pk)],
     )
     digest = tokens.hash_token(last_token(user.email))
-    slow(monkeypatch, "_grant_on_acceptance" if first == "accept" else "revoke_pending_tokens")
+    if first == "accept":
+        slow(monkeypatch, invitation_services, "_grant_on_acceptance")
+    else:
+        slow(monkeypatch, offboarding_services, "revoke_pending_tokens")
 
     def accept() -> str:
         principal = tokens.invitation_principal(digest, session_user_id=user.pk)

@@ -81,7 +81,7 @@ remove_webauthn = RemoveWebAuthnView.as_view()
 
 INVITATION_SESSION_KEY = "_gmat_invitation"
 EMAIL_CHANGE_SESSION_KEY = "_gmat_email_change"
-TOKEN_RATE_LIMITS = {"token": "20/m/ip"}
+LINK_RATE_LIMITS = {"link": "20/m/ip"}
 # A link over the rate limit: its 429 is shown by the token-less page it redirects to. In the
 # URL, not the session: a client without a cookie must not write a session row per request.
 LIMITED_PARAMETER = "limited"
@@ -89,7 +89,7 @@ LIMITED_PARAMETER = "limited"
 
 def _rate_limited(request: HttpRequest) -> HttpResponse | None:
     response: HttpResponse | None = consume_or_429(
-        request, app="allauth.account", action="token", config=TOKEN_RATE_LIMITS, limit_get=True
+        request, app="allauth.account", action="link", config=LINK_RATE_LIMITS, limit_get=True
     )
     return response
 

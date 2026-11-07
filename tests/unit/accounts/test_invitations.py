@@ -15,6 +15,8 @@ from apps.access.roles import Role
 from apps.accounts import services, tokens
 from apps.accounts.models import Invitation, User
 from apps.accounts.services import AssignmentGrant, MembershipGrant, parse_grants
+from apps.accounts.services import common as common_services
+from apps.accounts.services import invitations as invitation_services
 from apps.audit.models import AuditEvent
 from apps.core.idempotency import issue_key
 from apps.core.locking import LockSetChanged
@@ -424,13 +426,13 @@ class TestEdges:
     ) -> None:
         """The shared wrapper retries ``LockSetChanged``; inside the test's own transaction
         there is nothing to retry, so it reaches the test."""
-        original = services._lock_and_authorize
+        original = common_services._lock_and_authorize
 
         def racing(principal: SessionPrincipal, target_id: object) -> User:
             User.objects.create_user("new@example.org")  # created after the discovery
             return original(principal, target_id)  # type: ignore[arg-type]
 
-        monkeypatch.setattr(services, "_lock_and_authorize", racing)
+        monkeypatch.setattr(invitation_services, "_lock_and_authorize", racing)
         with pytest.raises(LockSetChanged):
             invite()
         assert not Invitation.objects.exists()
