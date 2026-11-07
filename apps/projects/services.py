@@ -8,7 +8,9 @@ their branches by material managers (S1, S3):
 
 - creating a project needs its branch and its procurement branch in scope;
 - changing one needs the project in scope (else ``NotInScope``, 404 for a project the
-  actor cannot see), and any new branch or procurement branch too;
+  actor cannot see), and any new branch or procurement branch too; a new procurement
+  branch takes the project's open documents along, or is refused while one of them is
+  already committed (``procurement``);
 - an assignment needs its project in scope, and an assignee who can hold it: an active
   account with a valid membership of the matching role, a site manager's home branch in
   the actor's scope (S4; the same rule as the form's choices, ``selectors``).
@@ -38,8 +40,9 @@ from apps.core.locking import LockMode, LockOrder, transactional
 from apps.locations.models import Location
 from apps.organizations.models import Branch
 from apps.organizations.services import lock_for_user_change
-from apps.projects import selectors
+from apps.projects import procurement, selectors
 from apps.projects.models import Project, ProjectAssignment
+from apps.projects.procurement import ProcurementChange
 
 PROJECT_FIELDS = frozenset(
     {
@@ -178,6 +181,7 @@ def update_project(principal: Principal, project_id: UUID, **changes: Any) -> Pr
     project = Project.objects.get(pk=project_id)
     new_branches = _branches(changes.get("branch_id"), changes.get("procurement_branch_id"))
     _authorize(principal, locks, project, *new_branches)
+    old_procurement = project.procurement_branch_id
     diff = apply_changes(project, changes, PROJECT_FIELDS)
     if not diff:
         return project
@@ -186,6 +190,11 @@ def update_project(principal: Principal, project_id: UUID, **changes: Any) -> Pr
         _active_branch(project.branch_id, "branch")
     if "procurement_branch_id" in diff:
         _active_branch(project.procurement_branch_id, "procurement_branch")
+        procurement.follow(
+            ProcurementChange(
+                principal, project, old_procurement, project.procurement_branch_id, locks
+            )
+        )
     project.save()
     if "branch_id" in diff:
         Location.objects.filter(project=project).update(branch_id=project.branch_id)
