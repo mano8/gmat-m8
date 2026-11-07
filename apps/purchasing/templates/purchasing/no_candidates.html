@@ -1,0 +1,53 @@
+{% load i18n %}
+{% comment %}Why an order has no request line to add (selectors.no_candidates), in place of the tool that would add them. Parameters: hint (a NoCandidates), draft (True on a draft, whose destination can still change).{% endcomment %}
+<section class="card mb-4"
+         aria-label="{% translate 'Add request lines' %}"
+         data-testid="no-candidates">
+  <h2 class="mb-2 text-base">{% translate "No request line to add" %}</h2>
+  {% if hint.project %}
+    <p>
+      {% blocktranslate with project=hint.project.code name=hint.project.name trimmed %}
+        This order ships to the worksite of {{ project }} · {{ name }}, so it only takes lines of that project.
+      {% endblocktranslate %}
+    </p>
+    {% if hint.elsewhere %}
+      <p class="mt-2" data-field="elsewhere">
+        {% if hint.more %}
+          {% blocktranslate with branch=hint.branch.name projects=hint.elsewhere|join:", " count more=hint.more trimmed %}
+            {{ branch }} has lines to buy for {{ projects }} and {{ more }} other project.
+          {% plural %}
+            {{ branch }} has lines to buy for {{ projects }} and {{ more }} other projects.
+          {% endblocktranslate %}
+        {% else %}
+          {% blocktranslate with branch=hint.branch.name projects=hint.elsewhere|join:", " trimmed %}
+            {{ branch }} has lines to buy for {{ projects }}.
+          {% endblocktranslate %}
+        {% endif %}
+        {% if draft %}
+          {% translate "To add them, change the destination under “Edit supplier, destination and notes”." %}
+        {% else %}
+          {% translate "They go on another order." %}
+        {% endif %}
+      </p>
+    {% else %}
+      <p class="mt-2">
+        {% blocktranslate with branch=hint.branch.name trimmed %}
+          {{ branch }} has no approved line of that project left to buy.
+        {% endblocktranslate %}
+      </p>
+    {% endif %}
+  {% else %}
+    <p>
+      {% blocktranslate with branch=hint.branch.name trimmed %}
+        {{ branch }} has no approved line left to buy.
+      {% endblocktranslate %}
+    </p>
+  {% endif %}
+  <p class="mt-2 text-sm text-soft">
+    {% translate "A line reaches purchasing once its request is approved and it is sourced to purchase. Lines another draft already reserves in full are not offered either." %}
+  </p>
+  <div class="mt-3">
+    {% url 'purchasing:worklist' as worklist_url %}
+    {% include "components/button.html" with href=worklist_url label=_("See what is to purchase") %}
+  </div>
+</section>

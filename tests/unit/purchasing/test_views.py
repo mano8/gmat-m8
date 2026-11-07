@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from apps.access.principals import SessionPrincipal, SystemPrincipal
 from apps.audit.models import AuditEvent
+from apps.core.idempotency import issue_key
 from apps.core.locking import RetryExhausted
 from apps.material_requests import services as request_services
 from apps.material_requests.models import MaterialRequestLine
@@ -25,7 +26,10 @@ from apps.notifications.models import EmailOutbox, Outcome
 from apps.notifications.models import Status as MailStatus
 from apps.notifications.services import Claim, claim_next, record_outcome
 from apps.purchasing import services
+from apps.purchasing.forms import IssueForm
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
+from apps.purchasing.selectors import worklist as worklist_selectors
+from apps.suppliers.models import Supplier
 from tests.org import Org, People
 from tests.org import client_for as signed_in
 from tests.outbox import make_dispatch
@@ -195,6 +199,16 @@ class TestBuilder:
     def test_an_empty_builder_has_no_lines(self, manager: Client) -> None:
         html = page(manager, "new")
         assert 'data-testid="new-order-form"' in html and "new-order-line" not in html
+        assert 'data-testid="new-order-empty"' in html  # where the lines come from
+        assert 'data-testid="no-suppliers"' not in html
+
+    def test_the_builder_says_when_there_is_no_supplier(self, manager: Client) -> None:
+        Supplier.objects.update(is_active=False)
+        assert 'data-testid="no-suppliers"' in page(manager, "new")
+
+    def test_ticked_lines_need_no_explanation(self, manager: Client, make_line: MakeLine) -> None:
+        html = page(manager, "new", line=str(make_line("10").pk))
+        assert "new-order-line" in html and 'data-testid="new-order-empty"' not in html
 
     def test_lines_with_nothing_left_to_buy_go_back_to_the_worklist(
         self, manager: Client, make_line: MakeLine
@@ -444,6 +458,49 @@ class TestDraftPage:
         assert PurchaseAllocation.objects.filter(request_line=other, qty=D(3)).exists()
         assert only_line(draft).ordered_qty == D(9)
 
+    def test_a_draft_with_nothing_to_add_says_why(
+        self, manager: Client, buy: Buy, org: Org
+    ) -> None:
+        empty = buy(issue=False)
+        html = page(manager, "detail", empty.pk)
+        assert 'data-testid="add-lines-form"' not in html
+        assert 'data-testid="no-candidates"' in html
+        assert f"{org.a_mad.name} has no approved line left to buy." in html
+        assert "see below why none can be added" in html
+        assert reverse("purchasing:worklist") in html
+
+    def test_a_worksite_draft_names_the_projects_its_destination_leaves_out(
+        self, manager: Client, buy: Buy, make_line: MakeLine, org: Org
+    ) -> None:
+        make_line("5", project=org.sev_for_mad)
+        empty = buy(issue=False, ship_to=org.worksite(org.hospital))
+        html = " ".join(page(manager, "detail", empty.pk).split())
+        assert f"ships to the worksite of {org.hospital.code}" in html
+        assert f"{org.a_mad.name} has lines to buy for {org.sev_for_mad.code}." in html
+        assert "change the destination" in html
+
+    def test_a_worksite_draft_with_nothing_bought_anywhere(
+        self, manager: Client, buy: Buy, org: Org
+    ) -> None:
+        empty = buy(issue=False, ship_to=org.worksite(org.hospital))
+        html = " ".join(page(manager, "detail", empty.pk).split())
+        assert f"{org.a_mad.name} has no approved line of that project left to buy." in html
+
+    def test_more_projects_than_named_are_counted(
+        self,
+        manager: Client,
+        buy: Buy,
+        make_line: MakeLine,
+        org: Org,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(worklist_selectors, "ELSEWHERE_SHOWN", 1)
+        make_line("5", project=org.sev_for_mad)
+        make_line("5", project=org.mad_hold)
+        empty = buy(issue=False, ship_to=org.worksite(org.hospital))
+        html = " ".join(page(manager, "detail", empty.pk).split())
+        assert f"has lines to buy for {org.mad_hold.code} and 1 other project." in html
+
     def test_adding_nothing_is_refused(self, manager: Client, draft: PurchaseOrder) -> None:
         html = page(manager, "detail", draft.pk)
         response = post(
@@ -554,15 +611,15 @@ class TestIssue:
         assert refreshed(draft).status == Status.DRAFT
         assert "Tick the box to issue the order." in " ".join(messages_of(response))
 
-    def test_an_empty_order_is_refused(self, manager: Client, buy: Buy) -> None:
+    def test_an_empty_order_offers_no_issue_and_is_refused(
+        self, manager: Client, people: People, buy: Buy
+    ) -> None:
         empty = buy(issue=False)
         html = page(manager, "detail", empty.pk)
-        response = post(
-            manager,
-            "issue",
-            empty.pk,
-            data={"idempotency_key": hidden(html, "idempotency_key"), "confirm": "on"},
-        )
+        assert 'data-testid="issue-form"' not in html and 'data-testid="issue-blocked"' in html
+        assert 'data-testid="discard-form"' in html  # it can still be thrown away
+        key = issue_key(people.mm_mad.pk, IssueForm.operation)  # a stale tab still posts
+        response = post(manager, "issue", empty.pk, data={"idempotency_key": key, "confirm": "on"})
         assert "Add at least one line before issuing." in messages_of(response)
 
     def test_a_forged_key_is_refused(self, manager: Client, draft: PurchaseOrder) -> None:
@@ -670,6 +727,22 @@ class TestAmendment:
         for name in (f"qty_{line.pk}", f"price_{line.pk}", f"alloc_{alloc.pk}", "reason"):
             assert f'name="{name}"' in html
         assert f"add_pick_{other.pk}" in html
+
+    def test_says_why_nothing_can_be_added(
+        self, manager: Client, issued: PurchaseOrder, org: Org
+    ) -> None:
+        html = " ".join(page(manager, "amendment", issued.pk).split())
+        assert 'data-testid="no-candidates"' in html and "add_pick_" not in html
+        assert f"{org.a_mad.name} has no approved line left to buy." in html
+
+    def test_a_worksite_order_sends_other_projects_to_another_order(
+        self, manager: Client, buy: Buy, make_line: MakeLine, org: Org
+    ) -> None:
+        order = buy((make_line("5"), "5"), ship_to=org.worksite(org.hospital))
+        make_line("5", project=org.sev_for_mad)
+        html = " ".join(page(manager, "amendment", order.pk).split())
+        assert f"has lines to buy for {org.sev_for_mad.code}." in html
+        assert "They go on another order." in html and "change the destination" not in html
 
     def test_a_draft_has_no_amendment(self, manager: Client, draft: PurchaseOrder) -> None:
         response = manager.get(reverse("purchasing:amendment", args=[draft.pk]), follow=True)

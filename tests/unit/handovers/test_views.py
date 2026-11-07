@@ -146,6 +146,15 @@ class TestTheForm:
         assert hidden(html, "idempotency_key") and hidden(html, "project") == str(org.hospital.pk)
         assert 'data-testid="stock-warning"' not in html
 
+    def test_without_a_warehouse_it_says_why_instead_of_an_empty_choice(
+        self, org: Org, people: People, make_line: MakeLine
+    ) -> None:
+        make_line("10", sourcing="STOCK")
+        Location.objects.filter(kind=Location.Kind.WAREHOUSE).update(is_active=False)
+        html = " ".join(page(client_for(people.wo_mad), "new", project=org.hospital.pk).split())
+        assert 'data-testid="no-source"' in html and 'data-testid="handover-form"' not in html
+        assert f"an active warehouse of {org.a_mad.name}" in html
+
     def test_from_a_request(self, org: Org, people: People, make_line: MakeLine) -> None:
         first, second = make_line("10", sourcing="STOCK"), make_line("5", sourcing="STOCK")
         html = page(client_for(people.wo_mad), "new", request=str(second.request_id))

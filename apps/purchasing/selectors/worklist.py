@@ -364,18 +364,64 @@ def buyable(ctx: AccessContext, line_ids: Iterable[UUID]) -> list[WorklistRow]:
     return [row for row in to_purchase(ctx, line_ids=line_ids) if row.to_purchase > 0]
 
 
-def candidates(ctx: AccessContext, of: PurchaseOrder) -> list[WorklistRow]:
-    """The lines a draft or issued order could still take: to buy now, bought for by its
-    branch, for its project when it ships to a worksite, not yet allocated to it."""
+def _worksite_project_id(of: PurchaseOrder) -> UUID | None:
+    """The project an order's destination keeps it to: a worksite's (a warehouse: none)."""
     ship_to = of.ship_to
-    rows = to_purchase(
-        ctx,
-        branch_id=of.branch_id,
-        project_id=ship_to.project_id if ship_to.kind == Location.Kind.WORKSITE else None,
-    )
+    return ship_to.project_id if ship_to.kind == Location.Kind.WORKSITE else None
+
+
+def _open_to(ctx: AccessContext, of: PurchaseOrder, project_id: UUID | None) -> list[WorklistRow]:
+    """Lines to buy now, bought for by the order's branch (of ``project_id`` when given), not
+    yet allocated to the order."""
+    rows = to_purchase(ctx, branch_id=of.branch_id, project_id=project_id)
     taken = set(
         PurchaseAllocation.objects.filter(po_line__po=of, qty__gt=0).values_list(
             "request_line_id", flat=True
         )
     )
     return [row for row in rows if row.to_purchase > 0 and row.line.pk not in taken]
+
+
+def candidates(ctx: AccessContext, of: PurchaseOrder) -> list[WorklistRow]:
+    """The lines a draft or issued order could still take: to buy now, bought for by its
+    branch, for its project when it ships to a worksite, not yet allocated to it."""
+    return _open_to(ctx, of, _worksite_project_id(of))
+
+
+ELSEWHERE_SHOWN = 5  # project codes named when an order's destination leaves lines out
+
+
+@dataclass(frozen=True)
+class NoCandidates:
+    """Why an order has no line to add, so its page can say so instead of hiding the tool.
+
+    ``project`` is the worksite project its destination keeps it to (``None``: it ships to a
+    warehouse and takes any project's lines); ``elsewhere`` the first codes of the other
+    projects whose lines its branch could buy if it shipped elsewhere, ``more`` how many
+    others there are.
+    """
+
+    branch: Branch
+    project: Project | None
+    elsewhere: list[str]
+    more: int
+
+
+def no_candidates(ctx: AccessContext, of: PurchaseOrder) -> NoCandidates:
+    """The reason ``candidates(ctx, of)`` is empty (call it only then)."""
+    project_id = _worksite_project_id(of)
+    if project_id is None:
+        return NoCandidates(of.branch, None, [], 0)
+    codes = sorted(
+        {
+            row.line.project.code
+            for row in _open_to(ctx, of, None)
+            if row.line.project_id != project_id
+        }
+    )
+    return NoCandidates(
+        of.branch,
+        of.ship_to.project,
+        codes[:ELSEWHERE_SHOWN],
+        max(len(codes) - ELSEWHERE_SHOWN, 0),
+    )

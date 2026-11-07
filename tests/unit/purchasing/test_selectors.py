@@ -21,6 +21,7 @@ from apps.material_requests.models import MaterialRequest
 from apps.projects.models import Project
 from apps.purchasing import selectors, services
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
+from apps.purchasing.selectors import worklist as worklist_selectors
 from tests.org import Org, People
 from tests.support import every_key, read_all
 from tests.unit.purchasing.conftest import Buy, FakeReceipts, MakeLine, allocation, only_line, q
@@ -302,6 +303,52 @@ class TestBuilderChoices:
         buy((reserved, "5"), issue=False)  # reserved by another draft: nothing to purchase
         order = buy(issue=False)
         assert selectors.candidates(ctx(people.mm_mad), order) == []
+
+
+class TestNoCandidates:
+    """Why an order has nothing to add, so its page says so instead of hiding the tool."""
+
+    def test_a_warehouse_order_names_only_its_branch(
+        self, org: Org, people: People, buy: Buy
+    ) -> None:
+        order = buy(issue=False)
+        found = selectors.no_candidates(ctx(people.mm_mad), order)
+        assert found == selectors.NoCandidates(org.a_mad, None, [], 0)
+
+    def test_a_worksite_order_names_the_projects_it_leaves_out(
+        self, org: Org, people: People, buy: Buy, make_line: MakeLine
+    ) -> None:
+        make_line("5", project=org.sev_for_mad)  # bought by A-MAD, for another project
+        make_line("5", project=org.sev_works)  # bought by A-SEV: not this order's branch
+        order = buy(issue=False, ship_to=org.worksite(org.hospital))
+        manager = ctx(people.mm_mad)
+        assert selectors.candidates(manager, order) == []
+        found = selectors.no_candidates(manager, order)
+        assert found.project == org.hospital and found.branch == org.a_mad
+        assert (found.elsewhere, found.more) == ([org.sev_for_mad.code], 0)
+
+    def test_a_worksite_order_with_nothing_bought_elsewhere(
+        self, org: Org, people: People, buy: Buy, make_line: MakeLine
+    ) -> None:
+        line = make_line("5")
+        order = buy((line, "5"), issue=False, ship_to=org.worksite(org.hospital))
+        found = selectors.no_candidates(ctx(people.mm_mad), order)
+        assert (found.project, found.elsewhere, found.more) == (org.hospital, [], 0)
+
+    def test_only_the_first_projects_are_named(
+        self,
+        org: Org,
+        people: People,
+        buy: Buy,
+        make_line: MakeLine,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(worklist_selectors, "ELSEWHERE_SHOWN", 1)
+        make_line("5", project=org.sev_for_mad)
+        make_line("5", project=org.mad_hold)
+        order = buy(issue=False, ship_to=org.worksite(org.hospital))
+        found = selectors.no_candidates(ctx(people.mm_mad), order)
+        assert (found.elsewhere, found.more) == ([org.mad_hold.code], 1)  # MAD-1 < SEV-2
 
 
 class TestProgress:

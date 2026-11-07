@@ -13,6 +13,18 @@
   </div>
   {% if not entries %}
     {% include "components/empty_state.html" with title=_("Nothing left to hand over") text=_("Every approved line of this project has been handed over.") %}
+  {% elif source_branch %}
+    <section class="card mb-4" data-testid="no-source">
+      <h2 class="mb-2 text-base">{% translate "No warehouse to take the material from" %}</h2>
+      <p>
+        {% blocktranslate with branch=source_branch.name trimmed %}
+          A handover takes material out of an active warehouse of {{ branch }} or of a branch it manages, and there is none you can use.
+        {% endblocktranslate %}
+      </p>
+      <p class="mt-2 text-sm text-soft">
+        {% translate "Goods received directly at the worksite are handed over with their receipt." %}
+      </p>
+    </section>
   {% else %}
     <form method="post"
           action="{% url 'handovers:create' %}"

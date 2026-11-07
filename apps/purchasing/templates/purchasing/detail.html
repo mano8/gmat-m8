@@ -123,7 +123,11 @@
       {% for line in lines %}
         {% include "purchasing/line.html" with lv=line %}
       {% empty %}
-        {% include "components/empty_state.html" with title=_("No lines yet") text=_("Add request lines to buy.") %}
+        {% if managing and order.status == "DRAFT" and no_candidates %}
+          {% include "components/empty_state.html" with title=_("No lines yet") text=_("An order takes its lines from approved requests: see below why none can be added.") %}
+        {% else %}
+          {% include "components/empty_state.html" with title=_("No lines yet") text=_("Add request lines to buy.") %}
+        {% endif %}
       {% endfor %}
     </div>
   </section>
@@ -159,16 +163,22 @@
           </form>
         </details>
       </section>
+    {% else %}
+      {% include "purchasing/no_candidates.html" with hint=no_candidates draft=True %}
     {% endif %}
     <section class="card mb-4" aria-label="{% translate 'Issue the order' %}">
-      <form method="post"
-            action="{% url 'purchasing:issue' po_id=order.pk %}"
-            data-testid="issue-form">
-        {% csrf_token %}
-        {{ issue_form.idempotency_key }}
-        {{ issue_form.confirm.as_field_group }}
-        {% include "components/button.html" with type="submit" label=_("Issue the order") variant="primary" block=True %}
-      </form>
+      {% if lines %}
+        <form method="post"
+              action="{% url 'purchasing:issue' po_id=order.pk %}"
+              data-testid="issue-form">
+          {% csrf_token %}
+          {{ issue_form.idempotency_key }}
+          {{ issue_form.confirm.as_field_group }}
+          {% include "components/button.html" with type="submit" label=_("Issue the order") variant="primary" block=True %}
+        </form>
+      {% else %}
+        <p class="text-soft" data-testid="issue-blocked">{% translate "Add at least one line before issuing." %}</p>
+      {% endif %}
       <details class="mt-3">
         <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Discard the draft" %}</summary>
         <form method="post"
