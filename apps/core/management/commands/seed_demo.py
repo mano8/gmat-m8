@@ -36,9 +36,11 @@ from apps.locations.models import Location
 from apps.locations.services import create_warehouse
 from apps.organizations import services as org_services
 from apps.organizations.models import Branch, Company, JointVentureMember, Membership
+from apps.organizations.services import NewBranch
 from apps.projects import selectors as project_selectors
 from apps.projects import services as project_services
 from apps.projects.models import ProjectAssignment
+from apps.projects.services import NewProject
 from apps.suppliers import selectors as supplier_selectors
 from apps.suppliers import services as supplier_services
 
@@ -173,11 +175,13 @@ class _Seeding:
             if not found:
                 branches[key] = org_services.create_branch(
                     self.org,
-                    company_id=companies[company].pk,
-                    code=code,
-                    name=name,
-                    city=city,
-                    managed_by_id=branches[managed_by].pk if managed_by else None,
+                    NewBranch(
+                        company_id=companies[company].pk,
+                        code=code,
+                        name=name,
+                        city=city,
+                        managed_by_id=branches[managed_by].pk if managed_by else None,
+                    ),
                 )
             self.count("branches", created=not found)
         for key, name in demo.WAREHOUSES:
@@ -255,11 +259,13 @@ class _Seeding:
             if project is None:
                 project = project_services.create_project(
                     self.project,
-                    code=code,
-                    name=name,
-                    branch_id=branches[branch].pk,
-                    procurement_branch_id=branches[procurement].pk,
-                    client_name=client,
+                    NewProject(
+                        code=code,
+                        name=name,
+                        branch_id=branches[branch].pk,
+                        procurement_branch_id=branches[procurement].pk,
+                        client_name=client,
+                    ),
                 )
                 if status != project.status:
                     project = project_services.update_project(

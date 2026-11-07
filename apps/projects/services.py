@@ -14,6 +14,7 @@ their branches by material managers (S1, S3):
   the actor's scope (S4; the same rule as the form's choices, ``selectors``).
 """
 
+from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -82,55 +83,48 @@ def _active_branch(branch_id: UUID, field: str) -> Branch:
     return branch
 
 
+@dataclass(frozen=True)
+class NewProject:
+    """What a new project starts with. ``procurement_branch_id`` defaults to the branch that
+    manages ``branch_id``, or that branch itself (Q2: the procurement branch buys for it)."""
+
+    code: str
+    name: str
+    branch_id: UUID
+    procurement_branch_id: UUID | None = None
+    client_name: str = ""
+    address: str = ""
+    start_date: date | None = None
+    end_date: date | None = None
+
+
 @transactional
 def create_project(
-    principal: Principal,
-    *,
-    code: str,
-    name: str,
-    branch_id: UUID,
-    procurement_branch_id: UUID | None = None,
-    client_name: str = "",
-    address: str = "",
-    start_date: date | None = None,
-    end_date: date | None = None,
-    idempotency_key: str | None = None,
+    principal: Principal, new: NewProject, *, idempotency_key: str | None = None
 ) -> Project:
-    """Create a project and its worksite location (plan §3.3).
-
-    ``procurement_branch`` defaults to the branch that manages ``branch``, or ``branch``
-    itself (Q2: the procurement branch buys for the project).
-    """
+    """Create a project and its worksite location (plan §3.3)."""
     locks = _lock_project_change()
-    branch = Branch.objects.filter(pk=branch_id).first()
+    branch = Branch.objects.filter(pk=new.branch_id).first()
     default_procurement = (branch.managed_by_id or branch.pk) if branch is not None else None
     _authorize(
-        principal, locks, *_branches(branch_id, procurement_branch_id or default_procurement)
+        principal,
+        locks,
+        *_branches(new.branch_id, new.procurement_branch_id or default_procurement),
     )
-    payload = {
-        "code": code,
-        "name": name,
-        "branch_id": branch_id,
-        "procurement_branch_id": procurement_branch_id,
-        "client_name": client_name,
-        "address": address,
-        "start_date": start_date,
-        "end_date": end_date,
-    }
 
     def execute() -> Project:
-        branch = _active_branch(branch_id, "branch")
-        procurement = procurement_branch_id or branch.managed_by_id or branch.pk
+        branch = _active_branch(new.branch_id, "branch")
+        procurement = new.procurement_branch_id or branch.managed_by_id or branch.pk
         _active_branch(procurement, "procurement_branch")
         project = Project(
-            code=code,
-            name=name,
+            code=new.code,
+            name=new.name,
             branch=branch,
             procurement_branch_id=procurement,
-            client_name=client_name,
-            address=address,
-            start_date=start_date,
-            end_date=end_date,
+            client_name=new.client_name,
+            address=new.address,
+            start_date=new.start_date,
+            end_date=new.end_date,
         )
         project.full_clean()
         project.save()
@@ -150,8 +144,8 @@ def create_project(
             obj=project,
             branch_id=branch.pk,
             data={
-                "code": code,
-                "name": name,
+                "code": new.code,
+                "name": new.name,
                 "branch_id": branch.pk,
                 "procurement_branch_id": procurement,
                 "status": project.status,
@@ -171,7 +165,7 @@ def create_project(
         actor_id=principal.user_id,
         key=idempotency_key,
         operation="project.create",
-        payload=payload,
+        payload=asdict(new),
         execute=execute,
         replay=lambda _type, pk: Project.objects.get(pk=pk),
     )

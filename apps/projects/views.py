@@ -113,7 +113,11 @@ def project_create(request: HttpRequest) -> HttpResponse:
     form = ProjectCreateForm(request.POST, ctx=ctx)
     if form.is_valid():
         try:
-            project = services.create_project(ctx.principal, **form.create_kwargs())
+            project = services.create_project(
+                ctx.principal,
+                form.new_project(),
+                idempotency_key=form.cleaned_data["idempotency_key"],
+            )
         except ValidationError as exc:
             add_service_errors(form, exc)
         except IdempotencyError as exc:

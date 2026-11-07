@@ -16,9 +16,16 @@ from apps.audit.models import AuditEvent
 from apps.core.idempotency import issue_key
 from apps.locations.models import Location
 from apps.organizations.models import Branch, Company
-from apps.organizations.services import create_branch, create_company, update_branch, update_company
+from apps.organizations.services import (
+    NewBranch,
+    create_branch,
+    create_company,
+    update_branch,
+    update_company,
+)
 from apps.projects import services
 from apps.projects.models import Project, ProjectAssignment
+from apps.projects.services import NewProject
 from tests.support import authz_generation, grant, principal_for
 
 pytestmark = pytest.mark.django_db
@@ -30,13 +37,17 @@ def b_mad(admin_principal: SessionPrincipal, branch: Branch) -> Branch:
     venture = create_company(
         admin_principal, code="B", legal_name="UTE B", kind=Company.Kind.JOINT_VENTURE
     )
-    b_mad = create_branch(admin_principal, company_id=venture.pk, code="MAD", name="B Madrid")
+    b_mad = create_branch(
+        admin_principal, NewBranch(company_id=venture.pk, code="MAD", name="B Madrid")
+    )
     return update_branch(admin_principal, b_mad.pk, managed_by_id=branch.pk)
 
 
 @pytest.fixture
 def project(admin_principal: SessionPrincipal, branch: Branch) -> Project:
-    return services.create_project(admin_principal, code="P-1", name="Obra 1", branch_id=branch.pk)
+    return services.create_project(
+        admin_principal, NewProject(code="P-1", name="Obra 1", branch_id=branch.pk)
+    )
 
 
 class TestProjects:
@@ -47,11 +58,13 @@ class TestProjects:
         key = issue_key(admin_principal.user_id, "project.create")
         project = services.create_project(
             admin_principal,
-            code="HOSP-X",
-            name="Hospital X",
-            branch_id=branch.pk,
-            address="Av. 1",
-            start_date=date(2026, 11, 1),
+            NewProject(
+                code="HOSP-X",
+                name="Hospital X",
+                branch_id=branch.pk,
+                address="Av. 1",
+                start_date=date(2026, 11, 1),
+            ),
             idempotency_key=key,
         )
         worksite = Location.objects.get(project=project)
@@ -73,7 +86,7 @@ class TestProjects:
         self, admin_principal: SessionPrincipal, branch: Branch, b_mad: Branch
     ) -> None:
         project = services.create_project(
-            admin_principal, code="HOSP-X", name="Hospital X", branch_id=b_mad.pk
+            admin_principal, NewProject(code="HOSP-X", name="Hospital X", branch_id=b_mad.pk)
         )
         assert (project.branch_id, project.procurement_branch_id) == (b_mad.pk, branch.pk)
 
@@ -82,10 +95,7 @@ class TestProjects:
     ) -> None:
         project = services.create_project(
             admin_principal,
-            code="P-2",
-            name="P2",
-            branch_id=b_mad.pk,
-            procurement_branch_id=b_mad.pk,
+            NewProject(code="P-2", name="P2", branch_id=b_mad.pk, procurement_branch_id=b_mad.pk),
         )
         assert project.procurement_branch_id == b_mad.pk
 
@@ -94,25 +104,33 @@ class TestProjects:
     ) -> None:
         update_branch(admin_principal, branch.pk, is_active=False)
         with pytest.raises(ValidationError) as excinfo:
-            services.create_project(admin_principal, code="P", name="P", branch_id=branch.pk)
+            services.create_project(
+                admin_principal, NewProject(code="P", name="P", branch_id=branch.pk)
+            )
         assert "branch" in excinfo.value.message_dict
         with pytest.raises(ValidationError) as excinfo:
-            services.create_project(admin_principal, code="P", name="P", branch_id=b_mad.pk)
+            services.create_project(
+                admin_principal, NewProject(code="P", name="P", branch_id=b_mad.pk)
+            )
         assert "procurement_branch" in excinfo.value.message_dict
         update_branch(admin_principal, branch.pk, is_active=True)
         update_company(admin_principal, company.pk, is_active=False)
         with pytest.raises(ValidationError):
-            services.create_project(admin_principal, code="P", name="P", branch_id=branch.pk)
+            services.create_project(
+                admin_principal, NewProject(code="P", name="P", branch_id=branch.pk)
+            )
 
     def test_create_validates(self, admin_principal: SessionPrincipal, branch: Branch) -> None:
         with pytest.raises(ValidationError):
             services.create_project(
                 admin_principal,
-                code="P",
-                name="P",
-                branch_id=branch.pk,
-                start_date=date(2026, 2, 1),
-                end_date=date(2026, 1, 1),
+                NewProject(
+                    code="P",
+                    name="P",
+                    branch_id=branch.pk,
+                    start_date=date(2026, 2, 1),
+                    end_date=date(2026, 1, 1),
+                ),
             )
 
     @pytest.mark.parametrize("field", ["status", "branch_id", "procurement_branch_id"])
@@ -167,7 +185,9 @@ class TestProjects:
         grant(technician, Role.TECHNICIAN, branch=branch)
         principal = principal_for(technician)
         with pytest.raises(AccessDenied):
-            services.create_project(principal, code="P-9", name="P", branch_id=branch.pk)
+            services.create_project(
+                principal, NewProject(code="P-9", name="P", branch_id=branch.pk)
+            )
         with pytest.raises(AccessDenied):
             services.update_project(principal, project.pk, name="X")
 
@@ -353,7 +373,9 @@ class TestMaterialManagerScope:
 
     @pytest.fixture
     def sevilla(self, admin_principal: SessionPrincipal, company: Company) -> Branch:
-        return create_branch(admin_principal, company_id=company.pk, code="SEV", name="Sevilla")
+        return create_branch(
+            admin_principal, NewBranch(company_id=company.pk, code="SEV", name="Sevilla")
+        )
 
     @pytest.fixture
     def manager(self, make_user: Callable[..., User], branch: Branch) -> SessionPrincipal:
@@ -390,8 +412,12 @@ class TestMaterialManagerScope:
     def test_creates_in_its_branch_and_the_branches_it_manages(
         self, manager: SessionPrincipal, branch: Branch, b_mad: Branch
     ) -> None:
-        own = services.create_project(manager, code="P-1", name="P1", branch_id=branch.pk)
-        managed = services.create_project(manager, code="P-2", name="P2", branch_id=b_mad.pk)
+        own = services.create_project(
+            manager, NewProject(code="P-1", name="P1", branch_id=branch.pk)
+        )
+        managed = services.create_project(
+            manager, NewProject(code="P-2", name="P2", branch_id=b_mad.pk)
+        )
         assert own.procurement_branch_id == managed.procurement_branch_id == branch.pk
         services.update_project(manager, managed.pk, name="P2 bis")
 
@@ -403,17 +429,16 @@ class TestMaterialManagerScope:
         sevilla: Branch,
     ) -> None:
         with pytest.raises(NotInScope):
-            services.create_project(manager, code="P-9", name="P", branch_id=sevilla.pk)
+            services.create_project(manager, NewProject(code="P-9", name="P", branch_id=sevilla.pk))
         with pytest.raises(NotInScope):  # buying for a branch out of scope
             services.create_project(
                 manager,
-                code="P-9",
-                name="P",
-                branch_id=branch.pk,
-                procurement_branch_id=sevilla.pk,
+                NewProject(
+                    code="P-9", name="P", branch_id=branch.pk, procurement_branch_id=sevilla.pk
+                ),
             )
         foreign = services.create_project(
-            admin_principal, code="SEV-1", name="S", branch_id=sevilla.pk
+            admin_principal, NewProject(code="SEV-1", name="S", branch_id=sevilla.pk)
         )
         with pytest.raises(NotInScope):
             services.update_project(manager, foreign.pk, name="X")
@@ -422,7 +447,9 @@ class TestMaterialManagerScope:
     def test_cannot_move_a_project_out_of_its_scope(
         self, manager: SessionPrincipal, branch: Branch, sevilla: Branch
     ) -> None:
-        project = services.create_project(manager, code="P-1", name="P1", branch_id=branch.pk)
+        project = services.create_project(
+            manager, NewProject(code="P-1", name="P1", branch_id=branch.pk)
+        )
         for field in ("branch_id", "procurement_branch_id"):
             with pytest.raises(NotInScope):
                 services.update_project(manager, project.pk, **{field: sevilla.pk})
@@ -440,13 +467,15 @@ class TestMaterialManagerScope:
         site_manager = make_user("site@example.org")
         grant(site_manager, Role.SITE_MANAGER, branch=branch)
         grant(site_manager, Role.PARTNER_REQUESTER, company=branch.company)
-        own = services.create_project(manager, code="P-1", name="P1", branch_id=branch.pk)
+        own = services.create_project(
+            manager, NewProject(code="P-1", name="P1", branch_id=branch.pk)
+        )
         assignment = services.assign_to_project(
             manager, project_id=own.pk, user_id=site_manager.pk, kind=ProjectAssignment.Kind.MANAGER
         )
         services.revoke_project_assignment(manager, assignment.pk)
         foreign = services.create_project(
-            admin_principal, code="SEV-1", name="S", branch_id=sevilla.pk
+            admin_principal, NewProject(code="SEV-1", name="S", branch_id=sevilla.pk)
         )
         foreign_assignment = services.assign_to_project(
             admin_principal,
@@ -471,5 +500,6 @@ class TestMaterialManagerScope:
         grant(user, Role.MATERIAL_MANAGER, branch=branch)
         with pytest.raises(MFARequired):
             services.create_project(
-                principal_for(user, mfa_at=None), code="P-1", name="P1", branch_id=branch.pk
+                principal_for(user, mfa_at=None),
+                NewProject(code="P-1", name="P1", branch_id=branch.pk),
             )

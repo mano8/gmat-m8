@@ -19,7 +19,7 @@ from apps.notifications.outbox import queue_security_email
 from apps.organizations import services as org_services
 from apps.organizations.models import Branch, Membership
 from apps.projects.models import ProjectAssignment
-from apps.projects.services import assign_to_project, create_project
+from apps.projects.services import NewProject, assign_to_project, create_project
 from tests.support import authz_generation, error_codes, grant, principal_for
 
 pytestmark = pytest.mark.django_db
@@ -42,7 +42,9 @@ class TestOffboard:
         invite: Callable[..., Invitation],
     ) -> None:
         site = member(Role.SITE_MANAGER, email="site@example.org", branch=branch)
-        project = create_project(admin_principal, code="P-1", name="P", branch_id=branch.pk)
+        project = create_project(
+            admin_principal, NewProject(code="P-1", name="P", branch_id=branch.pk)
+        )
         assign_to_project(admin_principal, project_id=project.pk, user_id=site.pk, kind="MANAGER")
         theirs = invite("friend@example.org", principal=principal_for(second_admin))
         mine = invite("site@example.org", role=Role.TECHNICIAN)

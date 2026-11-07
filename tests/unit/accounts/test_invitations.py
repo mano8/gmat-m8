@@ -21,7 +21,7 @@ from apps.core.locking import LockSetChanged
 from apps.notifications.models import EmailOutbox, Status
 from apps.organizations.models import Branch, Company, Membership
 from apps.projects.models import Project, ProjectAssignment
-from apps.projects.services import create_project
+from apps.projects.services import NewProject, create_project
 from tests.support import PASSWORD, enroll_totp, error_codes, grant, principal_for
 from tests.tokens import last_token, tokens_sent_to
 
@@ -140,7 +140,9 @@ class TestCreate:
     def test_assignments_need_an_active_project(
         self, invite: Callable[..., Invitation], admin_principal: SessionPrincipal, branch: Branch
     ) -> None:
-        project = create_project(admin_principal, code="P-1", name="P", branch_id=branch.pk)
+        project = create_project(
+            admin_principal, NewProject(code="P-1", name="P", branch_id=branch.pk)
+        )
         grant_ = AssignmentGrant(project_id=project.pk, kind=ProjectAssignment.Kind.MANAGER)
         invitation = invite(role=Role.SITE_MANAGER, assignments=(grant_,))
         assert parse_grants(invitation.grants)[1] == [grant_]
@@ -298,7 +300,9 @@ class TestAcceptNewAccount:
     def test_assignments_are_created_once(
         self, invite: Callable[..., Invitation], admin_principal: SessionPrincipal, branch: Branch
     ) -> None:
-        project = create_project(admin_principal, code="P-1", name="P", branch_id=branch.pk)
+        project = create_project(
+            admin_principal, NewProject(code="P-1", name="P", branch_id=branch.pk)
+        )
         grant_ = AssignmentGrant(project_id=project.pk, kind=ProjectAssignment.Kind.MANAGER)
         invite(role=Role.SITE_MANAGER, assignments=(grant_, grant_))
         user = accept(last_token("new@example.org"))

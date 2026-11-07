@@ -14,6 +14,7 @@ from apps.organizations import selectors as org_selectors
 from apps.organizations.models import CODE_PATTERN
 from apps.projects import selectors
 from apps.projects.models import Project, ProjectAssignment
+from apps.projects.services import NewProject
 
 STATUS_CHOICES = [("", _("All statuses")), *Project.Status.choices]
 
@@ -126,20 +127,19 @@ class ProjectCreateForm(IdempotentForm, ProjectForm):
         super().__init__(*args, **kwargs)
         del self.fields["status"]  # new projects start ACTIVE
 
-    def create_kwargs(self) -> dict[str, Any]:
+    def new_project(self) -> NewProject:
         data = self.cleaned_data
         procurement = data.get("procurement_branch")
-        return {
-            "code": data["code"],
-            "name": data["name"],
-            "branch_id": data["branch"].pk,
-            "procurement_branch_id": procurement.pk if procurement is not None else None,
-            "client_name": data["client_name"],
-            "address": data["address"],
-            "start_date": data["start_date"],
-            "end_date": data["end_date"],
-            "idempotency_key": data["idempotency_key"],
-        }
+        return NewProject(
+            code=data["code"],
+            name=data["name"],
+            branch_id=data["branch"].pk,
+            procurement_branch_id=procurement.pk if procurement is not None else None,
+            client_name=data["client_name"],
+            address=data["address"],
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+        )
 
 
 class UserChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]

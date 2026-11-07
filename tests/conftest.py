@@ -20,6 +20,7 @@ from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role
 from apps.accounts.models import User
 from apps.organizations.models import Branch, Company
+from apps.organizations.services import NewBranch
 from tests.org import Org, People, build_org, build_people
 from tests.org import member as org_member
 from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
@@ -150,5 +151,5 @@ def branch(admin_principal: SessionPrincipal, company: Company) -> Branch:
     from apps.organizations.services import create_branch
 
     return create_branch(
-        admin_principal, company_id=company.pk, code="MAD", name="Madrid", city="Madrid"
+        admin_principal, NewBranch(company_id=company.pk, code="MAD", name="Madrid", city="Madrid")
     )

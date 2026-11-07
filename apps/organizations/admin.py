@@ -129,7 +129,9 @@ class BranchAdmin(MasterDataAdmin):
         if change:
             saved = services.update_branch(principal, obj.pk, **self.form_values(form))
         else:
-            saved = services.create_branch(principal, **self.form_values(form, self.ADD_FIELDS))
+            saved = services.create_branch(
+                principal, services.NewBranch(**self.form_values(form, self.ADD_FIELDS))
+            )
         self.adopt(obj, saved)
 
 
