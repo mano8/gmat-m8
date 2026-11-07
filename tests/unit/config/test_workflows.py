@@ -4,7 +4,9 @@ These run on every PR, so a workflow that weakens a rule fails before the mainta
 review. The banned triggers themselves are checked by ``scripts/check_access_rules.py``.
 """
 
+import os
 import re
+import subprocess
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -456,7 +458,7 @@ def test_image_scan_gate_and_issue_flow() -> None:
     assert gate["with"]["exit-code"] == "1"
     final = jobs["scan"]["steps"][-1]
     assert final["if"] == "steps.gate.outcome == 'failure'"  # the cell still fails
-    assert jobs["report"]["if"] == "always() && needs.targets.result == 'success'"
+    assert jobs["report"]["if"] == "${{ !cancelled() }}"  # a scan that never ran says so too
     assert jobs["report"]["permissions"]["issues"] == "write"
     assert jobs["scan"]["permissions"] == {"contents": "read", "packages": "read"}
 
@@ -482,6 +484,64 @@ def test_image_scan_closes_the_issue_only_after_a_complete_clean_run() -> None:
     assert '[ "$SCAN_RESULT" = "success" ]' in step["run"]
     assert "gh issue close" in step["run"]
     assert step["run"].index("gh issue create") < step["run"].index("gh issue close")
+
+
+def _issue_step() -> dict[str, Any]:
+    steps = _load(IMAGE_SCAN)["jobs"]["report"]["steps"]
+    return next(step for step in steps if step.get("name") == "Open, update or close the issue")
+
+
+@pytest.mark.parametrize(
+    ("scan_result", "findings", "open_issue", "expected"),
+    [
+        ("skipped", None, "", "issue create"),  # `targets` failed: nothing was scanned
+        ("failure", "", "", "issue create"),  # a leg ended without a report
+        ("failure", "", "7", "issue edit 7"),
+        ("failure", "a finding", "", "issue create"),
+        ("success", "a finding", "7", "issue edit 7"),
+        ("success", "", "7", "issue close 7"),
+        ("success", "", "", None),
+    ],
+)
+def test_the_nightly_issue_also_says_when_the_scan_did_not_finish(
+    tmp_path: Path, scan_result: str, findings: str | None, open_issue: str, expected: str | None
+) -> None:
+    """The step's own script, against a ``gh`` that only records what it was asked."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log = tmp_path / "gh.log"
+    fake = bin_dir / "gh"
+    fake.write_text(
+        f'#!/bin/bash\necho "$*" >> "{log}"\n'
+        f'if [ "$1 $2" = "issue list" ]; then echo "{open_issue}"; fi\n',
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+    if findings is not None:
+        (tmp_path / "scan-issue.md").write_text(findings, encoding="utf-8")
+    env = {
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "ISSUE_TITLE": "the title",
+        "SCAN_RESULT": scan_result,
+        "RUN_URL": "https://example.invalid/run",
+    }
+    subprocess.run(  # noqa: S603
+        ["bash", "-c", _issue_step()["run"]],  # noqa: S607
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+    )
+    asked = [line for line in log.read_text(encoding="utf-8").splitlines() if "list" not in line]
+    if expected is None:
+        assert asked == []
+        return
+    assert len(asked) == 1
+    assert asked[0].startswith(expected)
+    if not findings and scan_result != "success":
+        body = (tmp_path / "scan-issue.md").read_text(encoding="utf-8")
+        assert "did not finish" in body
+        assert env["RUN_URL"] in body
 
 
 def test_the_test_job_proves_every_migration_reverses() -> None:

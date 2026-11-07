@@ -156,7 +156,9 @@ jobs:
   report:
     name: report
     needs: [targets, scan]
-    if: always() && needs.targets.result == 'success'
+    # After any run but a cancelled one. When `targets` fails nothing is scanned, and a job that
+    # only ran after a scan left that silent for a week of red nights.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -173,12 +175,14 @@ jobs:
           python-version: "3.14"
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.targets.result == 'success'
         with:
           pattern: scan-*
           merge-multiple: true
           path: reports
 
       - name: Build the issue text
+        if: needs.targets.result == 'success'
         run: >-
           python scripts/release_tools.py scan-issue
           --dir reports
@@ -186,13 +190,17 @@ jobs:
           --output scan-issue.md
 
       # Findings: open the issue or refresh its body. No findings: close it, but only when every
-      # scan leg ran to the end (a leg that could not pull its image proves nothing).
+      # scan leg ran to the end. A run that did not (no targets, or a leg that could not pull its
+      # image) proves nothing, and the issue says so instead of staying quiet.
       - name: Open, update or close the issue
         env:
           SCAN_RESULT: ${{ needs.scan.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          if [ ! -s scan-issue.md ] && [ "$SCAN_RESULT" != "success" ]; then
+            echo "The nightly scan did not finish, so it says nothing about the images. Read the run: $RUN_URL" > scan-issue.md
+          fi
           number="$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" \
             --json number,title --jq '[.[] | select(.title == env.ISSUE_TITLE)] | .[0].number // empty')"
           if [ -s scan-issue.md ]; then
