@@ -168,16 +168,10 @@ class _Session:
     data_started: bool = False
 
 
-def _dialogue(
-    session: _Session,
-    mailer: SMTPBackend,
-    message: EmailMultiAlternatives,
-    deadline: Deadline,
-    per_op: float,
-) -> Result:
-    sender = mailer.prep_address(message.from_email)
-    recipients = [mailer.prep_address(address) for address in message.recipients()]
-    content = message.message(policy=email.policy.SMTP).as_bytes()
+def _open_connection(
+    session: _Session, mailer: SMTPBackend, deadline: Deadline, per_op: float
+) -> smtplib.SMTP:
+    """Connect, then STARTTLS and AUTH if configured; ``session.stage`` says how far it got."""
     options: dict[str, Any] = {"context": mailer.ssl_context} if mailer.use_ssl else {}
     session.stage = "connect"
     session.connection = connection = mailer.connection_class(
@@ -195,6 +189,37 @@ def _dialogue(
         session.stage = "AUTH"
         _set_timeout(connection, deadline, per_op)
         connection.login(mailer.username, mailer.password)
+    return connection
+
+
+def _offer_recipients(
+    connection: smtplib.SMTP,
+    recipients: list[str],
+    deadline: Deadline,
+    per_op: float,
+    code: int,
+) -> tuple[int, int]:
+    """How many recipients the server accepted, and its last reply (``code`` if none was asked)."""
+    accepted = 0
+    for recipient in recipients:
+        _set_timeout(connection, deadline, per_op)
+        code, _ = connection.rcpt(recipient)
+        if code in {250, 251}:
+            accepted += 1
+    return accepted, code
+
+
+def _dialogue(
+    session: _Session,
+    mailer: SMTPBackend,
+    message: EmailMultiAlternatives,
+    deadline: Deadline,
+    per_op: float,
+) -> Result:
+    sender = mailer.prep_address(message.from_email)
+    recipients = [mailer.prep_address(address) for address in message.recipients()]
+    content = message.message(policy=email.policy.SMTP).as_bytes()
+    connection = _open_connection(session, mailer, deadline, per_op)
     session.stage = "MAIL"
     _set_timeout(connection, deadline, per_op)
     connection.ehlo_or_helo_if_needed()
@@ -202,12 +227,7 @@ def _dialogue(
     if code != 250:
         return Result(Outcome.FAILED, f"SMTP {code} at MAIL")
     session.stage = "RCPT"
-    accepted = 0
-    for recipient in recipients:
-        _set_timeout(connection, deadline, per_op)
-        code, _ = connection.rcpt(recipient)
-        if code in {250, 251}:
-            accepted += 1
+    accepted, code = _offer_recipients(connection, recipients, deadline, per_op, code)
     if not accepted:
         return Result(Outcome.FAILED, f"SMTP {code} at RCPT")
     session.stage = "DATA"
@@ -309,37 +329,42 @@ class Worker:
         temporary.write_text(json.dumps(record), encoding="utf-8")
         temporary.replace(self.heartbeat_file)
 
-    def tick(self) -> bool:
-        """One iteration; ``True`` when there may be more work right away."""
-        state = self.state()
-        self.beat(state)
+    def _hold_while_paused(self, state: str) -> bool:
+        """Whether this iteration stops here; a resumed worker reconciles at once."""
         if state == PAUSED:
             if not self.was_paused:
                 logger.info("Worker paused: nothing is claimed, sent or cleaned up")
                 connections.close_all()
             self.was_paused = True
-            return False
+            return True
         if self.was_paused:
             logger.info("Worker resumed")
             self.was_paused = False
             self.next_reconcile = 0.0
-        now = self.clock()
-        if now >= self.next_reconcile:
-            reconciled = reconcile_abandoned(self.principal)
-            if reconciled.abandoned:
-                logger.warning("%d abandoned attempt(s) set AMBIGUOUS", reconciled.abandoned)
-            delay = self.reconcile_interval
-            if reconciled.next_due_in is not None:
-                delay = min(delay, reconciled.next_due_in + 0.5)
-            self.next_reconcile = now + delay
-        if now >= self.next_housekeeping:
-            done = run_housekeeping(self.principal)
-            logger.info(
-                "Housekeeping done: %s", ", ".join(f"{name}={rows}" for name, rows in done.items())
-            )
-            self.next_housekeeping = now + self.housekeeping_interval
-        if state == OUTBOUND_OFF:
-            return False
+        return False
+
+    def _reconcile_if_due(self, now: float) -> None:
+        if now < self.next_reconcile:
+            return
+        reconciled = reconcile_abandoned(self.principal)
+        if reconciled.abandoned:
+            logger.warning("%d abandoned attempt(s) set AMBIGUOUS", reconciled.abandoned)
+        delay = self.reconcile_interval
+        if reconciled.next_due_in is not None:
+            delay = min(delay, reconciled.next_due_in + 0.5)
+        self.next_reconcile = now + delay
+
+    def _housekeep_if_due(self, now: float) -> None:
+        if now < self.next_housekeeping:
+            return
+        done = run_housekeeping(self.principal)
+        logger.info(
+            "Housekeeping done: %s", ", ".join(f"{name}={rows}" for name, rows in done.items())
+        )
+        self.next_housekeeping = now + self.housekeeping_interval
+
+    def _process_next(self) -> bool:
+        """Claim one message and send it; ``True`` when there may be another right away."""
         claimed = claim_next(self.principal, worker=self.name)
         if claimed is None:
             return False
@@ -358,6 +383,17 @@ class Worker:
             "" if applied else " (superseded, not applied)",
         )
         return True
+
+    def tick(self) -> bool:
+        """One iteration; ``True`` when there may be more work right away."""
+        state = self.state()
+        self.beat(state)
+        if self._hold_while_paused(state):
+            return False
+        now = self.clock()
+        self._reconcile_if_due(now)
+        self._housekeep_if_due(now)
+        return state != OUTBOUND_OFF and self._process_next()
 
     def run(self) -> None:
         """Loop until SIGTERM / SIGINT; database outages are waited out."""
