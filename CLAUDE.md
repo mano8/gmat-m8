@@ -1,6 +1,6 @@
 # gmat-m8
 
-Materials app for a group of electrical-installation companies and their branches: technicians request materials for worksites, managers approve, purchasing orders from suppliers, goods are received at a warehouse or on site and handed over. Modular Django monolith (Django 6.1 + HTMX + PostgreSQL 18), Docker Compose on one VPS.
+Materials app for any company, or group of companies with branches, that buys for its projects and worksites: technicians request materials for worksites, managers approve, purchasing orders from suppliers, goods are received at a warehouse or on site and handed over. Modular Django monolith (Django 6.1 + HTMX + PostgreSQL 18), Docker Compose on one VPS.
 
 ## Source of truth
 

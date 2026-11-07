@@ -1,7 +1,7 @@
 [project]
 name = "gmat-m8"
 version = "0.1.0"
-description = "Materials app for electrical-installation companies: requests, purchasing, receiving and handovers"
+description = "Materials app for companies that buy for projects and worksites: requests, purchasing, receiving and handovers"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 license = { file = "LICENSE" }
