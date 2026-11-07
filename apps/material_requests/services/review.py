@@ -19,7 +19,7 @@ from apps.core import events
 from apps.core.changes import apply_changes
 from apps.core.db import db_now
 from apps.core.locking import LockOrder, transactional
-from apps.material_requests import commitments, ledger
+from apps.material_requests import commitments, ledger, procurement
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services.common import (
     REVIEW,
@@ -543,7 +543,8 @@ def reopen(principal: Principal, request_id: UUID, *, reason: str) -> MaterialRe
 
     Only the lines its manual close closed (``REQUEST``) reopen; lines closed on their own
     (``LINE``) stay closed until ``reopen_line``. Reopened lines keep their trimmed
-    allocations, so given-up commitments never revive (E5).
+    allocations, so given-up commitments never revive (E5). A request with nothing
+    committed takes its project's current procurement branch (``procurement``).
     """
     reason = _reason(reason)
     locks = LockOrder()
@@ -557,6 +558,7 @@ def reopen(principal: Principal, request_id: UUID, *, reason: str) -> MaterialRe
     close_mode = locked.close_mode
     locked.closed_at, locked.close_mode, locked.close_reason = None, "", ""
     locked.save()
+    procurement.follow_on_reopen(principal, locked)
     _record(
         principal,
         "request.reopened",

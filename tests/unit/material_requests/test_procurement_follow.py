@@ -1,4 +1,5 @@
-"""Open requests follow their project's procurement branch, or the change is refused."""
+"""Open requests follow their project's procurement branch, or the change is refused; a
+closed request reopened by hand catches up when nothing is committed."""
 
 from decimal import Decimal
 from uuid import UUID
@@ -8,6 +9,7 @@ from django.core.exceptions import ValidationError
 
 from apps.audit.models import AuditEvent
 from apps.material_requests import ledger
+from apps.material_requests import services as mr_services
 from apps.material_requests.models import MaterialRequest
 from apps.projects import procurement, services
 from apps.projects.models import Project
@@ -112,6 +114,52 @@ def test_a_committed_request_refuses_the_change(
     assert org.hospital.procurement_branch_id == org.a_mad.pk
     assert {_branch_of(committed), _branch_of(free)} == {org.a_mad.pk}
     assert not AuditEvent.objects.filter(action="request.procurement_branch_changed").exists()
+
+
+class TestReopen:
+    """A closed request stays where it was bought when the project changes; reopening it by
+    hand takes the project's branch then, unless something is committed."""
+
+    @pytest.fixture
+    def closed(self, org: Org, people: People, make_request: MakeRequest) -> MaterialRequest:
+        request = make_request(Status.APPROVED, decided=True)
+        mr_services.manual_close(principal_for(people.mm_mad), request.pk, reason="Fin")
+        _move(people, org.hospital, org.b_mad.pk)
+        assert _branch_of(request) == org.a_mad.pk
+        return request
+
+    def test_an_uncommitted_request_takes_the_new_branch(
+        self, org: Org, people: People, closed: MaterialRequest
+    ) -> None:
+        mr_services.reopen(principal_for(people.mm_mad), closed.pk, reason="Falta")
+        assert _branch_of(closed) == org.b_mad.pk
+        event = AuditEvent.objects.get(action="request.procurement_branch_changed")
+        assert (event.object_id, event.data["from"], event.data["cause"]) == (
+            closed.pk,
+            str(org.a_mad.pk),
+            "reopen",
+        )
+
+    def test_a_committed_request_keeps_its_branch(
+        self,
+        org: Org,
+        people: People,
+        closed: MaterialRequest,
+        flows_of: dict[UUID, ledger.Flows],
+    ) -> None:
+        flows_of[closed.lines.get().pk] = ledger.Flows(delivered=Decimal("1"))
+        reopened = mr_services.reopen(principal_for(people.mm_mad), closed.pk, reason="Falta")
+        assert reopened.status == Status.APPROVED
+        assert _branch_of(closed) == org.a_mad.pk
+        assert not AuditEvent.objects.filter(action="request.procurement_branch_changed").exists()
+
+    def test_a_request_on_the_project_branch_stays_quiet(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        request = make_request(Status.APPROVED, decided=True)
+        mr_services.manual_close(principal_for(people.mm_mad), request.pk, reason="Fin")
+        mr_services.reopen(principal_for(people.mm_mad), request.pk, reason="Falta")
+        assert not AuditEvent.objects.filter(action="request.procurement_branch_changed").exists()
 
 
 def test_other_project_changes_leave_requests_alone(
