@@ -188,6 +188,8 @@ def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
     context = {
         "person": user,
         "manageable": may_manage_account(request.user, user) and user.pk != ctx.user_id,
+        # One's own employer is the one thing an administrator changes on their own page.
+        "employer_editable": may_manage_account(request.user, user),
         "is_self": user.pk == ctx.user_id,
         **_person_sections(request, ctx, user),
         "open_change": change,

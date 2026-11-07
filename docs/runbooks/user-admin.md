@@ -48,6 +48,8 @@ Never paste a link into a chat or ticket: it is a credential. If you must give o
 
 People → the person: **grant** a membership, set its validity dates, or **revoke** it. Memberships are revoked, never deleted, and the history stays. Changes apply on the person's next request. A person's capabilities are never mixed across memberships: each applies only in its own scope. Giving a privileged role requires the person to pass MFA again before using it.
 
+On your own page you can change only your **employer**. Your roles and your email address are changed by another administrator: nobody grants or revokes their own roles (the last administrator could lock everyone out), and a stolen session must not be able to redirect your password resets.
+
 ## Offboarding
 
 When someone leaves: People → the person → **Offboard**. In one transaction it deactivates the account, ends all its sessions, revokes every membership and project assignment, revokes its pending invitations and email changes **and those it issued**, and wipes unsent security email addressed to it. The account and its history stay (users are deactivated, never deleted, for the audit trail).

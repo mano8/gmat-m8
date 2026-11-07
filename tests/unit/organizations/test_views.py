@@ -60,6 +60,57 @@ class TestPeople:
         assert reverse("org:offboard", args=[people.group_admin.pk]).encode() not in own.content
 
 
+class TestOwnPage:
+    """An administrator changes their own employer, and nothing else of their account."""
+
+    def test_offers_only_the_employer(self, people: People) -> None:
+        me = people.group_admin
+        page = client_for(me).get(reverse("org:person", args=[me.pk])).content.decode()
+        assert reverse("org:set_employer", args=[me.pk]) in page
+        for name in ("offboard", "request_email_change", "grant_membership"):
+            assert reverse(f"org:{name}", args=[me.pk]) not in page, name
+        assert "Revoke" not in page
+
+    def test_sets_own_employer(self, org: Org, people: People) -> None:
+        me = people.group_admin
+        response = client_for(me).post(
+            reverse("org:set_employer", args=[me.pk]), {"company": org.b.pk}, follow=True
+        )
+        assert response.status_code == 200
+        me.refresh_from_db()
+        assert me.employer_company_id == org.b.pk
+
+    def test_a_direct_post_on_own_roles_or_email_is_refused(self, org: Org, people: People) -> None:
+        me = people.group_admin
+        client = client_for(me)
+        own = Membership.objects.get(user=me, revoked_at__isnull=True)
+        posts = [
+            (
+                reverse("org:grant_membership", args=[me.pk]),
+                {
+                    "role": Role.WAREHOUSE_OPERATOR,
+                    "branch": org.a_sev.pk,
+                    "idempotency_key": issue_key(me.pk, "membership.grant"),
+                },
+            ),
+            (reverse("org:revoke_membership", args=[own.pk]), {}),
+            (
+                reverse("org:membership_validity", args=[own.pk]),
+                {"valid_from": "2026-01-01T00:00", "valid_until": "2031-01-01T00:00"},
+            ),
+            (reverse("org:request_email_change", args=[me.pk]), {"new_email": "me@example.org"}),
+        ]
+        for url, data in posts:
+            response = client.post(url, data, follow=True)
+            assert response.status_code == 200 and messages_of(response), url
+        assert list(Membership.objects.filter(user=me).values_list("pk", "revoked_at")) == [
+            (own.pk, None)
+        ]
+        own.refresh_from_db()
+        assert own.valid_until is None
+        assert not EmailChangeRequest.objects.filter(user=me).exists()
+
+
 class TestMemberships:
     def test_grant_validity_and_revoke(self, org: Org, people: People) -> None:
         client = client_for(people.group_admin)

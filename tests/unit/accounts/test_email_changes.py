@@ -71,6 +71,17 @@ class TestRequest:
         user.refresh_from_db()
         assert user.email == OLD  # nothing changes before confirmation and cooling-off
 
+    def test_not_on_ones_own_address(
+        self, admin_principal: SessionPrincipal, group_admin: User
+    ) -> None:
+        """F59: another administrator changes it, never the account itself."""
+        with pytest.raises(ValidationError) as exc:
+            services.request_email_change(
+                admin_principal, group_admin.pk, new_email="mine@example.org"
+            )
+        assert error_codes(exc) == {"self"}
+        assert not EmailChangeRequest.objects.exists()
+
     def test_a_new_request_replaces_the_open_one(
         self, admin_principal: SessionPrincipal, change: EmailChangeRequest, user: User
     ) -> None:

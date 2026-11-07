@@ -345,6 +345,15 @@ def update_branch(principal: Principal, branch_id: UUID, **changes: Any) -> Bran
 # --- memberships and employer -------------------------------------------------------
 
 
+def _not_own_roles(actor: User, user_id: UUID) -> None:
+    """Nobody grants, revokes or moves their own roles: another administrator does (the
+    last administrator could lock everyone out). The employer is the exception."""
+    if actor.pk == user_id:
+        raise ValidationError(
+            _("You cannot change your own roles; another administrator can."), code="self"
+        )
+
+
 @transactional
 def grant_membership(
     principal: Principal,
@@ -359,6 +368,7 @@ def grant_membership(
 ) -> Membership:
     """Grant ``role`` to a user; ``valid_from`` defaults to the database clock (S8)."""
     actor = lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
+    _not_own_roles(actor, user_id)
     payload = {
         "user_id": user_id,
         "role": role,
@@ -435,6 +445,7 @@ def revoke_membership(principal: Principal, membership_id: UUID) -> Membership:
     # Discover the user to lock; a membership's user never changes, so no re-check.
     user_id = Membership.objects.values_list("user_id", flat=True).get(pk=membership_id)
     actor = lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
+    _not_own_roles(actor, user_id)
     membership = _open_membership(membership_id)
     membership.revoked_at = db_now()
     membership.revoked_by = actor
@@ -461,7 +472,8 @@ def change_membership_validity(
 ) -> Membership:
     """Move a membership's validity window; a privileged role elevates again."""
     user_id = Membership.objects.values_list("user_id", flat=True).get(pk=membership_id)
-    lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
+    actor = lock_for_user_change(principal, user_id, Capability.ORG_MANAGE)
+    _not_own_roles(actor, user_id)
     membership = _open_membership(membership_id)
     diff = apply_changes(
         membership,

@@ -134,61 +134,67 @@
       </div>
     </section>
   {% endif %}
-  {% if manageable and person.is_active %}
+  {% if employer_editable and person.is_active %}
     <section class="card mb-4" aria-labelledby="account-title">
       <h2 id="account-title" class="card-title">{% translate "Account" %}</h2>
       <form method="post"
             class="mb-4 grid max-w-xl gap-x-3 sm:grid-cols-[1fr_auto] sm:items-end"
-            action="{% url 'org:set_employer' user_id=person.pk %}">
+            action="{% url 'org:set_employer' user_id=person.pk %}"
+            data-testid="employer-form">
         {% csrf_token %}
         {{ employer_form }}
         <div class="field">{% include "components/button.html" with type="submit" label=_("Save") %}</div>
       </form>
-      <h3 class="mb-2 font-semibold">{% translate "Email address" %}</h3>
-      {% if open_change %}
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div class="grid gap-1">
-            <p class="text-soft">
-              {% if open_change.confirmed_at %}
-                {% blocktranslate with email=open_change.new_email date=open_change.apply_after|date:"SHORT_DATETIME_FORMAT" %}Changes to {{ email }} after {{ date }}.{% endblocktranslate %}
-              {% else %}
-                {% blocktranslate with email=open_change.new_email %}Waiting for {{ email }} to confirm.{% endblocktranslate %}
-              {% endif %}
-            </p>
-            {% with confirm=change_delivery.confirm notice=change_delivery.notice change=open_change %}
-              {% include "organizations/delivery_email_change.html" %}
-            {% endwith %}
-          </div>
-          <form method="post"
-                action="{% url 'org:revoke_email_change' change_id=open_change.pk %}">
-            {% csrf_token %}
-            {% include "components/button.html" with type="submit" label=_("Revoke") variant="danger" %}
-          </form>
-        </div>
+      {% if is_self %}
+        <p class="text-sm text-soft">{% translate "Your email address and roles are changed by another administrator." %}</p>
       {% endif %}
-      <form method="post"
-            class="mb-4 grid max-w-xl gap-x-3 sm:grid-cols-[1fr_auto] sm:items-end"
-            action="{% url 'org:request_email_change' user_id=person.pk %}">
-        {% csrf_token %}
-        {{ email_form }}
-        <div class="field">{% include "components/button.html" with type="submit" label=_("Change") %}</div>
-      </form>
-      <p class="mb-4 text-sm text-soft">
-        {% translate "The new address confirms the change; the current one can cancel it. It applies 24 hours after confirmation and ends every session of the account." %}
-      </p>
-      <details>
-        <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-danger">{% translate "Offboard" %}</summary>
+      {% if manageable %}
+        <h3 class="mb-2 font-semibold">{% translate "Email address" %}</h3>
+        {% if open_change %}
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div class="grid gap-1">
+              <p class="text-soft">
+                {% if open_change.confirmed_at %}
+                  {% blocktranslate with email=open_change.new_email date=open_change.apply_after|date:"SHORT_DATETIME_FORMAT" %}Changes to {{ email }} after {{ date }}.{% endblocktranslate %}
+                {% else %}
+                  {% blocktranslate with email=open_change.new_email %}Waiting for {{ email }} to confirm.{% endblocktranslate %}
+                {% endif %}
+              </p>
+              {% with confirm=change_delivery.confirm notice=change_delivery.notice change=open_change %}
+                {% include "organizations/delivery_email_change.html" %}
+              {% endwith %}
+            </div>
+            <form method="post"
+                  action="{% url 'org:revoke_email_change' change_id=open_change.pk %}">
+              {% csrf_token %}
+              {% include "components/button.html" with type="submit" label=_("Revoke") variant="danger" %}
+            </form>
+          </div>
+        {% endif %}
         <form method="post"
-              class="mt-2 max-w-xl"
-              action="{% url 'org:offboard' user_id=person.pk %}">
+              class="mb-4 grid max-w-xl gap-x-3 sm:grid-cols-[1fr_auto] sm:items-end"
+              action="{% url 'org:request_email_change' user_id=person.pk %}">
           {% csrf_token %}
-          <p class="mb-2 text-soft">
-            {% translate "Deactivates the account, ends its sessions, revokes every role, project and pending invitation or email change, including those this person issued." %}
-          </p>
-          {{ confirm_form }}
-          {% include "components/button.html" with type="submit" label=_("Offboard") variant="danger" %}
+          {{ email_form }}
+          <div class="field">{% include "components/button.html" with type="submit" label=_("Change") %}</div>
         </form>
-      </details>
+        <p class="mb-4 text-sm text-soft">
+          {% translate "The new address confirms the change; the current one can cancel it. It applies 24 hours after confirmation and ends every session of the account." %}
+        </p>
+        <details>
+          <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-danger">{% translate "Offboard" %}</summary>
+          <form method="post"
+                class="mt-2 max-w-xl"
+                action="{% url 'org:offboard' user_id=person.pk %}">
+            {% csrf_token %}
+            <p class="mb-2 text-soft">
+              {% translate "Deactivates the account, ends its sessions, revokes every role, project and pending invitation or email change, including those this person issued." %}
+            </p>
+            {{ confirm_form }}
+            {% include "components/button.html" with type="submit" label=_("Offboard") variant="danger" %}
+          </form>
+        </details>
+      {% endif %}
     </section>
   {% endif %}
   {% active_filter_count invitation_filters as invitation_filter_count %}

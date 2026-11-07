@@ -6044,3 +6044,15 @@ msgstr "Une ligne arrive aux achats une fois sa demande approuvée et son approv
 #: apps/purchasing/templates/purchasing/no_candidates.html
 msgid "See what is to purchase"
 msgstr "Voir ce qu'il y a à acheter"
+
+#: apps/organizations/services.py
+msgid "You cannot change your own roles; another administrator can."
+msgstr "Vous ne pouvez pas modifier vos propres rôles ; un autre administrateur le peut."
+
+#: apps/accounts/services/email_changes.py
+msgid "You cannot change your own email address; another administrator can."
+msgstr "Vous ne pouvez pas modifier votre propre adresse e-mail ; un autre administrateur le peut."
+
+#: apps/organizations/templates/organizations/person.html
+msgid "Your email address and roles are changed by another administrator."
+msgstr "Votre adresse e-mail et vos rôles sont modifiés par un autre administrateur."

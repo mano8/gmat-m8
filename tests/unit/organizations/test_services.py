@@ -29,7 +29,7 @@ from apps.organizations.deactivation import (
 )
 from apps.organizations.models import Branch, Company, JointVentureMember, Membership
 from apps.organizations.services import NewBranch
-from tests.support import authz_generation, grant, principal_for
+from tests.support import authz_generation, error_codes, grant, principal_for
 
 pytestmark = pytest.mark.django_db
 
@@ -664,6 +664,36 @@ class TestMemberships:
             undo()
         assert authz_generation(technician) == before
         assert not AuditEvent.objects.filter(action="membership.granted").exists()
+
+
+class TestOwnAccount:
+    """An administrator changes their own employer, never their own roles."""
+
+    def test_own_roles_are_refused(
+        self, admin_principal: SessionPrincipal, group_admin: User, branch: Branch
+    ) -> None:
+        own = Membership.objects.get(user=group_admin, revoked_at__isnull=True)
+        attempts = [
+            lambda: services.grant_membership(
+                admin_principal, user_id=group_admin.pk, role=Role.TECHNICIAN, branch_id=branch.pk
+            ),
+            lambda: services.revoke_membership(admin_principal, own.pk),
+            lambda: services.change_membership_validity(
+                admin_principal, own.pk, valid_from=own.valid_from, valid_until=None
+            ),
+        ]
+        for attempt in attempts:
+            with pytest.raises(ValidationError) as exc:
+                attempt()
+            assert error_codes(exc) == {"self"}
+        assert list(Membership.objects.filter(user=group_admin)) == [own]
+        assert Membership.objects.get(pk=own.pk).revoked_at is None
+
+    def test_own_employer_is_allowed(
+        self, admin_principal: SessionPrincipal, group_admin: User, company: Company
+    ) -> None:
+        services.set_employer_company(admin_principal, group_admin.pk, company.pk)
+        assert User.objects.get(pk=group_admin.pk).employer_company_id == company.pk
 
 
 class TestEmployer:
