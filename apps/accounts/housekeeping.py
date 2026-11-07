@@ -1,4 +1,10 @@
-"""The worker applies confirmed email changes after the cooling-off (plan §5, Q28).
+"""Housekeeping of accounts: email changes, and sessions that ended.
+
+``sessions``: Django leaves an expired session in the table, with its signed data, until
+something deletes it; a row of the session list outlives a session that ended without a
+logout, and holds an address and a browser. Both go here.
+
+The worker applies confirmed email changes after the cooling-off (plan §5, Q28).
 
 Registered as the housekeeping task ``email_changes``: it runs in the worker's housekeeping
 transaction, authorized as ``housekeeping.email_changes`` for ``system:worker``. Each due
@@ -10,6 +16,8 @@ marks it verified, and ends every session of the account (the ``accounts.0002`` 
 bumps ``session_epoch`` on an email change).
 """
 
+from allauth.usersessions.models import UserSession
+from django.contrib.sessions.models import Session
 from django.db.models.functions import Now
 
 from apps.access.context import AccessContext
@@ -24,6 +32,7 @@ from apps.core.db import db_now
 from apps.core.locking import LockLevel, LockMode, LockOrder
 
 TASK_NAME = "email_changes"
+SESSIONS_TASK_NAME = "sessions"
 BATCH = 100
 WORKER = AuditIdentity(label="system:worker", via="system:worker")
 
@@ -95,3 +104,11 @@ def apply_due_email_changes() -> int:
         events.publish("email_change.applied", change_id=change.pk, user_id=user.pk)
         done += 1
     return done
+
+
+def purge_ended_sessions() -> int:
+    """Delete expired sessions, then the rows of the session list without a session."""
+    sessions, _details = Session.objects.filter(expire_date__lte=Now()).delete()
+    live = Session.objects.values("session_key")
+    rows, _details = UserSession.objects.exclude(session_key__in=live).delete()
+    return sessions + rows

@@ -223,6 +223,31 @@ class TestExaminePage:
         for selector in ("sourcing-form", "close-line-form", "schedule-form", "close-form"):
             assert f'data-testid="{selector}"' not in html
 
+    def test_a_site_manager_is_not_offered_a_reduction_of_their_own_request(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        """M8.3, R18: the page offers what the service allows."""
+        own = make_request(Status.APPROVED, user=people.site_manager, decided=True)
+        html = page(client_for(people.site_manager), own)
+        assert 'data-testid="reduce-form"' not in html
+
+    def test_a_site_manager_returning_or_reducing_their_own_request_gets_403(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        manager = client_for(people.site_manager)
+        submitted = make_request(Status.SUBMITTED, user=people.site_manager)
+        response = manager.post(
+            reverse("requests:return_to_draft", kwargs={"request_id": submitted.pk}),
+            {"note": "x"},
+        )
+        assert response.status_code == 403
+        line = make_request(Status.APPROVED, user=people.site_manager, decided=True).lines.get()
+        response = manager.post(
+            reverse("requests:reduce_line", kwargs={"line_id": line.pk}),
+            {"approved_qty": "1", "reason": ""},
+        )
+        assert response.status_code == 403
+
     def test_a_closure_shows_who_why_and_from_where(
         self, approved: MaterialRequest, people: People
     ) -> None:

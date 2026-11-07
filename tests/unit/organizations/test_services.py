@@ -28,6 +28,7 @@ from apps.organizations.deactivation import (
     register_open_documents,
 )
 from apps.organizations.models import Branch, Company, JointVentureMember, Membership
+from apps.organizations.services import NewBranch
 from tests.support import authz_generation, grant, principal_for
 
 pytestmark = pytest.mark.django_db
@@ -265,10 +266,7 @@ class TestBranches:
         key = issue_key(admin_principal.user_id, "branch.create")
         branch = services.create_branch(
             admin_principal,
-            company_id=company.pk,
-            code="SEV",
-            name="Sevilla",
-            allow_self_approval=True,
+            NewBranch(company_id=company.pk, code="SEV", name="Sevilla", allow_self_approval=True),
             idempotency_key=key,
         )
         assert branch.allow_self_approval is True
@@ -283,16 +281,22 @@ class TestBranches:
     ) -> None:
         services.update_company(admin_principal, company.pk, is_active=False)
         with pytest.raises(ValidationError) as excinfo:
-            services.create_branch(admin_principal, company_id=company.pk, code="X", name="X")
+            services.create_branch(
+                admin_principal, NewBranch(company_id=company.pk, code="X", name="X")
+            )
         assert "company" in excinfo.value.message_dict
 
     def test_code_is_unique_per_company(
         self, admin_principal: SessionPrincipal, company: Company, branch: Branch
     ) -> None:
         with pytest.raises(ValidationError):
-            services.create_branch(admin_principal, company_id=company.pk, code="MAD", name="X")
+            services.create_branch(
+                admin_principal, NewBranch(company_id=company.pk, code="MAD", name="X")
+            )
         other = services.create_company(admin_principal, code="B", legal_name="B")
-        services.create_branch(admin_principal, company_id=other.pk, code="MAD", name="B Madrid")
+        services.create_branch(
+            admin_principal, NewBranch(company_id=other.pk, code="MAD", name="B Madrid")
+        )
 
     def test_managed_by_bumps_and_stays_one_level(
         self, admin_principal: SessionPrincipal, company: Company, branch: Branch
@@ -301,7 +305,7 @@ class TestBranches:
             admin_principal, code="B", legal_name="UTE B", kind=Company.Kind.JOINT_VENTURE
         )
         b_mad = services.create_branch(
-            admin_principal, company_id=venture.pk, code="MAD", name="B Madrid"
+            admin_principal, NewBranch(company_id=venture.pk, code="MAD", name="B Madrid")
         )
         before = org_generation()
         services.update_branch(admin_principal, b_mad.pk, managed_by_id=branch.pk)
@@ -368,7 +372,7 @@ class TestBranches:
         self, outsider: SessionPrincipal, company: Company, branch: Branch
     ) -> None:
         with pytest.raises(AccessDenied):
-            services.create_branch(outsider, company_id=company.pk, code="X", name="X")
+            services.create_branch(outsider, NewBranch(company_id=company.pk, code="X", name="X"))
         with pytest.raises(AccessDenied):
             services.update_branch(outsider, branch.pk, is_active=False)
 

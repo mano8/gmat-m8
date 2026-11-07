@@ -80,9 +80,33 @@ def test_the_media_volume_is_private_to_web_worker_and_backup(base: dict[str, An
         "worker": ["media:/srv/media"],
         "db": [],
         "backup": ["media:/srv/media:ro"],
+        "decoder": [],
+        "clamd": [],
+        "freshclam": [],
     }
     assert services["backup"]["environment"]["MEDIA_DIR"] == "/srv/media/files"
     assert "media" in base["volumes"]
+
+
+def test_one_service_seeds_a_new_media_volume(base: dict[str, Any]) -> None:
+    """Created together, two containers race to copy /srv/media into it, and one fails to start."""
+    services = base["services"]
+    for name in ("worker", "backup"):
+        assert services[name]["depends_on"]["web"]["condition"] == "service_started", name
+    assert not {"worker", "backup"} & set(services["web"]["depends_on"])
+
+
+def test_the_database_runs_without_root_or_a_capability(base: dict[str, Any]) -> None:
+    """Its entrypoint then never calls gosu, and nothing here could change a file's owner. So it
+    reads its role script as uid 70, whatever the checkout's umask was."""
+    db = base["services"]["db"]
+    assert db["user"] == "70:70"
+    assert db["cap_drop"] == ["ALL"]
+    assert "cap_add" not in db
+    assert "/run/postgresql:uid=70,gid=70" in db["tmpfs"]
+    assert "../../docker/postgres/initdb:/docker-entrypoint-initdb.d:ro" in db["volumes"]
+    init = (STACK / "init.sh").read_text(encoding="utf-8")
+    assert "chmod -R a+rX ../../docker/postgres/initdb" in init
 
 
 def test_the_smtp_password_reaches_the_worker_only(base: dict[str, Any]) -> None:
@@ -116,6 +140,109 @@ def test_production_runs_the_worker_from_the_signed_digest() -> None:
     assert worker["image"] == "ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}"
 
 
+SOCKET_SERVICES = ("decoder", "clamd")
+
+
+@pytest.mark.parametrize("name", SOCKET_SERVICES)
+def test_what_parses_uploads_has_no_way_to_anything(base: dict[str, Any], name: str) -> None:
+    """M8.3, X7 and X11: no network, no media, no database, no application secret."""
+    service = base["services"][name]
+    assert service["network_mode"] == "none"
+    assert "networks" not in service
+    assert "env_file" not in service
+    assert service["read_only"] is True
+    assert service["cap_drop"] == ["ALL"]
+    assert service["security_opt"] == ["no-new-privileges:true"]
+    assert not any(volume.startswith("media:") for volume in service["volumes"])
+    assert not set(service.get("environment", {})) - {"ATTACHMENT_DECODER_SOCKET"}
+
+
+def test_the_decoder_runs_under_its_own_uid(base: dict[str, Any]) -> None:
+    services = base["services"]
+    assert services["decoder"]["user"] == "1001:1001"
+    assert services["web"]["user"] == "1000:1000"
+    assert "uid=1001" in services["decoder"]["tmpfs"][0]
+    assert "uid=1001" in base["volumes"]["decoder_socket"]["driver_opts"]["o"]
+
+
+@pytest.mark.parametrize(
+    ("volume", "service", "path"),
+    [
+        ("clamd_socket", "clamd", "/run/gmat/clamd"),
+        ("decoder_socket", "decoder", "/run/gmat/decoder"),
+    ],
+)
+def test_each_socket_is_shared_only_with_web_which_cannot_replace_it(
+    base: dict[str, Any], volume: str, service: str, path: str
+) -> None:
+    users = {
+        name: mount
+        for name, definition in base["services"].items()
+        for mount in definition.get("volumes", [])
+        if str(mount).startswith(f"{volume}:")
+    }
+    assert users == {service: f"{volume}:{path}", "web": f"{volume}:{path}:ro"}
+
+
+def test_the_sockets_are_where_production_settings_look() -> None:
+    settings = (ROOT / "config" / "settings" / "prod.py").read_text(encoding="utf-8")
+    assert '"/run/gmat/clamd/clamd.sock"' in settings
+    assert '"/run/gmat/decoder/decoder.sock"' in settings
+    clamd = (STACK / "clamav" / "clamd.conf").read_text(encoding="utf-8")
+    assert "LocalSocket /run/gmat/clamd/clamd.sock" in clamd
+    assert "\nTCPSocket" not in clamd
+
+
+def test_only_freshclam_reaches_out_and_it_sees_no_file(base: dict[str, Any]) -> None:
+    freshclam = base["services"]["freshclam"]
+    assert freshclam["networks"] == ["updates"]
+    assert "internal" not in base["networks"]["updates"]
+    assert set(freshclam["volumes"]) == {
+        "./clamav/freshclam.conf:/etc/gmat/freshclam.conf:ro",
+        "clamav_db:/var/lib/clamav",
+    }
+    assert "clamav_db:/var/lib/clamav:ro" in base["services"]["clamd"]["volumes"]
+    users = [
+        name
+        for name, definition in base["services"].items()
+        if "updates" in definition.get("networks", [])
+    ]
+    assert users == ["freshclam"]
+
+
+def test_each_image_of_the_scanner_is_on_its_service(base: dict[str, Any]) -> None:
+    """Dependabot reads ``services.*.image``; an anchor's would quietly stay behind."""
+    clamd, freshclam = base["services"]["clamd"], base["services"]["freshclam"]
+    assert clamd["image"] == freshclam["image"]
+    assert re.fullmatch(r"clamav/clamav:[\d.]+@sha256:[0-9a-f]{64}", clamd["image"])
+    text = (STACK / "docker-compose.yml").read_text(encoding="utf-8")
+    assert text.count(clamd["image"]) == 2
+
+
+def test_what_cannot_be_scanned_is_refused() -> None:
+    clamd = (STACK / "clamav" / "clamd.conf").read_text(encoding="utf-8").splitlines()
+    assert "AlertExceedsMax yes" in clamd
+    assert "AlertEncryptedDoc yes" in clamd
+    assert "MaxFileSize 16M" in clamd  # above an attachment's 10 MiB
+
+
+def test_production_runs_the_decoder_from_the_signed_digest() -> None:
+    decoder = compose("docker-compose.production.yml")["services"]["decoder"]
+    assert decoder["image"].startswith("ghcr.io/mano8/gmat-m8@${APP_DIGEST")
+
+
+def test_the_restore_drills_networks_are_all_internal(base: dict[str, Any]) -> None:
+    drill = compose("docker-compose.restore-drill.yml")
+    assert set(drill["networks"]) == set(base["networks"])
+    assert all(network["internal"] is True for network in drill["networks"].values())
+
+
+def test_production_needs_an_explicit_admin_allowlist() -> None:
+    """M8.3, X10: the base file's open default never reaches production."""
+    caddy = compose("docker-compose.production.yml")["services"]["caddy"]
+    assert caddy["environment"]["ADMIN_ALLOWED_CIDRS"].startswith("${ADMIN_ALLOWED_CIDRS:?")
+
+
 def test_the_restore_drill_never_sends() -> None:
     drill = compose("docker-compose.restore-drill.yml")
     assert drill["services"]["worker"]["environment"]["OUTBOUND_EMAIL"] == "off"
@@ -146,6 +273,30 @@ def test_the_worker_healthcheck_reads_the_heartbeat(
     result = subprocess.run(  # noqa: S603 (the interpreter running the tests)
         [sys.executable, "-c", _healthcheck_script()],
         env={"WORKER_HEARTBEAT_FILE": str(heartbeat)},
+        check=False,
+    )
+    assert (result.returncode == 0) is healthy
+
+
+@pytest.mark.parametrize(
+    ("state", "expected", "healthy"),
+    [
+        ("paused", "paused", True),
+        ("running", "paused", False),
+        ("running", "running,outbound-off", True),
+        ("outbound-off", "running,outbound-off", True),
+        ("paused", "running,outbound-off", False),
+        ("paused", "", True),
+    ],
+)
+def test_a_deploy_can_ask_the_heartbeat_for_a_state(
+    tmp_path: Path, state: str, expected: str, healthy: bool
+) -> None:
+    heartbeat = tmp_path / "heartbeat"
+    heartbeat.write_text(json.dumps({"state": state, "at": time.time()}))
+    result = subprocess.run(  # noqa: S603 (the interpreter running the tests)
+        [sys.executable, "-c", _healthcheck_script()],
+        env={"WORKER_HEARTBEAT_FILE": str(heartbeat), "WORKER_EXPECT_STATE": expected},
         check=False,
     )
     assert (result.returncode == 0) is healthy

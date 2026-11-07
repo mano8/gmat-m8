@@ -204,6 +204,14 @@ msgstr ""
 msgid "You cannot offboard your own account."
 msgstr "Vous ne pouvez pas désactiver votre propre compte."
 
+#: apps/accounts/services.py:633
+msgid "You cannot reset your own second factors."
+msgstr "Vous ne pouvez pas réinitialiser vos propres seconds facteurs."
+
+#: apps/accounts/services.py:636
+msgid "Give the reason."
+msgstr "Indiquez le motif."
+
 #: apps/accounts/services.py:591
 msgid "This account is already offboarded."
 msgstr "Ce compte est déjà désactivé."
@@ -429,6 +437,10 @@ msgstr "Invitation acceptée. Votre nouvel accès est prêt."
 #: apps/accounts/views.py:156
 msgid "Your account is ready. Sign in to continue."
 msgstr "Votre compte est prêt. Connectez-vous pour continuer."
+
+#: apps/accounts/views.py:60
+msgid "Your role needs a second factor: add another first."
+msgstr "Votre rôle exige un second facteur : ajoutez-en un autre d'abord."
 
 #: apps/accounts/views.py:215
 msgid "Address confirmed. The change applies after the waiting period."
@@ -5251,10 +5263,10 @@ msgstr "Choisissez un incident."
 msgid "Line %(line)s has nothing left to receive."
 msgstr "La ligne %(line)s n'a plus rien à réceptionner."
 
-#: apps/receiving/services.py:232
+#: apps/receiving/services.py:237
 #, python-format
-msgid "Line %(line)s: only %(remaining)s remain to be received."
-msgstr "Ligne %(line)s : il ne reste que %(remaining)s à réceptionner."
+msgid "Line %(line)s: more than remains to be received on this order."
+msgstr "Ligne %(line)s : plus que ce qui reste à réceptionner sur cette commande."
 
 #: apps/receiving/services.py:259
 msgid "A line is not on this order."
@@ -5847,3 +5859,116 @@ msgstr "%(shown)s affichés"
 
 msgid "Not revoked"
 msgstr "Non révoqué"
+
+#: apps/accounts/signals.py
+msgid "Your recovery codes stopped working after a restore. Generate a new set."
+msgstr "Vos codes de récupération ne fonctionnent plus après une restauration. Générez-en un nouveau jeu."
+
+#: apps/purchasing/services/dispatches.py
+msgid "Only a quarantined dispatch can be discarded."
+msgstr "Seul un envoi en quarantaine peut être écarté."
+
+#: apps/recovery/services.py
+#, python-format
+msgid "These addresses are not accounts of the restored database: %(addresses)s"
+msgstr "Ces adresses ne sont pas des comptes de la base de données restaurée : %(addresses)s"
+
+#: apps/recovery/services.py
+msgid "A preserved database says what happened: there is no gap to list."
+msgstr "La base de données conservée indique déjà ce qui s'est passé : il n'y a aucun intervalle à détailler."
+
+#: apps/recovery/services.py
+#, python-format
+msgid "Another account has the address %(address)s."
+msgstr "Un autre compte a l'adresse %(address)s."
+
+#: apps/recovery/services.py
+msgid "This account has no email change to decide on."
+msgstr "Ce compte n'a aucun changement d'adresse à trancher."
+
+#: apps/recovery/services.py
+#, python-format
+msgid "This account's email change to %(address)s must be accepted or rejected."
+msgstr "Le changement d'adresse de ce compte vers %(address)s doit être accepté ou refusé."
+
+#: apps/recovery/services.py
+msgid "This account has no second-factor removal to decide on."
+msgstr "Ce compte n'a aucun retrait de second facteur à trancher."
+
+#: apps/recovery/services.py
+msgid "Starting over removes every second factor: it cannot go with a rejection."
+msgstr "Repartir de zéro retire tous les seconds facteurs : c'est incompatible avec un refus."
+
+#: apps/recovery/services.py
+#, python-format
+msgid "This account's removal of %(factors)s must be accepted or rejected."
+msgstr "Le retrait de %(factors)s de ce compte doit être accepté ou refusé."
+
+#: apps/recovery/services.py
+msgid "This account is not suspended."
+msgstr "Ce compte n'est pas suspendu."
+
+#: apps/attachments/processing.py
+msgid "This file was refused: the virus scanner found something in it."
+msgstr "Ce fichier a été refusé : l'antivirus y a trouvé quelque chose."
+
+#: apps/attachments/processing.py
+msgid "Files cannot be checked right now. Try again in a few minutes."
+msgstr "Les fichiers ne peuvent pas être vérifiés pour le moment. Réessayez dans quelques minutes."
+
+#: apps/accounts/services.py
+msgid "Your second factors were removed"
+msgstr "Vos seconds facteurs ont été supprimés"
+
+#: apps/accounts/services.py
+msgid "Sign out to end this session."
+msgstr "Déconnectez-vous pour mettre fin à cette session."
+
+#: apps/accounts/views.py
+msgid "That session has ended."
+msgstr "Cette session est terminée."
+
+#: apps/accounts/views.py
+msgid "Your other sessions have ended."
+msgstr "Vos autres sessions sont terminées."
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Sessions"
+msgstr "Sessions"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Where you are signed in. If you do not recognise one, end it and change your password."
+msgstr "Là où vous êtes connecté. Si vous n'en reconnaissez pas une, mettez-y fin et changez votre mot de passe."
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Unknown browser"
+msgstr "Navigateur inconnu"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "This session"
+msgstr "Cette session"
+
+#: apps/accounts/templates/accounts/sessions.html
+#, python-format
+msgid "Started %(started)s, last seen %(seen)s"
+msgstr "Ouverte le %(started)s, dernière activité le %(seen)s"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End this session"
+msgstr "Mettre fin à cette session"
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "No other session is open."
+msgstr "Aucune autre session n'est ouverte."
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End all my other sessions"
+msgstr "Mettre fin à toutes mes autres sessions"
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "An administrator removed the second factors of your gmat-m8 account, and every session of your account has ended."
+msgstr "Un administrateur a supprimé les seconds facteurs de votre compte gmat-m8, et toutes les sessions de votre compte sont terminées."
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "If you did not ask for this, tell your administrator straight away and change your password."
+msgstr "Si vous ne l'avez pas demandé, prévenez immédiatement votre administrateur et changez votre mot de passe."

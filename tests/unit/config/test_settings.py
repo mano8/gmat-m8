@@ -6,7 +6,7 @@ from collections.abc import Iterator
 
 import pytest
 from cryptography.fernet import Fernet
-from django.core.checks import run_checks
+from django.core.checks import CheckMessage, run_checks
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
@@ -47,6 +47,8 @@ def load_prod(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
             *SMTP_ENV,
             "DJANGO_DEBUG",
             "DJANGO_HSTS_SECONDS",
+            "DJANGO_HSTS_INCLUDE_SUBDOMAINS",
+            "DJANGO_HSTS_PRELOAD",
             "DJANGO_ADMIN_URL_PATH",
         ]
         for name in unset:
@@ -71,7 +73,7 @@ def test_good_production_environment_loads(load_prod) -> None:  # type: ignore[n
     assert settings.CSRF_COOKIE_SECURE is True
     assert settings.SESSION_COOKIE_NAME == "__Host-sessionid"
     assert settings.CSRF_COOKIE_NAME == "__Host-csrftoken"
-    assert settings.SECURE_HSTS_SECONDS == 31536000
+    assert settings.SECURE_HSTS_SECONDS == 0
     assert settings.OUTBOX_ENCRYPTION_KEYS == [OUTBOX_KEY]
     assert (
         settings.MAILERS["default"]["BACKEND"] == "apps.notifications.backends.OutboxEmailBackend"
@@ -104,11 +106,60 @@ def test_admin_url_path_is_configurable_and_defaults_to_admin(load_prod) -> None
     assert load_prod(DJANGO_ADMIN_URL_PATH="ops-x7_k").ADMIN_URL_PATH == "ops-x7_k"
 
 
-def test_good_production_environment_passes_deploy_checks(load_prod) -> None:  # type: ignore[no-untyped-def]
-    prod = load_prod()
+def _deploy_messages(prod: object) -> list[CheckMessage]:
+    """The deploy checks under ``prod``, as `check --deploy` sees them (silenced ones kept)."""
     names = [name for name in dir(prod) if name.isupper() and name != "DATABASES"]
     with override_settings(**{name: getattr(prod, name) for name in names}):
-        assert run_checks(include_deployment_checks=True, databases=[]) == []
+        return run_checks(include_deployment_checks=True, databases=[])
+
+
+def test_good_production_environment_passes_deploy_checks(load_prod) -> None:  # type: ignore[no-untyped-def]
+    prod = load_prod()
+    visible = [m for m in _deploy_messages(prod) if m.id not in prod.SILENCED_SYSTEM_CHECKS]
+    assert visible == []
+
+
+def test_hsts_is_off_until_the_maintainer_turns_it_on(load_prod) -> None:  # type: ignore[no-untyped-def]
+    """M8.3, X3: nothing automatic, and a deploy check does not fail on it."""
+    prod = load_prod()
+    assert prod.SECURE_HSTS_SECONDS == 0
+    assert prod.SECURE_HSTS_INCLUDE_SUBDOMAINS is False
+    assert prod.SECURE_HSTS_PRELOAD is False
+    assert prod.SILENCED_SYSTEM_CHECKS == ["security.W004", "security.W005", "security.W021"]
+    assert {m.id for m in _deploy_messages(prod)} == {"security.W004"}
+
+
+@pytest.mark.parametrize(
+    ("switches", "silenced"),
+    [
+        ({"DJANGO_HSTS_SECONDS": "31536000"}, {"security.W005", "security.W021"}),
+        (
+            {"DJANGO_HSTS_SECONDS": "31536000", "DJANGO_HSTS_INCLUDE_SUBDOMAINS": "true"},
+            {"security.W021"},
+        ),
+        (
+            {
+                "DJANGO_HSTS_SECONDS": "31536000",
+                "DJANGO_HSTS_INCLUDE_SUBDOMAINS": "true",
+                "DJANGO_HSTS_PRELOAD": "true",
+            },
+            set(),
+        ),
+    ],
+)
+def test_each_hsts_switch_is_its_own(load_prod, switches, silenced) -> None:  # type: ignore[no-untyped-def]
+    """A warning is silenced only while its own switch is off."""
+    prod = load_prod(**switches)
+    assert set(prod.SILENCED_SYSTEM_CHECKS) == silenced
+    assert {m.id for m in _deploy_messages(prod)} == silenced
+
+
+def test_the_switches_stay_independent(load_prod) -> None:  # type: ignore[no-untyped-def]
+    prod = load_prod(DJANGO_HSTS_INCLUDE_SUBDOMAINS="true", DJANGO_HSTS_PRELOAD="true")
+    assert prod.SECURE_HSTS_SECONDS == 0
+    assert prod.SECURE_HSTS_INCLUDE_SUBDOMAINS is True
+    assert prod.SECURE_HSTS_PRELOAD is True
+    assert prod.SILENCED_SYSTEM_CHECKS == ["security.W004"]
 
 
 def test_health_endpoints_are_exempt_from_the_https_redirect(load_prod) -> None:  # type: ignore[no-untyped-def]

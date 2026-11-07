@@ -1,5 +1,10 @@
 # gmat-m8
 
+![CI/CD](https://github.com/mano8/gmat-m8/actions/workflows/CI.yaml/badge.svg?branch=main)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/31d22f109bda423081a6ba90684ab55e)](https://app.codacy.com/gh/mano8/gmat-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![codecov](https://codecov.io/gh/mano8/gmat-m8/graph/badge.svg?token=QT7EDP4EMY)](https://codecov.io/gh/mano8/gmat-m8)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/mano8/fa-auth-m8/blob/main/LICENSE)
+
 Materials app for a group of electrical-installation companies and their branches. Technicians request materials for worksites, managers approve, purchasing orders from suppliers, and goods are received at a warehouse or on site and handed over.
 
 It is a modular Django monolith: Django 6.1, HTMX 2.x and PostgreSQL 18, deployed with Docker Compose on one VPS. Decisions are recorded in [docs/adr](docs/adr/README.md).
@@ -36,11 +41,14 @@ Settings modules live in `config/settings/`: `dev` (default for `manage.py`), `t
 | `DJANGO_SECRET_KEY` | `prod` (required, at least 50 characters), `dev` (optional) | Signing key |
 | `DJANGO_ALLOWED_HOSTS` | `prod` (required, no wildcard), `dev` (optional) | Comma-separated host names |
 | `DJANGO_DEBUG` | `dev` | Defaults to on in `dev`; refused in `prod` |
-| `DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_PRELOAD` | `prod` | HSTS lifetime (default one year) and preload flag (default on) |
+| `DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_INCLUDE_SUBDOMAINS`, `DJANGO_HSTS_PRELOAD` | `prod` | HSTS: each off until the maintainer turns it on (default 0, false, false; exception X3) |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | `prod` (required, `https://` only) | Comma-separated origins, e.g. `https://materials.example.org` |
 | `MFA_ENCRYPTION_KEYS` | `prod` (required) | Comma-separated Fernet keys, newest first, separate from the secret key; see [docs/security.md](docs/security.md#mfa) |
 | `DJANGO_SESSION_AGE_SECONDS` | all | Session lifetime for ordinary accounts (default 14 days) |
 | `DJANGO_PRIVILEGED_SESSION_AGE_SECONDS` | all | Session lifetime for privileged accounts (default 12 hours) |
+| `DJANGO_SESSION_IDLE_SECONDS` | all | Inactivity that ends a session of an ordinary account (default 2 hours) |
+| `DJANGO_PRIVILEGED_SESSION_IDLE_SECONDS` | all | Inactivity that ends a session of a privileged account (default 30 minutes) |
+| `ATTACHMENT_SCAN_SOCKET`, `ATTACHMENT_DECODER_SOCKET` | `prod` | The malware scanner's and the image decoder's sockets (the stack's fixed paths by default; `gmat.E022` refuses them empty) |
 | `SECURITY_CACHE_MAX_ENTRIES` | all | Capacity of the rate-limit cache (default 50,000; at capacity new keys get 429) |
 | `DJANGO_LOG_LEVEL` | all | Root log level (default `INFO`); logs are JSON lines on stdout |
 | `DJANGO_DEFAULT_FROM_EMAIL` | all | Sender address of account emails |
@@ -76,7 +84,7 @@ Coverage must stay at 90 % or more overall (100 % for `apps/access` and every `s
 | `secret-scan` | gitleaks over the full history |
 | `compose-smoke-gate` | from `compose-smoke.yaml` (M1.5) |
 
-Two more workflows are not PR checks. `docker-publish.yaml` publishes both images, signed, with a signed release manifest, when the maintainer pushes a `v*` tag (a manual run builds without pushing); it refuses a commit that is not on `main` or lacks green `ci.yaml` and `compose-smoke.yaml` runs. `image-scan.yaml` scans the released images, Caddy and PostgreSQL every night and keeps one issue up to date. Both are described in [docs/release.md](docs/release.md).
+Three more workflows are not PR checks. `e2e.yaml` (M8.2) drives a real browser through the compose stack, on a push to `main`, nightly, by hand and on a pull request labelled `e2e`. `docker-publish.yaml` publishes both images, signed, with a signed release manifest, when the maintainer pushes a `v*` tag (a manual run builds without pushing); it refuses a commit that is not on `main` or lacks green `ci.yaml`, `compose-smoke.yaml` and `e2e.yaml` runs. `image-scan.yaml` scans the released images, Caddy, PostgreSQL and ClamAV every night and keeps one issue up to date. Both are described in [docs/release.md](docs/release.md).
 
 Trivy exceptions live in `.trivyignore.yaml` (empty; the entry format is documented in the file). Each needs a statement and an expiry at most 90 days away, and is added only in a pull request the maintainer approves. Reports of the Trivy and bandit scans are kept as workflow artifacts for 90 days.
 

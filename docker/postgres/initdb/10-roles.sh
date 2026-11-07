@@ -80,14 +80,18 @@ if [ -n "${POSTGRES_PASSWORD:-}" ]; then
     done
 fi
 
-# The passwords travel as psql variables: never interpolated into the shell command line
-# or the SQL text by hand, and never echoed (-q, no ON_ERROR_STOP trace of values).
+# psql reads the passwords from its environment (\getenv): they are never on a command line
+# (so not in the process list), never interpolated into the SQL text by hand, and never
+# echoed (-q, no ON_ERROR_STOP trace of values).
 psql -v ON_ERROR_STOP=1 -q --no-psqlrc \
     --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
     -v db="$POSTGRES_DB" \
-    -v owner="$GMAT_DB_OWNER_USER" -v owner_pw="$GMAT_DB_OWNER_PASSWORD" \
-    -v runtime="$GMAT_DB_RUNTIME_USER" -v runtime_pw="$GMAT_DB_RUNTIME_PASSWORD" \
-    -v backup="$GMAT_DB_BACKUP_USER" -v backup_pw="$GMAT_DB_BACKUP_PASSWORD" <<'SQL'
+    -v owner="$GMAT_DB_OWNER_USER" \
+    -v runtime="$GMAT_DB_RUNTIME_USER" \
+    -v backup="$GMAT_DB_BACKUP_USER" <<'SQL'
+\getenv owner_pw GMAT_DB_OWNER_PASSWORD
+\getenv runtime_pw GMAT_DB_RUNTIME_PASSWORD
+\getenv backup_pw GMAT_DB_BACKUP_PASSWORD
 SET password_encryption = 'scram-sha-256';
 
 -- Roles: login only, no superuser, no role or database creation, no replication.

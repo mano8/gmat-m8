@@ -82,6 +82,11 @@ django_settings_module = "config.settings.test"
 module = ["allauth", "allauth.*"]
 follow_untyped_imports = true
 
+# Playwright belongs to the optional `e2e` group, which the type-check job does not install.
+[[tool.mypy.overrides]]
+module = ["playwright", "playwright.*"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
@@ -101,12 +106,16 @@ markers = [
   "integration: concurrency, constraints, triggers and migrations (PostgreSQL)",
   "live: against the running compose stack",
   "e2e: Playwright against the compose stack",
+  "rehearsal: deploy and recovery against real containers (plan M8.4; REHEARSAL_REQUIRED=1)",
 ]
 
 # --- coverage -----------------------------------------------------------
 [tool.coverage.run]
 branch = true
-source = ["apps", "config"]
+# Packages, not directories (`source`): coverage.xml then names each file from the repository's
+# root, which is how Codecov and Codacy find it. With `source` it writes accounts/services.py,
+# and the two __init__.py of apps/ and config/ become one entry.
+source_pkgs = ["apps", "config"]
 omit = ["*/migrations/*", "config/settings/build.py", "config/asgi.py", "config/wsgi.py"]
 
 [tool.coverage.report]

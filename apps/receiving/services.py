@@ -219,7 +219,12 @@ def _check_line_input(item: ReceiptLineInput, po_line: PurchaseOrderLine) -> Non
 
 
 def _check_capacity(item: ReceiptLineInput, po_line: PurchaseOrderLine, book: Book) -> None:
-    """C10 and I4: the line can still receive, and never more than remains."""
+    """C10 and I4: the line can still receive, and never more than remains.
+
+    The order line's outstanding quantity is never put in the message: it covers every
+    project the line serves, and a site manager may learn only what their own project can
+    take (§3.4). Who holds ``po.view`` reads it on the form.
+    """
     facts = book.order_lines[po_line.pk]
     if not facts.has_capacity:
         raise ValidationError(
@@ -229,9 +234,9 @@ def _check_capacity(item: ReceiptLineInput, po_line: PurchaseOrderLine, book: Bo
         )
     if item.qty_received > facts.remaining:
         raise ValidationError(
-            _("Line %(line)s: only %(remaining)s remain to be received."),
+            _("Line %(line)s: more than remains to be received on this order."),
             code="over_receipt",
-            params={"line": po_line.line_no, "remaining": f"{facts.remaining.normalize():f}"},
+            params={"line": po_line.line_no},
         )
 
 
@@ -258,7 +263,6 @@ def _plan_line(
     if po_line is None:
         raise ValidationError(_("A line is not on this order."), code="unknown")
     _check_line_input(item, po_line)
-    _check_capacity(item, po_line, facts.book)
     candidates = _candidates(facts, po_line.pk, location.project_id)
     if item.split is None:
         split = default_split(item.qty_received, candidates, facts.capacity)
@@ -410,6 +414,10 @@ def post_receipt(
         _check_location(locked, here)
         facts = _facts(component, here)
         plans = [_plan_line(locked, here, facts, item) for item in lines]
+        # Capacity last, once every line and split is valid: otherwise which refusal comes
+        # back would tell a site manager whether a quantity fits the whole order line.
+        for plan in plans:
+            _check_capacity(plan.item, plan.po_line, facts.book)
         receipt = GoodsReceipt(
             po=locked,
             branch=locked.branch,

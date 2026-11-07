@@ -9,9 +9,12 @@ their branches by material managers (S1, S3):
 - creating a project needs its branch and its procurement branch in scope;
 - changing one needs the project in scope (else ``NotInScope``, 404 for a project the
   actor cannot see), and any new branch or procurement branch too;
-- an assignment needs its project in scope.
+- an assignment needs its project in scope, and an assignee who can hold it: an active
+  account with a valid membership of the matching role, a site manager's home branch in
+  the actor's scope (S4; the same rule as the form's choices, ``selectors``).
 """
 
+from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -21,6 +24,7 @@ from django.db.models import Model
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
+from apps.access.context import AccessContext
 from apps.access.generations import lock_access_state
 from apps.access.principals import Principal
 from apps.access.roles import Capability
@@ -34,6 +38,7 @@ from apps.core.locking import LockMode, LockOrder, transactional
 from apps.locations.models import Location
 from apps.organizations.models import Branch
 from apps.organizations.services import lock_for_user_change
+from apps.projects import selectors
 from apps.projects.models import Project, ProjectAssignment
 
 PROJECT_FIELDS = frozenset(
@@ -78,55 +83,48 @@ def _active_branch(branch_id: UUID, field: str) -> Branch:
     return branch
 
 
+@dataclass(frozen=True)
+class NewProject:
+    """What a new project starts with. ``procurement_branch_id`` defaults to the branch that
+    manages ``branch_id``, or that branch itself (Q2: the procurement branch buys for it)."""
+
+    code: str
+    name: str
+    branch_id: UUID
+    procurement_branch_id: UUID | None = None
+    client_name: str = ""
+    address: str = ""
+    start_date: date | None = None
+    end_date: date | None = None
+
+
 @transactional
 def create_project(
-    principal: Principal,
-    *,
-    code: str,
-    name: str,
-    branch_id: UUID,
-    procurement_branch_id: UUID | None = None,
-    client_name: str = "",
-    address: str = "",
-    start_date: date | None = None,
-    end_date: date | None = None,
-    idempotency_key: str | None = None,
+    principal: Principal, new: NewProject, *, idempotency_key: str | None = None
 ) -> Project:
-    """Create a project and its worksite location (plan §3.3).
-
-    ``procurement_branch`` defaults to the branch that manages ``branch``, or ``branch``
-    itself (Q2: the procurement branch buys for the project).
-    """
+    """Create a project and its worksite location (plan §3.3)."""
     locks = _lock_project_change()
-    branch = Branch.objects.filter(pk=branch_id).first()
+    branch = Branch.objects.filter(pk=new.branch_id).first()
     default_procurement = (branch.managed_by_id or branch.pk) if branch is not None else None
     _authorize(
-        principal, locks, *_branches(branch_id, procurement_branch_id or default_procurement)
+        principal,
+        locks,
+        *_branches(new.branch_id, new.procurement_branch_id or default_procurement),
     )
-    payload = {
-        "code": code,
-        "name": name,
-        "branch_id": branch_id,
-        "procurement_branch_id": procurement_branch_id,
-        "client_name": client_name,
-        "address": address,
-        "start_date": start_date,
-        "end_date": end_date,
-    }
 
     def execute() -> Project:
-        branch = _active_branch(branch_id, "branch")
-        procurement = procurement_branch_id or branch.managed_by_id or branch.pk
+        branch = _active_branch(new.branch_id, "branch")
+        procurement = new.procurement_branch_id or branch.managed_by_id or branch.pk
         _active_branch(procurement, "procurement_branch")
         project = Project(
-            code=code,
-            name=name,
+            code=new.code,
+            name=new.name,
             branch=branch,
             procurement_branch_id=procurement,
-            client_name=client_name,
-            address=address,
-            start_date=start_date,
-            end_date=end_date,
+            client_name=new.client_name,
+            address=new.address,
+            start_date=new.start_date,
+            end_date=new.end_date,
         )
         project.full_clean()
         project.save()
@@ -146,8 +144,8 @@ def create_project(
             obj=project,
             branch_id=branch.pk,
             data={
-                "code": code,
-                "name": name,
+                "code": new.code,
+                "name": new.name,
                 "branch_id": branch.pk,
                 "procurement_branch_id": procurement,
                 "status": project.status,
@@ -167,7 +165,7 @@ def create_project(
         actor_id=principal.user_id,
         key=idempotency_key,
         operation="project.create",
-        payload=payload,
+        payload=asdict(new),
         execute=execute,
         replay=lambda _type, pk: Project.objects.get(pk=pk),
     )
@@ -205,6 +203,14 @@ def update_project(principal: Principal, project_id: UUID, **changes: Any) -> Pr
 # --- assignments --------------------------------------------------------------------
 
 
+def _require_assignee(actor: User, kind: str, user_id: UUID) -> None:
+    """The user row is locked, so a membership cannot change under this check (S4)."""
+    candidates = selectors.assignment_candidates(AccessContext.for_user(actor), kind)
+    if not candidates.filter(pk=user_id).exists():
+        message = _("This person does not hold the matching role.")
+        raise ValidationError({"user": ValidationError(message, code="no_matching_role")})
+
+
 @transactional
 def assign_to_project(
     principal: Principal,
@@ -218,7 +224,7 @@ def assign_to_project(
 ) -> ProjectAssignment:
     """Share a project with a site manager or a partner (S4)."""
     project = Project.objects.get(pk=project_id)
-    lock_for_user_change(
+    actor = lock_for_user_change(
         principal, user_id, Capability.PROJECT_MANAGE, project, read=Capability.PROJECT_VIEW
     )
     payload = {
@@ -238,6 +244,7 @@ def assign_to_project(
             valid_until=valid_until,
         )
         assignment.full_clean()
+        _require_assignee(actor, kind, user_id)
         assignment.save()
         record(
             principal.audit_identity,

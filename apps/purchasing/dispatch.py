@@ -55,9 +55,13 @@ from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.selectors import final_qty, line_total
 
 # The supplier may have these: the cancellation notice is owed now.
-DELIVERED = frozenset({Status.SENT, Status.AMBIGUOUS})
-# A human decides on these (never resent automatically after AMBIGUOUS, plan §5).
-DECIDABLE = frozenset({Status.AMBIGUOUS, Status.FAILED})
+# (A quarantined one was restored from a backup, and what happened since is not known.)
+DELIVERED = frozenset({Status.SENT, Status.AMBIGUOUS, Status.QUARANTINED})
+# A human decides on these (never resent automatically after AMBIGUOUS, plan §5; a restored
+# dispatch one by one, after checking with the supplier, plan §9).
+DECIDABLE = frozenset({Status.AMBIGUOUS, Status.FAILED, Status.QUARANTINED})
+# The supplier may have these, so a human can say it does.
+CONFIRMABLE = frozenset({Status.AMBIGUOUS, Status.QUARANTINED})
 
 SOURCE_REF = re.compile(r"PO:(?P<po>[0-9a-f-]{36}):rev(?P<revision>\d+)")
 

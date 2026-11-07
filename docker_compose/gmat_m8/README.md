@@ -23,15 +23,18 @@ The full stack, ready to use. Local by default: `https://localhost:8443`, Caddy'
 
 | Service | Image | Networks | Notes |
 | --- | --- | --- | --- |
-| `caddy` | `caddy:2.11.7-alpine` (digest) | `ingress`, `edge` | The only service that publishes ports. Admin API off. |
+| `caddy` | `caddy:2.11.9-alpine` (digest) | `ingress`, `edge` | The only service that publishes ports. Admin API off. |
 | `migrate` | `gmat-m8` | `db_migrate` | One-shot `migrate` as the **owner** role; `web` waits for it. |
 | `web` | `gmat-m8` | `edge`, `db_web` | Runtime role (data access only). No route to the internet. |
 | `db` | `postgres:18-alpine` (digest) | `db_web`, `db_worker`, `db_backup`, `db_migrate` | Never published (except in the dev overlay, on 127.0.0.1). |
 | `worker` | `gmat-m8` | `db_worker`, `egress` | The only sender of email: claims outbox rows, delivers them through SMTP, runs the hourly housekeeping. Runtime role. Idle while `flags/worker.paused` exists; never sends with `OUTBOUND_EMAIL=off`. Heartbeat healthcheck. |
 | `backup` | `gmat-m8-backup` | `db_backup`, `egress` | Dumps every 6 hours; `backup-now`, `restore --verify`. |
+| `decoder` | `gmat-m8` | none | Decodes uploaded images (ADR-0015): uid 1001, no secret in its environment, reached by `web` through a socket on its own tmpfs volume. |
+| `clamd` | `clamav/clamav` (digest; x86-64) | none | Scans every upload before it is stored (ADR-0015), reached the same way. About 1 GB of memory, a minute to start. |
+| `freshclam` | `clamav/clamav` (digest; x86-64) | `updates` | Keeps the signature volume current. Sees no uploaded file. |
 | `mailpit` | `axllent/mailpit` (digest) | `egress` | Local and CI stacks only (`docker-compose.local-mail.yml`, loaded through `COMPOSE_FILE` in `.env`): the worker delivers here, nothing leaves the host. |
 
-Every container drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem. `web`, `worker`, `migrate`, `backup` and Mailpit run as uid 1000; Caddy runs as root inside its container with only `NET_BIND_SERVICE` (its data volumes are root-owned).
+Every container drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem. `web`, `worker`, `migrate`, `backup` and Mailpit run as uid 1000, `decoder` as uid 1001, `clamd` and `freshclam` as their image's `clamav` user (uid 100), `db` as its image's `postgres` user (uid 70); Caddy runs as root inside its container with only `NET_BIND_SERVICE` (its data volumes are root-owned).
 
 ## First start
 
@@ -70,8 +73,8 @@ None of the env files is committed; only the `*.example` templates are.
 | --- | --- |
 | `docker compose up -d --build --wait` (no `-f`) | The local stack: `COMPOSE_FILE` in `.env` adds `docker-compose.local-mail.yml` (Mailpit). |
 | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build` | Development: `dev` image target, source bind-mounted read-only, `runserver`, the worker, Tailwind in watch mode, Mailpit on 127.0.0.1:8025, PostgreSQL on 127.0.0.1:5432. |
-| `docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --wait` | Production on the VPS: ports 80/443 (tcp+udp), ACME for `APP_DOMAIN`, both images **by digest** from GHCR (`APP_DIGEST`, `BACKUP_DIGEST`; the worker runs the app image), no build, no Mailpit (mail goes to `EMAIL_HOST`). `deploy.sh` (M8.4) is the supported way to run it. |
-| `docker compose -f docker-compose.yml -f docker-compose.restore-drill.yml ...` | The quarterly restore drill on an isolated machine: own project name and volumes, **every network internal**, nothing published, `OUTBOUND_EMAIL=off`. |
+| `./deploy.sh X.Y.Z` (`docker-compose.production.yml`) | Production on the VPS: ports 80/443 (tcp+udp), ACME for `APP_DOMAIN`, both images **by digest** from GHCR (`APP_DIGEST`, `BACKUP_DIGEST`; the worker runs the app image), no build, no Mailpit (mail goes to `EMAIL_HOST`). See "Deploying and recovering". |
+| `./restore-drill.sh ...` (`docker-compose.restore-drill.yml`) | The quarterly restore drill on an isolated machine: own project name and volumes, **every network internal**, nothing published, `OUTBOUND_EMAIL=off`. |
 
 Seed data for development (the dev overlay only; the command refuses any settings but `config.settings.dev` and `config.settings.test`):
 
@@ -112,18 +115,57 @@ touch flags/maintenance.on                             # public site answers 503
 
 `restore --verify` starts a private PostgreSQL inside the backup container (unix socket, no network), restores the dump there and compares every row count, the migration head, the newest audit event and the attachment list with the manifest, then checks every listed attachment in the dump's `.media/` copy against its SHA-256. Sessions and the rate-limit cache are never part of a dump. The backup copies the attachments while it holds `gmat:media-backup`; the worker deletes removed files only while it can take that lock, and only a day after their rows went (plan §9).
 
+## Deploying and recovering
+
+Production only, on the VPS, by the maintainer; each script's header has the details, and the step-by-step runbooks are in [`docs/runbooks/`](../../docs/runbooks/README.md). Needs `docker`, `curl`, `flock`, `python3` and `cosign` on the host, a `.env` and `app.env` of mode 0600, an offsite repository (`../offsite/README.md`), and `ADMIN_ALLOWED_CIDRS` set.
+
+```bash
+git fetch --tags && git switch --detach vX.Y.Z   # the release's own compose files
+./deploy.sh X.Y.Z                                # verifies, gates, backs up, migrates, verifies, opens
+./recover.sh status                              # where it stopped, and the matching row below
+```
+
+| Situation | Command | Data loss |
+| --- | --- | --- |
+| Failed before step 7 | `./recover.sh rollback` | None |
+| Failed at steps 7-9, a reversible release | `./recover.sh migrate-back` | None |
+| Failed at steps 7-9, otherwise | `./recover.sh restore-predeploy --operator EMAIL` | None |
+| A defect after the commit point | Forward-fix first (`./deploy.sh X.Y.Z+1`). `./recover.sh rollback-images` only if the signed manifest says `Old code works on the new schema` | None |
+| Only a restore can fix it, after writes were accepted | `./recover.sh restore DUMP --operator EMAIL --incident TEXT`: an explicit decision. It keeps the failed state and states the loss window first | Everything since the deploy, unless re-entered |
+| The VPS is gone | On the new one: `./recover.sh restore-offsite --snapshot ID --version V --operator EMAIL --incident TEXT` | Up to the RPO (6 h) |
+
+Every action but `status` takes the deploy lock and both gates, and ends with the internal verification and the commit point. A failure leaves both gates on: the public site answers 503 and the worker sends nothing. `EMAIL` is a platform operator (`bootstrap_admin --superuser`).
+
+After a restore:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm --no-deps web manage outbox_quarantine --operator EMAIL list
+# notifications in bulk: release-notifications | discard-notifications
+# supplier dispatches one by one, after checking with the supplier: confirm-dispatch | release-dispatch | discard-dispatch ID
+docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm --no-deps web manage confirm_account --operator EMAIL --list
+# each account once its owner confirmed it: --email ADDRESS [--credentials-changed] [--email-change accept|reject] [--factor-removal accept|reject]
+```
+
+Files the tooling keeps here, all git-ignored: `deployed.log` (one line per deploy or recovery: time, version, both digests, dump, kind), `deploy.state` and `deploy.head` (the deploy in progress), `.release/` (verified manifests and notes), `preserved/` (the failed states, with personal data: delete them when the incident is closed), `incident.log`, and the renamed `pg_data` volumes (`docker volume ls`).
+
+The drill (`./restore-drill.sh`, see its header) never runs next to production: it refuses a directory that has a `deployed.log`.
+
 ## Security notes
 
 - **Networks.** `web`, `migrate`, `backup` and `worker` each reach the database through their own internal network, so none of them can reach another (the live suite proves the worker cannot reach `web`). The worker and the backup reach the outside through `egress`. `edge` is internal and shared only by Caddy and `web`; Gunicorn trusts forwarded headers from that subnet only (`EDGE_SUBNET`, pinned). `web` has no route to the internet.
 - **Client address.** Caddy trusts no client-sent `X-Forwarded-*` header, so rate limits see the address Caddy observed.
 - **Logs.** Caddy's filter replaces token paths (`/accounts/password/reset/key/…`, and the invitation and email-change routes from M2.6) and every query string with `REDACTED` and drops `Referer` and `HX-Current-URL`. Gunicorn's access log is off; its error log goes through the same redaction as Django's.
-- **Admin.** `ADMIN_URL_PATH` sets the admin prefix for both Caddy and Django; `ADMIN_ALLOWED_CIDRS` restricts it at Caddy (everyone else gets a 404). The admin also needs an MFA-verified session.
+- **Admin.** `ADMIN_URL_PATH` sets the admin prefix for both Caddy and Django; `ADMIN_ALLOWED_CIDRS` restricts it at Caddy (everyone else gets a 404). A local stack defaults to open; the production overlay requires a value, and `deploy.sh` refuses an open one. The admin also needs an MFA-verified session.
 - **Database roles.** `owner` (migrations only), `runtime` (DML only, so it cannot alter or drop tables), `backup` (`pg_read_all_data`, read-only sessions). Passwords are generated by `init.sh` and refused if weak.
 - **Mail.** Requests never talk to SMTP: they write `EmailOutbox` rows and the worker sends them. Sensitive bodies (reset links) are encrypted with `OUTBOX_ENCRYPTION_KEYS` and wiped once sent or after an hour. The SMTP password reaches the worker only.
-- **Secrets.** The restic repository for offsite backups must be **append-only** from this host; `forget`/`prune` run only from the maintainer's machine with other credentials (plan §9).
-- **Uploads.** Caddy refuses bodies above `MAX_UPLOAD_SIZE` (11 MiB) and cuts a body that stalls for `CADDY_READ_BODY_TIMEOUT` (120 s); images are decoded in a child process with memory and CPU limits, killed after 60 s, which is why `web` has 1.5 GiB. Files are downloaded only through the app, as attachments with a sandbox CSP.
+- **Secrets.** The restic repository for offsite backups must be **append-only** from this host; `forget`/`prune` run only from the maintainer's machine with other credentials (`../offsite/README.md`, `scripts/offsite_prune.py`).
+- **Uploads.** Caddy refuses bodies above `MAX_UPLOAD_SIZE` (11 MiB) and cuts a body that stalls for `CADDY_READ_BODY_TIMEOUT` (120 s); every file is scanned by `clamd`, and with no answer it is refused (503); images are decoded in the `decoder` container by a child with memory and CPU limits, killed after 60 s (the development overlay starts neither unless asked, `--profile uploads`, and its settings scan nothing and decode in a child of `web`). Files are downloaded only through the app, as attachments with a sandbox CSP.
 - **Docker and ufw.** Published Docker ports bypass ufw. Only Caddy publishes anything; keep it that way.
 
 ## Tests
 
 `tests/live` exercises a running stack (`LIVE_REQUIRED=1 uv run pytest -m live`, see `tests/live/conftest.py`). The `compose-smoke` workflow runs it on every pull request that touches the stack, and always on `main` and nightly.
+
+`tests/rehearsal` proves `deploy.sh`, `recover.sh`, the restore drill and the offsite rules against real containers in throwaway projects (`REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s`, about 21 minutes, about 3 GB free at its peak; the result of the last run is in `docs/deploy-rehearsal.md`). `tests/unit/docker/test_deploy_scripts.py` runs the same scripts against fakes on every CI run.
+
+`tests/e2e` drives a browser through the same stack (`E2E_REQUIRED=1 uv run pytest tests/e2e -m e2e`, see CLAUDE.md for the one-time setup). It needs an **empty database**: it creates the first administrator through `manage bootstrap_admin` and the browser, then runs `seed_demo` in a one-off `web` container with the development settings (the stack keeps serving with the production ones), so start it fresh (`docker compose down --volumes && docker compose up -d --build --wait`; give a stack started with `-p <name>` as `E2E_COMPOSE_PROJECT`). The `e2e` workflow runs it on `main`, nightly, by hand and on a pull request labelled `e2e`.

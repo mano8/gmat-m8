@@ -33,6 +33,7 @@ from apps.organizations import selectors as org_selectors
 from apps.organizations.models import CODE_PATTERN, Branch
 from apps.projects import selectors, services
 from apps.projects.models import Project
+from apps.projects.services import NewProject
 
 COLUMNS = (
     Column("code", ("codigo", "project", "proyecto", "obra", "chantier"), required=True),
@@ -177,10 +178,12 @@ class Command(ImportCommand):
     ) -> str:
         project = services.create_project(
             principal,
-            code=parsed.code,
-            branch_id=branch_id,
-            procurement_branch_id=procurement_id,
-            **fields,
+            NewProject(
+                code=parsed.code,
+                branch_id=branch_id,
+                procurement_branch_id=procurement_id,
+                **fields,
+            ),
         )
         if parsed.status and parsed.status != project.status:
             services.update_project(principal, project.pk, status=parsed.status)

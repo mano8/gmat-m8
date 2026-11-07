@@ -84,6 +84,41 @@ def bootstrap_allowed(*, platform_operator: bool) -> bool:
     return not (platform_operator and active_platform_operator_exists())
 
 
+def _new_account_problem(invitation: Invitation, session_user_id: UUID | None) -> str | None:
+    if session_user_id is not None:
+        return SIGN_OUT_REQUIRED
+    if User.objects.filter(email=invitation.email).exists():
+        return "an account with this email exists"
+    return None
+
+
+def _active_account_problem(target: User, session_user_id: UUID | None) -> str | None:
+    """Accepted only by that very account, signed in; credentials never change."""
+    if session_user_id == target.pk:
+        return None
+    return SIGN_IN_REQUIRED if session_user_id is None else SIGN_OUT_REQUIRED
+
+
+def _returning_account_problem(
+    invitation: Invitation, target: User, session_user_id: UUID | None
+) -> str | None:
+    if session_user_id is not None:
+        return SIGN_OUT_REQUIRED
+    if target.offboarded_at is not None and target.offboarded_at >= invitation.created_at:
+        return "created before the account was offboarded"
+    return None
+
+
+def _existing_account_problem(
+    invitation: Invitation, target: User | None, session_user_id: UUID | None
+) -> str | None:
+    if target is None:
+        return "the account no longer exists"
+    if target.is_active and target.offboarded_at is None:
+        return _active_account_problem(target, session_user_id)
+    return _returning_account_problem(invitation, target, session_user_id)
+
+
 def invitation_problem(
     invitation: Invitation, target: User | None, session_user_id: UUID | None
 ) -> str | None:
@@ -96,22 +131,11 @@ def invitation_problem(
     if invitation.expires_at <= db_now():
         return "expired"
     if invitation.kind == Invitation.Kind.NEW_ACCOUNT:
-        if session_user_id is not None:
-            return SIGN_OUT_REQUIRED
-        if User.objects.filter(email=invitation.email).exists():
-            return "an account with this email exists"
+        problem = _new_account_problem(invitation, session_user_id)
     else:
-        if target is None:
-            return "the account no longer exists"
-        if target.is_active and target.offboarded_at is None:
-            # Accepted only by that very account, signed in; credentials never change.
-            if session_user_id != target.pk:
-                return SIGN_IN_REQUIRED if session_user_id is None else SIGN_OUT_REQUIRED
-        else:
-            if session_user_id is not None:
-                return SIGN_OUT_REQUIRED
-            if target.offboarded_at is not None and target.offboarded_at >= invitation.created_at:
-                return "created before the account was offboarded"
+        problem = _existing_account_problem(invitation, target, session_user_id)
+    if problem is not None:
+        return problem
     if invitation.bootstrap and not bootstrap_allowed(
         platform_operator=invitation.platform_operator
     ):

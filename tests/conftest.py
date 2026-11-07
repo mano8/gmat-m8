@@ -6,6 +6,7 @@ live in ``tests/support.py``.
 """
 
 import importlib.util
+import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import ModuleType
@@ -19,11 +20,23 @@ from apps.access.principals import SessionPrincipal
 from apps.access.roles import Role
 from apps.accounts.models import User
 from apps.organizations.models import Branch, Company
+from apps.organizations.services import NewBranch
 from tests.org import Org, People, build_org, build_people
 from tests.org import member as org_member
 from tests.support import PASSWORD, TOTP_COUNTER, grant, principal_for
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+
+# The browser layer runs only when asked for (`E2E_REQUIRED=1`), with Playwright installed (the
+# optional `e2e` group). Its sync API leaves an asyncio loop running in the main thread, so in a
+# plain run every database test after it fails with SynchronousOnlyOperation. The directory
+# itself, not a glob of its contents: pytest imports a directory's conftest.py as soon as it
+# enters it, and tests/e2e/conftest.py imports Playwright.
+collect_ignore = (
+    []
+    if importlib.util.find_spec("playwright") and os.environ.get("E2E_REQUIRED") == "1"
+    else ["e2e"]
+)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -138,5 +151,5 @@ def branch(admin_principal: SessionPrincipal, company: Company) -> Branch:
     from apps.organizations.services import create_branch
 
     return create_branch(
-        admin_principal, company_id=company.pk, code="MAD", name="Madrid", city="Madrid"
+        admin_principal, NewBranch(company_id=company.pk, code="MAD", name="Madrid", city="Madrid")
     )

@@ -75,6 +75,15 @@ def test_health_and_login_answer(stack: Stack) -> None:
     assert stack.get("/accounts/login/").status == 200
 
 
+def test_web_says_at_startup_which_hsts_switches_are_off(stack: Stack) -> None:
+    """M8.3, X3: the local template sets a lifetime and leaves the other two off."""
+    logs = stack.compose("logs", "--no-log-prefix", "web").stdout
+    warnings = [json.loads(line) for line in logs.splitlines() if "hsts_incomplete" in line]
+    assert warnings, "no warning in web's log"
+    assert warnings[0]["level"] == "WARNING"
+    assert warnings[0]["security"]["off"] == "DJANGO_HSTS_INCLUDE_SUBDOMAINS,DJANGO_HSTS_PRELOAD"
+
+
 def test_security_headers_survive_the_proxy(stack: Stack) -> None:
     login = stack.get("/accounts/login/")
     csp = login.header("content-security-policy") or ""
@@ -239,6 +248,11 @@ def test_the_sentinel_never_reaches_a_log(stack: Stack) -> None:
     link_token = f"{sentinel}{'x' * (43 - len(sentinel))}"
     stack.get(f"/invite/{link_token}/", headers=hostile)
     stack.get(f"/account/email-change/{link_token}/?token={sentinel}", headers=hostile)
+    # The same links opened without their trailing slash: Django's slash-appending 301 points
+    # at the token URL, so the response's Location must stay out of the access log too.
+    for slashless in (f"/invite/{link_token}", token_path.rstrip("/")):
+        moved = stack.get(slashless, headers=hostile)
+        assert moved.status == 301 and sentinel in (moved.header("location") or "")
     stack.get(f"/accounts/login/?next=/x/{sentinel}/", headers=hostile)
     stack.get("/no-such-page/", headers=hostile)
     stack.get(f"/healthz/?probe={sentinel}", headers=hostile)
@@ -283,6 +297,10 @@ def test_maintenance_flag_gates_the_public_site_but_not_web(stack: Stack) -> Non
         assert gated.header("retry-after")
         assert "no-store" in (gated.header("cache-control") or "")
         assert stack.get("/healthz/").status == 503
+        # A form post gets the page as well, and never reaches Django.
+        posted = stack.request("POST", "/accounts/login/", body=b"login=x&password=y")
+        assert posted.status == 503
+        assert "Mantenimiento" in posted.text
         # web itself keeps answering inside the stack, so a deploy can verify it before opening.
         internal = stack.compose(
             "exec",
@@ -307,6 +325,8 @@ def test_the_fallback_page_replaces_a_missing_web(stack: Stack) -> None:
         gone = stack.get("/accounts/login/")
         assert gone.status == 503
         assert "Mantenimiento" in gone.text
+        posted = stack.request("POST", "/accounts/login/", body=b"login=x&password=y")
+        assert posted.status == 503
     finally:
         stack.wait_healthy("web")
     assert stack.get("/accounts/login/").status == 200
@@ -402,6 +422,13 @@ def test_the_worker_cannot_reach_web(stack: Stack) -> None:
     assert resolve.returncode != 0
 
 
+def test_the_database_runs_without_root_or_a_capability(stack: Stack) -> None:
+    result = stack.compose("exec", "-T", "db", "sh", "-c", "id -u; grep CapEff /proc/1/status")
+    uid, capabilities = result.stdout.split("\n", 1)
+    assert uid == "70"
+    assert capabilities.split()[1].strip("0") == ""
+
+
 def _as_role(stack: Stack, role: str, statement: str) -> tuple[int, str]:
     result = stack.compose(
         "exec",
@@ -454,7 +481,11 @@ def test_backup_now_then_restore_verify_against_the_manifest(stack: Stack) -> No
             stack.compose("exec", "-T", "backup", "cat", f"/backups/{base}.manifest.json").stdout
         )
         assert manifest["label"] == "smoke"
-        assert manifest["excluded_data_tables"] == ["django_session", "django_cache"]
+        assert manifest["excluded_data_tables"] == [
+            "django_session",
+            "usersessions_usersession",
+            "django_cache",
+        ]
         assert manifest["row_counts"]["django_session"] >= 1  # live rows existed at dump time
         assert "accounts" in manifest["migration_head"]
 

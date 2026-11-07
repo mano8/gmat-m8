@@ -4,7 +4,8 @@
 Standard library only, so the workflows run it without installing the project.
 
   notes         release notes: the CHANGELOG.md section of one version
-  manifest      release-manifest.json: version, commit, both digests, scan summary, SBOM names
+  manifest      release-manifest.json: version, commit, both digests, scan summary, SBOM names,
+                what the release states about its migrations
   scan-targets  the production image set for the nightly scan, as a GitHub matrix
   scan-issue    the body of the nightly scan issue, from the gate reports
 
@@ -38,7 +39,16 @@ SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
 # Every release image is built, scanned and listed for both architectures (plan §8.4); the
 # nightly scan covers the same two.
 ARCHITECTURES = ("amd64", "arm64")
+# Third-party images published for fewer architectures than ours. clamav/clamav is x86-64 only;
+# its multi-arch Debian variant ships libxml2 flaws clamd can reach (ADR-0015).
+SINGLE_ARCHITECTURE = {"clamav": ("amd64",)}
 GATE = {"severity": "CRITICAL,HIGH", "ignore_unfixed": False}
+# What a release states on a line of its own (docs/release.md, step 1). The deploy tooling decides
+# on these, so they go into the manifest, which is signed; the release notes are not (ADR-0017).
+MIGRATION_STATEMENTS = {
+    "irreversible": "Irreversible migration",
+    "old_code_works": "Old code works on the new schema",
+}
 MANIFEST_SCHEMA_VERSION = 1
 ISSUE_ROW_LIMIT = 60
 
@@ -66,6 +76,21 @@ def release_notes(changelog: str, version: str) -> str:
             raise ReleaseError(f"CHANGELOG.md section [{version}] is empty")
         return body + "\n"
     raise ReleaseError(f"CHANGELOG.md has no section [{version}]")
+
+
+def _statement(notes: str, marker: str) -> str:
+    """The text after ``marker`` on a line that starts with it; "yes" when the line says no more."""
+    wanted = marker.casefold()
+    for line in notes.splitlines():
+        text = line.strip(" \t*_-#")
+        if text.casefold().startswith(wanted):
+            return text[len(marker) :].strip(" \t*_:") or "yes"
+    return ""
+
+
+def migration_statements(notes: str) -> dict[str, str]:
+    """What the notes state; an empty value means they do not state it."""
+    return {key: _statement(notes, marker) for key, marker in MIGRATION_STATEMENTS.items()}
 
 
 # ------------------------------------------------------------------------- manifest
@@ -184,7 +209,7 @@ class Release:
 
 
 def build_manifest(
-    release: Release, *, directory: Path, images: dict[str, str], ignorefile: Path
+    release: Release, *, directory: Path, images: dict[str, str], ignorefile: Path, notes: str
 ) -> dict[str, Any]:
     """Return the release manifest; ``images`` maps a role (``app``) to an image name."""
     version = release.version
@@ -217,6 +242,7 @@ def build_manifest(
             for role, name in sorted(images.items())
         },
         "scan_gate": gate,
+        "migration": migration_statements(notes),
     }
 
 
@@ -224,9 +250,9 @@ def build_manifest(
 
 
 def scan_targets(compose_text: str, manifest: dict[str, Any] | None) -> list[dict[str, str]]:
-    """The production image set, one entry per image and architecture: Caddy and PostgreSQL
-    from the compose file, plus the application and backup images of the latest release when
-    there is one.
+    """The production image set, one entry per image and architecture: Caddy, PostgreSQL and
+    ClamAV from the compose file, plus the application and backup images of the latest release
+    when there is one.
 
     An ``image:`` line that is neither digest-pinned nor a ``${VAR}`` reference (the images
     built here) is an error: a quiet skip would shrink the scan without anyone noticing."""
@@ -244,7 +270,7 @@ def scan_targets(compose_text: str, manifest: dict[str, Any] | None) -> list[dic
     return [
         {"name": f"{name}-{arch}", "ref": ref, "platform": f"linux/{arch}"}
         for name, ref in images.items()
-        for arch in ARCHITECTURES
+        for arch in SINGLE_ARCHITECTURE.get(name, ARCHITECTURES)
     ]
 
 
@@ -326,6 +352,7 @@ def _cmd_manifest(args: argparse.Namespace) -> int:
         directory=Path(args.dir),
         images=images,
         ignorefile=Path(args.ignorefile),
+        notes=release_notes(Path(args.changelog).read_text(encoding="utf-8"), args.version),
     )
     Path(args.output).write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
@@ -379,6 +406,7 @@ def build_parser() -> argparse.ArgumentParser:
     manifest.add_argument("--run-url", required=True)
     manifest.add_argument("--created-at", help="UTC timestamp; default: now")
     manifest.add_argument("--ignorefile", default=str(ROOT / ".trivyignore.yaml"))
+    manifest.add_argument("--changelog", default=str(ROOT / "CHANGELOG.md"))
     manifest.add_argument("--output", default="release-manifest.json")
     manifest.set_defaults(handler=_cmd_manifest)
 

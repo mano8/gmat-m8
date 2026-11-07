@@ -1,0 +1,45 @@
+# The rehearsal's overlay on top of the production one (tests/rehearsal): images from a local
+# registry instead of GHCR, its own ports, and a restic REST server standing for the offsite
+# storage. rest-append is what the "VPS" reaches through `egress`; rest-admin can delete and is
+# published on 127.0.0.1 only, for the "maintainer's machine".
+services:
+  caddy:
+    ports: !override
+      - "127.0.0.1:${REHEARSAL_HTTP_PORT:-18080}:${REHEARSAL_HTTP_PORT:-18080}"
+      - "127.0.0.1:${REHEARSAL_HTTPS_PORT:-18443}:${REHEARSAL_HTTPS_PORT:-18443}"
+    environment:
+      HTTP_PORT: ${REHEARSAL_HTTP_PORT:-18080}
+      HTTPS_PORT: ${REHEARSAL_HTTPS_PORT:-18443}
+      HTTPS_PORT_SUFFIX: ":${REHEARSAL_HTTPS_PORT:-18443}"
+      HTTP_PROTOCOLS: "h1 h2"
+
+  migrate:
+    image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
+  web:
+    image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
+  decoder:
+    image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
+  worker:
+    image: ${REHEARSAL_PREFIX:?}/gmat-m8@${APP_DIGEST:?}
+  backup:
+    image: ${REHEARSAL_PREFIX:?}/gmat-m8-backup@${BACKUP_DIGEST:?}
+
+  rest-append:
+    image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
+    user: "1000:1000"
+    entrypoint: ["rest-server"]
+    command: ["--path=/data", "--no-auth", "--append-only", "--listen=:8000"]
+    volumes:
+      - ${REHEARSAL_OFFSITE:?}:/data
+    networks: [egress]
+
+  rest-admin:
+    image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
+    user: "1000:1000"
+    entrypoint: ["rest-server"]
+    command: ["--path=/data", "--no-auth", "--listen=:8000"]
+    ports:
+      - "127.0.0.1:${REHEARSAL_ADMIN_PORT:-18001}:8000"
+    volumes:
+      - ${REHEARSAL_OFFSITE:?}:/data
+    networks: [egress]

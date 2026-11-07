@@ -93,6 +93,7 @@ def _manifest_args(directory: Path, **overrides: Any) -> dict[str, Any]:
         "directory": directory,
         "images": {"app": "gmat-m8", "backup": "gmat-m8-backup"},
         "ignorefile": IGNOREFILE,
+        "notes": "- Notes.\n",
     }
     for key, value in overrides.items():
         (release if key in release else args)[key] = value
@@ -103,6 +104,12 @@ def _build(tools: ModuleType, args: dict[str, Any]) -> dict[str, Any]:
     rest = {key: value for key, value in args.items() if key != "release"}
     manifest: dict[str, Any] = tools.build_manifest(tools.Release(**args["release"]), **rest)
     return manifest
+
+
+def _changelog(directory: Path) -> Path:
+    path = directory / "CHANGELOG.md"
+    path.write_text(CHANGELOG, encoding="utf-8")
+    return path
 
 
 # ---------------------------------------------------------------------------- notes
@@ -118,6 +125,38 @@ def test_notes_are_the_versions_section(tools: ModuleType) -> None:
 
 def test_last_section_drops_the_link_references(tools: ModuleType) -> None:
     assert tools.release_notes(CHANGELOG, "1.0.0") == "- First release.\n"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Irreversible migration: drops x",
+        "**Irreversible migration:** drops x",
+        "- irreversible migration: drops x",
+        "### Irreversible Migration: drops x",
+    ],
+)
+def test_a_statement_is_a_line_of_its_own(tools: ModuleType, line: str) -> None:
+    statements = tools.migration_statements(f"Intro\n{line}\nEnd\n")
+    assert statements == {"irreversible": "drops x", "old_code_works": ""}
+
+
+def test_a_statement_with_nothing_after_it_still_counts(tools: ModuleType) -> None:
+    statements = tools.migration_statements("Old code works on the new schema\n")
+    assert statements == {"irreversible": "", "old_code_works": "yes"}
+
+
+@pytest.mark.parametrize("notes", ["", "This release has no irreversible migration.\n"])
+def test_anything_else_is_not_a_statement(tools: ModuleType, notes: str) -> None:
+    assert tools.migration_statements(notes) == {"irreversible": "", "old_code_works": ""}
+
+
+def test_the_manifest_carries_the_statements_of_the_notes(
+    tools: ModuleType, tmp_path: Path
+) -> None:
+    notes = "Old code works on the new schema: no change\n"
+    manifest = _build(tools, _manifest_args(_release_dir(tmp_path), notes=notes))
+    assert manifest["migration"] == {"irreversible": "", "old_code_works": "no change"}
 
 
 def test_unknown_version_has_no_notes(tools: ModuleType) -> None:
@@ -328,10 +367,16 @@ def test_targets_include_the_released_images(tools: ModuleType) -> None:
     }
 
 
-def test_repository_compose_file_yields_caddy_and_postgres(tools: ModuleType) -> None:
+def test_repository_compose_file_yields_caddy_postgres_and_clamav(tools: ModuleType) -> None:
     compose = (tools.ROOT / "docker_compose/gmat_m8/docker-compose.yml").read_text(encoding="utf-8")
-    names = [t["name"] for t in tools.scan_targets(compose, None)]
-    assert names == ["caddy-amd64", "caddy-arm64", "postgres-amd64", "postgres-arm64"]
+    names = {t["name"] for t in tools.scan_targets(compose, None)}
+    assert names == {
+        "caddy-amd64",
+        "caddy-arm64",
+        "postgres-amd64",
+        "postgres-arm64",
+        "clamav-amd64",
+    }
 
 
 @pytest.mark.parametrize(
@@ -457,6 +502,8 @@ def test_cli_manifest_writes_sorted_json(tools: ModuleType, tmp_path: Path) -> N
         RUN_URL,
         "--created-at",
         CREATED,
+        "--changelog",
+        str(_changelog(tmp_path)),
         "--output",
         str(output),
     ]
@@ -477,9 +524,24 @@ def test_cli_manifest_defaults_the_timestamp(tools: ModuleType, tmp_path: Path) 
         "manifest", "--dir", str(directory), "--version", "1.1.0", "--commit", SHA,
         "--repository", "mano8/gmat-m8", "--registry", "ghcr.io/mano8",
         "--image", "app=gmat-m8", "--run-url", RUN_URL, "--output", str(output),
+        "--changelog", str(_changelog(tmp_path)),
     ]  # fmt: skip
     assert tools.main(argv) == 0
     assert json.loads(output.read_text(encoding="utf-8"))["created_at"].endswith("Z")
+
+
+def test_cli_manifest_refuses_a_version_the_changelog_does_not_have(
+    tools: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = _release_dir(tmp_path)
+    argv = [
+        "manifest", "--dir", str(directory), "--version", "9.9.9", "--commit", SHA,
+        "--repository", "mano8/gmat-m8", "--registry", "ghcr.io/mano8",
+        "--image", "app=gmat-m8", "--run-url", RUN_URL,
+        "--changelog", str(_changelog(tmp_path)),
+    ]  # fmt: skip
+    assert tools.main(argv) == 1
+    assert "no section [9.9.9]" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("image", ["app", "=gmat-m8", "app="])
@@ -560,3 +622,17 @@ def test_the_release_gate_and_the_manifest_accept_the_same_versions(
     tag_ok = not gate.check_tag(f"v{version}")
     assert tag_ok == bool(tools.VERSION_PATTERN.match(version))
     assert gate.SHA_PATTERN.pattern == tools.SHA_PATTERN.pattern
+
+
+def test_clamav_is_scanned_for_the_one_architecture_it_is_published_for(tools: ModuleType) -> None:
+    """amd64 only (ADR-0015): asking Trivy for arm64 would fail the nightly leg, not skip it."""
+    digest = "a" * 64
+    compose = (
+        f"services:\n  clamd:\n    image: clamav/clamav:1.5.4@sha256:{digest}\n"
+        f"  db:\n    image: postgres:18-alpine@sha256:{digest}\n"
+    )
+    assert [target["name"] for target in tools.scan_targets(compose, None)] == [
+        "clamav-amd64",
+        "postgres-amd64",
+        "postgres-arm64",
+    ]

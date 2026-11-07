@@ -248,20 +248,23 @@ def return_to_draft(principal: Principal, request_id: UUID, *, note: str) -> Mat
     """Send a submitted or approved request back to its requester with a note.
 
     Every decision is cleared (the audit keeps them). An approved request returns only
-    while nothing is allocated or delivered.
+    while nothing is allocated or delivered. On one's own request this is a decision like
+    any other: the self-decision rule applies and the audit marks it (M8.3, R18).
     """
     note = _reason(note, "note")
     locks = LockOrder()
     request = MaterialRequest.objects.get(pk=request_id)
-    _authorize(principal, REVIEW, request, locks)
+    actor = _authorize(principal, REVIEW, request, locks)
     locked = _lock_header(locks, request)
     _lock_lines(locks, locked)
+    _require_may_decide(principal, actor, locked)
     left = transition(locked, Status.DRAFT, "return_to_draft")
     if left == Status.APPROVED:
         _require_nothing_allocated_or_delivered(locked)
     _reset_decisions(locked)
     locked.save()
-    _record(principal, "request.returned", locked, from_status=left, note=note)
+    marker = _self_decided(actor, locked)
+    _record(principal, "request.returned", locked, from_status=left, note=note, **marker)
     events.publish("request.returned", request_id=locked.pk)
     return locked
 
@@ -273,10 +276,12 @@ def reduce_approved_qty(
     """Lower the approved quantity of a live line of an approved request.
 
     Never below max(D, R) + P + Q (§4.4, F70), never on a closed-short line, never up:
-    more takes a new request. A line reduced to zero is no longer live.
+    more takes a new request. A line reduced to zero is no longer live. On one's own
+    request the self-decision rule applies and the audit marks it (M8.3, R18).
     """
     locks = LockOrder()
-    _actor, locked, lines, line, component = _component_line(principal, REVIEW, line_id, locks)
+    actor, locked, lines, line, component = _component_line(principal, REVIEW, line_id, locks)
+    _require_may_decide(principal, actor, locked)
     _require_state(locked, Status.APPROVED)
     _require_live(line)
     check_quantity(approved_qty, line.unit, "approved_qty", zero=True)
@@ -312,6 +317,7 @@ def reduce_approved_qty(
         line,
         changes={"approved_qty": {"from": current, "to": approved_qty}},
         reason=reason.strip(),
+        **_self_decided(actor, locked),
     )
     _settle_closure(principal, locked, lines)
     component.reconcile(principal, "reduce_approved_qty")

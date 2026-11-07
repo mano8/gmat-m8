@@ -6,14 +6,20 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models import Count, OuterRef, QuerySet, Subquery
 from django.utils.functional import Promise
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
-from apps.notifications.models import EmailOutbox, Kind, NotificationPreference, Status
+from apps.notifications.models import (
+    DISPATCH_KINDS,
+    EmailOutbox,
+    Kind,
+    NotificationPreference,
+    Status,
+)
 
 # The security mail whose status a group administrator may see: the objects they manage
 # (``eligibility_object_type`` of the invitation and of the email change).
@@ -151,3 +157,18 @@ def delivery_status(
         for object_id, source_ref, status, attempts, sent_at, created_at in latest
         if object_id is not None
     }
+
+
+def quarantined_counts() -> dict[str, int]:
+    """Held messages per kind (``manage outbox_quarantine``, a shell's view of the outbox)."""
+    rows = EmailOutbox.objects.filter(status=Status.QUARANTINED).order_by("kind")
+    return {row["kind"]: row["n"] for row in rows.values("kind").annotate(n=Count("pk"))}
+
+
+def quarantined_dispatches() -> QuerySet[EmailOutbox]:
+    """Held supplier dispatches: a human decides on each after checking with the supplier."""
+    return (
+        EmailOutbox.objects.filter(status=Status.QUARANTINED, kind__in=DISPATCH_KINDS)
+        .select_related("source_po")
+        .order_by("created_at", "pk")
+    )

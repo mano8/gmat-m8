@@ -9,9 +9,10 @@ from the admin: records are deactivated through their service instead.
 from typing import Any
 
 from django.contrib import admin, messages
-from django.contrib.admin import ActionLocation
+from django.contrib.admin import ActionLocation, SimpleListFilter
 from django.core.exceptions import ValidationError
 from django.db.models import Model
+from django.db.models.constants import LOOKUP_SEP
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 
 
@@ -27,6 +28,29 @@ class ServiceBackedModelAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def may_edit(self, request: HttpRequest, obj: Model | None = None) -> bool:
         """Whether this user may add, or change ``obj``; the service checks again."""
         return False
+
+    def lookup_allowed(self, lookup: str, value: str, request: HttpRequest) -> bool:
+        """Only what the page offers filters it: its list filters and its date hierarchy.
+
+        Django accepts a query-string lookup on any local field, so the result count would
+        read back a column the page never shows (``?password__startswith=…`` on a user, a
+        price, an audit payload), one guess at a time. Anything else is a 400.
+        """
+        offered = self._filter_fields(request)
+        if lookup not in offered and lookup.split(LOOKUP_SEP, 1)[0] not in offered:
+            return False
+        return super().lookup_allowed(lookup, value, request)
+
+    def _filter_fields(self, request: HttpRequest) -> set[str]:
+        """The field of every list filter (or its parameter) and of the date hierarchy."""
+        fields = {self.date_hierarchy} if self.date_hierarchy else set()
+        for item in self.get_list_filter(request):
+            if isinstance(item, type) and issubclass(item, SimpleListFilter):
+                fields.add(str(item.parameter_name))
+            else:
+                path = item[0] if isinstance(item, list | tuple) else item
+                fields.add(str(path).split(LOOKUP_SEP, 1)[0])
+        return fields
 
     def has_module_permission(self, request: HttpRequest) -> bool:
         return self.admin_site.has_permission(request)

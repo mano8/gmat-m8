@@ -16,6 +16,7 @@ wrapper, in the write order of plan §4.7:
 The generation counters are bumped by database triggers (``access.0002``), not here.
 """
 
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -264,33 +265,29 @@ def _check_default_warehouse(branch: Branch) -> None:
         )
 
 
+@dataclass(frozen=True)
+class NewBranch:
+    """What a new branch starts with."""
+
+    company_id: UUID
+    code: str
+    name: str
+    city: str = ""
+    address: str = ""
+    managed_by_id: UUID | None = None
+    allow_self_approval: bool = False
+
+
 @transactional
 def create_branch(
-    principal: Principal,
-    *,
-    company_id: UUID,
-    code: str,
-    name: str,
-    city: str = "",
-    address: str = "",
-    managed_by_id: UUID | None = None,
-    allow_self_approval: bool = False,
-    idempotency_key: str | None = None,
+    principal: Principal, new: NewBranch, *, idempotency_key: str | None = None
 ) -> Branch:
     """Create a branch of an active company. Its warehouses come after it (Q3)."""
     _org_change(principal)
-    payload = {
-        "company_id": company_id,
-        "code": code,
-        "name": name,
-        "city": city,
-        "address": address,
-        "managed_by_id": managed_by_id,
-        "allow_self_approval": allow_self_approval,
-    }
+    payload = asdict(new)
 
     def execute() -> Branch:
-        company = Company.objects.get(pk=company_id)
+        company = Company.objects.get(pk=new.company_id)
         if not company.is_active:
             raise ValidationError(
                 {"company": ValidationError(_("The company is inactive."), code="inactive_company")}

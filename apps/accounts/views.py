@@ -1,25 +1,31 @@
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from allauth.account.views import PasswordResetFromKeyView as AllauthPasswordResetFromKeyView
 from allauth.core.internal.ratelimit import consume_or_429
+from allauth.mfa.adapter import get_adapter as get_mfa_adapter
+from allauth.mfa.webauthn.views import RemoveWebAuthnView as AllauthRemoveWebAuthnView
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST, require_safe
 
 from apps.access.exceptions import AccessDenied
+from apps.access.middleware import access_for
 from apps.accounts import selectors, services, tokens
 from apps.accounts.adapters import PasswordResetTokenInvalid
 from apps.accounts.forms import AcceptInvitationForm, ResetPasswordKeyForm
-from apps.accounts.models import EmailChangeRequest, Invitation
+from apps.accounts.models import EmailChangeRequest, Invitation, User
+from apps.accounts.security_log import log_event
 from apps.accounts.tokens import hash_token
 from apps.core.http import client_ip
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict
+from apps.core.responses import conflict, perform
 
 
 @method_decorator(sensitive_post_parameters("password1", "password2"), name="dispatch")
@@ -46,6 +52,24 @@ class PasswordResetFromKeyView(AllauthPasswordResetFromKeyView):
 password_reset_from_key = PasswordResetFromKeyView.as_view()
 
 
+class RemoveWebAuthnView(AllauthRemoveWebAuthnView):
+    """allauth's passkey removal, which asks the MFA adapter first, as TOTP deactivation does.
+
+    A privileged account keeps a second factor (``MFAAdapter.can_delete_authenticator``):
+    without it, the next sign-in would be password-only and enroll a new factor.
+    """
+
+    def form_valid(self, form: Any) -> HttpResponse:
+        if not get_mfa_adapter().can_delete_authenticator(self.get_object()):
+            messages.error(self.request, _("Your role needs a second factor: add another first."))
+            return redirect("mfa_list_webauthn")
+        response: HttpResponse = super().form_valid(form)
+        return response
+
+
+remove_webauthn = RemoveWebAuthnView.as_view()
+
+
 # --- token pages (plan §5: invitations, email changes) ----------------------------------
 #
 # A token link (``/invite/<token>/``, ``/account/email-change/<token>/``) keeps only the
@@ -57,14 +81,27 @@ password_reset_from_key = PasswordResetFromKeyView.as_view()
 
 INVITATION_SESSION_KEY = "_gmat_invitation"
 EMAIL_CHANGE_SESSION_KEY = "_gmat_email_change"
-TOKEN_RATE_LIMITS = {"token": "20/m/ip"}
+LINK_RATE_LIMITS = {"link": "20/m/ip"}
+# A link over the rate limit: its 429 is shown by the token-less page it redirects to. In the
+# URL, not the session: a client without a cookie must not write a session row per request.
+LIMITED_PARAMETER = "limited"
 
 
 def _rate_limited(request: HttpRequest) -> HttpResponse | None:
     response: HttpResponse | None = consume_or_429(
-        request, app="allauth.account", action="token", config=TOKEN_RATE_LIMITS, limit_get=True
+        request, app="allauth.account", action="link", config=LINK_RATE_LIMITS, limit_get=True
     )
     return response
+
+
+def _limited_link(request: HttpRequest, page: str) -> HttpResponse:
+    """Never answer a limited link where the token sits (address bar, history)."""
+    return redirect(f"{reverse(page)}?{LIMITED_PARAMETER}=1")
+
+
+def _limited_page(request: HttpRequest) -> HttpResponse | None:
+    """The 429 of the link that led here. Asking for it by hand only answers yourself."""
+    return HttpResponse(status=429) if LIMITED_PARAMETER in request.GET else None
 
 
 def _session_user_id(request: HttpRequest) -> UUID | None:
@@ -84,9 +121,8 @@ def _done(request: HttpRequest, message: str) -> HttpResponse:
 
 @require_safe
 def invitation_link(request: HttpRequest, token: str) -> HttpResponse:
-    limited = _rate_limited(request)
-    if limited is not None:
-        return limited
+    if _rate_limited(request) is not None:
+        return _limited_link(request, "invitations:accept")
     request.session[INVITATION_SESSION_KEY] = hash_token(token)
     return redirect("invitations:accept")
 
@@ -119,6 +155,9 @@ def _invitation_page(
 
 @require_safe
 def invitation_accept(request: HttpRequest) -> HttpResponse:
+    limited = _limited_page(request)
+    if limited is not None:
+        return limited
     invitation = selectors.invitation_by_hash(request.session.get(INVITATION_SESSION_KEY))
     if invitation is None:
         return _invalid(request)
@@ -158,9 +197,8 @@ def invitation_submit(request: HttpRequest) -> HttpResponse:
 
 @require_safe
 def email_change_link(request: HttpRequest, token: str) -> HttpResponse:
-    limited = _rate_limited(request)
-    if limited is not None:
-        return limited
+    if _rate_limited(request) is not None:
+        return _limited_link(request, "email_change:confirm")
     token_hash = hash_token(token)
     request.session[EMAIL_CHANGE_SESSION_KEY] = token_hash
     found = selectors.email_change_by_hash(token_hash)
@@ -178,6 +216,9 @@ def _email_change(
 
 
 def _email_change_page(request: HttpRequest, action: tokens.EmailChangeAction) -> HttpResponse:
+    limited = _limited_page(request)
+    if limited is not None:
+        return limited
     change = _email_change(request, action)
     if change is None:
         return _invalid(request)
@@ -234,3 +275,48 @@ def email_change_cancel(request: HttpRequest) -> HttpResponse:
 @require_POST
 def email_change_cancel_submit(request: HttpRequest) -> HttpResponse:
     return _email_change_submit(request, "cancel")
+
+
+# --- one's own sessions (M8.3, X5) ------------------------------------------------------
+
+
+@require_safe
+@login_required
+def sessions_list(request: HttpRequest) -> HttpResponse:
+    """Where the signed-in user is signed in. Theirs alone: nothing reads anyone else's."""
+    sessions = selectors.own_sessions(cast(User, request.user), _current_key(request))
+    context = {"sessions": sessions, "others": any(not item.current for item in sessions)}
+    return render(request, "accounts/sessions.html", context)
+
+
+def _current_key(request: HttpRequest) -> str:
+    """A signed-in request always has a saved session."""
+    return cast(str, request.session.session_key)
+
+
+def _log_ended(request: HttpRequest, count: int) -> None:
+    log_event("sessions_ended", request, request.user, count=str(count))
+
+
+@require_POST
+@login_required
+def session_end(request: HttpRequest, session_id: int) -> HttpResponse:
+    principal = access_for(request).principal
+
+    def call() -> None:
+        ended = services.end_own_session(principal, session_id, current_key=_current_key(request))
+        _log_ended(request, ended)
+
+    return perform(request, call, _("That session has ended."), "sessions:list")
+
+
+@require_POST
+@login_required
+def sessions_end_others(request: HttpRequest) -> HttpResponse:
+    principal = access_for(request).principal
+
+    def call() -> None:
+        ended = services.end_other_sessions(principal, current_key=_current_key(request))
+        _log_ended(request, ended)
+
+    return perform(request, call, _("Your other sessions have ended."), "sessions:list")

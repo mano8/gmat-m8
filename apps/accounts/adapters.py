@@ -12,7 +12,7 @@ from allauth.account.forms import default_token_generator
 from allauth.account.internal.stagekit import clear_login
 from allauth.mfa.adapter import DefaultMFAAdapter
 from allauth.mfa.models import Authenticator
-from cryptography.fernet import Fernet, MultiFernet
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.http import HttpRequest
@@ -111,8 +111,9 @@ class MFAAdapter(DefaultMFAAdapter):
 
     allauth's default adapter stores TOTP secrets and recovery-code seeds in plaintext. The
     newest key comes first and encrypts; every listed key decrypts, so a rotation adds a
-    key in front and re-encrypts. A value no key can decrypt raises ``InvalidToken``: the
-    user cannot complete MFA until it is reset (runbook, M8.5).
+    key in front and re-encrypts (``manage reencrypt_mfa``). A value no key can decrypt raises
+    ``InvalidToken``: the user cannot complete MFA until it is reset
+    (docs/runbooks/user-admin.md).
     """
 
     def _fernet(self) -> MultiFernet:
@@ -123,6 +124,18 @@ class MFAAdapter(DefaultMFAAdapter):
 
     def decrypt(self, encrypted_text: str) -> str:
         return self._fernet().decrypt(encrypted_text.encode("ascii")).decode("utf-8")
+
+    def is_under_newest_key(self, encrypted_text: str) -> bool:
+        keys = tuple(settings.MFA_ENCRYPTION_KEYS)
+        try:
+            _multi_fernet(keys[:1]).decrypt(encrypted_text.encode("ascii"))
+        except InvalidToken:
+            return False
+        return True
+
+    def reencrypt(self, encrypted_text: str) -> str:
+        """The same secret under the newest key; ``InvalidToken`` if no listed key opens it."""
+        return self._fernet().rotate(encrypted_text.encode("ascii")).decode("ascii")
 
     def can_delete_authenticator(self, authenticator: Authenticator) -> bool:
         """Privileged accounts must keep a second factor; others may remove theirs."""

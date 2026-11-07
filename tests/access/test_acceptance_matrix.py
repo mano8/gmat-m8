@@ -272,6 +272,12 @@ def app_action(**outcomes: Outcome) -> dict[str, Expect]:
     return {"GET": get, "HEAD": get, "POST": expect(DENIED, signed_out=LOGIN, **outcomes)}
 
 
+def own_account_action() -> dict[str, Expect]:
+    """A POST-only action on the signed-in account itself: no capability involved."""
+    get = expect(NOT_ALLOWED, no_mfa=STEP_UP)
+    return {"GET": get, "HEAD": get, "POST": expect(REDIRECT, signed_out=LOGIN, no_mfa=DENIED)}
+
+
 def project_page(
     capable: tuple[str, ...], visible: tuple[str, ...], allowed: tuple[str, ...]
 ) -> dict[str, Expect]:
@@ -692,6 +698,21 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # M7.1: every member (catalog.view) sets their own business-email choice.
     "notifications:settings": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
     "notifications:save": (Route(app_action(**_each(REDIRECT, CATALOG_VIEWERS))),),
+    # M8.3 (X5): every signed-in account, whatever its memberships; session MFA as everywhere.
+    # Only one's own rows are reached: someone else's id answers as an ended session does.
+    "sessions:list": (
+        Route(
+            same(expect(OK, signed_out=LOGIN, no_mfa=STEP_UP), expect(NOT_ALLOWED, no_mfa=DENIED))
+        ),
+    ),
+    "sessions:end_others": (Route(own_account_action()),),
+    "sessions:end": (
+        Route(
+            own_account_action(),
+            path=lambda world: reverse("sessions:end", kwargs={"session_id": 999_999}),
+            note="no such session: flashed, then back to the list",
+        ),
+    ),
     "dashboard:panel": dashboard_routes(),
     "audit:list": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
     "audit:object": audit_routes(),

@@ -5,9 +5,14 @@ Accounts, invitations and email changes are installation-wide; only ``org.manage
 invitation or email change by the hash kept in the session: nothing else is reachable.
 """
 
+import time
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from allauth.usersessions.models import UserSession
+from django.contrib.sessions.models import Session
 from django.db.models import Exists, OuterRef, Q, QuerySet
 from django.db.models.functions import Now
 from django.utils.translation import gettext_lazy as _
@@ -17,6 +22,7 @@ from apps.access.exceptions import NotInScope
 from apps.access.policy import valid_now
 from apps.access.roles import Capability
 from apps.accounts.models import EmailChangeRequest, Invitation, User
+from apps.accounts.sessions import session_limits, why_stale
 from apps.accounts.tokens import same_hash
 from apps.core.listing import OPEN_FIRST, by_revocation
 from apps.notifications import selectors as notification_selectors
@@ -37,6 +43,51 @@ STATUSES = ("active", "inactive")
 
 def _admin(ctx: AccessContext) -> bool:
     return ctx.has(Capability.ORG_MANAGE)
+
+
+# --- one's own sessions (M8.3, X5) --------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class OwnSession:
+    pk: int
+    ip: str
+    user_agent: str
+    started_at: datetime
+    last_seen_at: datetime
+    current: bool
+
+
+def own_sessions(user: User, current_key: str | None) -> list[OwnSession]:
+    """The sessions of ``user`` that still work, the current one first, then the latest seen.
+
+    The list is bounded by the person's own devices (a list view's exception, plan Q43). A
+    row stays behind when a session ends without a logout, so each is checked against the
+    session it names, with the rules ``SessionGuardMiddleware`` applies: what is listed here
+    is exactly what could still be used.
+    """
+    rows = list(UserSession.objects.filter(user=user).order_by("-last_seen_at", "-pk"))
+    keys = [row.session_key for row in rows]
+    stored = Session.objects.filter(session_key__in=keys, expire_date__gt=Now())
+    limits, now = session_limits(user), time.time()
+    live = {
+        item.session_key
+        for item in stored
+        if why_stale(item.get_decoded(), user, limits, now) is None
+    }
+    found = [
+        OwnSession(
+            pk=row.pk,
+            ip=row.ip,
+            user_agent=row.user_agent,
+            started_at=row.created_at,
+            last_seen_at=row.last_seen_at,
+            current=row.session_key == current_key,
+        )
+        for row in rows
+        if row.session_key in live
+    ]
+    return sorted(found, key=lambda item: not item.current)
 
 
 def people(

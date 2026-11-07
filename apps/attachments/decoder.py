@@ -24,6 +24,7 @@ EXIT_FORMAT = 10  # not an image of the announced format
 EXIT_TOO_MANY_PIXELS = 11  # above the pixel limit (a decompression bomb)
 EXIT_TOO_LARGE = 12  # the re-encoded file is larger than allowed
 EXIT_UNDECODABLE = 13  # truncated, corrupt or too demanding to decode
+EXIT_TIMEOUT = 124  # killed at the deadline (the parent's status; this process never returns it)
 EXIT_USAGE = 64
 
 WEBP_QUALITY = 82

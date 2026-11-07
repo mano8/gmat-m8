@@ -15,13 +15,15 @@ from apps.access.roles import Role
 from apps.accounts import services, tokens
 from apps.accounts.models import Invitation, User
 from apps.accounts.services import AssignmentGrant, MembershipGrant, parse_grants
+from apps.accounts.services import common as common_services
+from apps.accounts.services import invitations as invitation_services
 from apps.audit.models import AuditEvent
 from apps.core.idempotency import issue_key
 from apps.core.locking import LockSetChanged
 from apps.notifications.models import EmailOutbox, Status
 from apps.organizations.models import Branch, Company, Membership
 from apps.projects.models import Project, ProjectAssignment
-from apps.projects.services import create_project
+from apps.projects.services import NewProject, create_project
 from tests.support import PASSWORD, enroll_totp, error_codes, grant, principal_for
 from tests.tokens import last_token, tokens_sent_to
 
@@ -140,7 +142,9 @@ class TestCreate:
     def test_assignments_need_an_active_project(
         self, invite: Callable[..., Invitation], admin_principal: SessionPrincipal, branch: Branch
     ) -> None:
-        project = create_project(admin_principal, code="P-1", name="P", branch_id=branch.pk)
+        project = create_project(
+            admin_principal, NewProject(code="P-1", name="P", branch_id=branch.pk)
+        )
         grant_ = AssignmentGrant(project_id=project.pk, kind=ProjectAssignment.Kind.MANAGER)
         invitation = invite(role=Role.SITE_MANAGER, assignments=(grant_,))
         assert parse_grants(invitation.grants)[1] == [grant_]
@@ -298,7 +302,9 @@ class TestAcceptNewAccount:
     def test_assignments_are_created_once(
         self, invite: Callable[..., Invitation], admin_principal: SessionPrincipal, branch: Branch
     ) -> None:
-        project = create_project(admin_principal, code="P-1", name="P", branch_id=branch.pk)
+        project = create_project(
+            admin_principal, NewProject(code="P-1", name="P", branch_id=branch.pk)
+        )
         grant_ = AssignmentGrant(project_id=project.pk, kind=ProjectAssignment.Kind.MANAGER)
         invite(role=Role.SITE_MANAGER, assignments=(grant_, grant_))
         user = accept(last_token("new@example.org"))
@@ -420,13 +426,13 @@ class TestEdges:
     ) -> None:
         """The shared wrapper retries ``LockSetChanged``; inside the test's own transaction
         there is nothing to retry, so it reaches the test."""
-        original = services._lock_and_authorize
+        original = common_services._lock_and_authorize
 
         def racing(principal: SessionPrincipal, target_id: object) -> User:
             User.objects.create_user("new@example.org")  # created after the discovery
             return original(principal, target_id)  # type: ignore[arg-type]
 
-        monkeypatch.setattr(services, "_lock_and_authorize", racing)
+        monkeypatch.setattr(invitation_services, "_lock_and_authorize", racing)
         with pytest.raises(LockSetChanged):
             invite()
         assert not Invitation.objects.exists()

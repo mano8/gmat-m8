@@ -39,7 +39,12 @@ from django.utils import timezone
 
 from apps.access.roles import Role
 from apps.accounts.models import User
-from apps.accounts.sessions import SESSION_EPOCH_KEY, SESSION_LOGIN_AT_KEY, session_lifetime
+from apps.accounts.sessions import (
+    SESSION_EPOCH_KEY,
+    SESSION_LOGIN_AT_KEY,
+    SESSION_SEEN_AT_KEY,
+    session_lifetime,
+)
 from apps.catalog.models import Material, UnitOfMeasure
 from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
@@ -265,7 +270,7 @@ def session_for(user: User, *, mfa: bool = True) -> str:
     session[BACKEND_SESSION_KEY] = "allauth.account.auth_backends.AuthenticationBackend"
     session[HASH_SESSION_KEY] = user.get_session_auth_hash()
     session[SESSION_EPOCH_KEY] = epoch
-    session[SESSION_LOGIN_AT_KEY] = int(time.time())
+    session[SESSION_LOGIN_AT_KEY] = session[SESSION_SEEN_AT_KEY] = int(time.time())
     session.set_expiry(session_lifetime(user))
     records: list[dict[str, Any]] = [{"method": "password", "at": time.time()}]
     if mfa:

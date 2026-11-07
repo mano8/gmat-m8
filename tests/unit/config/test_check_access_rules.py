@@ -242,6 +242,46 @@ class TestServicesAuthorize:
         reported = [violation.split(": ")[2].split("(")[0] for violation in found]
         assert reported == ["bulk", "close", "public_via_helper", "rename"]
 
+    def test_a_write_is_followed_across_the_modules_of_a_package(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """A split into a package must not hide what a service reaches through its helpers."""
+        files = {
+            "apps/x/services/__init__.py": "",
+            "apps/x/services/common.py": "def _write(thing):\n    thing.save()\n",
+            "apps/x/services/public.py": (
+                "from apps.x.services.common import _write\ndef rename(thing):\n    _write(thing)\n"
+            ),
+        }
+        found = _violations(script, tmp_path, files)
+        assert _rules(found) == ["service-without-authorize"]
+        assert "apps/x/services/public.py" in found[0]
+
+    @pytest.mark.parametrize(
+        ("authorizes", "expected"),
+        [
+            ("    authorize_in_txn(p, 'x', locks=None)\n", []),
+            ("", ["service-without-authorize"] * 2),
+        ],
+    )
+    def test_a_call_through_a_packages_reexport_reaches_its_module(
+        self, script: ModuleType, tmp_path: Path, authorizes: str, expected: list[str]
+    ) -> None:
+        files = {
+            "apps/x/services/__init__.py": "from apps.x.services.orders import close\n",
+            "apps/x/services/orders.py": (
+                "from apps.access.authorization import authorize_in_txn\n"
+                f"def close(p, thing):\n{authorizes}    thing.save()\n"
+            ),
+            "apps/y/services.py": (
+                "from apps.x import services\n"
+                "def close_too(p, thing):\n"
+                "    services.close(p, thing)\n"
+                "    thing.save()\n"
+            ),
+        }
+        assert _rules(_violations(script, tmp_path, files)) == expected
+
     def test_authorization_directly_through_helpers_or_other_services(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
@@ -422,7 +462,7 @@ class TestPrincipalConstructors:
         # ``tests/conftest.py`` adds ``tests`` to every entry for the session.
         expected = {name: modules - {"tests"} for name, modules in CONSTRUCTOR_MODULES.items()}
         problems: list[str] = []
-        assert script._constructor_modules(script.ROOT, problems) == expected
+        assert script.constructor_modules(script.ROOT, problems) == expected
         assert problems == []
 
     def test_without_the_registry_nothing_may_construct_them(

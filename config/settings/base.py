@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "allauth",
     "allauth.account",
     "allauth.mfa",
+    "allauth.usersessions",  # the list of one's own sessions (M8.3, X5)
     # Project apps last: their admin modules replace third-party registrations.
     "apps.core",
     "apps.accounts.apps.AccountsConfig",
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.dashboards",
     "apps.exports",
+    "apps.recovery",
 ]
 
 # Order matters (plan §3.6): session auth → session epoch → MFA enforcement → access context.
@@ -158,6 +160,9 @@ ACCOUNT_PASSWORD_RESET_BY_CODE_ENABLED = False
 ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
 ACCOUNT_EMAIL_SUBJECT_PREFIX = "[gmat-m8] "
+# A password or second factor that changes tells its owner, through the outbox, sealed like any
+# account mail (M8.3).
+ACCOUNT_EMAIL_NOTIFICATIONS = True
 ACCOUNT_RATE_LIMITS = {
     "change_password": "5/m/user",  # nosec B105
     "reset_password": "20/m/ip,5/m/key",  # nosec B105
@@ -189,6 +194,12 @@ CACHES = {
 # --- sessions and cookies -------------------------------------------------------------
 SESSION_COOKIE_AGE = env_int("DJANGO_SESSION_AGE_SECONDS", 14 * 24 * 3600, minimum=300)
 PRIVILEGED_SESSION_AGE = env_int("DJANGO_PRIVILEGED_SESSION_AGE_SECONDS", 12 * 3600, minimum=300)
+# Inactivity ends a session long before its age does (M8.3, X6). What counts as activity:
+# apps.accounts.sessions.touch_session.
+SESSION_IDLE = env_int("DJANGO_SESSION_IDLE_SECONDS", 2 * 3600, minimum=300)
+PRIVILEGED_SESSION_IDLE = env_int("DJANGO_PRIVILEGED_SESSION_IDLE_SECONDS", 30 * 60, minimum=300)
+# Seconds between writes of the last activity to the session and to the session list.
+SESSION_TOUCH_INTERVAL = 60
 SESSION_COOKIE_NAME = "__Host-sessionid"
 CSRF_COOKIE_NAME = "__Host-csrftoken"
 SESSION_COOKIE_SECURE = True
@@ -215,6 +226,9 @@ SECURE_CSP = {
     "base-uri": [CSP.SELF],
     "object-src": [CSP.NONE],
 }
+
+# Only production warns when an HSTS switch is off (exception X3).
+HSTS_STARTUP_WARNING = False
 
 # --- email (plan §5, "Email: outbox and worker") --------------------------------------
 # Never SMTP inside a request: the default mailer writes EmailOutbox rows (allauth's mail
@@ -266,6 +280,11 @@ ATTACHMENT_LEASE = 15 * 60
 ATTACHMENT_DECODE_TIMEOUT = 60  # wall time, then the child is killed
 ATTACHMENT_DECODE_CPU = 60  # RLIMIT_CPU of the child
 ATTACHMENT_DECODE_MEMORY = 512 * 1024 * 1024  # RLIMIT_AS of the child
+# Production scans every upload with clamd and decodes images in a container of its own (M8.3,
+# ADR-0015), through these unix sockets. Empty, as here: no scan, and a child process.
+ATTACHMENT_SCAN_SOCKET = env_str("ATTACHMENT_SCAN_SOCKET", "", min_length=0)
+ATTACHMENT_SCAN_TIMEOUT = 60  # seconds, the whole scan of one file
+ATTACHMENT_DECODER_SOCKET = env_str("ATTACHMENT_DECODER_SOCKET", "", min_length=0)
 ATTACHMENT_MAX_PIXELS = 40_000_000
 ATTACHMENT_MAX_SIDE = 2560
 # Removed attachments are kept this long, then purged; their files are deleted after a

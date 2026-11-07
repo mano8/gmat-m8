@@ -8,10 +8,11 @@
 | Receipt | ``receipt.view`` | ``receipt.post``, ``POSTED`` | ``receipt.void`` |
 | Handover | ``handover.view`` | ``handover.post``, ``POSTED`` | ``handover.void`` |
 
-The "remove with a reason" capabilities are those only group administrators and material
-managers hold (§3.4), each on its own parent. Besides them, the uploader may remove their own
-file while the parent is still a draft (only requests have drafts); every removal is a soft
-delete, and the file counts against the quota until the purge.
+The "remove with a reason" capabilities are those only group administrators, material
+managers and engineers hold (§3.4, ADR-0014), each on its own parent. Besides them, the
+uploader may remove their own file while the parent is still a draft (only requests have
+drafts); every removal is a soft delete, and the file counts against the quota until the
+purge.
 """
 
 from collections.abc import Callable

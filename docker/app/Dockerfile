@@ -6,7 +6,7 @@
 # Every external reference is pinned by digest. The Python base moves in lock-step with
 # fa-auth-m8's images, never alone; Dependabot's `docker` ecosystem proposes the updates.
 
-ARG PYTHON_IMAGE=python:3.14-slim@sha256:caaf356f40667c496d405780745b9ac25771c189a51dfcc42430d531ea09f8a2
+ARG PYTHON_IMAGE=python:3.14-slim@sha256:af8a5aa14780025dbfbcfbc81bd8a91ebd87711dd5b0f48ed71090949dd7cb1d
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff
 
 FROM ${UV_IMAGE} AS uv
@@ -121,6 +121,12 @@ RUN DJANGO_SETTINGS_MODULE=config.settings.build python manage.py collectstatic 
 # and its vendored dependency tree would surface as findings that are not ours. Removing it
 # deletes the code instead of ignoring the report.
 RUN /usr/local/bin/python -m pip uninstall -y pip     && rm -rf "$(/usr/local/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/pip"     && rm -f /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.*
+
+# SQLite is dead weight too: the application uses PostgreSQL only, nothing here loads the module
+# (Django imports its SQLite backend only when configured for it), and the one package that asks
+# for the library is the unused lastlog2. Deleting it keeps its stream of findings out of the image.
+RUN dpkg --purge --force-depends libsqlite3-0 \
+    && rm -f /usr/local/lib/python3.14/lib-dynload/_sqlite3.*
 
 # The private media volume (attachments, M6.4): a fresh named volume copies this folder,
 # so it starts owned by the app user and closed to everyone else.

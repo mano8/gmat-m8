@@ -25,6 +25,8 @@ REDACTED = "REDACTED"
 request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "request_id", default=None
 )
+# The signed-in account's id while the view runs (``apps.access.middleware``): who did it.
+user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("user_id", default=None)
 
 # The path segment after each prefix is a secret (the same prefixes as the Caddyfile's
 # access-log filter).
@@ -116,13 +118,20 @@ class RedactionFilter(logging.Filter):
 
 
 class RequestIdFilter(logging.Filter):
+    """Stamps each record with the request's id and the signed-in account's id."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_var.get()
+        record.user_id = user_id_var.get()
         return True
 
 
 class JsonFormatter(logging.Formatter):
-    """One JSON object per line. Only known, already redacted fields are written."""
+    """One JSON object per line. Only known, already redacted fields are written.
+
+    ``security`` is the event of ``apps.accounts.security_log``: short values it builds
+    itself (an event name, account ids, a client address, a keyed hint), never user input.
+    """
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
@@ -132,6 +141,12 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "request_id": getattr(record, "request_id", None),
         }
+        user = getattr(record, "user_id", None)
+        if user is not None:
+            payload["user"] = user
+        security = getattr(record, "security", None)
+        if isinstance(security, dict):
+            payload["security"] = security
         status = getattr(record, "status_code", None)
         if status is not None:
             payload["status"] = status

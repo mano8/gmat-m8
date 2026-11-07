@@ -119,7 +119,7 @@ class RowAccess:
     user_id: Any
     deciding: bool  # a submitted request this user may decide
     approved: bool  # an approved request
-    reviewing: bool
+    reducing: bool
     sourcing: bool
     editing: bool = False  # ``request.edit`` on a submitted or approved request
     version: int = 0  # ``selectors.version``: sent back with every decision and edit
@@ -147,7 +147,7 @@ def _live_tools(row: ReviewRow, access: RowAccess) -> None:
     line = row.entry.line
     row.reduce = (
         _form_for(ReduceForm, line, initial={"approved_qty": row.entry.approved})
-        if access.reviewing
+        if access.reducing
         else None
     )
     if access.sourcing:
@@ -216,7 +216,7 @@ def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
         user_id=ctx.user_id,
         deciding=found.status == Status.SUBMITTED and selectors.can_decide(ctx, found),
         approved=found.status == Status.APPROVED,
-        reviewing=selectors.can_review(ctx, found),
+        reducing=selectors.can_decide(ctx, found),
         sourcing=sourcing,
         editing=selectors.can_edit_lines(ctx, found),
         version=selectors.version(found),

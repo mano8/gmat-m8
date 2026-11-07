@@ -41,7 +41,7 @@ from django.db.models import Min, QuerySet
 from django.db.models.functions import Now
 
 from apps.access.authorization import authorize_in_txn
-from apps.access.principals import SessionPrincipal, SystemPrincipal
+from apps.access.principals import Principal, SessionPrincipal, SystemPrincipal
 from apps.access.roles import Capability
 from apps.audit.recorder import record
 from apps.core.db import db_now
@@ -500,3 +500,29 @@ def set_email_opt_out(principal: SessionPrincipal, opt_out: bool) -> Notificatio
         data={"email_opt_out": opt_out},
     )
     return preference
+
+
+# --- messages a restore held back (plan §9, step 4; Q25) ------------------------------------
+
+
+def _held_notifications(principal: Principal) -> QuerySet[EmailOutbox]:
+    authorize_in_txn(principal, Capability.ORG_MANAGE, locks=LockOrder())
+    return EmailOutbox.objects.filter(kind=Kind.NOTIFICATION, status=Status.QUARANTINED)
+
+
+@transactional
+def release_quarantined_notifications(principal: Principal) -> int:
+    """Queue every held notification again, in bulk (Q25); each is re-checked at its claim."""
+    held = _held_notifications(principal)
+    released = held.update(status=Status.QUEUED, not_before=Now(), updated_at=Now())
+    record(principal.audit_identity, "outbox.quarantine_released", data={"messages": released})
+    return released
+
+
+@transactional
+def discard_quarantined_notifications(principal: Principal) -> int:
+    """Cancel every held notification, in bulk (Q25): they are never sent."""
+    held = _held_notifications(principal)
+    discarded = held.update(status=Status.CANCELLED, updated_at=Now())
+    record(principal.audit_identity, "outbox.quarantine_discarded", data={"messages": discarded})
+    return discarded

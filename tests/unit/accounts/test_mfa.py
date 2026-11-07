@@ -1,6 +1,7 @@
 """MFA: secrets at rest, code reuse, session-level verification, cancelled logins, resets."""
 
 import json
+import time
 from collections.abc import Callable
 from datetime import timedelta
 
@@ -11,7 +12,9 @@ from allauth.mfa.models import Authenticator
 from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 from allauth.mfa.totp.internal.auth import TOTP
 from cryptography.fernet import Fernet, InvalidToken
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.sessions.backends.db import SessionStore
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db import connection
 from django.test import Client, RequestFactory, override_settings
@@ -31,8 +34,10 @@ from apps.accounts.mfa import (
     step_up_response,
 )
 from apps.accounts.models import User
+from apps.accounts.views import RemoveWebAuthnView
 from apps.organizations.models import Branch
 from apps.organizations.services import grant_membership
+from tests.org import People, client_for
 from tests.support import (
     enroll_totp,
     grant,
@@ -43,6 +48,18 @@ from tests.support import (
 )
 
 pytestmark = pytest.mark.django_db
+
+
+def reauthenticated(client: Client) -> Client:
+    """The client's session also reauthenticated just now (allauth's sensitive MFA pages)."""
+    session = SessionStore(client.cookies[settings.SESSION_COOKIE_NAME].value)
+    record = {"method": "password", "at": time.time(), "reauthenticated": True}
+    session[AUTHENTICATION_METHODS_SESSION_KEY] = [
+        *session[AUTHENTICATION_METHODS_SESSION_KEY],
+        record,
+    ]
+    session.save()
+    return client
 
 
 def raw_authenticator_data(authenticator: Authenticator) -> str:
@@ -373,6 +390,28 @@ class TestFactorRemoval:
         user = make_user()
         enroll_totp(user)
         assert MFAAdapter().can_delete_authenticator(totp_authenticator(user)) is True
+
+    def test_passkey_removal_goes_through_the_projects_view(self) -> None:
+        match = resolve(reverse("mfa_remove_webauthn", kwargs={"pk": 1}))
+        assert match.func.view_class is RemoveWebAuthnView  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize("keeps_totp", [True, False])
+    def test_a_privileged_account_cannot_remove_its_last_passkey(
+        self, people: People, keeps_totp: bool
+    ) -> None:
+        # allauth's own passkey removal never asked the adapter: with the TOTP removed
+        # first, the passkey went too, and the account was back to a password alone.
+        manager = people.mm_mad
+        client = reauthenticated(client_for(manager))
+        passkey = Authenticator.objects.create(
+            user=manager, type=Authenticator.Type.WEBAUTHN, data={"name": "Phone"}
+        )
+        if not keeps_totp:
+            totp_authenticator(manager).delete()
+        response = client.post(reverse("mfa_remove_webauthn", kwargs={"pk": passkey.pk}))
+        assert response.status_code == 302
+        assert response["Location"] == reverse("mfa_list_webauthn")
+        assert Authenticator.objects.filter(pk=passkey.pk).exists() is not keeps_totp
 
 
 class TestStepUp:

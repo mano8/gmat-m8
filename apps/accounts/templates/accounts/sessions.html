@@ -1,0 +1,46 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Sessions" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <h1 class="mb-2">{% translate "Sessions" %}</h1>
+  <p class="mb-4 text-soft">
+    {% translate "Where you are signed in. If you do not recognise one, end it and change your password." %}
+  </p>
+  <ul class="mb-4 grid gap-3" data-testid="sessions">
+    {% for item in sessions %}
+      <li class="card" data-testid="session-row">
+        <p class="mb-1 font-medium [overflow-wrap:anywhere]">{{ item.user_agent|default:_("Unknown browser") }}</p>
+        <p class="mb-1 text-sm text-soft">
+          {{ item.ip }}
+          {% if item.current %}
+            · <strong data-testid="session-current">{% translate "This session" %}</strong>
+          {% endif %}
+        </p>
+        <p class="text-sm text-soft">
+          {% blocktranslate with started=item.started_at|date:"SHORT_DATETIME_FORMAT" seen=item.last_seen_at|date:"SHORT_DATETIME_FORMAT" %}Started {{ started }}, last seen {{ seen }}{% endblocktranslate %}
+        </p>
+        {% if not item.current %}
+          <form method="post"
+                class="mt-3"
+                action="{% url 'sessions:end' session_id=item.pk %}"
+                data-testid="session-end">
+            {% csrf_token %}
+            {% include "components/button.html" with type="submit" label=_("End this session") %}
+          </form>
+        {% endif %}
+      </li>
+    {% empty %}
+      <li class="card text-soft">{% translate "No other session is open." %}</li>
+    {% endfor %}
+  </ul>
+  {% if others %}
+    <form method="post"
+          action="{% url 'sessions:end_others' %}"
+          data-testid="sessions-end-others">
+      {% csrf_token %}
+      {% include "components/button.html" with type="submit" label=_("End all my other sessions") variant="danger" %}
+    </form>
+  {% endif %}
+{% endblock content %}

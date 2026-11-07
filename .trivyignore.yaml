@@ -21,6 +21,15 @@
 # move to. Re-evaluate every entry when it expires or when Debian ships a fix, whichever
 # comes first, and drop the entry then.
 
+# Added in M8.3 (2026-11-05), at the end of the list: the third-party images of the compose file.
+# The nightly scan covers them but failed before it scanned anything (a prerelease without assets,
+# fixed in M8.3), so these surfaced only now. Caddy and PostgreSQL were moved to their newest digests
+# first (again on 2026-11-06, which cleared brotli-libs and libcurl); what is listed has no fix either
+# published image ships. ClamAV's image has no finding. gosu will not clear by itself: its maintainer
+# keeps it on Go 1.24.6 on purpose and does not rebuild for CVEs in code it never calls (its
+# SECURITY.md); `govulncheck -mode=binary` on the image's binary agrees for all 26 (2026-11-06). The
+# backup image deletes gosu, and SQLite left the application image, so neither is listed for those.
+
 vulnerabilities:
   - id: CVE-2026-76642
     statement: >-
@@ -106,23 +115,293 @@ vulnerabilities:
       read-only root filesystem, and the service never calls the affected tool.
       Compensating control: those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
     expired_at: 2027-01-20
-  - id: CVE-2026-119373
+  - id: CVE-2026-76844
     statement: >-
-      sqlite3 (libsqlite3-0) in the Debian 13 base image of the application image has
-      no fixed version yet (Debian tracker status 'affected' on 2026-11-01). Affects
-      a heap-based buffer overflow in SQLite's FTS5 extension, which is not reachable from the service: the application uses
-      PostgreSQL only and never loads SQLite. The application image runs as uid 1000
-      with every capability dropped, no-new-privileges and a read-only root
-      filesystem. Compensating control: those container limits, plus the entry's
-      expiry, which forces a re-review. Owner: maintainer (mano8).
-    expired_at: 2026-12-31
-  - id: CVE-2026-119586
+      zlib (zlib1g) in the Debian 13 base image of the application image has no fixed
+      version yet (Debian tracker status 'vulnerable' on 2026-11-05; Trivy's title for
+      it names webpack-dev-middleware by mistake). Affects a heap overflow in the gz*
+      file API after a failed write(), which is not reachable from the service:
+      CPython's gzip module and Pillow use the deflate and inflate streams, never
+      gzopen or gzwrite. The application image runs as uid 1000 with every capability
+      dropped, no-new-privileges and a read-only root filesystem. Compensating control:
+      those container limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2025-61726
+    paths:
+      - "usr/local/bin/gosu"
     statement: >-
-      sqlite3 (libsqlite3-0) in the Debian 13 base image of the application image has
-      no fixed version yet (Debian tracker status 'affected' on 2026-11-01). Affects
-      command execution through the sqlite3 shell's .recover command, which is not reachable from the service: the application uses
-      PostgreSQL only and never loads SQLite. The application image runs as uid 1000
-      with every capability dropped, no-new-privileges and a read-only root
-      filesystem. Compensating control: those container limits, plus the entry's
-      expiry, which forces a re-review. Owner: maintainer (mano8).
-    expired_at: 2026-12-31
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2025-61729
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2025-68121
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-111943
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-25679
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-27145
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-32280
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-32281
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-32283
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-33811
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-33814
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-33818
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-39820
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-39821
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-39822
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-39836
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-42499
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-42504
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-56853
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-56858
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-56859
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-56860
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-56862
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-78667
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-78669
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-97031
+    paths:
+      - "usr/local/bin/gosu"
+    statement: >-
+      The Go standard library built into gosu in the official postgres:18-alpine image. The db
+      service runs as the postgres user from the start, with no capability, so its entrypoint
+      never executes gosu: the file only sits in the image, and govulncheck finds gosu does not
+      call the affected Go code anyway. Compensating control: that, plus the entry's expiry,
+      which forces a re-review against the next image. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-85091
+    statement: >-
+      zlib (zlib1g) in the Debian 13 base image of the application image has no fixed version yet
+      (Debian tracker status 'affected' on 2026-11-06). Affects a heap overflow in gz_vacate() on
+      gzprintf() or gzvprintf() after a non-blocking write stall, which is not reachable from the
+      service: CPython's gzip module and Pillow use the deflate and inflate streams, never the gz*
+      file API. The application image runs as uid 1000 with every capability dropped,
+      no-new-privileges and a read-only root filesystem. Compensating control: those container
+      limits, plus the entry's expiry, which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20
+  - id: CVE-2026-116587
+    statement: >-
+      The go-jose v3 copy inside the Caddy 2.11.9 binary has no fixed version yet (Trivy status
+      'affected' on 2026-11-06; 2.11.9 moved the v4 copy to the fixed 4.1.6). A denial of service on
+      parsing crafted JOSE objects, which Caddy handles only in its ACME conversation with the
+      certificate authority it was configured for, never from a client of the site. Caddy is limited
+      to 128 MiB and restarts by itself. Compensating control: those limits, plus the entry's expiry,
+      which forces a re-review. Owner: maintainer (mano8).
+    expired_at: 2027-01-20

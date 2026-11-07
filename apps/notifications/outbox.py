@@ -64,15 +64,13 @@ def queue_notification(
     body: str,
     html_body: str = "",
     source_ref: str = "",
-    from_email: str | None = None,
-    using: str = DEFAULT_DB_ALIAS,
 ) -> list[EmailOutbox]:
     """Queue one notification per ``MAX_RECIPIENTS`` recipients; return the messages.
 
     Each recipient must still be active and hold ``capability`` on ``obj`` when the worker
     claims the message; ``obj`` must be a scoped model (it has ``visible_to``).
     """
-    _require_transaction(using)
+    _require_transaction(DEFAULT_DB_ALIAS)
     if capability not in set(Capability):
         raise ValueError(f"Unknown capability {capability!r}")
     object_type, object_id = "", None
@@ -82,14 +80,14 @@ def queue_notification(
         object_type, object_id = eligibility.object_reference(obj)
     user_ids = sorted(set(recipients))
     return [
-        EmailOutbox.objects.using(using).create(
+        EmailOutbox.objects.create(
             kind=Kind.NOTIFICATION,
             recipient_users=user_ids[start : start + MAX_RECIPIENTS],
             eligibility_rule=capability,
             eligibility_object_type=object_type,
             eligibility_object_id=object_id,
             source_ref=source_ref,
-            from_email=_from(from_email),
+            from_email=_from(None),
             subject=subject,
             body=body,
             html_body=html_body,
@@ -135,7 +133,6 @@ def queue_security_email(
     html_body: str = "",
     source_ref: str = "",
     from_email: str | None = None,
-    using: str = DEFAULT_DB_ALIAS,
 ) -> EmailOutbox:
     """Queue a sensitive message to ``address``, sent only while ``rule`` holds for ``target``.
 
@@ -146,7 +143,7 @@ def queue_security_email(
         raise ValueError(f"Unknown security rule {rule!r}")
     object_type, object_id = eligibility.object_reference(target)
     ttl = timedelta(seconds=int(settings.OUTBOX_SENSITIVE_TTL))
-    return EmailOutbox.objects.using(using).create(
+    return EmailOutbox.objects.create(
         kind=Kind.SECURITY,
         sensitive=True,
         recipient_address=address,
@@ -158,7 +155,7 @@ def queue_security_email(
         subject=subject,
         body=seal(body),
         html_body=seal(html_body),
-        expires_at=db_now(using=using) + ttl,
+        expires_at=db_now() + ttl,
     )
 
 

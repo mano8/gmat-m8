@@ -7,7 +7,7 @@ import pytest
 from django.db import transaction
 
 from apps.access.principals import SessionPrincipal
-from apps.attachments.checks import lease_outlasts_the_limits
+from apps.attachments.checks import lease_outlasts_the_limits, uploads_go_through_their_services
 from apps.attachments.parents import PARENTS, Kind, parent_of, type_of
 from apps.attachments.quota import lock_parent
 from apps.core.locking import LockOrder, LockSetChanged
@@ -23,6 +23,24 @@ def test_a_lease_shorter_than_the_limits_is_refused(settings: Any) -> None:
     settings.ATTACHMENT_LEASE = 200
     (error,) = lease_outlasts_the_limits()
     assert error.id == "gmat.E020"
+
+
+def test_the_lease_covers_the_scan_too(settings: Any) -> None:
+    settings.ATTACHMENT_SCAN_TIMEOUT = settings.ATTACHMENT_LEASE
+    (error,) = lease_outlasts_the_limits()
+    assert error.id == "gmat.E020"
+
+
+@pytest.mark.parametrize("name", ["ATTACHMENT_SCAN_SOCKET", "ATTACHMENT_DECODER_SOCKET"])
+def test_production_refuses_an_upload_path_without_its_service(settings: Any, name: str) -> None:
+    """M8.3: an empty value would store unscanned files, or decode inside ``web``."""
+    settings.ATTACHMENT_SCAN_SOCKET = "/run/gmat/clamd/clamd.sock"
+    settings.ATTACHMENT_DECODER_SOCKET = "/run/gmat/decoder/decoder.sock"
+    assert uploads_go_through_their_services() == []
+    setattr(settings, name, "")
+    (error,) = uploads_go_through_their_services()
+    assert error.id == "gmat.E022"
+    assert name in error.msg
 
 
 @pytest.mark.django_db

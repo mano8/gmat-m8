@@ -10,8 +10,9 @@ service's transaction, right after ``authorize_in_txn``, ``idempotent()``:
 3. inserts ``IdempotencyRecord(actor, key_id, operation, payload_hash)``:
 
    - new key: runs the command and stores a reference to its result;
-   - same key and hash: a replay. ``replay`` must authorize again that the actor can still
-     see the result, then return it (the view answers 303 to the document);
+   - same key and hash: a replay. The service has just authorized the actor again for the
+     command's inputs; ``replay`` returns the recorded result and the view answers 303 to
+     its page, which reads it through the scoped selectors like any visit (S7);
    - same key, other operation or hash: 409, nothing is written;
    - concurrent duplicate: the second insert waits on the unique index until the first
      transaction ends, then takes one of the two paths above (or runs as new if the first
@@ -28,7 +29,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Any
+from typing import Any, NoReturn
 from uuid import UUID
 
 from django.conf import settings
@@ -103,29 +104,44 @@ def _key_max_age() -> int:
     return int(settings.IDEMPOTENCY_KEY_MAX_AGE)
 
 
+def _finite_decimal(value: Decimal) -> str:
+    if not value.is_finite():
+        raise ValueError("Non-finite decimals are not allowed in a command payload")
+    return str(value)
+
+
+def _no_float(value: float) -> NoReturn:
+    raise TypeError("Floats are not allowed in a command payload; use Decimal")
+
+
+def _string_keyed(value: Mapping[Any, Any]) -> dict[str, Any]:
+    if not all(isinstance(key, str) for key in value):
+        raise TypeError("Command payload keys must be strings")
+    return {key: _canonical(item) for key, item in value.items()}
+
+
+# In this order: a ``StrEnum`` is a ``str`` and stays one, a ``bool`` is an ``int``, and an
+# ``IntEnum`` is an ``Enum`` before it is an ``int``. A stored ``payload_hash`` outlives a
+# deploy, so what this writes never changes.
+_CANONICAL: tuple[tuple[Any, Callable[[Any], Any]], ...] = (
+    (bool | str, lambda value: value),
+    (Enum, lambda value: _canonical(value.value)),
+    (int, lambda value: value),
+    (float, _no_float),
+    (Decimal, _finite_decimal),
+    (UUID, str),
+    (datetime | date | time, lambda value: value.isoformat()),
+    (Mapping, _string_keyed),
+    (list | tuple, lambda value: [_canonical(item) for item in value]),
+)
+
+
 def _canonical(value: Any) -> Any:
-    if value is None or isinstance(value, bool | str):
-        return value
-    if isinstance(value, Enum):
-        return _canonical(value.value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        raise TypeError("Floats are not allowed in a command payload; use Decimal")
-    if isinstance(value, Decimal):
-        if not value.is_finite():
-            raise ValueError("Non-finite decimals are not allowed in a command payload")
-        return str(value)
-    if isinstance(value, UUID):
-        return str(value)
-    if isinstance(value, datetime | date | time):
-        return value.isoformat()
-    if isinstance(value, Mapping):
-        if not all(isinstance(key, str) for key in value):
-            raise TypeError("Command payload keys must be strings")
-        return {key: _canonical(item) for key, item in value.items()}
-    if isinstance(value, list | tuple):
-        return [_canonical(item) for item in value]
+    if value is None:
+        return None
+    for kinds, convert in _CANONICAL:
+        if isinstance(value, kinds):
+            return convert(value)
     raise TypeError(f"Unsupported type in a command payload: {type(value).__name__}")
 
 
@@ -155,8 +171,10 @@ def idempotent[M: Model](
     """Run ``execute`` once per key; on a replay return ``replay(result_type, result_id)``.
 
     ``execute`` returns the created object (its label and primary key are recorded).
-    ``replay`` reloads that object for the actor, re-authorizing the read (S7: 404 out of
-    scope, 403 without the capability). Call this inside the service's transaction.
+    ``replay`` reloads it; the service authorized the actor for the command's inputs just
+    before, and the page the view redirects to reads the result through its scoped
+    selectors (S7: 404 out of scope, 403 without the capability). Call this inside the
+    service's transaction.
     """
     if not connections[using].in_atomic_block:
         raise IdempotencyOutsideTransaction("idempotent() must run inside the service transaction")

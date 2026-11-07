@@ -1,0 +1,60 @@
+# The offsite restic repository, on a host that is NOT the VPS (plan §9, F61): one data
+# directory behind two servers.
+#
+#   rest-append  --append-only, published: what the VPS talks to. Its credentials can add
+#                snapshots, never delete or overwrite one, whoever holds them.
+#   rest-admin   can delete, bound to 127.0.0.1: reached only through an SSH tunnel from the
+#                maintainer's machine, with credentials that never touch the VPS. forget and
+#                prune run through it (scripts/offsite_prune.py).
+#
+#   docker compose -f docker-compose.rest-server.yml up -d
+#
+# Terminate TLS in front of rest-append, or give it --tls-cert and --tls-key. Create the users
+# with the image's create_user script, separately for each server. See README.md.
+name: gmat-m8-offsite
+
+x-server: &server
+  image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  user: "1000:1000"
+  tmpfs: [/tmp]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  mem_limit: 256m
+  pids_limit: 64
+
+services:
+  rest-append:
+    <<: *server
+    entrypoint: ["rest-server"]
+    command:
+      - --path=/data
+      - --htpasswd-file=/auth/append.htpasswd
+      - --append-only
+      - --private-repos
+      - --listen=:8000
+    ports:
+      - "${OFFSITE_BIND_IP:-0.0.0.0}:${OFFSITE_PORT:-8000}:8000"
+    volumes:
+      - ${OFFSITE_DATA:-./data}:/data
+      - ${OFFSITE_AUTH:-./auth}:/auth:ro
+
+  rest-admin:
+    <<: *server
+    entrypoint: ["rest-server"]
+    command:
+      - --path=/data
+      - --htpasswd-file=/auth/admin.htpasswd
+      - --private-repos
+      - --listen=:8000
+    ports:
+      - "127.0.0.1:${OFFSITE_ADMIN_PORT:-8001}:8000"
+    volumes:
+      - ${OFFSITE_DATA:-./data}:/data
+      - ${OFFSITE_AUTH:-./auth}:/auth:ro

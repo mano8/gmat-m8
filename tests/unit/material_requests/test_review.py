@@ -469,6 +469,53 @@ class TestReturnToDraft:
                 principal_for(people.tech_mad), make_request(Status.SUBMITTED).pk, note="x"
             )
 
+    def test_a_reviewer_without_a_self_deciding_role_cannot_return_their_own(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        """M8.3, R18: returning is a decision like the others."""
+        user = people.site_manager
+        request = make_request(Status.SUBMITTED, user=user)
+        with pytest.raises(AccessDenied):
+            services.return_to_draft(principal_for(user), request.pk, note="x")
+        assert fresh(request).status == Status.SUBMITTED
+        assert actions() == []
+        # The grant itself reaches: someone else's request on the same project goes back.
+        other = make_request(Status.SUBMITTED)
+        assert (
+            services.return_to_draft(principal_for(user), other.pk, note="x").status == Status.DRAFT
+        )
+
+    def test_a_procurement_branch_that_allows_it_lets_them(
+        self, make_request: MakeRequest, org: Org, people: People
+    ) -> None:
+        user = people.site_manager
+        request = make_request(Status.SUBMITTED, user=user)
+        Branch.objects.filter(pk=org.a_mad.pk).update(allow_self_approval=True)  # procurement
+        assert (
+            services.return_to_draft(principal_for(user), request.pk, note="x").status
+            == Status.DRAFT
+        )
+        assert AuditEvent.objects.get(action="request.returned").data["self_decided"] is True
+
+    @pytest.mark.parametrize("person", ["group_admin", "mm_mad", "engineer"])
+    def test_a_self_deciding_role_returns_their_own_and_it_is_marked(
+        self, make_request: MakeRequest, people: People, person: str
+    ) -> None:
+        user = getattr(people, person)
+        request = make_request(Status.SUBMITTED, user=user)
+        assert (
+            services.return_to_draft(principal_for(user), request.pk, note="x").status
+            == Status.DRAFT
+        )
+        assert AuditEvent.objects.get(action="request.returned").data["self_decided"] is True
+
+    def test_returning_someone_elses_request_is_not_marked(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        request = make_request(Status.SUBMITTED)
+        services.return_to_draft(principal_for(people.engineer), request.pk, note="x")
+        assert "self_decided" not in AuditEvent.objects.get(action="request.returned").data
+
 
 # --- approved-quantity reduction ------------------------------------------------------
 
@@ -569,6 +616,40 @@ class TestReduce:
             services.reduce_approved_qty(
                 principal_for(people.tech_mad), lines_of(approved)[0].pk, approved_qty=D(1)
             )
+
+    def test_a_reviewer_without_a_self_deciding_role_cannot_reduce_their_own(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        """M8.3, R18: a reduction is a decision like the others."""
+        user = people.site_manager
+        request = make_request(Status.APPROVED, user=user, decided=True)
+        line = request.lines.get()
+        before = line.approved_qty
+        with pytest.raises(AccessDenied):
+            services.reduce_approved_qty(principal_for(user), line.pk, approved_qty=D(1))
+        assert fresh(line).approved_qty == before
+        # The grant itself reaches: someone else's line on the same project is reduced.
+        other = make_request(Status.APPROVED, decided=True).lines.get()
+        services.reduce_approved_qty(principal_for(user), other.pk, approved_qty=D(1))
+        assert fresh(other).approved_qty == D(1)
+
+    @pytest.mark.parametrize("person", ["group_admin", "mm_mad", "engineer"])
+    def test_a_self_deciding_role_reduces_their_own_and_it_is_marked(
+        self, make_request: MakeRequest, people: People, person: str
+    ) -> None:
+        user = getattr(people, person)
+        request = make_request(Status.APPROVED, user=user, decided=True)
+        line = request.lines.get()
+        services.reduce_approved_qty(principal_for(user), line.pk, approved_qty=D(1))
+        event = AuditEvent.objects.get(action="request_line.reduced")
+        assert event.data["self_decided"] is True
+
+    def test_reducing_someone_elses_line_is_not_marked(
+        self, approved: MaterialRequest, people: People
+    ) -> None:
+        services.reduce_approved_qty(mm(people), lines_of(approved)[0].pk, approved_qty=D(1))
+        event = AuditEvent.objects.get(action="request_line.reduced")
+        assert "self_decided" not in event.data
 
 
 def test_i1_and_i13_hold_through_any_sequence(

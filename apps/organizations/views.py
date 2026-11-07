@@ -34,6 +34,7 @@ from apps.accounts.services import (
     EMAIL_CHANGE_NOTICE_MAIL,
     INVITATION_MAIL,
 )
+from apps.accounts.sessions import session_passive
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
 from apps.core.idempotency import IdempotencyError
 from apps.core.listing import ListPage, ListScope, paginate, render_list
@@ -440,6 +441,7 @@ def revoke_invitation(request: HttpRequest, invitation_id: UUID) -> HttpResponse
 # --- delivery status fragments (M7c.1) ---------------------------------------------------
 
 
+@session_passive
 @require_safe
 @require_capability(ORG)
 def invitation_delivery(request: HttpRequest, invitation_id: UUID) -> HttpResponse:
@@ -450,6 +452,7 @@ def invitation_delivery(request: HttpRequest, invitation_id: UUID) -> HttpRespon
     return render(request, "organizations/delivery_invitation.html", {"invitation": row})
 
 
+@session_passive
 @require_safe
 @require_capability(ORG)
 def email_change_delivery(request: HttpRequest, change_id: UUID) -> HttpResponse:

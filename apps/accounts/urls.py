@@ -9,6 +9,8 @@ There is deliberately no ``app_name``: allauth reverses its own URL names global
 - Login by code is off, so every login takes the password and then MFA.
 - Setting a first password happens in invitation acceptance, not here.
 - The password-reset key view is replaced by the locked redemption (``views``).
+- Passkey removal is replaced by one that keeps a privileged account's last second factor
+  (``views.remove_webauthn``); its pattern comes before allauth's, which it shadows.
 """
 
 from allauth.account import urls as account_urls
@@ -43,6 +45,11 @@ urlpatterns: list[URLPattern | URLResolver] = [
         pattern
         for pattern in account_urls.urlpatterns
         if getattr(pattern, "name", None) not in DISABLED_URL_NAMES | REPLACED_URL_NAMES
+    ),
+    path(
+        "2fa/webauthn/keys/<int:pk>/remove/",
+        views.remove_webauthn,
+        name="mfa_remove_webauthn",
     ),
     path("2fa/", include(mfa_urls)),
 ]

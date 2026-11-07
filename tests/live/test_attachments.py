@@ -22,6 +22,7 @@ import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -159,11 +160,17 @@ def multipart(fields: dict[str, str], content: bytes, name: str = "photo.png") -
 
 
 def upload(
-    who: Technician, draft: str, content: bytes, *, origin: str | None = None, token: str = ""
+    who: Technician,
+    draft: str,
+    content: bytes,
+    *,
+    origin: str | None = None,
+    token: str = "",
+    name: str = "photo.png",
 ) -> Response:
     csrf, form_token, key = who.page(draft)
     body, content_type = multipart(
-        {"csrfmiddlewaretoken": token or form_token, "idempotency_key": key}, content
+        {"csrfmiddlewaretoken": token or form_token, "idempotency_key": key}, content, name
     )
     headers = {
         "Cookie": who.cookies(csrf),
@@ -329,3 +336,125 @@ def test_a_disguised_file_is_refused(stack: Stack, technician: Technician) -> No
     svg = b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"
     assert upload(technician, draft, svg).status == 415
     assert _states(stack, draft) == ["RELEASED"]
+
+
+# --- the scanner and the decoder (M8.3, X7 and X11; ADR-0015) ------------------------------------
+
+EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+# The industry's harmless test file, as a stream inside a PDF: the type check lets it through and
+# only clamd, which unpacks PDF objects, can tell.
+INFECTED_PDF = (
+    b"%PDF-1.4\n1 0 obj\n<< /Length "
+    + str(len(EICAR)).encode()
+    + b" >>\nstream\n"
+    + EICAR
+    + b"\nendstream\nendobj\ntrailer << /Root 1 0 R >>\n%%EOF\n"
+)
+
+
+def attachments_of(stack: Stack, draft: str) -> str:
+    return stack.sql(f"SELECT count(*) FROM attachments_attachment WHERE request_id = '{draft}'")  # noqa: S608
+
+
+def exec_in(stack: Stack, service: str, *command: str) -> Any:
+    return stack.compose("exec", "-T", service, *command, check=False, timeout=60)
+
+
+def test_a_file_with_malware_is_refused_by_the_real_scanner(
+    stack: Stack, technician: Technician
+) -> None:
+    draft = technician.drafts[1]
+    stored = attachments_of(stack, draft)
+    response = upload(technician, draft, INFECTED_PDF, name="nota.pdf")
+    assert response.status == 422, response.text[:300]
+    assert attachments_of(stack, draft) == stored
+    audited = stack.sql(
+        "SELECT data->>'signature' FROM audit_auditevent "  # noqa: S608
+        f"WHERE action = 'attachment.malware_refused' AND object_id = '{draft}'"
+    )
+    assert "Eicar" in audited or "EICAR" in audited
+
+
+def test_a_clean_pdf_goes_through_the_real_scanner(stack: Stack, technician: Technician) -> None:
+    draft = technician.drafts[1]
+    pdf = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
+    assert upload(technician, draft, pdf, name="n.pdf").status == 302
+
+
+def test_with_the_scanner_down_nothing_is_stored(stack: Stack, technician: Technician) -> None:
+    """Fail closed; and the rest of the site does not depend on it."""
+    draft = technician.drafts[2]
+    stored = attachments_of(stack, draft)
+    stack.compose("stop", "clamd")
+    try:
+        response = upload(technician, draft, png())
+        assert response.status == 503
+        assert response.header("retry-after")
+        assert stack.get("/healthz/").status == 200
+        assert attachments_of(stack, draft) == stored
+    finally:
+        stack.compose(
+            "up", "-d", "--no-deps", "--no-build", "--wait", "--wait-timeout", "300", "clamd"
+        )
+
+
+def test_with_the_decoder_down_an_image_is_refused(stack: Stack, technician: Technician) -> None:
+    draft = technician.drafts[2]
+    stack.compose("stop", "decoder")
+    try:
+        assert upload(technician, draft, png()).status == 503
+    finally:
+        stack.compose("up", "-d", "--no-deps", "--no-build", "--wait", "decoder")
+    assert upload(technician, draft, png()).status == 302
+
+
+PROBE_OUT = (
+    "import socket, sys\n"
+    "try:\n"
+    "    socket.create_connection(('1.1.1.1', 443), timeout=3)\n"
+    "except OSError:\n"
+    "    sys.exit(0)\n"
+    "sys.exit(1)\n"
+)
+
+
+def test_the_decoder_has_its_own_uid_no_network_and_no_secrets(stack: Stack) -> None:
+    assert exec_in(stack, "decoder", "id", "-u").stdout.strip() == "1001"
+    assert exec_in(stack, "web", "id", "-u").stdout.strip() == "1000"
+    environment = exec_in(stack, "decoder", "env").stdout
+    for name in ("SECRET_KEY", "DB_PASSWORD", "ENCRYPTION_KEYS", "SMTP", "EMAIL"):
+        assert name not in environment
+    assert exec_in(stack, "decoder", "ls", "/srv/media/files").returncode != 0
+    assert exec_in(stack, "decoder", "python", "-I", "-c", PROBE_OUT).returncode == 0
+    interfaces = exec_in(
+        stack,
+        "decoder",
+        "python",
+        "-I",
+        "-c",
+        "import socket; print([n for _, n in socket.if_nameindex()])",
+    )
+    assert interfaces.stdout.strip() == "['lo']"
+
+
+def test_the_scanner_has_no_network_and_cannot_see_the_files(stack: Stack) -> None:
+    assert exec_in(stack, "clamd", "id", "-u").stdout.strip() == "100"
+    assert exec_in(stack, "clamd", "ls", "/srv/media/files").returncode != 0
+    assert exec_in(stack, "clamd", "ls", "/sys/class/net").stdout.split() == ["lo"]
+
+
+def test_web_cannot_replace_the_sockets_it_uses(stack: Stack) -> None:
+    for directory in ("/run/gmat/clamd", "/run/gmat/decoder"):
+        assert exec_in(stack, "web", "touch", f"{directory}/x").returncode != 0
+    assert (
+        exec_in(
+            stack,
+            "web",
+            "python",
+            "-c",
+            "from pathlib import Path; "
+            "print(all(Path(p).is_socket() for p in "
+            "('/run/gmat/clamd/clamd.sock', '/run/gmat/decoder/decoder.sock')))",
+        ).stdout.strip()
+        == "True"
+    )

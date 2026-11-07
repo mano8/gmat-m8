@@ -202,6 +202,14 @@ msgstr ""
 msgid "You cannot offboard your own account."
 msgstr ""
 
+#: apps/accounts/services.py:633
+msgid "You cannot reset your own second factors."
+msgstr ""
+
+#: apps/accounts/services.py:636
+msgid "Give the reason."
+msgstr ""
+
 #: apps/accounts/services.py:591
 msgid "This account is already offboarded."
 msgstr ""
@@ -393,6 +401,10 @@ msgstr ""
 
 #: apps/accounts/views.py:156
 msgid "Your account is ready. Sign in to continue."
+msgstr ""
+
+#: apps/accounts/views.py:60
+msgid "Your role needs a second factor: add another first."
 msgstr ""
 
 #: apps/accounts/views.py:215
@@ -5061,9 +5073,9 @@ msgstr ""
 msgid "Line %(line)s has nothing left to receive."
 msgstr ""
 
-#: apps/receiving/services.py:232
+#: apps/receiving/services.py:237
 #, python-format
-msgid "Line %(line)s: only %(remaining)s remain to be received."
+msgid "Line %(line)s: more than remains to be received on this order."
 msgstr ""
 
 #: apps/receiving/services.py:259
@@ -5627,3 +5639,116 @@ msgstr "%(shown)s shown"
 
 msgid "Not revoked"
 msgstr "Not revoked"
+
+#: apps/accounts/signals.py
+msgid "Your recovery codes stopped working after a restore. Generate a new set."
+msgstr ""
+
+#: apps/purchasing/services/dispatches.py
+msgid "Only a quarantined dispatch can be discarded."
+msgstr ""
+
+#: apps/recovery/services.py
+#, python-format
+msgid "These addresses are not accounts of the restored database: %(addresses)s"
+msgstr ""
+
+#: apps/recovery/services.py
+msgid "A preserved database says what happened: there is no gap to list."
+msgstr ""
+
+#: apps/recovery/services.py
+#, python-format
+msgid "Another account has the address %(address)s."
+msgstr ""
+
+#: apps/recovery/services.py
+msgid "This account has no email change to decide on."
+msgstr ""
+
+#: apps/recovery/services.py
+#, python-format
+msgid "This account's email change to %(address)s must be accepted or rejected."
+msgstr ""
+
+#: apps/recovery/services.py
+msgid "This account has no second-factor removal to decide on."
+msgstr ""
+
+#: apps/recovery/services.py
+msgid "Starting over removes every second factor: it cannot go with a rejection."
+msgstr ""
+
+#: apps/recovery/services.py
+#, python-format
+msgid "This account's removal of %(factors)s must be accepted or rejected."
+msgstr ""
+
+#: apps/recovery/services.py
+msgid "This account is not suspended."
+msgstr ""
+
+#: apps/attachments/processing.py
+msgid "This file was refused: the virus scanner found something in it."
+msgstr ""
+
+#: apps/attachments/processing.py
+msgid "Files cannot be checked right now. Try again in a few minutes."
+msgstr ""
+
+#: apps/accounts/services.py
+msgid "Your second factors were removed"
+msgstr ""
+
+#: apps/accounts/services.py
+msgid "Sign out to end this session."
+msgstr ""
+
+#: apps/accounts/views.py
+msgid "That session has ended."
+msgstr ""
+
+#: apps/accounts/views.py
+msgid "Your other sessions have ended."
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Sessions"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Where you are signed in. If you do not recognise one, end it and change your password."
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "Unknown browser"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "This session"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+#, python-format
+msgid "Started %(started)s, last seen %(seen)s"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End this session"
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "No other session is open."
+msgstr ""
+
+#: apps/accounts/templates/accounts/sessions.html
+msgid "End all my other sessions"
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "An administrator removed the second factors of your gmat-m8 account, and every session of your account has ended."
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
+msgid "If you did not ask for this, tell your administrator straight away and change your password."
+msgstr ""

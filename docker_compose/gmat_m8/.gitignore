@@ -9,3 +9,8 @@ backups/
 flags/
 media/
 *.log
+deploy.state
+deploy.head
+.release/
+preserved/
+drill/

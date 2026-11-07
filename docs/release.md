@@ -19,12 +19,16 @@ Only the maintainer creates `v*` tags, and a tag push is what publishes images. 
 
 Nothing is signed or released unless every earlier step passed. Only the digests in the signed manifest are trusted; the `X.Y.Z` tag on GHCR is a label for humans.
 
-`image-scan.yaml` runs every night (and on demand). It scans the released app and backup images (the digests in the latest release's manifest), Caddy and PostgreSQL (the digests in `docker-compose.yml`), each for amd64 and arm64, with the same gate; it keeps the full reports as artifacts for 90 days. When something is not covered it opens or updates one issue, "Nightly image scan: unresolved HIGH/CRITICAL findings". A later run in which every scan completed with no findings closes that issue with a comment; a run in which a scan could not complete leaves it alone. Before the first release only Caddy and PostgreSQL are scanned. An `image:` line in `docker-compose.yml` that is neither pinned by digest nor a `${VAR}` reference stops the run, so the scan cannot shrink silently.
+`image-scan.yaml` runs every night (and on demand). It scans the released app and backup images (the digests in the latest release's manifest), Caddy, PostgreSQL and ClamAV (the digests in `docker-compose.yml`), each for amd64 and arm64, with the same gate; it keeps the full reports as artifacts for 90 days. When something is not covered it opens or updates one issue, "Nightly image scan: unresolved HIGH/CRITICAL findings". A later run in which every scan completed with no findings closes that issue with a comment; a run in which a scan could not complete leaves it alone. Before the first release only Caddy and PostgreSQL are scanned. An `image:` line in `docker-compose.yml` that is neither pinned by digest nor a `${VAR}` reference stops the run, so the scan cannot shrink silently.
 
 ## Release procedure (maintainer)
 
-1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Say there whether a migration is irreversible or needs a confirmation at deploy time. Merge it with the usual review and required checks.
-2. **Wait for `main`.** `ci.yaml` and `compose-smoke.yaml` (and later `e2e.yaml`) run on the merge commit. Rehearse the gate on it without tagging anything (needs an authenticated `gh`):
+1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Two statements have a line of their own. The publish workflow copies them into the signed manifest, and the deploy tooling reads them only from there (ADR-0017):
+   - `Irreversible migration: <what>` makes `deploy.sh` ask for the version to be typed, and `recover.sh migrate-back` refuse: going back then means restoring the pre-deploy dump.
+   - `Old code works on the new schema: <why>` is the only thing that lets `recover.sh rollback-images` start the previous images after the commit point.
+
+   Merge it with the usual review and required checks.
+2. **Wait for `main`.** `ci.yaml`, `compose-smoke.yaml` and `e2e.yaml` run on the merge commit. Rehearse the gate on it without tagging anything (needs an authenticated `gh`):
 
    ```bash
    git fetch origin
@@ -41,7 +45,7 @@ Nothing is signed or released unless every earlier step passed. Only the digests
 
    Never move or delete a published tag; fix forward with the next patch version.
 5. **Watch the run**, then open the GitHub Release and check the list below.
-6. **Deploy** on the VPS with `./deploy.sh X.Y.Z` (M8.4), which verifies everything in the next section before it touches anything.
+6. **Deploy** on the VPS, from a checkout of the tag: `git fetch --tags && git switch --detach vX.Y.Z && cd docker_compose/gmat_m8 && ./deploy.sh X.Y.Z`. It verifies everything in the next section before it touches anything, and its header lists the steps. If it stops, `./recover.sh status` prints the matching row of the decision tree.
 
 A release has these files: `release-manifest.json`, `release-manifest.json.sigstore.json` (the signature bundle), `sbom-<image>-<arch>.spdx.json` (four) and `trivy-<image>-<arch>-report.json` (four, every severity, exceptions not applied).
 
@@ -69,7 +73,8 @@ A release has these files: `release-manifest.json`, `release-manifest.json.sigst
   "scan_gate": {
     "severity": "CRITICAL,HIGH", "ignore_unfixed": false,
     "ignorefile": ".trivyignore.yaml", "ignorefile_sha256": "<hex>"
-  }
+  },
+  "migration": {"irreversible": "", "old_code_works": ""}
 }
 ```
 
@@ -96,7 +101,7 @@ cosign verify --certificate-identity "<same identity>" \
 gh attestation verify "oci://<ref>" --repo <owner>/gmat-m8
 ```
 
-`deploy.sh` (M8.4) makes the first two checks and pulls both images by the digests in the verified manifest.
+`deploy.sh` makes the first two checks, compares the manifest with the version, repository and registry it expects, pulls both images by the digests in it and stops if the compose files would run anything else or the checkout is not the release's commit. It does not run `gh attestation verify`: the VPS has no `gh`, and the attestation adds nothing the two signatures do not already bind.
 
 ## When something fails
 
@@ -104,7 +109,7 @@ gh attestation verify "oci://<ref>" --repo <owner>/gmat-m8
 - **The Trivy gate fails.** Fix it (new base image digest, dependency bump) or accept it in a pull request the maintainer approves: an entry in `.trivyignore.yaml` with the component, the compensating control, the owner and an expiry at most 90 days away (`scripts/check_trivyignore.py` enforces the format). Then release the next version; never skip the gate.
 - **Failure after the push** (signature, attestation, manifest). Images may already be on GHCR. No release exists, and nothing trusts a digest that is not in a signed manifest, so there is nothing to undo: fix the cause and use "Re-run failed jobs", or release the next patch version.
 - **"release already exists".** The workflow never overwrites a release. Delete the release (not the tag) in the GitHub UI and re-run the `release` job, or release the next patch version.
-- **First publish.** GHCR creates the packages private. They are linked to this repository through the `org.opencontainers.image.source` label, so the run's token can push and the nightly scan can pull. Package visibility and the VPS's read-only token are the maintainer's (H8.6).
+- **First publish.** GHCR creates the packages private. They are linked to this repository through the `org.opencontainers.image.source` label, so the run's token can push and the nightly scan can pull. The maintainer then makes both public, before the first deploy (ADR-0017, [vps-setup.md](runbooks/vps-setup.md)); the VPS holds no token.
 
 ## Pipeline verification record
 

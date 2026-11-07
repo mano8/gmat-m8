@@ -1,0 +1,4 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}An administrator removed the second factors of your gmat-m8 account, and every session of your account has ended.{% endblocktranslate %}
+
+{% blocktranslate %}If you did not ask for this, tell your administrator straight away and change your password.{% endblocktranslate %}
+{% endautoescape %}

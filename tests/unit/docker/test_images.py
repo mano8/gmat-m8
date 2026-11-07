@@ -32,6 +32,8 @@ ENTRYPOINT_COMMANDS = {
     "verify-internal",
     "post-restore-reconcile",
     "healthcheck",
+    "decoder",
+    "decoder-healthcheck",
     "manage",
 }
 
@@ -105,6 +107,7 @@ def test_downloaded_binaries_are_verified() -> None:
 def test_app_image_ships_no_pip_and_collects_static_without_secrets() -> None:
     text = _text(DOCKER / "app" / "Dockerfile")
     assert "pip uninstall" in text
+    assert "dpkg --purge --force-depends libsqlite3-0" in text
     assert "DJANGO_SETTINGS_MODULE=config.settings.build" in text
     assert "uv sync --frozen --no-dev" in text
 
@@ -188,7 +191,7 @@ class TestBackupScripts:
         assert match
         excluded = set(match.group(1).split())
         cache_table = settings.CACHES["default"]["LOCATION"]
-        assert excluded == {"django_session", cache_table}
+        assert excluded == {"django_session", "usersessions_usersession", cache_table}
 
     def test_backup_follows_the_snapshot_protocol(self) -> None:
         backup = _text(DOCKER / "backup" / "backup.sh")

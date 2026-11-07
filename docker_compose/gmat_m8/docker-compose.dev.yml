@@ -111,5 +111,15 @@ services:
     restart: unless-stopped
     networks: [devhost]
 
+  # Development settings scan nothing and decode in a child of `web` (no sockets configured),
+  # so these three stay down unless asked for: docker compose --profile uploads ...
+  decoder:
+    image: gmat-m8:dev
+    profiles: [uploads]
+  clamd:
+    profiles: [uploads]
+  freshclam:
+    profiles: [uploads]
+
 networks:
   devhost: {}

@@ -28,7 +28,7 @@ On Windows, keep LF line endings (`.gitattributes` enforces them); scripts under
 
 Read [CLAUDE.md](CLAUDE.md) before writing code: it is the working agreement for every contributor, human or agent, and lists the architecture invariants. In short:
 
-- Views read through `selectors.py` and write through `services.py`, never through models directly.
+- Views read through `selectors` and write through `services`, never through models directly.
 - Every mutating service authorizes inside its transaction (`authorize_in_txn`), then locks, validates, writes, and records an audit event.
 - Scoped data is read only through `visible_to(ctx, capability)` or selectors. Out of scope answers 404, in scope without the capability 403, an unsupported method 405.
 - Quantities are `Decimal`, never float, and derived quantities (received, pending, delivered, …) are computed, never stored.
@@ -63,7 +63,8 @@ uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/che
 ## Tests
 
 - PostgreSQL only; markers `integration`, `live` and `e2e` are strict.
-- Coverage stays at 90 % or more overall and at 100 % for `apps/access`, every `services` module and every `selectors.py`.
+- Coverage stays at 90 % or more overall and at 100 % for `apps/access`, every `services` module and every `selectors` module. After a green `test`, CI sends the report to Codecov and Codacy; a pull request from a fork has no token for either and skips them, and it still passes.
+- A function stays at a cyclomatic complexity of 10 or less with at most 8 parameters, and a file under 500 lines of code (Codacy's limits; `lizard` prints them).
 - A service needs tests for the allowed, denied and revoked roles, its invariants and its state transitions; a concurrency-sensitive one adds a threaded test in `tests/integration/`.
 - Use the shared A/B/C organization fixture in `tests/org.py` and its sentinels to prove nothing leaks across companies, branches or projects.
 - A new URL gets rows for GET, HEAD and POST and every actor in `tests/access/test_acceptance_matrix.py`.
