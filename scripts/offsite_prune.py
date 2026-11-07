@@ -34,7 +34,7 @@ import argparse
 import datetime
 import json
 import re
-import subprocess
+import subprocess  # nosec B404 - a fixed program, see run_restic
 import sys
 from collections import Counter
 from collections.abc import Callable, Iterable
@@ -194,7 +194,7 @@ def inside_the_window(removals: Iterable[Snapshot], now: datetime.datetime) -> l
 
 def run_restic(arguments: list[str]) -> str:
     command = ["restic", *arguments]
-    result = subprocess.run(  # noqa: S603 (fixed program, arguments from this file)
+    result = subprocess.run(  # noqa: S603  # nosec B603 - a fixed program, arguments from this file
         command, capture_output=True, text=True, timeout=RESTIC_TIMEOUT_SECONDS, check=False
     )
     if result.returncode != 0:
