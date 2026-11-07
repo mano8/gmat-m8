@@ -5972,3 +5972,75 @@ msgstr "Un administrateur a supprimé les seconds facteurs de votre compte gmat-
 #: apps/accounts/templates/accounts/email/mfa_reset_notice.txt
 msgid "If you did not ask for this, tell your administrator straight away and change your password."
 msgstr "Si vous ne l'avez pas demandé, prévenez immédiatement votre administrateur et changez votre mot de passe."
+
+#: apps/handovers/templates/handovers/new.html
+msgid "No warehouse to take the material from"
+msgstr "Aucun entrepôt d'où prendre le matériel"
+
+#: apps/handovers/templates/handovers/new.html
+#, python-format
+msgid "A handover takes material out of an active warehouse of %(branch)s or of a branch it manages, and there is none you can use."
+msgstr "Une remise sort le matériel d'un entrepôt actif de %(branch)s ou d'une agence qu'elle gère, et vous n'en avez aucun à disposition."
+
+#: apps/handovers/templates/handovers/new.html
+msgid "Goods received directly at the worksite are handed over with their receipt."
+msgstr "Le matériel reçu directement sur le chantier est remis avec sa réception."
+
+#: apps/purchasing/templates/purchasing/detail.html
+msgid "An order takes its lines from approved requests: see below why none can be added."
+msgstr "Une commande prend ses lignes dans des demandes approuvées : voyez plus bas pourquoi aucune ne peut être ajoutée."
+
+#: apps/purchasing/templates/purchasing/new.html
+msgid "There is no active supplier yet: an order needs one, so a supplier has to be added first."
+msgstr "Il n'y a encore aucun fournisseur actif : une commande en a besoin, il faut donc d'abord ajouter un fournisseur."
+
+#: apps/purchasing/templates/purchasing/new.html
+msgid "This draft starts without lines: you add approved request lines on its page. An order that ships to a worksite only takes lines of that worksite's project."
+msgstr "Ce brouillon commence sans lignes : vous ajoutez les lignes de demandes approuvées sur sa page. Une commande livrée sur un chantier ne prend que des lignes du projet de ce chantier."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+msgid "No request line to add"
+msgstr "Aucune ligne de demande à ajouter"
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+#, python-format
+msgid "This order ships to the worksite of %(project)s · %(name)s, so it only takes lines of that project."
+msgstr "Cette commande est livrée sur le chantier de %(project)s · %(name)s : elle ne prend donc que des lignes de ce projet."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+#, python-format
+msgid "%(branch)s has lines to buy for %(projects)s and %(more)s other project."
+msgid_plural "%(branch)s has lines to buy for %(projects)s and %(more)s other projects."
+msgstr[0] "%(branch)s a des lignes à acheter pour %(projects)s et %(more)s autre projet."
+msgstr[1] "%(branch)s a des lignes à acheter pour %(projects)s et %(more)s autres projets."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+#, python-format
+msgid "%(branch)s has lines to buy for %(projects)s."
+msgstr "%(branch)s a des lignes à acheter pour %(projects)s."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+msgid "To add them, change the destination under “Edit supplier, destination and notes”."
+msgstr "Pour les ajouter, changez la destination dans « Modifier le fournisseur, la destination et les notes »."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+msgid "They go on another order."
+msgstr "Elles vont sur une autre commande."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+#, python-format
+msgid "%(branch)s has no approved line of that project left to buy."
+msgstr "%(branch)s n'a plus aucune ligne approuvée de ce projet à acheter."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+#, python-format
+msgid "%(branch)s has no approved line left to buy."
+msgstr "%(branch)s n'a plus aucune ligne approuvée à acheter."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+msgid "A line reaches purchasing once its request is approved and it is sourced to purchase. Lines another draft already reserves in full are not offered either."
+msgstr "Une ligne arrive aux achats une fois sa demande approuvée et son approvisionnement fixé à l'achat. Les lignes qu'un autre brouillon réserve déjà en entier ne sont pas proposées non plus."
+
+#: apps/purchasing/templates/purchasing/no_candidates.html
+msgid "See what is to purchase"
+msgstr "Voir ce qu'il y a à acheter"

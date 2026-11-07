@@ -155,6 +155,10 @@ def _form_page(
         "form": form,
         "entries": form.entries(),
         "warnings": warnings or [],
+        # No warehouse to take the material from: say so instead of an empty, required select.
+        "source_branch": None
+        if form.fields["source"].choices  # type: ignore[attr-defined]
+        else (asked or project).procurement_branch,
     }
     return render(request, "handovers/new.html", context, status=status)
 

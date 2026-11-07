@@ -69,6 +69,8 @@
           {% endwith %}
         {% endfor %}
       </section>
+    {% else %}
+      {% include "purchasing/no_candidates.html" with hint=no_candidates draft=False %}
     {% endif %}
     <div class="flex flex-wrap gap-3">
       {% include "components/button.html" with type="submit" label=_("Save the amendment") variant="primary" %}

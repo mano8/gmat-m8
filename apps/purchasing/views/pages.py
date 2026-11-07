@@ -114,7 +114,11 @@ def worklist(request: HttpRequest) -> HttpResponse:
 
 
 def new_order_page(request: HttpRequest, form: NewOrderForm, status: int = 200) -> HttpResponse:
-    return render(request, "purchasing/new.html", {"form": form}, status=status)
+    context = {
+        "form": form,
+        "no_suppliers": not form.fields["supplier"].queryset.exists(),  # type: ignore[attr-defined]
+    }
+    return render(request, "purchasing/new.html", context, status=status)
 
 
 @require_safe
@@ -289,13 +293,13 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
 def _manager_tools(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
     """The forms of the order page for who manages the order, by its state."""
     if found.status == Status.DRAFT:
+        rows = selectors.candidates(ctx, found)
         return {
             "header_form": DraftHeaderForm(
                 initial=DraftHeaderForm.initial_for(found), ctx=ctx, order=found
             ),
-            "items_form": ItemsForm(
-                actor_id=ctx.user_id, rows=selectors.candidates(ctx, found), picked=set()
-            ),
+            "items_form": ItemsForm(actor_id=ctx.user_id, rows=rows, picked=set()),
+            "no_candidates": None if rows else selectors.no_candidates(ctx, found),
             "issue_form": IssueForm(actor_id=ctx.user_id),
             "discard_form": ReasonForm(auto_id=_fresh("discard", 0)),
         }
@@ -345,12 +349,14 @@ def amend_page(
         )
         for entry in form.line_entries()
     ]
+    entries = form.entries()
     context = {
         "order": found,
         "form": form,
         "blocks": blocks,
         "prices": form.prices,
-        "entries": form.entries(),
+        "entries": entries,
+        "no_candidates": None if entries else selectors.no_candidates(ctx, found),
     }
     return render(request, "purchasing/amend.html", context, status=status)
 

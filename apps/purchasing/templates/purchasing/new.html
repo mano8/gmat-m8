@@ -15,6 +15,11 @@
     {{ form.idempotency_key }}
     {{ form.items_key }}
     {% if form.non_field_errors %}<div role="alert" class="errorlist">{{ form.non_field_errors }}</div>{% endif %}
+    {% if no_suppliers %}
+      <p class="card mb-4 border-warn" role="note" data-testid="no-suppliers">
+        {% translate "There is no active supplier yet: an order needs one, so a supplier has to be added first." %}
+      </p>
+    {% endif %}
     <section class="card mb-4" aria-label="{% translate 'Order' %}">
       {{ form.branch.as_field_group }}
       {{ form.supplier.as_field_group }}
@@ -51,6 +56,10 @@
           {% endwith %}
         {% endfor %}
       </section>
+    {% else %}
+      <p class="mb-4 text-sm text-soft" data-testid="new-order-empty">
+        {% translate "This draft starts without lines: you add approved request lines on its page. An order that ships to a worksite only takes lines of that worksite's project." %}
+      </p>
     {% endif %}
     {% include "components/button.html" with type="submit" label=_("Create the draft") variant="primary" block=True %}
   </form>
