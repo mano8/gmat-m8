@@ -196,10 +196,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
   - a password or second factor that changes tells its owner, and so does an administrator's MFA reset;
   - `gmat.E021` refuses an SMTP relay with credentials and no TLS.
 - `manage reencrypt_mfa` moves every stored second-factor secret to the newest key, so an old key can leave `MFA_ENCRYPTION_KEYS` (M8.5).
+- CI sends the coverage report to Codecov and Codacy after a green `test` (job `coverage-upload`, secrets `CODECOV_TOKEN` and `CODACY_PROJECT_TOKEN`). It is not a required check, runs nothing of the project's and skips a service it has no token for, so a fork's or Dependabot's pull request still passes. Exception X14 records that Codacy's action fetches its reporter when it runs.
 - The hourly `sessions` housekeeping deletes expired sessions and rows of the session list without a session: nothing purged them before.
 
 ### Changed
 
+- Codacy's complexity and size findings are cleared. `apps/accounts/services`, `apps/purchasing/selectors` and `apps/material_requests/selectors` are packages that keep their public names; `scripts/check_access_rules.py` keeps its rules in `access_rules_parsed.py` on `access_rules_ast.py`, and now follows a write across the modules of a service package and through a package's re-exports. `create_branch` and `create_project` take a `NewBranch` and a `NewProject`; `queue_notification` lost `from_email` and `using`, and `queue_security_email` lost `using`, which nothing passed. Idempotency hashes are unchanged. The 100 % coverage gate also covers `selectors/` packages. The token pages' rate limit is now the action `link`, so counters restart at the deploy that brings this.
 - Pre-authentication form pages keep `Referrer-Policy: same-origin`; only a URL that carries a token is `no-referrer` (browsers send `Origin: null` on a form POST under `no-referrer`, which CSRF refuses, so login failed in a real browser).
 - Production settings now also require `DJANGO_CSRF_TRUSTED_ORIGINS` (https only) and `MFA_ENCRYPTION_KEYS`.
 - Mail is configured through Django 6.1's `MAILERS`: the outbox is the default mailer everywhere and the worker sends through `MAILERS["outbound"]` (SMTP; Mailpit in development). The interim `apps.core.mail.DisabledEmailBackend` is gone. Production sends nothing until `OUTBOUND_EMAIL=on` and requires `OUTBOX_ENCRYPTION_KEYS`.
