@@ -3,9 +3,9 @@
 
 The whole-project floor (90 %, branch coverage) is ``fail_under`` in ``pyproject.toml``.
 This script reads the JSON report (``coverage json``) and requires every statement and
-branch of ``apps/access/**``, ``apps/*/services.py`` (or the modules of an
-``apps/*/services/`` package) and ``apps/*/selectors.py`` to be covered. A path that
-does not exist yet simply matches nothing.
+branch of ``apps/access/**``, ``apps/*/services.py`` and ``apps/*/selectors.py`` (or the
+modules of such a package) to be covered. A path that does not exist yet simply matches
+nothing.
 """
 
 import json
@@ -16,9 +16,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 
-STRICT = re.compile(
-    r"^apps/(access/.*\.py|[^/]+/(services|selectors)\.py|[^/]+/services/[^/]+\.py)$"
-)
+STRICT = re.compile(r"^apps/(access/.*\.py|[^/]+/(services|selectors)(\.py|/[^/]+\.py))$")
 
 
 def check(report: dict[str, Any]) -> list[str]:

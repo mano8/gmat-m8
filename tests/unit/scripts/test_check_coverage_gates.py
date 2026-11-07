@@ -24,6 +24,8 @@ def _file(lines: int = 0, branches: int = 0) -> dict[str, Any]:
         "apps/material_requests/services.py",
         "apps/material_requests/services/review.py",
         "apps/material_requests/selectors.py",
+        "apps/material_requests/selectors/reviewer.py",
+        "apps/material_requests/selectors/__init__.py",
         "apps\\handovers\\services.py",
     ],
 )
@@ -43,6 +45,7 @@ def test_strict_file_fully_covered_passes(script: ModuleType) -> None:
         "apps/core/services_helpers.py",
         "config/env.py",
         "apps/a/b/services.py",
+        "apps/a/selectors/b/deep.py",
     ],
 )
 def test_other_files_are_ignored(script: ModuleType, name: str) -> None:
