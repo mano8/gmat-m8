@@ -627,3 +627,16 @@ def test_the_test_job_proves_every_migration_reverses() -> None:
     assert check["if"] == "matrix.migrations"
     include = workflow["jobs"]["test-shard"]["strategy"]["matrix"]["include"]
     assert [entry["shard"] for entry in include if entry.get("migrations")] == ["serial"]
+
+
+def test_adr_alignment_reads_the_description_safely_and_again_when_it_is_edited() -> None:
+    """ADR-0026: the description reaches the script only through the environment."""
+    workflow = _load(ROOT / ".github" / "workflows" / "adr.yaml")
+    trigger = _triggers(workflow)
+    assert trigger.keys() == {"pull_request"}
+    assert "edited" in trigger["pull_request"]["types"]
+    step = next(s for s in workflow["jobs"]["adr-alignment"]["steps"] if "run" in s)
+    assert step["env"]["PR_BODY"] == "${{ github.event.pull_request.body }}"
+    assert "${{" not in step["run"]
+    assert step["run"] == "python scripts/check_adr_alignment.py pr --base HEAD^1"
+    assert step["if"] == "github.event.pull_request.user.login != 'dependabot[bot]'"

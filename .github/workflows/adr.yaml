@@ -1,0 +1,46 @@
+name: ADR alignment
+
+# ADR-0026: a pull request answers every ADR whose governed files it touches, by updating it or
+# by naming it in the description's `## ADRs` section. Runs again when the description is edited.
+#
+# Rules for this file (CLAUDE.md, plan §8.4): no pull_request_target or workflow_run, no
+# `on.paths` filter, no secret, every action pinned by full commit SHA, least-privilege
+# permissions. A change under .github/workflows/ needs the maintainer's explicit review.
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: adr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  adr-alignment:
+    name: adr-alignment
+    runs-on: ubuntu-latest
+    steps:
+      # The pull request's merge commit and its first parent, the base it merges into.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+
+      # The description reaches the script as an environment variable, never inside the script.
+      # Dependabot's version bumps change no decision.
+      - name: Every ADR the change touches is updated or named
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python scripts/check_adr_alignment.py pr --base HEAD^1
