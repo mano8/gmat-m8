@@ -41,7 +41,7 @@ To update: download the new tarball, compare its integrity with the registry's, 
 | `chart.umd.min.js` sha256 (kept here) | `84d0e233daba702b8f77d669d8c137cad36d441a10f200b6f2d3ab553bdfcf6b` |
 | Change | the last line, `//# sourceMappingURL=chart.umd.min.js.map`, is removed: the source map is not vendored and the hashing static files storage fails on a reference it cannot find |
 
-Loaded only by the pages that draw a chart (M8b.5), with its data in a `json_script` block, colours
+Loaded only by the pages that draw a chart (M8b.5), with its data as escaped JSON in the canvas's `data-chart` attribute (not `json_script`: htmx removes `<script>` from swapped fragments, ADR-0027), colours
 read from the CSS tokens and a data table beside every chart. It draws on a `<canvas>` and sizes
 it through the CSSOM, which the CSP (`style-src 'self'`) allows; no plugin is fetched at run time.
 

@@ -56,7 +56,6 @@ from apps.organizations.forms import (
     ReasonForm,
     SharedProjectFilterForm,
 )
-from apps.organizations.models import Membership  # noqa: F401
 from apps.organizations.row_dialogs import (
     grant_dialog,
     membership_revoke_dialog,

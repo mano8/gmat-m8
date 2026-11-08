@@ -511,7 +511,7 @@ CHART_HOLDERS: dict[str, tuple[str, ...]] = {
     "on-time": PO_VIEWERS,
     "overdue-suppliers": PO_VIEWERS,
     "receipts-handovers": RECEIPT_HOLDERS,
-    "handover-projects": RECEIPT_HOLDERS,
+    "handover-projects": HANDOVER_POSTERS,
     "branch-requests": ("group_admin",),
     "branch-people": ("group_admin",),
 }

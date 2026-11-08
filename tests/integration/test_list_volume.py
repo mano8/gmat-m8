@@ -144,7 +144,7 @@ CHARTS = (
     chart("on-time", "mm_mad"),
     chart("overdue-suppliers", "mm_mad", "wo_mad"),
     chart("receipts-handovers", "wo_mad", "site_manager"),
-    chart("handover-projects", "wo_mad", "group_admin", "site_manager"),
+    chart("handover-projects", "wo_mad", "group_admin"),
     chart("branch-requests", "group_admin"),
     chart("branch-people", "group_admin"),
     Screen(

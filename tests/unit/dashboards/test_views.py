@@ -207,6 +207,13 @@ class TestPeriodAndCharts:
         assert client_for(people.wo_mad).get(panel_url("request-progress")).status_code == 403
         assert client_for(people.group_admin).get(panel_url("branch-people")).status_code == 200
 
+    def test_the_handover_ranking_is_for_who_hands_over(self, people: People) -> None:
+        """Like the "to hand over" list: a site manager reads handovers, not the stock waiting
+        to be handed over (plan §3.4)."""
+        assert (
+            client_for(people.site_manager).get(panel_url("handover-projects")).status_code == 403
+        )
+
 
 class TestChartLeaks:
     """Per projection (plan §8.2): a chart never carries a price or another project's

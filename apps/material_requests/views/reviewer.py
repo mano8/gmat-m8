@@ -409,9 +409,10 @@ def line_reduce(request: HttpRequest, line_id: UUID) -> HttpResponse:
     to = _examine_url(line)
     form = _form_for(ReduceForm, line, "reduce", data=request.POST)
     entry = next(
-        e for e in selectors.lines(ctx, [line.request])[line.request_id] if e.line.pk == line.pk
+        (e for e in selectors.lines(ctx, [line.request])[line.request_id] if e.line.pk == line.pk),
+        None,
     )
-    dialog = reduce_dialog(line, form, entry.floor).dialog()
+    dialog = reduce_dialog(line, form, entry.floor if entry else 0).dialog()
     if not form.is_valid():
         return _invalid(request, form, to, dialog=dialog)
     data = form.cleaned_data

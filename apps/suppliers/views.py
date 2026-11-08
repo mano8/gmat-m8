@@ -158,7 +158,9 @@ def _set_active(request: HttpRequest, supplier_id: UUID, *, active: bool) -> Htt
         if active
         else _("Supplier %(name)s deactivated.") % {"name": supplier.name},
         reverse("suppliers:detail", args=[supplier.pk]),
-        dialog=deactivate_dialog(supplier, form).dialog(),
+        dialog=None
+        if active
+        else deactivate_dialog(supplier, form).dialog(),  # only that one is a dialog
     )
 
 

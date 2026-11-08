@@ -334,10 +334,11 @@ CHARTS: tuple[ChartPanel, ...] = (
     ChartPanel(
         "handover-projects",
         gettext_lazy("Awaiting handover"),
-        C.HANDOVER_VIEW,
+        C.HANDOVER_POST,  # who hands over, like the "to hand over" list panel (plan §3.4)
         awaiting_handover,
         "handovers:list",
         gettext_lazy("Nothing received is waiting to be handed over."),
+        requires=(C.HANDOVER_VIEW,),
     ),
     ChartPanel(
         "branch-requests",

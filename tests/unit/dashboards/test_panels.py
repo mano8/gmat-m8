@@ -55,7 +55,6 @@ class TestRegistry:
             "decisions",
             "inbox-age",
             "receipts-handovers",
-            "handover-projects",
         }
 
     def test_a_warehouse_operator_gets_goods_and_orders_not_purchasing(

@@ -191,7 +191,9 @@ def _set_active(request: HttpRequest, material_id: UUID, *, active: bool) -> Htt
         if active
         else _("Material %(reference)s deactivated.") % {"reference": material.reference},
         reverse("catalog:detail", args=[material.pk]),
-        dialog=deactivate_dialog(material, form).dialog(),
+        dialog=None
+        if active
+        else deactivate_dialog(material, form).dialog(),  # only that one is a dialog
     )
 
 

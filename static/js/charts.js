@@ -255,8 +255,10 @@
     canvas.addEventListener("keydown", onKey);
     canvas.addEventListener("blur", onBlur);
     var table = canvas.closest(".chart-card") && canvas.closest(".chart-card").querySelector("[data-chart-table]");
-    if (table) {
+    // Folded when first drawn; a redraw (the theme changed) leaves it as the person set it.
+    if (table && !table.hasAttribute("data-chart-seen")) {
       table.open = false;
+      table.setAttribute("data-chart-seen", "");
     }
   }
 
