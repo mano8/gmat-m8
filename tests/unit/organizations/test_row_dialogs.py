@@ -27,7 +27,7 @@ def in_dialog(kind: str) -> dict[str, str]:
 
 @pytest.fixture
 def admin(people: People) -> Client:
-    return client_for(people.group_admin)
+    return client_for(people.group_admin, HTTP_ACCEPT_LANGUAGE="en")
 
 
 @pytest.fixture

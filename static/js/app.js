@@ -142,7 +142,18 @@
     }
     var command = button.getAttribute("command");
     if (command === "show-modal") {
-      openers.set(dialog, button);
+      // An item of a menu (a popover): the menu closes and the focus later returns to the
+      // button that opened the menu, since the item itself is hidden by then.
+      var menu = button.closest("[popover]");
+      var returnTo = button;
+      if (menu) {
+        var invoker = menu.id ? document.querySelector('[popovertarget="' + menu.id + '"]') : null;
+        if (menu.matches(":popover-open")) {
+          menu.hidePopover();
+        }
+        returnTo = invoker || button;
+      }
+      openers.set(dialog, returnTo);
       if (!nativeCommands && !dialog.open) {
         dialog.showModal();
       }

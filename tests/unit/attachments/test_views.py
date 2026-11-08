@@ -399,7 +399,8 @@ class TestPanels:
         assert 'data-testid="attachment-upload"' in page
         assert reverse("attachments:download", args=[item.pk]) in page
         assert 'data-testid="attachment-remove-open"' in page
-        assert 'name="reason"' not in page  # the uploader's own draft: no reason asked
+        # The uploader's own draft: removing a file asks for no reason.
+        assert f'id="id_remove_{item.pk}_reason"' not in page
 
     def test_the_review_page_lists_and_moderates(
         self, people: People, draft: MaterialRequest, tech: SessionPrincipal, attach: Attach

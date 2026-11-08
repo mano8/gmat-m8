@@ -49,6 +49,9 @@ def test_return_a_request_from_the_review_pages_dialog(browsing: Browsing, viewp
     expect(dialog.get_by_test_id("dialog-cancel")).to_be_focused()
     engineer.keyboard.press("Escape")
     expect(dialog).to_be_hidden()
+    # The menu closed when its item opened the dialog; the focus is back on the menu's button.
+    expect(engineer.locator("#request-menu")).to_be_hidden()
+    expect(engineer.locator("[popovertarget=request-menu]")).to_be_focused()
 
     engineer.locator("[popovertarget=request-menu]").click()
     engineer.get_by_test_id("return-open").click()

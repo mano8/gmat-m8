@@ -175,7 +175,9 @@ class TestDeactivateDialog:
     def test_the_page_confirms_in_a_dialog_that_states_the_consequence(
         self, org: Org, people: People
     ) -> None:
-        page = client_for(people.mm_mad).get(reverse("suppliers:detail", args=[org.supplier.pk]))
+        page = client_for(people.mm_mad, HTTP_ACCEPT_LANGUAGE="en").get(
+            reverse("suppliers:detail", args=[org.supplier.pk])
+        )
         body = page.content.decode()
         assert 'id="deactivate-dialog"' in body
         assert "Existing orders and documents keep it." in body
