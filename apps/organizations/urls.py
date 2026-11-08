@@ -24,6 +24,16 @@ urlpatterns = [
         name="membership_validity",
     ),
     path(
+        "memberships/<uuid:membership_id>/validity/edit/",
+        views.membership_validity_form,
+        name="edit_membership_validity",
+    ),
+    path(
+        "memberships/<uuid:membership_id>/revoke/confirm/",
+        views.membership_revoke_form,
+        name="confirm_revoke_membership",
+    ),
+    path(
         "email-changes/<uuid:change_id>/revoke/",
         views.revoke_email_change,
         name="revoke_email_change",

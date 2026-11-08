@@ -81,7 +81,12 @@
           {% endwith %}
         {% endfor %}
       </section>
-      {% include "components/button.html" with type="submit" label=_("Hand the material over") variant="primary" block=True %}
+      <div class="action-bar">
+        <p class="action-bar-sum">
+          <span>{% blocktranslate count counter=entries|length %}{{ counter }} line to hand over{% plural %}{{ counter }} lines to hand over{% endblocktranslate %}</span>
+        </p>
+        {% include "components/button.html" with type="submit" label=_("Hand the material over") icon="hand-helping" variant="primary" block=True %}
+      </div>
     </form>
   {% endif %}
 {% endblock content %}

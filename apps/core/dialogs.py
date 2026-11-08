@@ -11,10 +11,16 @@ Authorization is the views' and services' as before: nothing here decides who ma
 from dataclasses import dataclass, replace
 
 from django.forms import Form
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+from django.utils.cache import patch_vary_headers
+from django.utils.translation import gettext
 
-from apps.core.responses import Dialog
+from apps.core.http import is_htmx
+from apps.core.responses import Dialog, varies
 
 FRAGMENT = "components/dialog_form.html"
+PAGE = "layouts/dialog_page.html"
 
 
 @dataclass(frozen=True)
@@ -42,6 +48,8 @@ class ActionDialog:
     testid: str = ""
     size: str = ""
     submit_testid: str = ""
+    modal: bool = True  # False on the form's own page (opened as a link): Cancel goes ``back``
+    back: str = ""
     label: str = ""  # what the button or menu item that opens it says (default: the title)
     icon: str = ""  # that button's icon, a Lucide name
 
@@ -76,3 +84,40 @@ class ActionDialog:
     def dialog(self) -> Dialog:
         """What ``perform``/``invalid`` need to answer an htmx POST with this dialog again."""
         return Dialog(self.form, FRAGMENT, lambda bound: {"d": self.with_form(bound)})
+
+
+def lazy(request: HttpRequest, spec: ActionDialog) -> HttpResponse:
+    """The form of a lazy dialog (GET): its fragment for the page's dialog, which asks with htmx
+    and names the dialog's content as the target (``HX-Target``, compared, never printed), or
+    the whole page, so the URL still works as a link and without JavaScript (Q67).
+
+    ``spec.id`` is the id of the page's shared dialog for this kind of action; ``spec.back``
+    is where the page's own Cancel leads.
+    """
+    in_dialog = is_htmx(request) and request.headers.get("HX-Target") == f"{spec.id}-content"
+    if in_dialog:
+        response = render(request, FRAGMENT, {"d": spec})
+    else:
+        response = render(request, PAGE, {"d": replace(spec, modal=False)})
+    patch_vary_headers(response, ["HX-Target"])
+    return varies(response)
+
+
+# --- what a membership and a project assignment share (both have a validity window) ------------
+
+VALIDITY_DIALOG = "validity-dialog"
+REVOKE_DIALOG = "revoke-dialog"
+
+
+def validity_dialog(action: str, form: Form, *, back: str = "") -> ActionDialog:
+    """Change the window a role or a project assignment is valid in: a lazy dialog."""
+    return ActionDialog(
+        id=VALIDITY_DIALOG,
+        title=gettext("Change validity"),
+        action=action,
+        submit=gettext("Save"),
+        form=form,
+        back=back,
+        testid="validity-form",
+        submit_testid="validity-submit",
+    )

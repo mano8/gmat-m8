@@ -35,11 +35,12 @@ from apps.accounts.services import (
     INVITATION_MAIL,
 )
 from apps.accounts.sessions import session_passive
+from apps.core.dialogs import lazy
 from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
 from apps.core.idempotency import IdempotencyError
 from apps.core.listing import ListPage, ListScope, paginate, render_list
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict, idempotency_failure
+from apps.core.responses import conflict, idempotency_failure, invalid, perform
 from apps.notifications import selectors as notification_selectors
 from apps.organizations import selectors, services
 from apps.organizations.forms import (
@@ -54,6 +55,15 @@ from apps.organizations.forms import (
     PersonInvitationFilterForm,
     ReasonForm,
     SharedProjectFilterForm,
+)
+from apps.organizations.models import Membership  # noqa: F401
+from apps.organizations.row_dialogs import (
+    grant_dialog,
+    membership_revoke_dialog,
+    membership_validity_dialog,
+    offboard_dialog,
+    person_url,
+    revoke_email_change_dialog,
 )
 
 ORG = Capability.ORG_MANAGE
@@ -176,6 +186,13 @@ def _person_sections(request: HttpRequest, ctx: AccessContext, user: User) -> di
     }
 
 
+def _email_revoke(change: EmailChangeRequest | None) -> Any:
+    """The dialog that revokes the open email change, if there is one."""
+    if change is None:
+        return None
+    return revoke_email_change_dialog(change, ReasonForm(auto_id=EMAIL_REVOKE_IDS))
+
+
 @require_safe
 @require_capability(ORG)
 def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
@@ -194,10 +211,13 @@ def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
         **_person_sections(request, ctx, user),
         "open_change": change,
         "change_delivery": None if change is None else _change_delivery(ctx, change),
-        "membership_form": MembershipForm(ctx=ctx, actor_id=ctx.user_id),
+        "grant_dialog": grant_dialog(
+            user, MembershipForm(ctx=ctx, actor_id=ctx.user_id, auto_id=GRANT_IDS)
+        ),
         "employer_form": EmployerForm(initial={"company": user.employer_company_id}, ctx=ctx),
         "email_form": EmailChangeForm(),
-        "confirm_form": ConfirmForm(),
+        "offboard_dialog": offboard_dialog(user, ConfirmForm(auto_id=OFFBOARD_IDS)),
+        "email_revoke_dialog": _email_revoke(change),
     }
     return render(request, "organizations/person.html", context)
 
@@ -206,64 +226,86 @@ def _back(user_id: UUID) -> HttpResponse:
     return redirect("org:person", user_id=user_id)
 
 
+GRANT_IDS = "id_grant_%s"
+VALIDITY_IDS = "id_validity_%s"
+OFFBOARD_IDS = "id_offboard_%s"
+EMAIL_REVOKE_IDS = "id_email_revoke_%s"
+
+
 @mutating(ORG)
 def grant_membership(request: HttpRequest, user_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     user = account_selectors.person(ctx, user_id)
-    form = MembershipForm(request.POST, ctx=ctx)
+    form = MembershipForm(request.POST, ctx=ctx, auto_id=GRANT_IDS)
+    dialog = grant_dialog(user, form).dialog()
+    to = person_url(user.pk)
     if not form.is_valid():
-        messages.error(request, form_error_text(form))
-        return _back(user.pk)
-    try:
-        services.grant_membership(ctx.principal, user_id=user.pk, **form.grant_kwargs())
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except IdempotencyError as exc:
-        return idempotency_failure(request, exc)
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(request, _("Role granted."))
-    return _back(user.pk)
+        return invalid(request, form, to, dialog=dialog)
+    return perform(
+        request,
+        lambda: services.grant_membership(ctx.principal, user_id=user.pk, **form.grant_kwargs()),
+        _("Role granted."),
+        to,
+        dialog=dialog,
+    )
+
+
+@require_safe
+@require_capability(ORG)
+def membership_validity_form(request: HttpRequest, membership_id: UUID) -> HttpResponse:
+    """The dialog that changes a role's validity (its POST is ``membership_validity``)."""
+    membership = selectors.membership(access_for(request), membership_id)
+    form = ValidityForm(
+        initial={"valid_from": membership.valid_from, "valid_until": membership.valid_until},
+        auto_id=VALIDITY_IDS,
+    )
+    return lazy(request, membership_validity_dialog(membership, form))
+
+
+@require_safe
+@require_capability(ORG)
+def membership_revoke_form(request: HttpRequest, membership_id: UUID) -> HttpResponse:
+    """The dialog that confirms revoking a role (its POST is ``revoke_membership``)."""
+    membership = selectors.membership(access_for(request), membership_id)
+    return lazy(request, membership_revoke_dialog(membership, forms.Form()))
 
 
 @mutating(ORG)
 def revoke_membership(request: HttpRequest, membership_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     membership = selectors.membership(ctx, membership_id)
-    try:
-        services.revoke_membership(ctx.principal, membership.pk)
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(request, _("Role revoked."))
-    return _back(membership.user_id)
+    form = forms.Form(request.POST)
+    form.is_valid()  # no fields: a service refusal can then be shown on it
+    return perform(
+        request,
+        lambda: services.revoke_membership(ctx.principal, membership.pk),
+        _("Role revoked."),
+        person_url(membership.user_id),
+        dialog=membership_revoke_dialog(membership, form).dialog(),
+    )
 
 
 @mutating(ORG)
 def membership_validity(request: HttpRequest, membership_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     membership = selectors.membership(ctx, membership_id)
-    form = ValidityForm(request.POST)
+    form = ValidityForm(request.POST, auto_id=VALIDITY_IDS)
+    dialog = membership_validity_dialog(membership, form).dialog()
+    to = person_url(membership.user_id)
     if not form.is_valid():
-        messages.error(request, form_error_text(form))
-        return _back(membership.user_id)
-    try:
-        services.change_membership_validity(
+        return invalid(request, form, to, dialog=dialog)
+    return perform(
+        request,
+        lambda: services.change_membership_validity(
             ctx.principal,
             membership.pk,
             valid_from=form.cleaned_data["valid_from"],
             valid_until=form.cleaned_data["valid_until"],
-        )
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(request, _("Validity saved."))
-    return _back(membership.user_id)
+        ),
+        _("Validity saved."),
+        to,
+        dialog=dialog,
+    )
 
 
 @mutating(ORG)
@@ -290,19 +332,18 @@ def set_employer(request: HttpRequest, user_id: UUID) -> HttpResponse:
 def offboard(request: HttpRequest, user_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     user = account_selectors.person(ctx, user_id)
-    form = ConfirmForm(request.POST)
+    form = ConfirmForm(request.POST, auto_id=OFFBOARD_IDS)
+    dialog = offboard_dialog(user, form).dialog()
+    to = person_url(user.pk)
     if not form.is_valid():
-        messages.error(request, _("Tick the confirmation to offboard this account."))
-        return _back(user.pk)
-    try:
-        account_services.offboard_user(ctx.principal, user.pk)
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(request, _("Account offboarded."))
-    return _back(user.pk)
+        return invalid(request, form, to, dialog=dialog)
+    return perform(
+        request,
+        lambda: account_services.offboard_user(ctx.principal, user.pk),
+        _("Account offboarded."),
+        to,
+        dialog=dialog,
+    )
 
 
 @mutating(ORG)
@@ -333,17 +374,15 @@ def request_email_change(request: HttpRequest, user_id: UUID) -> HttpResponse:
 def revoke_email_change(request: HttpRequest, change_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     change = account_selectors.email_change(ctx, change_id)
-    form = ReasonForm(request.POST)
+    form = ReasonForm(request.POST, auto_id=EMAIL_REVOKE_IDS)
     reason = form.cleaned_data["reason"] if form.is_valid() else ""
-    try:
-        account_services.revoke_email_change(ctx.principal, change.pk, reason=reason)
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(request, _("Email change revoked."))
-    return _back(change.user_id)
+    return perform(
+        request,
+        lambda: account_services.revoke_email_change(ctx.principal, change.pk, reason=reason),
+        _("Email change revoked."),
+        person_url(change.user_id),
+        dialog=revoke_email_change_dialog(change, form).dialog(),
+    )
 
 
 # --- invitations -----------------------------------------------------------------------

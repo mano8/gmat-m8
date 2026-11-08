@@ -719,6 +719,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=_project_url("projects:assign", "hospital"),
             note="an empty form: the detail page with errors",
         ),
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, UNPROCESSABLE),
+            position="htmx",
+            path=_project_url("projects:assign", "hospital"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "projects:revoke_assignment": (
         Route(
@@ -726,12 +733,52 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=_object_url("projects:revoke_assignment", "projectassignment"),
             note="the hospital's site manager; revoked once, then reported",
         ),
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("projects:revoke_assignment", "projectassignment"),
+            headers=HTMX,
+            note="already revoked by the plain row: refused on the dialog's form",
+        ),
     ),
     "projects:assignment_validity": (
         Route(
             project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, REDIRECT),
             path=_object_url("projects:assignment_validity", "projectassignment"),
             note="an empty form: reported, then back to the project",
+        ),
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("projects:assignment_validity", "projectassignment"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
+    "projects:edit_assignment_validity": (
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            path=_object_url("projects:edit_assignment_validity", "projectassignment"),
+        ),
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            position="htmx",
+            path=_object_url("projects:edit_assignment_validity", "projectassignment"),
+            headers=HTMX,
+            note="the page's dialog asks for the same URL with htmx",
+        ),
+    ),
+    "projects:confirm_revoke_assignment": (
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            path=_object_url("projects:confirm_revoke_assignment", "projectassignment"),
+        ),
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            position="htmx",
+            path=_object_url("projects:confirm_revoke_assignment", "projectassignment"),
+            headers=HTMX,
+            note="the page's dialog asks for the same URL with htmx",
         ),
     ),
     # Catalog (M3.1): installation-wide master data. Every valid membership views it (also a
@@ -1658,6 +1705,18 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=_object_url("handovers:void", "handover"),
             note="no reason: back to the handover (it goes with its receipt)",
         ),
+        Route(
+            project_action(
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                UNPROCESSABLE,
+            ),
+            position="from a warehouse, htmx",
+            path=_object_url("handovers:void", "warehousehandover"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
     ),
     "attachments:upload_request": (
         Route(
@@ -1742,22 +1801,78 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # Group administrators only (org.manage); the target is the A-MAD technician.
     "org:people": (Route(org_page()),),
     "org:person": (Route(org_page(), path=_person_url("org:person")),),
-    "org:grant_membership": (Route(org_action(), path=_person_url("org:grant_membership")),),
+    "org:grant_membership": (
+        Route(org_action(), path=_person_url("org:grant_membership")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:grant_membership"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
     "org:set_employer": (Route(org_action(), path=_person_url("org:set_employer")),),
     "org:offboard": (
         Route(org_action(), path=_person_url("org:offboard"), note="unconfirmed: nothing happens"),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:offboard"),
+            headers=HTMX,
+            note="unconfirmed from the dialog: the form again with its errors",
+        ),
     ),
     "org:request_email_change": (
         Route(org_action(), path=_person_url("org:request_email_change")),
     ),
     "org:revoke_membership": (
         Route(org_action(), path=_object_url("org:revoke_membership", "membership")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("org:revoke_membership", "membership"),
+            headers=HTMX,
+            note="already revoked by the plain row: refused on the dialog's form",
+        ),
     ),
     "org:membership_validity": (
         Route(org_action(), path=_object_url("org:membership_validity", "membership")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("org:membership_validity", "membership"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
+    # M8b.4: the lazy dialogs of a role's rows; the page's dialog asks for the same URL with htmx.
+    "org:edit_membership_validity": (
+        Route(org_page(), path=_object_url("org:edit_membership_validity", "membership")),
+        Route(
+            org_page(),
+            position="htmx",
+            path=_object_url("org:edit_membership_validity", "membership"),
+            headers=HTMX,
+        ),
+    ),
+    "org:confirm_revoke_membership": (
+        Route(org_page(), path=_object_url("org:confirm_revoke_membership", "membership")),
+        Route(
+            org_page(),
+            position="htmx",
+            path=_object_url("org:confirm_revoke_membership", "membership"),
+            headers=HTMX,
+        ),
     ),
     "org:revoke_email_change": (
         Route(org_action(), path=_object_url("org:revoke_email_change", "emailchangerequest")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("org:revoke_email_change", "emailchangerequest"),
+            headers=HTMX,
+            note="already revoked by the plain row: refused on the dialog's form",
+        ),
     ),
     "org:invitations": (Route(org_page()),),
     "org:invitation_delivery": (

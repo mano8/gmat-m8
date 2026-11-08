@@ -10,6 +10,7 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -18,11 +19,13 @@ from django.views.decorators.http import require_safe
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
 from apps.access.roles import Capability
-from apps.core.forms import ValidityForm, add_service_errors, error_text, form_error_text
+from apps.core.dialogs import lazy
+from apps.core.forms import ValidityForm, add_service_errors
+from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError
 from apps.core.listing import ListScope, paginate, render_list
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict, idempotency_failure
+from apps.core.responses import conflict, form_again, go, idempotency_failure, invalid, perform
 from apps.projects import selectors, services
 from apps.projects.forms import (
     AssignmentFilterForm,
@@ -31,7 +34,13 @@ from apps.projects.forms import (
     ProjectFilterForm,
     ProjectForm,
 )
-from apps.projects.models import Project
+from apps.projects.models import Project, ProjectAssignment
+from apps.projects.row_dialogs import (
+    assignment_revoke_dialog,
+    assignment_validity_dialog,
+    project_url,
+    share_dialog,
+)
 
 VIEW, MANAGE = Capability.PROJECT_VIEW, Capability.PROJECT_MANAGE
 ASSIGNMENTS_SCOPE = ListScope(prefix="assignments_", anchor="assignments")
@@ -87,8 +96,12 @@ def _detail(
         "manageable": manageable,
         "assignment_filters": filters,
         "assignments": listing,
-        "assignment_form": assignment_form
-        or (AssignmentForm(ctx=ctx, actor_id=ctx.user_id) if manageable else None),
+        "share_dialog": share_dialog(
+            project,
+            assignment_form or AssignmentForm(ctx=ctx, actor_id=ctx.user_id, auto_id=SHARE_IDS),
+        )
+        if manageable
+        else None,
     }
     return render(request, "projects/detail.html", context, status=status)
 
@@ -157,11 +170,15 @@ def project_update(request: HttpRequest, project_id: UUID) -> HttpResponse:
     return render(request, "projects/form.html", {"form": form, "project": project})
 
 
+SHARE_IDS = "id_share_%s"
+VALIDITY_IDS = "id_validity_%s"
+
+
 @mutating(MANAGE)
 def assignment_create(request: HttpRequest, project_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     project = _manageable(request, project_id)
-    form = AssignmentForm(request.POST, ctx=ctx)
+    form = AssignmentForm(request.POST, ctx=ctx, auto_id=SHARE_IDS)
     if form.is_valid():
         data = form.cleaned_data
         try:
@@ -181,46 +198,72 @@ def assignment_create(request: HttpRequest, project_id: UUID) -> HttpResponse:
             return conflict(request)
         else:
             messages.success(request, _("Project shared."))
-            return redirect("projects:detail", project_id=project.pk)
+            return go(request, "projects:detail", project_id=project.pk)
+    if is_htmx(request):
+        return form_again(request, share_dialog(project, form).dialog())
     return _detail(request, project, assignment_form=form)
+
+
+def _assignment(request: HttpRequest, assignment_id: UUID) -> ProjectAssignment:
+    """The assignment, if in scope (404) and its project manageable (403)."""
+    assignment = selectors.assignment(access_for(request), assignment_id)
+    require(request, MANAGE, assignment.project, read=VIEW)
+    return assignment
+
+
+@require_safe
+@require_capability(MANAGE)
+def assignment_validity_form(request: HttpRequest, assignment_id: UUID) -> HttpResponse:
+    """The dialog that changes an assignment's validity (its POST is ``assignment_validity``)."""
+    assignment = _assignment(request, assignment_id)
+    form = ValidityForm(
+        initial={"valid_from": assignment.valid_from, "valid_until": assignment.valid_until},
+        auto_id=VALIDITY_IDS,
+    )
+    return lazy(request, assignment_validity_dialog(assignment, form))
+
+
+@require_safe
+@require_capability(MANAGE)
+def assignment_revoke_form(request: HttpRequest, assignment_id: UUID) -> HttpResponse:
+    """The dialog that confirms revoking an assignment (its POST is ``assignment_revoke``)."""
+    assignment = _assignment(request, assignment_id)
+    return lazy(request, assignment_revoke_dialog(assignment, Form()))
 
 
 @mutating(MANAGE)
 def assignment_revoke(request: HttpRequest, assignment_id: UUID) -> HttpResponse:
     ctx = access_for(request)
-    assignment = selectors.assignment(ctx, assignment_id)
-    require(request, MANAGE, assignment.project, read=VIEW)
-    try:
-        services.revoke_project_assignment(ctx.principal, assignment.pk)
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(request, _("Access to the project revoked."))
-    return redirect("projects:detail", project_id=assignment.project_id)
+    assignment = _assignment(request, assignment_id)
+    form = Form(request.POST)
+    form.is_valid()  # no fields: a service refusal can then be shown on it
+    return perform(
+        request,
+        lambda: services.revoke_project_assignment(ctx.principal, assignment.pk),
+        _("Access to the project revoked."),
+        project_url(assignment.project_id),
+        dialog=assignment_revoke_dialog(assignment, form).dialog(),
+    )
 
 
 @mutating(MANAGE)
 def assignment_validity(request: HttpRequest, assignment_id: UUID) -> HttpResponse:
     ctx = access_for(request)
-    assignment = selectors.assignment(ctx, assignment_id)
-    require(request, MANAGE, assignment.project, read=VIEW)
-    form = ValidityForm(request.POST)
+    assignment = _assignment(request, assignment_id)
+    form = ValidityForm(request.POST, auto_id=VALIDITY_IDS)
+    dialog = assignment_validity_dialog(assignment, form).dialog()
+    to = project_url(assignment.project_id)
     if not form.is_valid():
-        messages.error(request, form_error_text(form))
-    else:
-        try:
-            services.change_assignment_validity(
-                ctx.principal,
-                assignment.pk,
-                valid_from=form.cleaned_data["valid_from"],
-                valid_until=form.cleaned_data["valid_until"],
-            )
-        except ValidationError as exc:
-            messages.error(request, error_text(exc))
-        except RetryExhausted:
-            return conflict(request)
-        else:
-            messages.success(request, _("Validity saved."))
-    return redirect("projects:detail", project_id=assignment.project_id)
+        return invalid(request, form, to, dialog=dialog)
+    return perform(
+        request,
+        lambda: services.change_assignment_validity(
+            ctx.principal,
+            assignment.pk,
+            valid_from=form.cleaned_data["valid_from"],
+            valid_until=form.cleaned_data["valid_until"],
+        ),
+        _("Validity saved."),
+        to,
+        dialog=dialog,
+    )

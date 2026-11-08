@@ -18,6 +18,16 @@ urlpatterns = [
         name="revoke_assignment",
     ),
     path(
+        "assignments/<uuid:assignment_id>/validity/edit/",
+        views.assignment_validity_form,
+        name="edit_assignment_validity",
+    ),
+    path(
+        "assignments/<uuid:assignment_id>/revoke/confirm/",
+        views.assignment_revoke_form,
+        name="confirm_revoke_assignment",
+    ),
+    path(
         "assignments/<uuid:assignment_id>/validity/",
         views.assignment_validity,
         name="assignment_validity",

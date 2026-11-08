@@ -8,7 +8,7 @@
     <div class="page-head-main">
       {% url 'projects:list' as crumb_url %}
       {% include "components/crumbs.html" with parent_label=_("Projects") parent_url=crumb_url current=project.code %}
-      <h1>{{ project.code }} · {{ project.name }}</h1>
+      <h1><span class="doc-no">{{ project.code }}</span> · {{ project.name }}</h1>
       <p class="mt-1">{% include "projects/status.html" %}</p>
     </div>
     <div class="page-head-actions">
@@ -34,34 +34,34 @@
       </div>
     </div>
   </header>
-  <section class="card mb-4">
-    <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+  <section class="@container card mb-4" aria-label="{% translate 'Project details' %}">
+    <dl class="facts">
       <div>
-        <dt class="text-sm text-soft">{% translate "Client" %}</dt>
+        <dt>{% translate "Client" %}</dt>
         <dd>
           {{ project.client_name|default:"—" }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Address" %}</dt>
+        <dt>{% translate "Address" %}</dt>
         <dd>
           {{ project.address|default:"—"|linebreaksbr }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Branch" %}</dt>
+        <dt>{% translate "Branch" %}</dt>
         <dd>
           {{ project.branch }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Procurement branch" %}</dt>
+        <dt>{% translate "Procurement branch" %}</dt>
         <dd>
           {{ project.procurement_branch }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Dates" %}</dt>
+        <dt>{% translate "Dates" %}</dt>
         <dd>
           {{ project.start_date|date:"SHORT_DATE_FORMAT"|default:"—" }} – {{ project.end_date|date:"SHORT_DATE_FORMAT"|default:"—" }}
         </dd>
@@ -93,39 +93,25 @@
                   {% if assignment.revoked_at %}
                     {% include "components/status_chip.html" with label=_("Revoked") tone="danger" %}
                   {% else %}
-                    <form method="post"
-                          action="{% url 'projects:revoke_assignment' assignment_id=assignment.pk %}">
-                      {% csrf_token %}
-                      {% include "components/button.html" with type="submit" label=_("Revoke") variant="danger" %}
-                    </form>
+                    <div class="flex flex-wrap gap-2">
+                      {% url 'projects:edit_assignment_validity' assignment_id=assignment.pk as validity_url %}
+                      {# Lazy dialogs (M8b.4): htmx loads the form into the page's dialog; the link opens its own page without JavaScript. #}
+                      <a class="btn btn-secondary"
+                         href="{{ validity_url }}"
+                         hx-get="{{ validity_url }}"
+                         hx-target="#validity-dialog-content"
+                         data-dialog-open="validity-dialog"
+                         data-testid="validity-open">{% translate "Change validity" %}</a>
+                      {% url 'projects:confirm_revoke_assignment' assignment_id=assignment.pk as revoke_url %}
+                      <a class="btn btn-danger"
+                         href="{{ revoke_url }}"
+                         hx-get="{{ revoke_url }}"
+                         hx-target="#revoke-dialog-content"
+                         data-dialog-open="revoke-dialog"
+                         data-testid="revoke-open">{% translate "Revoke" %}</a>
+                    </div>
                   {% endif %}
                 </div>
-                {% if not assignment.revoked_at %}
-                  <details class="mt-2">
-                    <summary class="inline-flex min-h-11 cursor-pointer items-center text-brand">{% translate "Change validity" %}</summary>
-                    <form method="post"
-                          class="mt-2 grid gap-x-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
-                          action="{% url 'projects:assignment_validity' assignment_id=assignment.pk %}">
-                      {% csrf_token %}
-                      <div class="field">
-                        <label for="from-{{ assignment.pk }}">{% translate "Valid from" %}</label>
-                        <input id="from-{{ assignment.pk }}"
-                               type="datetime-local"
-                               name="valid_from"
-                               required
-                               value="{{ assignment.valid_from|date:'Y-m-d\TH:i' }}">
-                      </div>
-                      <div class="field">
-                        <label for="until-{{ assignment.pk }}">{% translate "Valid until" %}</label>
-                        <input id="until-{{ assignment.pk }}"
-                               type="datetime-local"
-                               name="valid_until"
-                               value="{{ assignment.valid_until|date:'Y-m-d\TH:i' }}">
-                      </div>
-                      <div class="field">{% include "components/button.html" with type="submit" label=_("Save") %}</div>
-                    </form>
-                  </details>
-                {% endif %}
               </li>
             {% endfor %}
           </ul>
@@ -141,16 +127,14 @@
           </p>
         {% endif %}
       </div>
-      {% if assignment_form %}
-        <h3 class="mb-2 font-semibold">{% translate "Share the project" %}</h3>
-        <form method="post"
-              class="max-w-xl"
-              action="{% url 'projects:assign' project_id=project.pk %}">
-          {% csrf_token %}
-          {{ assignment_form }}
-          {% include "components/button.html" with type="submit" label=_("Share") variant="primary" %}
-        </form>
+      {% if share_dialog %}
+        <p>{% include "components/dialog_button.html" with dialog="share-dialog" label=_("Share the project") variant="primary" icon="users" testid="share-open" %}</p>
       {% endif %}
     </section>
+  {% endif %}
+  {% if share_dialog %}
+    {% include "components/action_dialog.html" with d=share_dialog %}
+    {% include "components/dialog.html" with id="validity-dialog" title=_("Change validity") testid="validity-dialog" %}
+    {% include "components/dialog.html" with id="revoke-dialog" title=_("Revoke access to the project") tone="danger" testid="revoke-dialog" %}
   {% endif %}
 {% endblock content %}

@@ -36,7 +36,11 @@
     {% for field in d.form.visible_fields %}{{ field.as_field_group }}{% endfor %}
   </div>
   <fieldset class="dialog-foot" data-dialog-actions>
-    {% include "components/dialog_cancel.html" with dialog_id=d.id label=d.cancel focus=d.tone %}
+    {% if d.modal %}
+      {% include "components/dialog_cancel.html" with dialog_id=d.id label=d.cancel focus=d.tone %}
+    {% else %}
+      {% include "components/dialog_cancel.html" with back_url=d.back label=d.cancel %}
+    {% endif %}
     <button type="submit"
             class="btn {% if d.tone == 'danger' %}btn-danger{% else %}btn-primary{% endif %}"
             {% if d.submit_testid %}data-testid="{{ d.submit_testid }}"{% endif %}>{{ d.submit }}</button>

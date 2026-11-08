@@ -175,7 +175,10 @@ class EmailChangeForm(forms.Form):
 class ConfirmForm(forms.Form):
     """An irreversible action: the administrator ticks the box."""
 
-    confirm = forms.BooleanField(label=_("I understand this cannot be undone."))
+    confirm = forms.BooleanField(
+        label=_("I understand this cannot be undone."),
+        error_messages={"required": _("Tick the confirmation to offboard this account.")},
+    )
 
 
 class ReasonForm(forms.Form):

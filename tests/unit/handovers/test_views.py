@@ -430,6 +430,19 @@ class TestVoid:
         assert stock.status == "POSTED"
         assert any("Give a reason" in message for message in messages_of(response))
 
+    def test_the_void_dialog_states_what_it_does_and_comes_back_with_its_errors(
+        self, org: Org, people: People, make_line: MakeLine, hand_over: HandOver
+    ) -> None:
+        stock = hand_over((make_line("10", sourcing="STOCK"), "4"))
+        client = client_for(people.mm_mad)
+        html = page(client, "detail", stock.pk)
+        assert 'id="void-dialog"' in html and "The requests it served reopen." in html
+        target = reverse("handovers:void", args=[stock.pk])
+        again = client.post(target, {"reason": " "}, headers={"HX-Request": "true"})
+        assert again.status_code == 422 and 'data-testid="void-form"' in again.content.decode()
+        done = client.post(target, {"reason": "Wrong project"}, headers={"HX-Request": "true"})
+        assert done.status_code == 204 and done["HX-Redirect"].endswith(f"/{stock.pk}/")
+
     def test_a_site_handover_is_refused_with_the_services_message(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy, receive: Receive
     ) -> None:
