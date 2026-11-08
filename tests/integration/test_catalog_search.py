@@ -20,7 +20,7 @@ from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure, fold
 from apps.core.ids import new_id
 from tests.support import PASSWORD, grant
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db]
 
 SIZE = 20_000
 LIMIT_SECONDS = 0.1

@@ -24,6 +24,7 @@ dev = [
   "pytest>=8.3",
   "pytest-django>=4.9",
   "pytest-cov>=6.0",
+  "pytest-xdist>=3.6",
   "factory-boy>=3.3",
   "hypothesis>=6.120",
   "ruff>=0.14",
@@ -107,6 +108,7 @@ markers = [
   "live: against the running compose stack",
   "e2e: Playwright against the compose stack",
   "rehearsal: deploy and recovery against real containers (plan M8.4; REHEARSAL_REQUIRED=1)",
+  "serial: depends on wall-clock time (thread head starts, sleeps, time budgets); runs alone, never under pytest-xdist",
 ]
 
 # --- coverage -----------------------------------------------------------

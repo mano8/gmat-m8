@@ -104,6 +104,7 @@ class TestPanel:
         assert org.supplier.name not in html
 
 
+@pytest.mark.serial  # a wall-clock budget: never under pytest-xdist
 def test_every_panel_answers_within_budget_with_the_demo_data(group_admin: User) -> None:
     call_command("seed_demo", "--operator", group_admin.email, stdout=StringIO())
     enroll_totp(group_admin)

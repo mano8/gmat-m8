@@ -10,7 +10,7 @@ from apps.core.models import DocumentSequence
 from apps.core.sequences import next_number
 from tests.integration.conftest import run_concurrently
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 WORKERS = 8
 PER_WORKER = 5

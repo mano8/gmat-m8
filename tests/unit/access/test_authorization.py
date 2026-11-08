@@ -102,7 +102,9 @@ class TestSessionPrincipal:
                 authorize(principal_for(operator), capability)
 
     @pytest.mark.parametrize(
-        "change", [{"is_active": False}, {"offboarded_at": timezone.now()}], ids=str
+        "change",
+        [{"is_active": False}, {"offboarded_at": timezone.now()}],
+        ids=["inactive", "offboarded"],
     )
     def test_inactive_or_offboarded_users_are_refused(
         self, member: Member, change: dict[str, Any]

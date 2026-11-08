@@ -54,7 +54,7 @@ from tests.outbox import make_dispatch, start_worker
 from tests.smtp import Behaviour, fake_smtp
 from tests.support import principal_for
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 HOLD = 0.5  # seconds the first transaction keeps the order locked
 HEAD_START = 0.2  # seconds before the second one starts

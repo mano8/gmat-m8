@@ -14,7 +14,7 @@ from apps.accounts.adapters import AccountAdapter, PasswordResetTokenInvalid
 from apps.accounts.models import User
 from tests.integration.conftest import run_concurrently
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 PASSWORDS = ["first-new-password-1", "second-new-password-2"]
 

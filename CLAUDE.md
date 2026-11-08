@@ -97,6 +97,7 @@ python scripts/release_tools.py notes --version X.Y.Z   # CHANGELOG section a re
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest            # needs PostgreSQL 18; DB_* env, defaults in config/settings/test.py
 uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
+uv run pytest -n auto -m "not serial" --cov --cov-report= --cov-fail-under=0 && uv run pytest -m serial --cov --cov-append --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py   # the same in two passes, as CI does: all but `serial` across the cores (pytest-xdist), then `serial` alone; compile the catalogs first (`manage.py compilemessages`)
 uv run python scripts/check_migrations_reversible.py   # scratch database only: migrates to zero and back
 LEDGER_MACHINE_EXAMPLES=300 LEDGER_MACHINE_STEPS=50 uv run pytest tests/integration/test_ledger_machine.py   # M8.1: a deeper run of the ledger state machine (CI: 20 examples of up to 30 steps, derandomized)
 uv sync --group e2e && uv run playwright install --with-deps chromium     # once: the browser layer's dependencies (optional group)
@@ -128,7 +129,8 @@ docker build -f docker/app/Dockerfile --target runtime -t gmat-m8:local .   # im
 
 ## Testing
 
-- PostgreSQL only, never SQLite. Markers: default, `integration`, `live`, `e2e`, `rehearsal`; `--strict-markers`.
+- PostgreSQL only, never SQLite. Markers: default, `integration`, `live`, `e2e`, `rehearsal`, `serial`; `--strict-markers`.
+- CI runs the suite under pytest-xdist, each worker on its own test database, then the `serial` tests alone. A test that depends on wall-clock time (a thread's head start, a sleep while another holds locks, a time budget) is marked `serial`: the whole module in `tests/integration`, the test elsewhere; `tests/unit/test_serial_marker.py` finds the unmarked ones. Nothing else may assume it runs alone: no fixed port, path or global resource shared between workers. Test ids are the same in every process: a parametrized value made at import time (`timezone.now()`, `uuid7()`) gets explicit `ids=`, or the workers collect different tests and the run stops.
 - Coverage ≥ 90 % overall; 100 % for `apps/access`, every `services.py` and `selectors.py` (or such a package). CI sends `coverage.xml` to Codecov and Codacy after a green `test`; `source_pkgs` keeps its paths relative to the repository's root.
 - Each service: allowed, denied and revoked roles, invariants, integrity rules, transitions; concurrency-sensitive ones add a threaded test in `tests/integration/`.
 - A service that changes a ledger input (plan §4.5) becomes an operation of the state machine (`tests/integration/test_ledger_machine.py`, also in its tour); a new invariant or integrity rule gets a check in `tests/invariants.py` and a case in `test_invariant_checker.py` showing the check notices it broken.

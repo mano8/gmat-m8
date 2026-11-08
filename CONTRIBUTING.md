@@ -58,11 +58,15 @@ uv run python scripts/check_security_floors.py
 uv run python scripts/check_trivyignore.py
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
+# or faster, as CI runs it: the tests across your cores, then the time-sensitive ones alone
+uv run python manage.py compilemessages
+uv run pytest -n auto -m "not serial" --cov --cov-report= --cov-fail-under=0 && uv run pytest -m serial --cov --cov-append --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
 ```
 
 ## Tests
 
 - PostgreSQL only; markers `integration`, `live` and `e2e` are strict.
+- A test that depends on wall-clock time (a thread started after a delay, a sleep while another holds a lock, a time budget) is marked `serial`: CI runs every other test in parallel and those alone afterwards.
 - Coverage stays at 90 % or more overall and at 100 % for `apps/access`, every `services` module and every `selectors` module. After a green `test`, CI sends the report to Codecov and Codacy; a pull request from a fork has no token for either and skips them, and it still passes.
 - A function stays at a cyclomatic complexity of 10 or less with at most 8 parameters, and a file under 500 lines of code (Codacy's limits; `lizard` prints them).
 - A service needs tests for the allowed, denied and revoked roles, its invariants and its state transitions; a concurrency-sensitive one adds a threaded test in `tests/integration/`.

@@ -25,7 +25,7 @@ from tests.integration.conftest import run_concurrently
 from tests.support import grant
 from tests.tokens import last_token
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 PASSWORDS = ["first-password-1234", "second-password-1234"]
 HOLD = 0.4  # seconds the first transaction keeps its locks

@@ -36,7 +36,7 @@ from tests.org import Org, People
 from tests.support import error_codes, principal_for
 from tests.unit.attachments.conftest import png
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 State = AttachmentReservation.State
 PDF = b"%PDF-1.4\n" + b"%" * 990 + b"\n%%EOF\n"  # 1000 bytes, stored as they are

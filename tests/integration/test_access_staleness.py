@@ -44,7 +44,7 @@ from apps.projects.services import assign_to_project, update_project
 from tests.integration.conftest import run_concurrently
 from tests.support import authz_generation, grant, principal_for
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 # Without the membership the project is out of the user's scope: the write answers 404
 # (``NotInScope``, S7) rather than 403. Either way it is refused.
