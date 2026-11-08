@@ -135,11 +135,15 @@ def order_from_worklist(
 
 
 def issue_order(page: Page, unit_price: str = "1.25") -> None:
-    for editor in page.locator("main details", has_text="Edit the line").all():
-        editor.locator("summary").click()
-        editor.locator("input[name=unit_price]").fill(unit_price)
-        editor.get_by_role("button").first.click()
+    # Each line's price is entered in its own dialog; saving navigates, so the openers are
+    # found again by position.
+    for index in range(page.get_by_test_id("line-edit-open").count()):
+        page.get_by_test_id("line-edit-open").nth(index).click()
+        dialog = page.locator("dialog[open]")
+        dialog.locator("input[name=unit_price]").fill(unit_price)
+        dialog.get_by_test_id("line-save").click()
         page.wait_for_load_state()
+        expect(page.locator("dialog[open]")).to_have_count(0)
     page.locator("[data-testid=issue-form] input[name=confirm]").check()
     page.locator("[data-testid=issue-form] button[type=submit]").click()
     expect(page.locator("main")).to_contain_text("Issued")

@@ -1341,9 +1341,24 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     ),
     "purchasing:update": (
         Route(order_action(), path=purchase_url("purchasing:update", "draftorder")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:update", "draftorder"),
+            headers=HTMX,
+            allowed=SUPPLIER_SENTINELS,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:add_lines": (
         Route(order_action(), path=purchase_url("purchasing:add_lines", "draftorder")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:add_lines", "draftorder"),
+            headers=HTMX,
+            note="nothing ticked from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:issue": (
         Route(
@@ -1370,6 +1385,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     ),
     "purchasing:update_line": (
         Route(order_action(), path=purchase_url("purchasing:update_line", "draftline")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:update_line", "draftline"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:remove_line": (
         Route(
@@ -1377,20 +1399,48 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=purchase_url("purchasing:remove_line", "purchaseorderline"),
             note="an issued line: refused, nothing is removed",
         ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:remove_line", "purchaseorderline"),
+            headers=HTMX,
+            note="an issued line: refused on the dialog's form, nothing is removed",
+        ),
     ),
     "purchasing:close_line": (
         Route(order_action(), path=purchase_url("purchasing:close_line", "purchaseorderline")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:close_line", "purchaseorderline"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:increase_allocation": (
         Route(
             order_action(),
             path=purchase_url("purchasing:increase_allocation", "draftallocation"),
         ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:increase_allocation", "draftallocation"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:unallocate": (
         Route(
             order_action(),
             path=purchase_url("purchasing:unallocate", "draftallocation"),
+        ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:unallocate", "draftallocation"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
         ),
     ),
     # M5.3: the issued order's dispatch, left AMBIGUOUS by the worker.

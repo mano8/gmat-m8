@@ -10,6 +10,7 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.translation import gettext as _
@@ -20,10 +21,9 @@ from apps.access.mixins import mutating
 from apps.core.forms import add_service_errors, error_text
 from apps.core.idempotency import IdempotencyError
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict, idempotency_failure
+from apps.core.responses import Dialog, conflict, idempotency_failure
 from apps.purchasing import selectors, services
 from apps.purchasing.forms import (
-    AllocationQuantityForm,
     DispatchNoteForm,
     DraftHeaderForm,
     IssueForm,
@@ -45,7 +45,24 @@ from apps.purchasing.views.common import (
     _on_order,
     _perform,
 )
+from apps.purchasing.views.order_dialogs import (
+    allocation_form,
+    cancel_dialog,
+    confirm_dialog,
+    discard_dialog,
+    fresh,
+    header_dialog,
+    line_close_dialog,
+    line_edit_dialog,
+    line_remove_dialog,
+    lower_dialog,
+    raise_dialog,
+    resend_dialog,
+)
 from apps.purchasing.views.pages import _uuids, amend_form_for, amend_page, new_order_page
+
+# The add-lines dialog's form (M8b.4): shown again alone, with its errors, to an htmx POST.
+ADD_LINES_FORM = "purchasing/detail.html#add_lines_form"
 
 # --- a new order ----------------------------------------------------------------------------
 
@@ -122,13 +139,15 @@ def order_update(request: HttpRequest, po_id: UUID) -> HttpResponse:
     found = _on_order(request, po_id)
     to = _detail_url(found)
     form = DraftHeaderForm(request.POST, ctx=ctx, order=found)
+    dialog = header_dialog(found, form).dialog()
     if not form.is_valid():
-        return _invalid(request, form, to)
+        return _invalid(request, form, to, dialog=dialog)
     return _perform(
         request,
         lambda: services.update_order(ctx.principal, found.pk, **form.changes()),
         _("Draft saved."),
         to,
+        dialog=dialog,
     )
 
 
@@ -139,8 +158,9 @@ def lines_add(request: HttpRequest, po_id: UUID) -> HttpResponse:
     found = _on_order(request, po_id)
     to = _detail_url(found)
     form = ItemsForm(request.POST, rows=selectors.candidates(ctx, found))
+    dialog = Dialog(form, ADD_LINES_FORM, lambda bound: {"order": found, "items_form": bound})
     if not form.is_valid():
-        return _invalid(request, form, to)
+        return _invalid(request, form, to, dialog=dialog)
     return _perform(
         request,
         lambda: services.add_request_lines(
@@ -151,6 +171,7 @@ def lines_add(request: HttpRequest, po_id: UUID) -> HttpResponse:
         ),
         _("Request lines added."),
         to,
+        dialog=dialog,
     )
 
 
@@ -159,14 +180,20 @@ def line_update(request: HttpRequest, line_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     line = _on_line(request, line_id)
     to = _detail_url(line)
-    form = LineForm(request.POST, prices=selectors.shows_prices(ctx, line.po))
+    form = LineForm(
+        request.POST,
+        prices=selectors.shows_prices(ctx, line.po),
+        auto_id=fresh("line", line.line_no),
+    )
+    dialog = line_edit_dialog(line, form).dialog()
     if not form.is_valid():
-        return _invalid(request, form, to)
+        return _invalid(request, form, to, dialog=dialog)
     return _perform(
         request,
         lambda: services.update_line(ctx.principal, line.pk, **form.service_kwargs()),
         _("Line %(line)s saved.") % {"line": line.line_no},
         to,
+        dialog=dialog,
     )
 
 
@@ -174,11 +201,14 @@ def line_update(request: HttpRequest, line_id: UUID) -> HttpResponse:
 def line_remove(request: HttpRequest, line_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     line = _on_line(request, line_id)
+    form = Form(request.POST, auto_id=fresh("remove", line.line_no))
+    form.is_valid()  # no fields: valid, and a service refusal can then be shown on it
     return _perform(
         request,
         lambda: services.remove_line(ctx.principal, line.pk),
         _("Line %(line)s removed.") % {"line": line.line_no},
         _detail_url(line),
+        dialog=line_remove_dialog(line, form).dialog(),
     )
 
 
@@ -188,9 +218,11 @@ def _allocation_action(
     ctx = access_for(request)
     allocation = _on_allocation(request, allocation_id)
     to = _detail_url(allocation)
-    form = AllocationQuantityForm(request.POST)
+    form = allocation_form(allocation, raising=raise_it, data=request.POST)
+    make = raise_dialog if raise_it else lower_dialog
+    dialog = make(allocation, form).dialog()
     if not form.is_valid():
-        return _invalid(request, form, to)
+        return _invalid(request, form, to, dialog=dialog)
     qty = form.cleaned_data["qty"]
     if raise_it:
         return _perform(
@@ -198,12 +230,14 @@ def _allocation_action(
             lambda: services.increase_allocation(ctx.principal, allocation.pk, qty=qty),
             _("Allocation raised."),
             to,
+            dialog=dialog,
         )
     return _perform(
         request,
         lambda: services.unallocate(ctx.principal, allocation.pk, qty=qty),
         _("Allocation lowered."),
         to,
+        dialog=dialog,
     )
 
 
@@ -246,14 +280,16 @@ def order_cancel(request: HttpRequest, po_id: UUID) -> HttpResponse:
     """Discard a draft or cancel an issued order that has no receipt (a reason is required)."""
     ctx = access_for(request)
     found = _on_order(request, po_id)
-    form = ReasonForm(request.POST)
-    reason = form.cleaned_data["reason"] if form.is_valid() else ""
     issued = found.status == Status.ISSUED
+    form = ReasonForm(request.POST, auto_id=fresh("cancel" if issued else "discard", 0))
+    reason = form.cleaned_data["reason"] if form.is_valid() else ""
+    make = cancel_dialog if issued else discard_dialog
     return _perform(
         request,
         lambda: services.cancel(ctx.principal, found.pk, reason=reason),
         _("Order cancelled.") if issued else _("Draft discarded."),
         _detail_url(found),
+        dialog=make(found, form).dialog(),
     )
 
 
@@ -265,9 +301,10 @@ def line_close_short(request: HttpRequest, line_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     line = _on_line(request, line_id)
     to = _detail_url(line)
-    form = RequiredReasonForm(request.POST)
+    form = RequiredReasonForm(request.POST, auto_id=fresh("close", line.line_no))
+    dialog = line_close_dialog(line, form).dialog()
     if not form.is_valid():
-        return _invalid(request, form, to)
+        return _invalid(request, form, to, dialog=dialog)
     return _perform(
         request,
         lambda: services.close_line_short(
@@ -275,6 +312,7 @@ def line_close_short(request: HttpRequest, line_id: UUID) -> HttpResponse:
         ),
         _("Line %(line)s closed short.") % {"line": line.line_no},
         to,
+        dialog=dialog,
     )
 
 
@@ -322,13 +360,14 @@ def dispatch_confirm(request: HttpRequest, dispatch_id: UUID) -> HttpResponse:
     """The supplier has a dispatch whose delivery was uncertain."""
     ctx = access_for(request)
     found = _on_dispatch(request, dispatch_id)
-    form = DispatchNoteForm(request.POST)
+    form = DispatchNoteForm(request.POST, auto_id=fresh("confirm", found.pk))
     note = form.cleaned_data["note"] if form.is_valid() else ""
     return _perform(
         request,
         lambda: services.confirm_dispatch(ctx.principal, found.pk, note=note),
         _("Delivery to the supplier confirmed."),
         _detail_url(found),
+        dialog=confirm_dialog(found, form).dialog(),
     )
 
 
@@ -337,11 +376,12 @@ def dispatch_resend(request: HttpRequest, dispatch_id: UUID) -> HttpResponse:
     """Send a failed or uncertain dispatch again: the worker makes a new attempt."""
     ctx = access_for(request)
     found = _on_dispatch(request, dispatch_id)
-    form = DispatchNoteForm(request.POST)
+    form = DispatchNoteForm(request.POST, auto_id=fresh("resend", found.pk))
     note = form.cleaned_data["note"] if form.is_valid() else ""
     return _perform(
         request,
         lambda: services.resend_dispatch(ctx.principal, found.pk, note=note),
         _("The dispatch is queued to be sent again."),
         _detail_url(found),
+        dialog=resend_dialog(found, form).dialog(),
     )

@@ -50,9 +50,7 @@ class TestThePageDrawsTheDialogs:
         assert 'data-testid="return-form"' in page and 'data-testid="consequences"' in page
         # A destructive dialog opens with Cancel focused; the page has no <details> holding a form.
         assert re.search(r"autofocus[^>]*data-testid=\"dialog-cancel\"", page)
-        assert (
-            "<details" not in page.split("</header>", 1)[1].split('data-testid="review-lines"')[0]
-        )
+        assert "<details" not in page.split("<main", 1)[1].split("</main>", 1)[0]
 
     def test_an_approved_request_offers_close_and_cancel_to_the_material_manager(
         self, make_request: MakeRequest, people: People

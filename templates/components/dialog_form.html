@@ -18,6 +18,11 @@
     {% csrf_token %}
     {% for hidden in d.form.hidden_fields %}{{ hidden }}{% endfor %}
     {% if d.note %}<p class="text-sm text-soft">{{ d.note }}</p>{% endif %}
+    {% if d.warning %}
+      <p class="rounded-lg border border-warn bg-warn-soft p-3 text-sm"
+         role="note"
+         {% if d.warning_testid %}data-testid="{{ d.warning_testid }}"{% endif %}>{{ d.warning }}</p>
+    {% endif %}
     {% if d.consequences %}
       <ul class="consequences" data-testid="consequences">
         {% for text in d.consequences %}

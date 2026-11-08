@@ -60,17 +60,14 @@ def return_dialog(found: MaterialRequest, form: Form) -> ActionDialog:
 
 
 def close_dialog(found: MaterialRequest, form: Form, *, worksite_warning: bool) -> ActionDialog:
-    consequences = [
-        _("Every line still open is closed short."),
-        _("Reopening the request restores them."),
-    ]
-    if worksite_warning:
-        consequences.append(
-            _(
-                "An order still on its way ships to this request's own worksite: goods may "
-                "still arrive on site after the close, and will be recorded as site surplus."
-            )
+    warning = (
+        _(
+            "An order still on its way ships to this request's own worksite: goods may "
+            "still arrive on site after the close, and will be recorded as site surplus."
         )
+        if worksite_warning
+        else ""
+    )
     return ActionDialog(
         id="close-dialog",
         title=_("Close the request"),
@@ -79,7 +76,12 @@ def close_dialog(found: MaterialRequest, form: Form, *, worksite_warning: bool) 
         action=reverse("requests:close", args=[found.pk]),
         submit=_("Close request"),
         form=form,
-        consequences=tuple(consequences),
+        consequences=(
+            _("Every line still open is closed short."),
+            _("Reopening the request restores them."),
+        ),
+        warning=warning,
+        warning_testid="worksite-warning",
         cancel=_("Keep it open"),
         testid="close-form",
         submit_testid="close-submit",

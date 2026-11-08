@@ -15,6 +15,7 @@ from uuid import UUID
 
 from django.conf import settings
 from django.contrib import messages
+from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
@@ -22,11 +23,11 @@ from django.views.decorators.http import require_safe
 
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
+from apps.core.dialogs import ActionDialog
 from apps.core.listing import cursor_page, paginate, render_list
 from apps.purchasing import selectors
 from apps.purchasing.forms import (
     AllocationEntry,
-    AllocationQuantityForm,
     AmendForm,
     DispatchNoteForm,
     DraftHeaderForm,
@@ -40,9 +41,23 @@ from apps.purchasing.forms import (
     RequiredReasonForm,
     WorklistFilterForm,
 )
-from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
+from apps.purchasing.models import PurchaseOrder
 from apps.purchasing.selectors import MANAGE, VIEW, AllocationRow, LineRow
 from apps.purchasing.views.common import Status, _detail_url, _on_order
+from apps.purchasing.views.order_dialogs import (
+    allocation_form,
+    cancel_dialog,
+    confirm_dialog,
+    discard_dialog,
+    fresh,
+    header_dialog,
+    line_close_dialog,
+    line_edit_dialog,
+    line_remove_dialog,
+    lower_dialog,
+    raise_dialog,
+    resend_dialog,
+)
 
 
 def _uuids(values: list[str]) -> list[UUID]:
@@ -54,11 +69,6 @@ def _uuids(values: list[str]) -> list[UUID]:
         except ValueError:
             continue
     return found
-
-
-def _fresh(prefix: str, number: int | str) -> str:
-    """An ``auto_id`` that stays unique when a page holds one form per line."""
-    return f"id_%s_{prefix}{number}"
 
 
 # --- the worklist ---------------------------------------------------------------------------
@@ -203,31 +213,29 @@ def order_list(request: HttpRequest) -> HttpResponse:
 @dataclass
 class AllocationView:
     row: AllocationRow
-    raise_form: AllocationQuantityForm | None = None
-    lower_form: AllocationQuantityForm | None = None
+    raise_it: ActionDialog | None = None  # the dialogs that raise or lower a draft allocation
+    lower: ActionDialog | None = None
 
 
 @dataclass
 class LineView:
     row: LineRow
     allocations: list[AllocationView]
-    form: LineForm | None = None  # a draft's quantity and price
-    close_form: RequiredReasonForm | None = None  # an issued line still receivable
+    edit: ActionDialog | None = None  # a draft's quantity and price
+    remove: ActionDialog | None = None  # a draft line
+    close: ActionDialog | None = None  # an issued line still receivable
 
 
-def _allocation_views(
-    line: PurchaseOrderLine, entries: list[AllocationRow], editable: bool
-) -> list[AllocationView]:
+def _allocation_views(entries: list[AllocationRow], editable: bool) -> list[AllocationView]:
     """A line's allocations; on a draft its manager raises or lowers each one."""
     views = []
-    for number, entry in enumerate(entries, start=1):
+    for entry in entries:
         view = AllocationView(entry)
         if editable:
-            tag = f"{line.line_no}_{number}"
-            view.raise_form = AllocationQuantityForm(
-                auto_id=_fresh("r", tag), initial={"qty": entry.allocation.qty}
-            )
-            view.lower_form = AllocationQuantityForm(auto_id=_fresh("l", tag))
+            allocation = entry.allocation
+            raising = allocation_form(allocation, raising=True, initial={"qty": allocation.qty})
+            view.raise_it = raise_dialog(allocation, raising)
+            view.lower = lower_dialog(allocation, allocation_form(allocation, raising=False))
         views.append(view)
     return views
 
@@ -237,15 +245,18 @@ def _line_view(
 ) -> LineView:
     """A line with its tools for a manager: ``status`` is the order's (``None``: no tools)."""
     line = row.line
-    view = LineView(row, _allocation_views(line, allocations, status == Status.DRAFT))
+    view = LineView(row, _allocation_views(allocations, status == Status.DRAFT))
     if status == Status.DRAFT:
-        view.form = LineForm(
+        edit = LineForm(
             initial=LineForm.initial_for(line, prices=prices),
             prices=prices,
-            auto_id=_fresh("line", line.line_no),
+            auto_id=fresh("line", line.line_no),
         )
+        view.edit = line_edit_dialog(line, edit)
+        view.remove = line_remove_dialog(line, Form(auto_id=fresh("remove", line.line_no)))
     elif status == Status.ISSUED and line.closed_short_at is None:
-        view.close_form = RequiredReasonForm(auto_id=_fresh("close", line.line_no))
+        close = RequiredReasonForm(auto_id=fresh("close", line.line_no))
+        view.close = line_close_dialog(line, close)
     return view
 
 
@@ -286,40 +297,50 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
     }
     if managing:
         context |= _manager_tools(ctx, found)
+        context["menu_items"] = [
+            context[key].menu_item()
+            for key in ("header_dialog", "discard_dialog", "cancel_dialog")
+            if key in context
+        ]
     context |= _dispatch_panel(ctx, found)
     return render(request, "purchasing/detail.html", context)
 
 
 def _manager_tools(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
-    """The forms of the order page for who manages the order, by its state."""
+    """The forms and dialogs of the order page for who manages the order, by its state."""
     if found.status == Status.DRAFT:
         rows = selectors.candidates(ctx, found)
+        header = DraftHeaderForm(initial=DraftHeaderForm.initial_for(found), ctx=ctx, order=found)
         return {
-            "header_form": DraftHeaderForm(
-                initial=DraftHeaderForm.initial_for(found), ctx=ctx, order=found
-            ),
+            "header_dialog": header_dialog(found, header),
             "items_form": ItemsForm(actor_id=ctx.user_id, rows=rows, picked=set()),
             "no_candidates": None if rows else selectors.no_candidates(ctx, found),
             "issue_form": IssueForm(actor_id=ctx.user_id),
-            "discard_form": ReasonForm(auto_id=_fresh("discard", 0)),
+            "discard_dialog": discard_dialog(found, ReasonForm(auto_id=fresh("discard", 0))),
         }
     if found.status == Status.ISSUED:
-        return {"cancel_form": RequiredReasonForm(auto_id=_fresh("cancel", 0))}
+        form = RequiredReasonForm(auto_id=fresh("cancel", 0))
+        return {"cancel_dialog": cancel_dialog(found, form)}
     return {}
 
 
 def _dispatch_panel(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
-    """The order's supplier dispatches, each with its note form (M5.3)."""
+    """The order's supplier dispatches, each with its dialogs for the decision (M5.3)."""
     dispatches = selectors.dispatches(ctx, found)
     return {
-        "dispatches": [
-            (row, DispatchNoteForm(auto_id=_fresh("dispatch", index)))
-            for index, row in enumerate(dispatches)
-        ],
+        "dispatches": [_dispatch_row(row) for row in dispatches],
         "dispatch_on": settings.PO_DISPATCH,
         "awaiting_decision": selectors.awaiting_decision(dispatches),
         "notice_awaited": selectors.notice_awaited(found, dispatches),
     }
+
+
+def _dispatch_row(row: Any) -> tuple[Any, ActionDialog, ActionDialog]:
+    """A dispatch with the dialogs that send it again and confirm it (each a note)."""
+    dispatch = row.dispatch
+    again = resend_dialog(dispatch, DispatchNoteForm(auto_id=fresh("resend", dispatch.pk)))
+    confirm = confirm_dialog(dispatch, DispatchNoteForm(auto_id=fresh("confirm", dispatch.pk)))
+    return row, again, confirm
 
 
 # --- the amendment form ---------------------------------------------------------------------------

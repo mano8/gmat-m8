@@ -50,6 +50,16 @@ class HistoryEntry:
     label: Any
     detail: str
 
+    @property
+    def when(self) -> datetime:
+        """The time, as the ``timeline`` component names it."""
+        return self.occurred_at
+
+    @property
+    def title(self) -> str:
+        """What happened (the ``timeline`` component's headline)."""
+        return str(self.label)
+
 
 ACTION_LABELS = {
     "purchase_order.created": _("Draft created"),

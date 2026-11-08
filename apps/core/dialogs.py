@@ -23,8 +23,8 @@ class ActionDialog:
 
     ``id`` is unique on the page (its title is ``<id>-title``). ``consequences`` are what the
     action will do, one sentence each (a destructive dialog states them); ``note`` is a single
-    paragraph of help. ``tone`` is ``"danger"`` for a destructive action: the danger badge, a
-    danger submit button and Cancel focused first.
+    paragraph of help; ``warning`` a note that deserves more attention. ``tone`` is ``"danger"``
+    for a destructive action: the danger badge, a danger submit button and Cancel focused first.
     """
 
     id: str
@@ -35,6 +35,8 @@ class ActionDialog:
     description: str = ""
     note: str = ""
     consequences: tuple[str, ...] = ()
+    warning: str = ""  # something to weigh before going on, drawn as a note (warn tone)
+    warning_testid: str = ""
     tone: str = ""
     cancel: str = ""
     testid: str = ""
