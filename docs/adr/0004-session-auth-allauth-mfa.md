@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/accounts/adapters.py`, `apps/accounts/mfa.py`
 
 ## Context
 

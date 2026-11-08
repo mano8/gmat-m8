@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (the maintainer's decisions of 2026-11-07; implemented in PR #37)
 - **Date:** 2026-11-07
+- **Governs:** `apps/projects/procurement.py`, `apps/material_requests/procurement.py`
 
 ## Context
 

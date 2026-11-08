@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `.claude/settings.json`, `.github/workflows/docker-publish.yaml`
 
 ## Context
 

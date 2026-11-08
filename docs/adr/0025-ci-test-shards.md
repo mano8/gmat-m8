@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (the maintainer's request, issues #42 and #45; implemented in PRs #43 and #44; recorded for issue #46)
 - **Date:** 2026-11-08
+- **Governs:** `.github/workflows/ci.yaml`, `tests/CLAUDE.md`, `tests/unit/test_serial_marker.py`
 
 ## Context
 

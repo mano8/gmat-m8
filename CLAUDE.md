@@ -5,7 +5,7 @@ Materials app for any company, or group of companies with branches, that buys fo
 ## Source of truth
 
 - **Plans:** markdown files in `.plans/todo/`; there can be several. Work from the plan the maintainer names; "plan §n" in this file means a section of that plan. Plans are local and git-ignored (missing in clones, CI and cloud sessions). If the named plan is missing, or none is named and the choice is unclear, stop and ask; never work from memory of a plan. Before a phase, read the plan's working rules, the phase's step cards and the sections they list.
-- **Decisions:** the plan's decisions and answered questions; committed ones live in `docs/adr/` (from M1.1 on), and an ADR wins over any plan. For a question still open, use its working assumption and say so in the PR. Do not invent business rules.
+- **Decisions:** the plan's decisions and answered questions; committed ones live in `docs/adr/` (from M1.1 on), and an ADR wins over any plan. **Keep them true (ADR-0026):** each ADR names the files it governs (`- **Governs:**`); a change that alters, extends or contradicts a recorded decision updates or supersedes its ADR in the same PR, a new decision gets a new ADR, and every PR touching a governed file names each such ADR in its `## ADRs` section ("updated" or "checked, still holds because …"). `python scripts/check_adr_alignment.py which <path>` lists them; the edit hook and the `adr-alignment` check enforce it. For a question still open, use its working assumption and say so in the PR. Do not invent business rules.
 - Keep this file current when commands, layout or rules change.
 
 ## Git, PRs, releases
@@ -92,6 +92,7 @@ uv run --with lizard lizard -C 10 -a 8 -w apps config scripts tests   # Codacy's
 uv run python scripts/check_access_rules.py
 uv run python scripts/check_security_floors.py   # uv.lock vs. security floors
 uv run python scripts/check_trivyignore.py       # .trivyignore.yaml entries valid and unexpired
+uv run python scripts/check_adr_alignment.py check   # ADR records: Governs lines match files, numbering, index (ADR-0026); `which <path>` lists the ADRs that govern a file
 python scripts/verify_release.py --repo mano8/gmat-m8 --sha <sha> [--tag vX.Y.Z]   # M1.7 release gate, read-only (needs `gh`); rehearses docker-publish's checks without a tag
 python scripts/release_tools.py notes --version X.Y.Z   # CHANGELOG section a release would use (also: manifest, scan-targets, scan-issue)
 uv run python manage.py makemigrations --check --dry-run

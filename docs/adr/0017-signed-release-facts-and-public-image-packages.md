@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (the maintainer's decisions of 2026-11-06)
 - **Date:** 2026-11-06
+- **Governs:** `scripts/release_tools.py`, `scripts/verify_release.py`, `.github/workflows/docker-publish.yaml`, `docker_compose/gmat_m8/deploy.sh`
 
 ## Context
 

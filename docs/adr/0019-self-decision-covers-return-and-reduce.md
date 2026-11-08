@@ -3,6 +3,7 @@
 - **Status:** Accepted (the maintainer's decision Q1 of M8.3; implemented in PR #33)
 - **Date:** 2026-11-08 (recorded); decided with M8.3, merged 2026-11-07
 - **Amends:** ADR-0014 §3
+- **Governs:** `apps/material_requests/services/review.py`, `apps/access/authorization.py`
 
 ## Context
 

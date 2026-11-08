@@ -2,6 +2,8 @@
 
 Accepted decisions. An ADR wins over the planning notes. A new decision gets the next number; a changed one is superseded by a new ADR.
 
+Each ADR names the files it governs (`- **Governs:**`). A pull request that touches them updates the ADR or names it in its `## ADRs` section ([ADR-0026](0026-adrs-stay-aligned.md)); `python scripts/check_adr_alignment.py which <path>` says which ADRs govern a file.
+
 - [ADR-0001](0001-modular-monolith.md): Modular monolith: Django 6.1 + HTMX + PostgreSQL 18
 - [ADR-0002](0002-shared-schema-scope-policy.md): Shared-schema multi-company with a code-defined scope policy
 - [ADR-0003](0003-one-deployment-per-group.md): One deployment per unrelated business group
@@ -27,3 +29,4 @@ Accepted decisions. An ADR wins over the planning notes. A new decision gets the
 - [ADR-0023](0023-lists-page-in-the-database.md): Lists page in the database; lists worked out from the ledger use a cursor
 - [ADR-0024](0024-session-idle-limits-own-sessions-credential-notices.md): Idle limits, one's own sessions and credential-change notices
 - [ADR-0025](0025-ci-test-shards.md): CI runs the tests in four shards at once; time-dependent tests run alone
+- [ADR-0026](0026-adrs-stay-aligned.md): Every change answers the ADRs that govern what it touches

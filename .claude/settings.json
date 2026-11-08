@@ -48,5 +48,20 @@
       "PowerShell(git push origin main:*)",
       "PowerShell(git push origin HEAD:main:*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "timeout": 10,
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/check_adr_alignment.py\" hook 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/scripts/check_adr_alignment.py\" hook 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   }
 }

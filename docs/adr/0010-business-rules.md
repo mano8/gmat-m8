@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/access/roles.py`, `apps/material_requests/transitions.py`, `apps/purchasing/transitions.py`, `apps/purchasing/dispatch.py`
 
 ## Context
 

@@ -3,6 +3,7 @@
 - **Status:** Accepted (the maintainer's decisions X5, X6 and Q3 of M8.3, and Q12 as amended on 2026-11-05; implemented in PR #33)
 - **Date:** 2026-11-08 (recorded); merged 2026-11-07
 - **Complements:** ADR-0004
+- **Governs:** `apps/accounts/sessions.py`, `apps/accounts/services/credentials.py`, `apps/accounts/security_log.py`
 
 ## Context
 

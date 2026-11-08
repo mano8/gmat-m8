@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/core/cache.py`, `apps/notifications/outbox.py`, `apps/notifications/backends.py`, `apps/notifications/worker.py`
 
 ## Context
 

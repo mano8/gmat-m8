@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/organizations/models.py`, `docker_compose/gmat_m8/docker-compose.yml`
 
 ## Context
 

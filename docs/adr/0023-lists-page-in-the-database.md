@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (the maintainer's request for M7d, issue #27; implemented in PR #31)
 - **Date:** 2026-11-08 (recorded); merged 2026-11-03
+- **Governs:** `apps/core/listing.py`, `tests/integration/test_list_volume.py`, `tests/volume.py`
 
 ## Context
 
