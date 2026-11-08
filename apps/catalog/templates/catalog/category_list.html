@@ -4,17 +4,23 @@
   {% translate "Categories" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h1>{% translate "Categories" %}</h1>
-    <div class="flex flex-wrap gap-3">
-      {% url 'catalog:list' as list_url %}
-      {% include "components/button.html" with href=list_url label=_("Catalog") %}
-      {% if manageable %}
-        {% url 'catalog:category_new' as new_url %}
-        {% include "components/button.html" with href=new_url label=_("New category") variant="primary" %}
-      {% endif %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'catalog:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Catalog") parent_url=crumb_url current=_("Categories") %}
+      <h1>{% translate "Categories" %}</h1>
     </div>
-  </div>
+    <div class="page-head-actions">
+      <div class="flex flex-wrap gap-3">
+        {% url 'catalog:list' as list_url %}
+        {% include "components/button.html" with href=list_url label=_("Catalog") %}
+        {% if manageable %}
+          {% url 'catalog:category_new' as new_url %}
+          {% include "components/button.html" with href=new_url label=_("New category") variant="primary" %}
+        {% endif %}
+      </div>
+    </div>
+  </header>
   {% if categories %}
     <ul class="card divide-y divide-line">
       {% for category in categories %}

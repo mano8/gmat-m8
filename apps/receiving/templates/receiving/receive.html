@@ -4,16 +4,20 @@
   {% translate "Receive goods" %} · {{ order.number }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1>{% translate "Receive goods" %}</h1>
-    <p class="mt-1 text-soft">
-      <span data-field="order">{{ order.number }}</span>
-      · <span data-field="supplier">{{ order.supplier_snapshot.name }}</span>
-      {% if order.expected_date %}
-        · {% translate "Expected" %} {{ order.expected_date|date:"SHORT_DATE_FORMAT" }}
-      {% endif %}
-    </p>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'receiving:orders' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Receive goods") parent_url=crumb_url current=order.number %}
+      <h1>{% translate "Receive goods" %}</h1>
+      <p class="page-head-sub">
+        <span data-field="order">{{ order.number }}</span>
+        · <span data-field="supplier">{{ order.supplier_snapshot.name }}</span>
+        {% if order.expected_date %}
+          · {% translate "Expected" %} {{ order.expected_date|date:"SHORT_DATE_FORMAT" }}
+        {% endif %}
+      </p>
+    </div>
+  </header>
   {% if not places %}
     {% include "components/empty_state.html" with title=_("Nowhere to receive") text=_("Goods of this order cannot be received at any place you can use.") %}
   {% else %}

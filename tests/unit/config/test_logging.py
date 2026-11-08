@@ -163,7 +163,7 @@ class TestErrorReports:
             "request": {
                 "url": f"https://app.example.org/invitations/{SENTINEL}/?a=1",
                 "query_string": f"token={SENTINEL}",
-                "cookies": {"__Host-sessionid": SENTINEL},
+                "cookies": {"__Host-sessionid": SENTINEL, "__Host-ui": SENTINEL},
                 "data": {"password": SENTINEL},
                 "headers": {
                     "Referer": SENTINEL,

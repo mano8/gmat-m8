@@ -4,10 +4,14 @@
   {{ request_obj.number|default:_("Request") }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h1 data-testid="examine-number">{{ request_obj.number|default:_("Request") }}</h1>
-    <div class="flex flex-wrap items-center gap-3">
-      {% include "material_requests/status.html" with obj=request_obj %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'requests:inbox' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Approval inbox") parent_url=crumb_url current=request_obj.number|default:_("Request") %}
+      <h1 data-testid="examine-number">{{ request_obj.number|default:_("Request") }}</h1>
+      <p class="mt-1 flex flex-wrap gap-2">{% include "material_requests/status.html" with obj=request_obj %}</p>
+    </div>
+    <div class="page-head-actions">
       {% if request_obj.status == "APPROVED" %}
         {% can "handover.post" request_obj %}
           {% url 'handovers:new' as handover_url %}
@@ -15,7 +19,7 @@
         {% endcan %}
       {% endif %}
     </div>
-  </div>
+  </header>
   <section class="card mb-4" aria-label="{% translate 'Request details' %}">
     <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
       <div>

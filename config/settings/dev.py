@@ -26,6 +26,8 @@ SESSION_COOKIE_NAME = "sessionid"
 CSRF_COOKIE_NAME = "csrftoken"
 LANGUAGE_COOKIE_NAME = "django_language"
 LANGUAGE_COOKIE_SECURE = False
+UI_COOKIE_NAME = "ui"
+UI_COOKIE_SECURE = False
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},

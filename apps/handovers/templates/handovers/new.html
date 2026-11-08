@@ -4,13 +4,17 @@
   {% translate "New handover" %} · {{ project.code }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1>{% translate "New handover" %}</h1>
-    <p class="mt-1 text-soft" data-testid="handover-project-name">
-      {{ project.code }} · {{ project.name }}
-      {% if asked %}· {{ asked.number }}{% endif %}
-    </p>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'handovers:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Handovers") parent_url=crumb_url current=_("New handover") %}
+      <h1>{% translate "New handover" %}</h1>
+      <p class="page-head-sub" data-testid="handover-project-name">
+        {{ project.code }} · {{ project.name }}
+        {% if asked %}· {{ asked.number }}{% endif %}
+      </p>
+    </div>
+  </header>
   {% if not entries %}
     {% include "components/empty_state.html" with title=_("Nothing left to hand over") text=_("Every approved line of this project has been handed over.") %}
   {% elif source_branch %}

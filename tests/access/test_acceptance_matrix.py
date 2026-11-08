@@ -49,16 +49,20 @@ from apps.organizations.models import Company, Membership
 from tests.access.matrix import (
     ACTOR_NAMES,
     ADMIN_LOGIN,
+    BAD_REQUEST,
     DENIED,
     GROUPS,
     HOME,
     LOGIN,
+    NO_CONTENT,
     NOT_ALLOWED,
     NOT_FOUND,
     OK,
     OTHER_METHODS,
     REAUTHENTICATE,
     REDIRECT,
+    SEE_OTHER,
+    SEE_OTHER_HOME,
     STEP_UP,
     TABLE_METHODS,
     Expect,
@@ -520,6 +524,41 @@ def dashboard_routes() -> tuple[Route, ...]:
     return (*panels, unknown)
 
 
+def ui_preference_routes() -> tuple[Route, ...]:
+    """``/ui/preferences/`` (M8b.2, Q69): open to everyone, including a privileged session without
+    MFA (it writes only the display cookie): GET and HEAD are refused, a POST answers 303 back (or
+    204 to htmx), a value outside the allowlist 400, a foreign ``next`` falls back to the home page.
+    No actor sees a sentinel: it renders nothing of the application's data."""
+
+    def post(outcome: Outcome, **data: str) -> Route:
+        return Route(
+            {
+                "GET": expect(NOT_ALLOWED),
+                "HEAD": expect(NOT_ALLOWED),
+                "POST": expect(outcome),
+            },
+            position=" ".join(f"{key}={value}" for key, value in data.items()) or "empty",
+            data=lambda world: dict(data),
+        )
+
+    htmx = replace(
+        post(NO_CONTENT, theme="dark", next="/requests/"),
+        position="htmx",
+        headers={"HX-Request": "true"},
+    )
+    return (
+        post(SEE_OTHER),
+        post(SEE_OTHER, theme="dark", next="/requests/"),
+        post(SEE_OTHER, theme="system"),
+        post(SEE_OTHER, menu="hidden"),
+        post(SEE_OTHER, fold="insights", state="closed"),
+        htmx,
+        post(SEE_OTHER_HOME, theme="light", next="https://evil.example/"),
+        post(BAD_REQUEST, theme="purple"),
+        post(BAD_REQUEST, fold="nowhere", state="open"),
+    )
+
+
 # Audit (M7.3): audit.view is the group administrators' and the material managers'; an event
 # belongs to its branch, so a manager gets 404 for another branch's object history. Engineers
 # hold both, like material managers (ADR-0014).
@@ -714,6 +753,7 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         ),
     ),
     "dashboard:panel": dashboard_routes(),
+    "core:ui_preferences": ui_preference_routes(),
     "audit:list": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
     "audit:object": audit_routes(),
     "exports:index": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),

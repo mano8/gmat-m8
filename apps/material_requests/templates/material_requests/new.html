@@ -4,8 +4,14 @@
   {% translate "New request" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-1">{% translate "New request" %}</h1>
-  <p class="mb-4 text-soft">{% translate "Which project is the material for?" %}</p>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'requests:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("My requests") parent_url=crumb_url current=_("New request") %}
+      <h1>{% translate "New request" %}</h1>
+      <p class="page-head-sub">{% translate "Which project is the material for?" %}</p>
+    </div>
+  </header>
   {% url 'requests:new' as new_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#project-results" action=new_url sort_always=True grid="sm:grid-cols-[1fr_auto]" %}
   {% partialdef results inline %}

@@ -4,15 +4,19 @@
   {% translate "To purchase" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h1>{% translate "To purchase" %}</h1>
-    <span class="flex flex-wrap gap-2">
-      {% url 'purchasing:new' as empty_url %}
-      {% include "components/button.html" with href=empty_url label=_("New empty order") %}
-      {% url 'purchasing:orders' as orders_url %}
-      {% include "components/button.html" with href=orders_url label=_("Orders") %}
-    </span>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "To purchase" %}</h1>
+    </div>
+    <div class="page-head-actions">
+      <span class="flex flex-wrap gap-2">
+        {% url 'purchasing:new' as empty_url %}
+        {% include "components/button.html" with href=empty_url label=_("New empty order") %}
+        {% url 'purchasing:orders' as orders_url %}
+        {% include "components/button.html" with href=orders_url label=_("Orders") %}
+      </span>
+    </div>
+  </header>
   {% url 'purchasing:worklist' as worklist_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#worklist-results" action=worklist_url grid="sm:grid-cols-[1fr_1fr_1fr_auto]" %}
   {% partialdef results inline %}

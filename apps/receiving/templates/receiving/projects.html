@@ -4,10 +4,12 @@
   {% translate "Expected on site" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1>{% translate "Expected on site" %}</h1>
-    <p class="mt-1 text-soft">{% translate "Choose a project to see what is still coming to its worksite." %}</p>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Expected on site" %}</h1>
+      <p class="page-head-sub">{% translate "Choose a project to see what is still coming to its worksite." %}</p>
+    </div>
+  </header>
   {% url 'receiving:projects' as projects_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing sort_always=True target="#expected-results" action=projects_url grid="sm:grid-cols-[1fr_auto]" %}
   {% partialdef results inline %}

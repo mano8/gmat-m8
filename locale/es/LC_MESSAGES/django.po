@@ -6039,3 +6039,59 @@ msgstr "Más acciones"
 #: templates/components/tabs.html:7
 msgid "Sections"
 msgstr "Secciones"
+
+#: apps/core/navigation.py:58
+msgid "Work"
+msgstr "Trabajo"
+
+#: apps/core/navigation.py:83
+msgid "Purchasing"
+msgstr "Compras"
+
+#: apps/core/navigation.py:107
+msgid "Site & warehouse"
+msgstr "Obra y almacén"
+
+#: apps/core/navigation.py:111
+msgid "Receiving"
+msgstr "Recepción"
+
+#: apps/core/navigation.py:140
+msgid "Organization"
+msgstr "Organización"
+
+#: apps/core/navigation.py:174
+msgid "Insights"
+msgstr "Análisis"
+
+#: templates/layouts/app.html:65
+msgid "Show the menu"
+msgstr "Mostrar el menú"
+
+#: templates/layouts/app.html:65
+msgid "Hide the menu"
+msgstr "Ocultar el menú"
+
+#: templates/layouts/app.html:97
+msgid "Account menu"
+msgstr "Menú de la cuenta"
+
+#: templates/layouts/app.html:122
+msgid "More"
+msgstr "Más"
+
+#: templates/partials/theme_switch.html:14
+msgid "Theme"
+msgstr "Tema"
+
+#: templates/partials/theme_switch.html:23
+msgid "System"
+msgstr "Sistema"
+
+#: templates/partials/theme_switch.html:30
+msgid "Light"
+msgstr "Claro"
+
+#: templates/partials/theme_switch.html:37
+msgid "Dark"
+msgstr "Oscuro"

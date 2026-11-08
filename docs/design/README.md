@@ -65,3 +65,18 @@ page.
 
 The screenshots show the component library at the end of the design-system step; the screens
 themselves move onto it in the steps after. Regenerate them when a component changes shape.
+
+## The app shell
+
+The signed-in layout (`templates/layouts/app.html`, `apps/core/navigation.py`): a left menu of
+category dropdowns that the person can hide, a top bar with the place, the quick action and the
+account menu (language and theme in it), and on phones a bottom bar of four entries plus a More
+sheet. Both choices and the folded categories are remembered in one cookie the server writes
+(`/ui/preferences/`, see `docs/security.md`). The phone views come first, then the desktop ones
+(phone: a page, the More sheet, the account menu; desktop: the menu shown, hidden, and the account
+menu open).
+
+| | Light | Dark |
+| --- | --- | --- |
+| 360 px | ![App shell, 360 px, light](screenshots/shell-360-light.webp) | ![App shell, 360 px, dark](screenshots/shell-360-dark.webp) |
+| 1280 px | ![App shell, 1280 px, light](screenshots/shell-1280-light.webp) | ![App shell, 1280 px, dark](screenshots/shell-1280-dark.webp) |

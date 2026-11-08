@@ -4,13 +4,17 @@
   {% translate "Purchase orders" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h1>{% translate "Purchase orders" %}</h1>
-    {% if can_manage %}
-      {% url 'purchasing:worklist' as worklist_url %}
-      {% include "components/button.html" with href=worklist_url label=_("To purchase") variant="primary" %}
-    {% endif %}
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Purchase orders" %}</h1>
+    </div>
+    <div class="page-head-actions">
+      {% if can_manage %}
+        {% url 'purchasing:worklist' as worklist_url %}
+        {% include "components/button.html" with href=worklist_url label=_("To purchase") variant="primary" %}
+      {% endif %}
+    </div>
+  </header>
   {% url 'purchasing:orders' as orders_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_9rem_1fr_1fr_auto]" %}
   {% partialdef results inline %}

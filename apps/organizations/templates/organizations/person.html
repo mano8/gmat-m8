@@ -4,16 +4,20 @@
   {{ person.email }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1 class="break-all">{{ person.full_name|default:person.email }}</h1>
-    <p class="mt-1 flex flex-wrap items-center gap-2 text-soft">
-      <span class="break-all">{{ person.email }}</span>
-      {% include "organizations/account_status.html" %}
-    </p>
-    {% if not manageable and not is_self %}
-      <p class="mt-2 text-sm text-soft">{% translate "Only a platform operator can change this account." %}</p>
-    {% endif %}
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'org:people' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("People") parent_url=crumb_url current=person.full_name|default:person.email %}
+      <h1 class="break-all">{{ person.full_name|default:person.email }}</h1>
+      <p class="mt-1 flex flex-wrap items-center gap-2 text-soft">
+        <span class="break-all">{{ person.email }}</span>
+        {% include "organizations/account_status.html" %}
+      </p>
+      {% if not manageable and not is_self %}
+        <p class="mt-2 text-sm text-soft">{% translate "Only a platform operator can change this account." %}</p>
+      {% endif %}
+    </div>
+  </header>
   <section class="card mb-4"
            id="roles"
            aria-labelledby="roles-title"

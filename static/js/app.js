@@ -94,6 +94,87 @@
     element.replaceWith(still);
   });
 
+  // Display preferences (M8b.2, Q69). The server renders the remembered state and writes the
+  // cookie; the script only paints a choice at once. Nothing here reads or writes a cookie.
+  //
+  // The left menu's button: hide or show the menu now. The button's value is the state it asks
+  // for, so it flips only once the request is done.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-menu-toggle]");
+    if (!button) {
+      return;
+    }
+    var hide = button.value === "hidden";
+    var menu = document.getElementById(button.getAttribute("aria-controls"));
+    if (menu) {
+      menu.hidden = hide;
+    }
+    button.setAttribute("aria-expanded", hide ? "false" : "true");
+  });
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var button = event.detail.elt.querySelector && event.detail.elt.querySelector("[data-menu-toggle]");
+    if (!button) {
+      return;
+    }
+    var hidden = button.getAttribute("aria-expanded") === "false";
+    button.value = hidden ? "shown" : "hidden";
+    button.setAttribute("aria-label", button.getAttribute(hidden ? "data-label-show" : "data-label-hide"));
+  });
+
+  // The theme switch: System, Light or Dark takes effect without a reload. The server writes the
+  // same on <html> for the next page, so the first paint is right.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-theme-switch] button[name=theme]");
+    if (!button) {
+      return;
+    }
+    var theme = button.value;
+    var root = document.documentElement;
+    if (theme === "system") {
+      root.removeAttribute("data-theme");
+    } else {
+      root.setAttribute("data-theme", theme);
+    }
+    var scheme = document.querySelector("meta[name=color-scheme]");
+    if (scheme) {
+      scheme.setAttribute("content", theme === "system" ? "light dark" : theme);
+    }
+    document.querySelectorAll("[data-theme-switch] button[name=theme]").forEach(function (other) {
+      other.setAttribute("aria-pressed", other.value === theme ? "true" : "false");
+    });
+    document.dispatchEvent(new CustomEvent("gmat:theme", { detail: { theme: theme } }));
+  });
+
+  // A category of the menu folded or unfolded by the person (not the page opening the current one):
+  // remembered through the same endpoint. Without JavaScript the dropdowns still fold for the page.
+  document.addEventListener("click", function (event) {
+    var summary = event.target.closest("[data-nav-group] > summary");
+    if (summary) {
+      summary.parentElement.setAttribute("data-user-toggle", "1");
+    }
+  });
+  document.addEventListener(
+    "toggle",
+    function (event) {
+      var group = event.target;
+      if (!group.matches || !group.matches("[data-nav-group]") || !group.hasAttribute("data-user-toggle")) {
+        return;
+      }
+      group.removeAttribute("data-user-toggle");
+      var state = group.open ? "open" : "closed";
+      if (state === group.getAttribute("data-saved") || !window.htmx) {
+        return;
+      }
+      group.setAttribute("data-saved", state);
+      window.htmx.ajax("POST", group.getAttribute("data-prefs-url"), {
+        source: group,
+        swap: "none",
+        values: { fold: group.getAttribute("data-nav-group"), state: state },
+      });
+    },
+    true
+  );
+
   // The language switcher submits when the selection changes (without JavaScript the form
   // still has its button).
   document.addEventListener("change", function (event) {

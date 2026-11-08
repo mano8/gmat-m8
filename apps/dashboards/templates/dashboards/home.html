@@ -4,8 +4,12 @@
   {% translate "Home" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-1">{% translate "Home" %}</h1>
-  <p class="mb-4 text-soft">{% blocktranslate with email=request.user.email %}Signed in as {{ email }}.{% endblocktranslate %}</p>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Home" %}</h1>
+      <p class="page-head-sub">{% blocktranslate with email=request.user.email %}Signed in as {{ email }}.{% endblocktranslate %}</p>
+    </div>
+  </header>
   {% can "request.create" %}
     <div class="mb-4">
       {% url 'requests:new' as new_url %}

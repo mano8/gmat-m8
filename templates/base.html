@@ -1,11 +1,14 @@
 {% load i18n static %}
 {% get_current_language as LANGUAGE_CODE %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE }}">
+{# The remembered theme is written on <html> by the server, so the first paint is right; System writes nothing. #}
+<html lang="{{ LANGUAGE_CODE }}"
+      {% if ui_theme %} data-theme="{{ ui_theme }}"{% endif %}>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme"
+          content="{% if ui_theme %}{{ ui_theme }}{% else %}light dark{% endif %}">
     <meta name="robots" content="noindex, nofollow">
     {# htmx is configured here, never inline: no page snapshot is stored (historyCacheSize 0), nothing is evaluated. #}
     <meta name="htmx-config"

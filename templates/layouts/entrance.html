@@ -1,18 +1,26 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% comment %}
-  Pages before sign-in (login, password reset, MFA): one centred card, no navigation.
+  Pages before sign-in (login, password reset, invitation, email change, MFA): one centred card on
+  a branded ground, the wordmark, the language and the theme. No navigation, no account menu.
 {% endcomment %}
 {% block shell %}
-  <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-4 px-4 py-8">
-    <div class="flex items-center justify-between gap-3">
-      <a href="/"
-         class="inline-flex min-h-11 items-center text-xl font-bold text-ink no-underline hover:no-underline">gmat-m8</a>
-      {% include "partials/language_switcher.html" %}
+  <div class="min-h-dvh bg-linear-to-b from-brand-soft to-surface">
+    <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-4 px-4 py-8">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <a href="/"
+           class="inline-flex min-h-11 items-center gap-2 text-xl font-bold tracking-tight text-ink no-underline hover:no-underline">
+          <span class="grid size-8 place-items-center rounded-md bg-brand text-base text-brand-ink"
+                aria-hidden="true">g</span>
+          gmat-m8
+        </a>
+        {% include "partials/language_switcher.html" %}
+      </div>
+      <main id="main" class="card">
+        {% block content %}
+        {% endblock content %}
+      </main>
+      <div class="flex justify-center">{% include "partials/theme_switch.html" %}</div>
     </div>
-    <main id="main" class="card">
-      {% block content %}
-      {% endblock content %}
-    </main>
   </div>
 {% endblock shell %}

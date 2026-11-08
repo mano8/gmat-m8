@@ -4,17 +4,21 @@
   {% if line %}{% translate "Change a line" %}{% else %}{% translate "Add a line" %}{% endif %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-1">
-    {% if line %}
-      {% translate "Change a line" %}
-    {% else %}
-      {% translate "Add a line" %}
-    {% endif %}
-  </h1>
-  <p class="mb-4 text-soft" data-testid="edit-target">
-    {{ request_obj.number }}
-    {% if line %}· {{ line.line_no }}. {{ line.description }} · {{ line.requested_qty|quantity }} {{ line.unit.code }}{% endif %}
-  </p>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>
+        {% if line %}
+          {% translate "Change a line" %}
+        {% else %}
+          {% translate "Add a line" %}
+        {% endif %}
+      </h1>
+      <p class="page-head-sub" data-testid="edit-target">
+        {{ request_obj.number }}
+        {% if line %}· {{ line.line_no }}. {{ line.description }} · {{ line.requested_qty|quantity }} {{ line.unit.code }}{% endif %}
+      </p>
+    </div>
+  </header>
   {% if approved and line %}
     <p class="mb-3 text-sm text-soft">
       {% translate "The request is approved: your change is approved with it. A new material for a line that already has orders or deliveries closes it short and adds a new line for the rest." %}

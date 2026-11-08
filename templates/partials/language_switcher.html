@@ -5,7 +5,8 @@
       class="flex items-center gap-2">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ language_next|default:'/' }}">
-  <label for="language" class="sr-only">{% translate "Language" %}</label>
+  <label for="language"
+         class="{% if show_label %}text-sm text-soft{% else %}sr-only{% endif %}">{% translate "Language" %}</label>
   <select id="language"
           name="language"
           data-autosubmit

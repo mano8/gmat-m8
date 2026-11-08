@@ -4,13 +4,17 @@
   {% translate "Suppliers" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h1>{% translate "Suppliers" %}</h1>
-    {% if manageable %}
-      {% url 'suppliers:new' as new_url %}
-      {% include "components/button.html" with href=new_url label=_("New supplier") variant="primary" %}
-    {% endif %}
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Suppliers" %}</h1>
+    </div>
+    <div class="page-head-actions">
+      {% if manageable %}
+        {% url 'suppliers:new' as new_url %}
+        {% include "components/button.html" with href=new_url label=_("New supplier") variant="primary" %}
+      {% endif %}
+    </div>
+  </header>
   {% url 'suppliers:list' as list_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#supplier-results" action=list_url %}
   {% partialdef results inline %}

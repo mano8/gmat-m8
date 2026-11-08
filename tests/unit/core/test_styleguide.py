@@ -62,6 +62,7 @@ class TestTheStyleGuide:
             "status_chip": "chip-ok",
             "table": "table-responsive",
             "page_header": 'data-testid="page-header"',
+            "crumbs": 'data-testid="breadcrumbs"',
             "stat_tile": 'data-testid="stat-tile"',
             "progress": "<meter",
             "skeleton": 'aria-busy="true"',

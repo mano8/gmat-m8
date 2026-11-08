@@ -1,0 +1,40 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The theme choice (Q65): System (the default), Light or Dark, a form posting to /ui/preferences/.
+  Without JavaScript it posts and comes back; with it, htmx posts in the background and app.js
+  paints the choice at once (data-theme-switch). Parameters: none; `language_next` (context
+  processor) is where it returns to, never with a query string.
+{% endcomment %}
+<form action="{% url 'core:ui_preferences' %}"
+      method="post"
+      hx-post="{% url 'core:ui_preferences' %}"
+      hx-swap="none"
+      data-theme-switch
+      role="group"
+      aria-label="{% translate 'Theme' %}">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ language_next|default:'/' }}">
+  <div class="seg">
+    <button type="submit"
+            name="theme"
+            value="system"
+            aria-pressed="{% if not ui_theme %}true{% else %}false{% endif %}">
+      {% icon "monitor" classes="size-4" %}
+      {% translate "System" %}
+    </button>
+    <button type="submit"
+            name="theme"
+            value="light"
+            aria-pressed="{% if ui_theme == 'light' %}true{% else %}false{% endif %}">
+      {% icon "sun" classes="size-4" %}
+      {% translate "Light" %}
+    </button>
+    <button type="submit"
+            name="theme"
+            value="dark"
+            aria-pressed="{% if ui_theme == 'dark' %}true{% else %}false{% endif %}">
+      {% icon "moon" classes="size-4" %}
+      {% translate "Dark" %}
+    </button>
+  </div>
+</form>

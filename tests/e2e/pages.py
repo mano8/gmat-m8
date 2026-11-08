@@ -233,6 +233,17 @@ def invite(
     page.wait_for_url(lambda url: "/invitations/new/" not in url)
 
 
+def open_user_menu(page: Page) -> None:
+    """The account menu (sessions, language, theme, sign out) on a phone or a desktop."""
+    page.get_by_role("button", name="Account menu").click()
+    expect(page.locator("#user-menu")).to_be_visible()
+
+
+def sign_out(page: Page) -> None:
+    open_user_menu(page)
+    page.get_by_role("button", name="Sign out").click()
+
+
 def _settle(page: Page, move: Callable[[], object]) -> None:
     """A history step, then let htmx's history restore (a reload of the address) settle. The
     reload can cancel the step's own navigation (``ERR_ABORTED``): the page is then where the

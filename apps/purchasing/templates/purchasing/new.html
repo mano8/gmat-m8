@@ -4,10 +4,14 @@
   {% translate "New purchase order" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1>{% translate "New purchase order" %}</h1>
-    <p class="mt-1 text-soft">{% translate "It starts as a draft: nothing reaches the supplier until you issue it." %}</p>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'purchasing:orders' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Purchase orders") parent_url=crumb_url current=_("New purchase order") %}
+      <h1>{% translate "New purchase order" %}</h1>
+      <p class="page-head-sub">{% translate "It starts as a draft: nothing reaches the supplier until you issue it." %}</p>
+    </div>
+  </header>
   <form method="post"
         action="{% url 'purchasing:create' %}"
         data-testid="new-order-form">

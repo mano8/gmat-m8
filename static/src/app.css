@@ -739,21 +739,28 @@
   }
 }
 
-/* --- navigation (the shell is redrawn in M8b.2; these classes keep working until then) ---------- */
+/* --- app shell (M8b.2): left menu of category dropdowns, top bar, phone bar, theme switch -------- */
+/* A hidden attribute always wins over a display set by a class (the menu hidden by the cookie). */
+@layer base {
+  [hidden] {
+    display: none !important;
+  }
+}
+/* A row of the menu or of the More sheet: icon and label, the current page in the brand tint. */
 @utility nav-link {
   display: flex;
   min-height: 2.75rem;
-  flex: 1 1 0%;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.125rem;
+  gap: 0.75rem;
   border-radius: var(--radius-md);
-  padding: 0.25rem 0.5rem;
-  color: var(--ink-soft);
-  font-size: 0.75rem;
+  padding-inline: 0.75rem;
+  color: var(--ink);
+  font-size: 0.9375rem;
   font-weight: 500;
   text-decoration: none;
+  & > svg {
+    color: var(--ink-soft);
+  }
   @media (hover: hover) {
     &:hover {
       background-color: var(--surface-sunken);
@@ -763,14 +770,117 @@
   &[aria-current="page"] {
     background-color: var(--brand-soft);
     color: var(--brand);
+    & > svg {
+      color: var(--brand);
+    }
   }
-  @media (min-width: 48rem) {
-    flex: none;
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 0.75rem;
+}
+/* A category: a native details element, the summary is the dropdown's label. */
+@utility nav-group {
+  & > summary {
+    display: flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-md);
     padding-inline: 0.75rem;
-    font-size: 0.9375rem;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    user-select: none;
+    &::-webkit-details-marker {
+      display: none;
+    }
+    @media (hover: hover) {
+      &:hover {
+        background-color: var(--surface-sunken);
+        color: var(--ink);
+      }
+    }
+    & > svg {
+      margin-left: auto;
+      @media (prefers-reduced-motion: no-preference) {
+        transition: transform var(--dur-base) var(--ease-standard);
+      }
+    }
+  }
+  &:not([open]) > summary > svg {
+    transform: rotate(-90deg);
+  }
+  & > .nav-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding-block: 0.125rem 0.5rem;
+  }
+}
+/* The phone's bottom bar: an icon over a label, the current one in a pill. */
+@utility bar-link {
+  display: flex;
+  min-height: 3.5rem;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  border-radius: var(--radius-md);
+  padding: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  & > svg {
+    box-sizing: content-box;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.875rem;
+  }
+  &[aria-current="page"] {
+    color: var(--brand);
+    & > svg {
+      background-color: var(--brand-soft);
+    }
+  }
+}
+/* The theme choice (System, Light, Dark) and any short group of exclusive buttons. */
+@utility seg {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+  & > button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    flex: 1 1 0%;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-right: 1px solid var(--line);
+    padding-inline: 0.75rem;
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+    font-weight: 500;
+    &:last-child {
+      border-right: 0;
+    }
+    @media (hover: hover) {
+      &:hover {
+        background-color: var(--surface-sunken);
+      }
+    }
+    &[aria-pressed="true"] {
+      background-color: var(--brand-soft);
+      color: var(--brand);
+      font-weight: 600;
+    }
   }
 }
 
@@ -780,12 +890,15 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
   & .page-head-main {
     min-width: 0;
     flex: 1 1 16rem;
   }
   & .page-head-actions {
     display: flex;
+    flex: 0 1 auto;
+    max-width: 100%;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
@@ -993,6 +1106,40 @@
       inset: auto;
       position-area: bottom span-left;
       margin-top: 0.375rem;
+    }
+  }
+}
+/* A bottom sheet at every width the phone bar exists (the More sheet): `menu` anchors under its
+   button from 40rem, which would push a sheet opened from the bottom bar off the screen. */
+@utility sheet {
+  margin: 0;
+  max-height: 80dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-3);
+  padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  color: var(--ink);
+  inset: auto 0 0 0;
+  width: 100%;
+  &::backdrop {
+    background-color: var(--backdrop);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity var(--dur-base) var(--ease-standard),
+      transform var(--dur-base) var(--ease-standard),
+      overlay var(--dur-base) allow-discrete,
+      display var(--dur-base) allow-discrete;
+    @starting-style {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+    &:not(:popover-open) {
+      opacity: 0;
+      transform: translateY(1rem);
     }
   }
 }

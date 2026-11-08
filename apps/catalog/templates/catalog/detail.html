@@ -4,31 +4,35 @@
   {{ material.reference }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'catalog:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Catalog") parent_url=crumb_url current=material.reference %}
       <h1>{{ material.reference }} · {{ material.name }}</h1>
       <p class="mt-1">{% include "catalog/status.html" %}</p>
     </div>
-    {% if manageable %}
-      <div class="flex flex-wrap gap-3">
-        {% url 'catalog:edit' material_id=material.pk as edit_url %}
-        {% include "components/button.html" with href=edit_url label=_("Edit") %}
-        {% if material.is_active %}
-          <form method="post"
-                action="{% url 'catalog:deactivate' material_id=material.pk %}">
-            {% csrf_token %}
-            {% include "components/button.html" with type="submit" label=_("Deactivate") variant="danger" %}
-          </form>
-        {% else %}
-          <form method="post"
-                action="{% url 'catalog:reactivate' material_id=material.pk %}">
-            {% csrf_token %}
-            {% include "components/button.html" with type="submit" label=_("Reactivate") %}
-          </form>
-        {% endif %}
-      </div>
-    {% endif %}
-  </div>
+    <div class="page-head-actions">
+      {% if manageable %}
+        <div class="flex flex-wrap gap-3">
+          {% url 'catalog:edit' material_id=material.pk as edit_url %}
+          {% include "components/button.html" with href=edit_url label=_("Edit") %}
+          {% if material.is_active %}
+            <form method="post"
+                  action="{% url 'catalog:deactivate' material_id=material.pk %}">
+              {% csrf_token %}
+              {% include "components/button.html" with type="submit" label=_("Deactivate") variant="danger" %}
+            </form>
+          {% else %}
+            <form method="post"
+                  action="{% url 'catalog:reactivate' material_id=material.pk %}">
+              {% csrf_token %}
+              {% include "components/button.html" with type="submit" label=_("Reactivate") %}
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </header>
   <section class="card">
     <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
       <div>

@@ -93,6 +93,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.template.context_processors.i18n",
                 "apps.core.context_processors.ui",
+                "apps.core.context_processors.preferences",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -302,6 +303,14 @@ LANGUAGE_COOKIE_SECURE = True
 LANGUAGE_COOKIE_HTTPONLY = True
 LANGUAGE_COOKIE_SAMESITE = "Lax"
 LANGUAGE_COOKIE_AGE = 365 * 24 * 3600
+# The display preferences (theme, left menu) are one more cookie of that kind (M8b.2, Q69):
+# written only by ``/ui/preferences/``, allowlisted values, no identifier
+# (``apps.core.preferences``).
+UI_COOKIE_NAME = "__Host-ui"
+UI_COOKIE_SECURE = True
+UI_COOKIE_HTTPONLY = True
+UI_COOKIE_SAMESITE = "Lax"
+UI_COOKIE_AGE = 365 * 24 * 3600
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True

@@ -4,10 +4,16 @@
   {% translate "Invite someone" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-1">{% translate "Invite someone" %}</h1>
-  <p class="mb-4 text-soft">
-    {% translate "The address receives a link valid for 72 hours. A new person sets a password; an existing account accepts while signed in." %}
-  </p>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'org:people' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("People") parent_url=crumb_url current=_("Invite someone") %}
+      <h1>{% translate "Invite someone" %}</h1>
+      <p class="page-head-sub">
+        {% translate "The address receives a link valid for 72 hours. A new person sets a password; an existing account accepts while signed in." %}
+      </p>
+    </div>
+  </header>
   <form method="post"
         class="card max-w-2xl"
         action="{% url 'org:create_invitation' %}">

@@ -4,10 +4,14 @@
   {% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h1>{% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %}</h1>
-    {% include "material_requests/status.html" with obj=request_obj %}
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'requests:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("My requests") parent_url=crumb_url current=request_obj.number|default:_("Draft request") %}
+      <h1>{% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %}</h1>
+      <p class="mt-1 flex flex-wrap gap-2">{% include "material_requests/status.html" with obj=request_obj %}</p>
+    </div>
+  </header>
   <section class="card mb-4" aria-label="{% translate 'Request details' %}">
     <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
       <div>

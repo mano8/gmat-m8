@@ -4,13 +4,19 @@
   {% if category %}{{ category.name }}{% else %}{% translate "New category" %}{% endif %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-4">
-    {% if category %}
-      {% blocktranslate with name=category.name %}Edit category {{ name }}{% endblocktranslate %}
-    {% else %}
-      {% translate "New category" %}
-    {% endif %}
-  </h1>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'catalog:categories' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Categories") parent_url=crumb_url current=category.name|default:_("New category") %}
+      <h1>
+        {% if category %}
+          {% blocktranslate with name=category.name %}Edit category {{ name }}{% endblocktranslate %}
+        {% else %}
+          {% translate "New category" %}
+        {% endif %}
+      </h1>
+    </div>
+  </header>
   <form method="post"
         class="card max-w-2xl"
         action="{% if category %}{% url 'catalog:category_update' category_id=category.pk %}{% else %}{% url 'catalog:category_create' %}{% endif %}">

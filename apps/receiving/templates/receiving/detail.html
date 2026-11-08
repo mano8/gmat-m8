@@ -4,16 +4,20 @@
   {{ receipt.number }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'receiving:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Receipts") parent_url=crumb_url current=receipt.number %}
       <h1 data-testid="receipt-number">{{ receipt.number }}</h1>
       <p class="mt-1 flex flex-wrap gap-2">{% include "receiving/status.html" with obj=receipt %}</p>
     </div>
-    {% can "po.view" receipt.po %}
-      {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
-      {% include "components/button.html" with href=order_url label=_("Purchase order") %}
-    {% endcan %}
-  </div>
+    <div class="page-head-actions">
+      {% can "po.view" receipt.po %}
+        {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
+        {% include "components/button.html" with href=order_url label=_("Purchase order") %}
+      {% endcan %}
+    </div>
+  </header>
   <section class="card mb-4" aria-label="{% translate 'Receipt details' %}">
     <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
       <div>

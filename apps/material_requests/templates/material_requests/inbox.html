@@ -4,9 +4,11 @@
   {% translate "Approval inbox" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h1>{% translate "Approval inbox" %}</h1>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Approval inbox" %}</h1>
+    </div>
+  </header>
   {% url 'requests:inbox' as inbox_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing sort_always=True target="#inbox-results" action=inbox_url grid="sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" %}
   {% partialdef results inline %}

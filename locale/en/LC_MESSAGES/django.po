@@ -5855,3 +5855,59 @@ msgstr ""
 #: templates/components/tabs.html:7
 msgid "Sections"
 msgstr ""
+
+#: apps/core/navigation.py:58
+msgid "Work"
+msgstr ""
+
+#: apps/core/navigation.py:83
+msgid "Purchasing"
+msgstr ""
+
+#: apps/core/navigation.py:107
+msgid "Site & warehouse"
+msgstr ""
+
+#: apps/core/navigation.py:111
+msgid "Receiving"
+msgstr ""
+
+#: apps/core/navigation.py:140
+msgid "Organization"
+msgstr ""
+
+#: apps/core/navigation.py:174
+msgid "Insights"
+msgstr ""
+
+#: templates/layouts/app.html:65
+msgid "Show the menu"
+msgstr ""
+
+#: templates/layouts/app.html:65
+msgid "Hide the menu"
+msgstr ""
+
+#: templates/layouts/app.html:97
+msgid "Account menu"
+msgstr ""
+
+#: templates/layouts/app.html:122
+msgid "More"
+msgstr ""
+
+#: templates/partials/theme_switch.html:14
+msgid "Theme"
+msgstr ""
+
+#: templates/partials/theme_switch.html:23
+msgid "System"
+msgstr ""
+
+#: templates/partials/theme_switch.html:30
+msgid "Light"
+msgstr ""
+
+#: templates/partials/theme_switch.html:37
+msgid "Dark"
+msgstr ""

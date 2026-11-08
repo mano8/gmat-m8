@@ -4,13 +4,19 @@
   {% if material %}{{ material.reference }}{% else %}{% translate "New material" %}{% endif %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-4">
-    {% if material %}
-      {% blocktranslate with reference=material.reference %}Edit material {{ reference }}{% endblocktranslate %}
-    {% else %}
-      {% translate "New material" %}
-    {% endif %}
-  </h1>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'catalog:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Catalog") parent_url=crumb_url current=material.reference|default:_("New material") %}
+      <h1>
+        {% if material %}
+          {% blocktranslate with reference=material.reference %}Edit material {{ reference }}{% endblocktranslate %}
+        {% else %}
+          {% translate "New material" %}
+        {% endif %}
+      </h1>
+    </div>
+  </header>
   <form method="post"
         class="card max-w-2xl"
         action="{% if material %}{% url 'catalog:update' material_id=material.pk %}{% else %}{% url 'catalog:create' %}{% endif %}">

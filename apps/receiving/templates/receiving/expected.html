@@ -4,10 +4,14 @@
   {% translate "Expected deliveries" %} · {{ project.code }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1>{% translate "Expected deliveries" %}</h1>
-    <p class="mt-1 text-soft" data-testid="expected-project-name">{{ project.code }} · {{ project.name }}</p>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'receiving:projects' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Expected on site") parent_url=crumb_url current=project.code %}
+      <h1>{% translate "Expected deliveries" %}</h1>
+      <p class="page-head-sub" data-testid="expected-project-name">{{ project.code }} · {{ project.name }}</p>
+    </div>
+  </header>
   {% url 'receiving:expected' project_id=project.pk as expected_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#expected-results" action=expected_url grid="sm:grid-cols-[1fr_10rem_auto]" %}
   {% partialdef results inline %}
