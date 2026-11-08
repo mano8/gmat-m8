@@ -203,6 +203,8 @@ SEE_OTHER = Outcome(303, To.ANYWHERE)
 SEE_OTHER_HOME = Outcome(303, To.HOME)
 NO_CONTENT = Outcome(204)
 BAD_REQUEST = Outcome(400)
+# A form sent from a dialog with htmx that comes back with its errors (M8b.3).
+UNPROCESSABLE = Outcome(422)
 DENIED = Outcome(403)
 NOT_FOUND = Outcome(404)
 NOT_ALLOWED = Outcome(405)

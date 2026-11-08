@@ -65,6 +65,7 @@ from tests.access.matrix import (
     SEE_OTHER_HOME,
     STEP_UP,
     TABLE_METHODS,
+    UNPROCESSABLE,
     Expect,
     Outcome,
     Route,
@@ -81,6 +82,9 @@ from tests.org import Sentinel
 pytestmark = pytest.mark.django_db
 
 # --- row helpers -------------------------------------------------------------------------
+
+# The header htmx sends: a dialog's fragment or form (M8b.3) is asked for with it.
+HTMX = {"HX-Request": "true"}
 
 
 def same(outcomes: Expect, post: Expect | None = None) -> dict[str, Expect]:
@@ -1083,6 +1087,14 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a live line of an approved request",
             path=line_of("requests:edit_line", "approved_request_line"),
         ),
+        # M8b.3's lazy dialog pilot: the review page's dialog asks for the same URL with htmx
+        # and gets its fragment; the outcomes and sentinels are the plain page's.
+        Route(
+            source_page(),
+            position="a live line of an approved request, htmx",
+            path=line_of("requests:edit_line", "approved_request_line"),
+            headers=HTMX,
+        ),
     ),
     "requests:apply_edit": (
         Route(
@@ -1090,6 +1102,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a live line of an approved request",
             path=line_of("requests:apply_edit", "approved_request_line"),
             note="an empty form: back to the dialog",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a live line of an approved request, htmx",
+            path=line_of("requests:apply_edit", "approved_request_line"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
         ),
     ),
     "requests:new_line": (
@@ -1436,6 +1455,30 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             ),
             position="warehouse",
             path=_object_url("receiving:void", "warehousereceipt"),
+        ),
+        # M8b.3's inline dialog pilot: the void form posted with htmx.
+        Route(
+            project_action(
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                UNPROCESSABLE,
+            ),
+            position="worksite, htmx",
+            path=_object_url("receiving:void", "goodsreceipt"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
+        Route(
+            project_action(
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                UNPROCESSABLE,
+            ),
+            position="warehouse, htmx",
+            path=_object_url("receiving:void", "warehousereceipt"),
+            headers=HTMX,
         ),
     ),
     # Handovers (M6.3): handover.view also reaches an assigned project (the site manager reads,

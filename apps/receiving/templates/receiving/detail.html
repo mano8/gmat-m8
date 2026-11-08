@@ -16,6 +16,16 @@
         {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
         {% include "components/button.html" with href=order_url label=_("Purchase order") %}
       {% endcan %}
+      {% if can_void %}
+        <button type="button"
+                class="btn btn-danger"
+                commandfor="void-dialog"
+                command="show-modal"
+                data-testid="void-open">
+          {% icon "ban" classes="size-5" %}
+          {% translate "Void the receipt" %}
+        </button>
+      {% endif %}
     </div>
   </header>
   <section class="card mb-4" aria-label="{% translate 'Receipt details' %}">
@@ -134,21 +144,31 @@
   </section>
   {% include "attachments/panel.html" with panel=attachments %}
   {% if can_void %}
-    <section class="card mb-4" aria-label="{% translate 'Void the receipt' %}">
-      <details>
-        <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Void the receipt" %}</summary>
-        <p class="mb-2 text-sm text-soft">
-          {% translate "A void takes the goods out of the receipts (and out of the handover made on site). Enter the receipt again if it was only wrong." %}
-        </p>
-        <form method="post"
-              action="{% url 'receiving:void' receipt_id=receipt.pk %}"
-              data-once
-              data-testid="void-form">
-          {% csrf_token %}
-          {{ void_form.reason.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Void the receipt") variant="danger" %}
-        </form>
-      </details>
-    </section>
+    {# An inline dialog (M8b.3): the form is in the page, the button opens it with no script. #}
+    {% include "components/dialog.html" with id="void-dialog" title=_("Void the receipt?") description=_("A void takes the goods out of the receipts (and out of the handover made on site). Enter the receipt again if it was only wrong.") tone="danger" content="receiving/detail.html#void_form" testid="void-dialog" %}
   {% endif %}
 {% endblock content %}
+{% comment %}
+  The void dialog's form (M8b.3): drawn in the page's dialog, and sent back alone with its
+  errors (422) when the reason is missing or the service refuses the void.
+{% endcomment %}
+{% partialdef void_form %}
+  {% url 'receiving:void' receipt_id=receipt.pk as void_url %}
+  <form method="post"
+        action="{{ void_url }}"
+        hx-post="{{ void_url }}"
+        hx-disabled-elt="find [data-dialog-actions]"
+        class="dialog-content"
+        novalidate
+        data-testid="void-form">
+    <div class="dialog-body">
+      {% include "components/error_summary.html" with form=void_form %}
+      {% csrf_token %}
+      {{ void_form.reason.as_field_group }}
+    </div>
+    <fieldset class="dialog-foot" data-dialog-actions>
+      {% include "components/dialog_cancel.html" with dialog_id="void-dialog" label=_("Keep the receipt") focus=True %}
+      <button type="submit" class="btn btn-danger" data-testid="void-submit">{% translate "Void the receipt" %}</button>
+    </fieldset>
+  </form>
+{% endpartialdef %}
