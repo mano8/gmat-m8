@@ -5911,3 +5911,46 @@ msgstr ""
 #: templates/partials/theme_switch.html:37
 msgid "Dark"
 msgstr ""
+
+#: templates/components/dialog.html
+msgid "Close"
+msgstr ""
+
+#: templates/components/dialog.html
+msgid "This cannot be done from here any more."
+msgstr ""
+
+#: templates/components/dialog.html templates/components/dialog_problem.html
+msgid "Reload the page"
+msgstr ""
+
+#: templates/components/dialog_problem.html
+msgid "The page is out of date"
+msgstr ""
+
+#: templates/components/dialog_problem.html
+msgid "Someone else changed this, or the form expired or was already sent. Reload the page to see where things stand, then try again."
+msgstr ""
+
+#: templates/components/dialog_problem.html
+msgid "This form cannot be sent"
+msgstr ""
+
+#: templates/components/dialog_problem.html
+msgid "Reload the page and fill in the form again."
+msgstr ""
+
+#: apps/receiving/templates/receiving/detail.html
+msgid "Void the receipt?"
+msgstr ""
+
+#: apps/receiving/templates/receiving/detail.html
+msgid "Keep the receipt"
+msgstr ""
+
+#: templates/components/error_summary.html
+#, python-format
+msgid "Correct one thing to continue."
+msgid_plural "Correct %(counter)s things to continue."
+msgstr[0] ""
+msgstr[1] ""

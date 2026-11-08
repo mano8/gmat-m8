@@ -1172,6 +1172,261 @@
   }
 }
 
+/* --- dialog (M8b.3): a native <dialog>; a bottom sheet on a phone, centred from 40rem ------------ */
+@utility dialog {
+  /* The phone: a sheet along the bottom edge, as tall as its content up to 90 % of the screen. */
+  margin: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 90dvh;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-3);
+  padding: 0;
+  color: var(--ink);
+  &[open] {
+    display: flex;
+  }
+  &::backdrop {
+    background-color: var(--backdrop);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity var(--dur-base) var(--ease-standard),
+      transform var(--dur-base) var(--ease-standard),
+      overlay var(--dur-base) allow-discrete,
+      display var(--dur-base) allow-discrete;
+    &::backdrop {
+      transition:
+        opacity var(--dur-base) var(--ease-standard),
+        overlay var(--dur-base) allow-discrete,
+        display var(--dur-base) allow-discrete;
+    }
+    @starting-style {
+      &[open] {
+        opacity: 0;
+        transform: translateY(1.5rem);
+      }
+      &[open]::backdrop {
+        opacity: 0;
+      }
+    }
+    &:not([open]) {
+      opacity: 0;
+      transform: translateY(1.5rem);
+    }
+  }
+  @media (min-width: 40rem) {
+    margin: auto;
+    width: calc(100% - 2rem);
+    max-width: 32rem;
+    max-height: calc(100dvh - 4rem);
+    border-bottom: 1px solid var(--line);
+    border-radius: var(--radius-2xl);
+    @media (prefers-reduced-motion: no-preference) {
+      @starting-style {
+        &[open] {
+          transform: scale(0.97);
+        }
+      }
+      &:not([open]) {
+        transform: scale(0.97);
+      }
+    }
+  }
+}
+@utility dialog-lg {
+  @media (min-width: 40rem) {
+    max-width: 42rem;
+  }
+}
+/* The grab handle says "sheet" on a phone; a centred dialog has none. */
+@utility dialog-grab {
+  flex: none;
+  margin: 0.5rem auto 0;
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: 9999px;
+  background-color: var(--line);
+  @media (min-width: 40rem) {
+    display: none;
+  }
+}
+@utility dialog-head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.5rem 0.5rem 0 1rem;
+  @media (min-width: 40rem) {
+    padding: 1rem 0.75rem 0 1.25rem;
+  }
+}
+@utility dialog-badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  margin-top: 0.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-color: var(--danger-soft);
+  color: var(--danger);
+}
+@utility dialog-title {
+  padding-top: 0.625rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+@utility dialog-desc {
+  margin-top: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  text-wrap: pretty;
+}
+@utility dialog-close {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-soft);
+}
+/* What the dialog holds: the content swapped by htmx, a scrolling body and the footer. */
+@utility dialog-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+@utility dialog-body {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+  @media (min-width: 40rem) {
+    padding: 1rem 1.25rem;
+  }
+}
+/* The actions: side by side in thumb reach on a phone (the main one wider and last), right-aligned
+   from 40rem; kept above the phone's safe area. A <fieldset> htmx disables while the form is sent. */
+@utility dialog-foot {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+  margin: 0;
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background-color: var(--surface-sunken);
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  /* A lone action fills the row; with three (Cancel, a second action, the main one) the middle
+     one takes a row of its own above the pair. */
+  & > :only-child,
+  & > :nth-child(2):nth-last-child(2) {
+    grid-column: 1 / -1;
+  }
+  & > :nth-child(2):nth-last-child(2) {
+    order: -1;
+  }
+  @media (min-width: 40rem) {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.875rem 1.25rem;
+    & > :nth-child(2):nth-last-child(2) {
+      order: 0;
+    }
+  }
+}
+/* The server could not answer with a form (a refusal, the network): app.js shows this. */
+@utility dialog-failure {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+  margin: 0.75rem 1rem 0;
+  border-radius: var(--radius-md);
+  background-color: var(--danger-soft);
+  padding: 0.625rem 0.75rem;
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 500;
+  & > svg {
+    flex: none;
+  }
+  & a {
+    color: inherit;
+    text-decoration: underline;
+  }
+}
+/* What a destructive action will do, as a list in its dialog: an icon and a sentence each. */
+@utility consequences {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  & > li {
+    display: grid;
+    grid-template-columns: 1.125rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+  & > li > svg {
+    margin-top: 0.125rem;
+    color: var(--ink-soft);
+  }
+}
+/* A lazy dialog's own page (opened without JavaScript or as a link): the same parts in a panel. */
+@utility dialog-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+/* A message on top of a form: what went wrong (the error summary) or why it cannot be sent. */
+@utility alert {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: 0.5rem;
+  border-radius: var(--radius-md);
+  background-color: var(--danger-soft);
+  padding: 0.625rem 0.75rem;
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 500;
+  & a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  /* The summary's links to the fields are 44 px targets, one per row. */
+  & li > a {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+  }
+  &:focus-visible {
+    outline-offset: 2px;
+  }
+}
+/* A modal dialog locks the page behind it. */
+@layer base {
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+}
+
 /* --- tabs: links, the current one marked with aria-current -------------------------------------- */
 @utility tabs {
   display: flex;

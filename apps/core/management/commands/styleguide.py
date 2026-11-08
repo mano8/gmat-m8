@@ -64,6 +64,14 @@ class SampleForm(forms.Form):
     sure = forms.BooleanField(label="I checked the goods", required=False)
 
 
+class ReasonSample(forms.Form):
+    """The reason of a destructive confirmation."""
+
+    reason = forms.CharField(
+        label="Reason", widget=forms.Textarea(attrs={"rows": 2}), help_text="Kept in the history."
+    )
+
+
 def _pages() -> dict[str, Any]:
     """Lists in the shapes the list components take (a counted page, a cursor page)."""
     request = RequestFactory().get("/styleguide/", {"page": "3"})
@@ -90,6 +98,11 @@ def _context() -> dict[str, Any]:
         "filter_form": SampleFilter({"state": "open"}),
         "form": SampleForm(),
         "invalid_form": invalid,
+        # The dialogs' forms (M8b.3), with their own ids: the fields above use the same names.
+        "reason_form": ReasonSample(auto_id="sg_reason_%s"),
+        "dialog_form": SampleForm(
+            data={"reference": "", "quantity": "x", "kind": "a"}, auto_id="sg_dialog_%s"
+        ),
         "table_columns": ["Material", "Ordered", "Received"],
         "table_rows": [["Copper cable 3x2.5", "120", "80"], ["Plug, type F", "40", "40"]],
         "numeric_columns": [1, 2],

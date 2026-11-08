@@ -77,6 +77,10 @@ class TestTheStyleGuide:
             "list_summary": "results",
             "icon": "<svg",
             "filter_form": 'role="search"',
+            "dialog": "<dialog",
+            "dialog_cancel": 'data-testid="dialog-cancel"',
+            "dialog_problem": 'data-testid="dialog-problem"',
+            "error_summary": "data-error-summary",
         }
         drawn = {path.stem for path in COMPONENTS.glob("*.html")}
         # sort_header sits in a table header and messages needs a request: own tests.

@@ -1,0 +1,24 @@
+{% load i18n ui_tags %}
+{% comment %}
+  What an htmx request from a dialog gets when no correction of its form can help (M8b.3):
+  409 (the page is out of date: a stale version, a form key used for other data, a command that
+  kept conflicting) or 400 (a form key that is not valid). Swapped into the dialog in place of
+  the form, with the way out: reload the page. Parameter: status.
+{% endcomment %}
+<div class="dialog-body" data-testid="dialog-problem">
+  <div class="alert" role="alert" tabindex="-1" data-error-summary>
+    {% icon "circle-alert" classes="size-5" %}
+    <div>
+      {% if status == 409 %}
+        <p class="font-semibold">{% translate "The page is out of date" %}</p>
+        <p>{% translate "Someone else changed this, or the form expired or was already sent. Reload the page to see where things stand, then try again." %}</p>
+      {% else %}
+        <p class="font-semibold">{% translate "This form cannot be sent" %}</p>
+        <p>{% translate "Reload the page and fill in the form again." %}</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="dialog-foot">
+  <a class="btn btn-primary" href="">{% translate "Reload the page" %}</a>
+</div>

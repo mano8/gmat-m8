@@ -1,0 +1,20 @@
+{% load i18n %}
+{% comment %}
+  The Cancel of a dialog's form (M8b.3): in a dialog it closes it (an invoker command, no
+  script); the same form on its own page (a lazy dialog's URL opened without JavaScript or as a
+  link) has a link back instead.
+  Parameters: dialog_id (empty on the form's own page), back_url, label (default "Cancel"),
+  focus (true in a destructive dialog: Cancel has the focus when it opens).
+{% endcomment %}
+{% if dialog_id %}
+  <button type="button"
+          class="btn btn-secondary"
+          commandfor="{{ dialog_id }}"
+          command="close"
+          {% if focus %}autofocus{% endif %}
+          data-testid="dialog-cancel">{{ label|default:_("Cancel") }}</button>
+{% else %}
+  <a class="btn btn-secondary"
+     href="{{ back_url }}"
+     data-testid="dialog-cancel">{{ label|default:_("Cancel") }}</a>
+{% endif %}

@@ -213,6 +213,38 @@
         <h2 id="h-skeleton">Skeleton</h2>
         <div class="card">{% include "components/skeleton.html" %}</div>
       </section>
+      <section id="dialogs" class="grid gap-3" aria-labelledby="h-dialogs">
+        <h2 id="h-dialogs">Dialogs</h2>
+        <p class="text-soft">
+          A bottom sheet on a phone, centred from 40rem. The buttons open them (invoker commands, no script).
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button"
+                  class="btn btn-danger"
+                  commandfor="sg-dialog-danger"
+                  command="show-modal">Destructive confirmation</button>
+          <button type="button"
+                  class="btn"
+                  commandfor="sg-dialog-form"
+                  command="show-modal">Form with errors</button>
+          <button type="button"
+                  class="btn"
+                  commandfor="sg-dialog-problem"
+                  command="show-modal">Out of date (409)</button>
+          <button type="button"
+                  class="btn"
+                  commandfor="sg-dialog-lazy"
+                  command="show-modal">Loading (lazy)</button>
+        </div>
+        {% include "components/dialog.html" with id="sg-dialog-danger" title="Close the cable line short?" description="Cable RZ1-K 3G2,5 mm² on PED-A-2026-00087: 380 of 500 m received." tone="danger" content="styleguide/index.html#sg_danger" %}
+        {% include "components/dialog.html" with id="sg-dialog-form" title="Change a line" size="lg" content="styleguide/index.html#sg_form" %}
+        {% include "components/dialog.html" with id="sg-dialog-problem" title="Change a line" content="components/dialog_problem.html" status=409 %}
+        {% include "components/dialog.html" with id="sg-dialog-lazy" title="Change a line" %}
+        <div class="card grid gap-3">
+          <h3 class="card-title">The error summary, on top of a form</h3>
+          {% include "components/error_summary.html" with form=dialog_form %}
+        </div>
+      </section>
       <section id="icons" class="grid gap-3" aria-labelledby="h-icons">
         <h2 id="h-icons">Icons ({{ icons|length }})</h2>
         <ul class="m-0 grid list-none grid-cols-3 gap-2 p-0 sm:grid-cols-6">
@@ -224,5 +256,42 @@
         </ul>
       </section>
     </div>
+    {% partialdef sg_danger %}
+      <form class="dialog-content" novalidate>
+        <div class="dialog-body">
+          <ul class="consequences">
+            <li>
+              {% icon "undo-2" classes="size-4" %}<span>The <b class="num">120 m</b> still due are no longer expected from this supplier; their 2 requests show them as still to purchase.</span>
+            </li>
+            <li>
+              {% icon "check" classes="size-4" %}<span>The <b class="num">380 m</b> already received stay with their requests.</span>
+            </li>
+            <li>
+              {% icon "paperclip" classes="size-4" %}<span>The reason is kept in the order's history.</span>
+            </li>
+          </ul>
+          {% include "components/field.html" with field=reason_form.reason %}
+        </div>
+        <fieldset class="dialog-foot" data-dialog-actions>
+          {% include "components/dialog_cancel.html" with dialog_id="sg-dialog-danger" label="Keep the line open" focus=True %}
+          <button type="button" class="btn btn-danger">Close short</button>
+        </fieldset>
+      </form>
+    {% endpartialdef %}
+    {% partialdef sg_form %}
+      <form class="dialog-content" novalidate>
+        <div class="dialog-body">
+          {% include "components/error_summary.html" with form=dialog_form %}
+          {% for field in dialog_form %}
+            {% include "components/field.html" with field=field %}
+          {% endfor %}
+        </div>
+        <fieldset class="dialog-foot" data-dialog-actions>
+          {% include "components/dialog_cancel.html" with dialog_id="sg-dialog-form" %}
+          <button type="button" class="btn btn-secondary">Save and approve</button>
+          <button type="button" class="btn btn-primary">Save</button>
+        </fieldset>
+      </form>
+    {% endpartialdef %}
   </body>
 </html>

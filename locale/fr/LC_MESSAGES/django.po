@@ -6133,3 +6133,46 @@ msgstr "Clair"
 #: templates/partials/theme_switch.html:37
 msgid "Dark"
 msgstr "Sombre"
+
+#: templates/components/dialog.html
+msgid "Close"
+msgstr "Fermer"
+
+#: templates/components/dialog.html
+msgid "This cannot be done from here any more."
+msgstr "Cela ne peut plus être fait d'ici."
+
+#: templates/components/dialog.html templates/components/dialog_problem.html
+msgid "Reload the page"
+msgstr "Recharger la page"
+
+#: templates/components/dialog_problem.html
+msgid "The page is out of date"
+msgstr "La page n'est plus à jour"
+
+#: templates/components/dialog_problem.html
+msgid "Someone else changed this, or the form expired or was already sent. Reload the page to see where things stand, then try again."
+msgstr "Quelqu'un d'autre l'a modifié, ou le formulaire a expiré ou a déjà été envoyé. Rechargez la page pour voir où en sont les choses, puis réessayez."
+
+#: templates/components/dialog_problem.html
+msgid "This form cannot be sent"
+msgstr "Ce formulaire ne peut pas être envoyé"
+
+#: templates/components/dialog_problem.html
+msgid "Reload the page and fill in the form again."
+msgstr "Rechargez la page et remplissez à nouveau le formulaire."
+
+#: apps/receiving/templates/receiving/detail.html
+msgid "Void the receipt?"
+msgstr "Annuler la réception ?"
+
+#: apps/receiving/templates/receiving/detail.html
+msgid "Keep the receipt"
+msgstr "Garder la réception"
+
+#: templates/components/error_summary.html
+#, python-format
+msgid "Correct one thing to continue."
+msgid_plural "Correct %(counter)s things to continue."
+msgstr[0] "Corrigez une chose pour continuer."
+msgstr[1] "Corrigez %(counter)s choses pour continuer."
