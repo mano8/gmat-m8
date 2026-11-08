@@ -185,3 +185,17 @@ def remove_line_dialog(line: MaterialRequestLine, form: Form, status: str) -> Ac
         testid="remove-line-form",
         submit_testid="remove-line-submit",
     )
+
+
+def free_line_dialog(found: MaterialRequest, form: Form) -> ActionDialog:
+    """A material outside the catalog, on a draft: described, with its unit and quantity."""
+    return ActionDialog(
+        id="free-line-dialog",
+        title=_("Not in the catalog?"),
+        icon="plus",
+        action=reverse("requests:add_free_line", args=[found.pk]),
+        submit=_("Add to the request"),
+        form=form,
+        testid="free-line-form",
+        submit_testid="free-line-submit",
+    )

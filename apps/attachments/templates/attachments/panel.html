@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n attachment_tags %}
 {% comment %}
   The attachments of a document page (``attachments.selectors.panel``). Parameter: panel.
   Each row downloads through the authorised view; the upload and remove forms post to their
@@ -29,26 +29,9 @@
                 {{ row.item.get_content_type_display }} · {{ row.item.size_bytes|filesizeformat }} · {{ row.item.uploaded_by.full_name|default:row.item.uploaded_by.email }} · {{ row.item.uploaded_at|date:"SHORT_DATETIME_FORMAT" }}
               </p>
               {% if row.can_remove %}
-                <details>
-                  <summary class="min-h-11 cursor-pointer py-2 text-sm text-danger">{% translate "Remove" %}</summary>
-                  <form method="post"
-                        action="{% url 'attachments:remove' attachment_id=row.item.pk %}?back={{ panel.back }}"
-                        data-once
-                        data-testid="attachment-remove">
-                    {% csrf_token %}
-                    {% if row.needs_reason %}
-                      <div class="field">
-                        <label for="id_remove_reason_{{ forloop.counter }}">{% translate "Reason" %}</label>
-                        <textarea id="id_remove_reason_{{ forloop.counter }}"
-                                  name="reason"
-                                  rows="2"
-                                  maxlength="500"
-                                  required></textarea>
-                      </div>
-                    {% endif %}
-                    {% include "components/button.html" with type="submit" label=_("Remove the attachment") variant="danger" %}
-                  </form>
-                </details>
+                {% attachment_remove_dialog row panel as remove %}
+                {% include "components/dialog_button.html" with dialog=remove.id label=_("Remove") variant="ghost" size="sm" icon="trash" testid="attachment-remove-open" %}
+                {% include "components/action_dialog.html" with d=remove %}
               {% endif %}
             {% endif %}
           </li>

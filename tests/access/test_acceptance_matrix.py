@@ -972,6 +972,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=request_url("requests:add_free_line", "materialrequest"),
             note="an empty form: back to the request",
         ),
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", UNPROCESSABLE),
+            position="own draft, htmx",
+            path=request_url("requests:add_free_line", "materialrequest"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "requests:submit": (
         Route(
@@ -1791,6 +1798,15 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, REDIRECT),
             position="worksite receipt",
             path=_attachment_url("attachments:remove", "attachment"),
+        ),
+        # M8b.4: the remove dialog posts with htmx. A moderator must give a reason, so an empty
+        # form comes back on the dialog (before the plain row removes the file).
+        Route(
+            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, UNPROCESSABLE),
+            position="handover, htmx",
+            path=_attachment_url("attachments:remove", "handoverattachment"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again, nothing removed",
         ),
         Route(
             project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, REDIRECT),
