@@ -109,7 +109,7 @@ Every pull request runs these checks from [ci.yaml](.github/workflows/ci.yaml) a
 | `lint` | ruff, djLint, the access rules and banned constructs, `uv lock --check`, security floors, valid and unexpired Trivy exceptions |
 | `typecheck` | mypy (strict, django-stubs) |
 | `security` | bandit (medium and above), pip-audit on the locked set, Trivy filesystem scan (HIGH and CRITICAL, no `--ignore-unfixed`) |
-| `test` | PostgreSQL 18, no missing migrations, the coverage gates, migrations that reverse |
+| `test` | the test suite in four jobs at once on PostgreSQL 18 (`test-shard`), no missing migrations, migrations that reverse; it merges their coverage and applies the gates |
 | `trivy-image` | builds the app and backup images and gates both with Trivy |
 | `secret-scan` | gitleaks over the full history |
 | `compose-smoke-gate` | the whole stack, started fresh, against the live test suite, when a change can affect it |
