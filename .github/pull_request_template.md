@@ -28,6 +28,10 @@
 
 <!-- Authentication, authorization, secrets, logging, headers, outbound calls. Flag any change under .github/workflows/ for explicit review. -->
 
+## ADRs
+
+<!-- Required when the change touches a file an ADR governs (ADR-0026; the adr-alignment check says which). One line per ADR: "ADR-00NN: updated" or "ADR-00NN: checked, still holds because …". A new decision gets a new ADR. "none" if no governed file changed. -->
+
 ## Assumptions used
 
 <!-- Open questions (plan section 10 / ADR-0010) answered by a working assumption. Reviewer: please confirm or correct. -->

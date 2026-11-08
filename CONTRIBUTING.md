@@ -41,6 +41,7 @@ Read [CLAUDE.md](CLAUDE.md) before writing code: it is the working agreement for
 1. Branch from the latest `main`: `git switch --no-track -c <short-slug> origin/main`.
 2. Commit in small steps with [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, for example `fix(catalog): keep the search term after paging`. Types in use: `feat`, `fix`, `docs`, `test`, `refactor`, `ci`, `deps`, `chore`. Maintainer phase work adds the step id, e.g. `[M4.2]`.
 3. Add tests with the change (see below) and run the local gates.
+   If the change touches a file an ADR governs (`python scripts/check_adr_alignment.py which <path>`), check the decision still holds: update that ADR in the same pull request when the change alters it, or say in the template's **ADRs** section why it still holds ([ADR-0026](docs/adr/0026-adrs-stay-aligned.md)). A new decision gets a new ADR.
 4. Push and open a pull request against `main`. Fill in every section of the template; write "n/a" where one does not apply.
 
 Never commit secrets or real environment files (`.env`, `*.env`, keys, backups); only `*.example` templates. Never use `--no-verify`.
