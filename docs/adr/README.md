@@ -26,3 +26,4 @@ Accepted decisions. An ADR wins over the planning notes. A new decision gets the
 - [ADR-0022](0022-no-change-to-ones-own-authority-or-email.md): An administrator never changes their own authority or email
 - [ADR-0023](0023-lists-page-in-the-database.md): Lists page in the database; lists worked out from the ledger use a cursor
 - [ADR-0024](0024-session-idle-limits-own-sessions-credential-notices.md): Idle limits, one's own sessions and credential-change notices
+- [ADR-0025](0025-ci-test-shards.md): CI runs the tests in four shards at once; time-dependent tests run alone
