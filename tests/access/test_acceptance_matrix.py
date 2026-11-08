@@ -500,6 +500,22 @@ PANEL_HOLDERS: dict[str, tuple[str, ...]] = {
     "dispatches": PO_MANAGERS,
     "overview": ("group_admin",),
 }
+# Chart panels (M8b.5): offered to who holds every capability the chart reads with; counts
+# and durations only, so no sentinel may show but the supplier's name on the ranking of
+# overdue orders (its readers all hold supplier.view).
+CHART_HOLDERS: dict[str, tuple[str, ...]] = {
+    "request-progress": REQUEST_CREATORS,
+    "decisions": REVIEWERS,
+    "inbox-age": REVIEWERS,
+    "orders-receipts": PO_VIEWERS,
+    "on-time": PO_VIEWERS,
+    "overdue-suppliers": PO_VIEWERS,
+    "receipts-handovers": RECEIPT_HOLDERS,
+    "handover-projects": RECEIPT_HOLDERS,
+    "branch-requests": ("group_admin",),
+    "branch-people": ("group_admin",),
+}
+CHART_ALLOWED: dict[str, frozenset[Sentinel]] = {"overdue-suppliers": SUPPLIER_NAME}
 # An unknown panel is a 404 for every signed-in session that passed the MFA guard.
 SESSION_ACTORS = tuple(
     name for name in ACTOR_NAMES if name not in (*GROUPS["signed_out"], *GROUPS["no_mfa"])
@@ -520,12 +536,27 @@ def dashboard_routes() -> tuple[Route, ...]:
         )
         for key, holders in PANEL_HOLDERS.items()
     )
+    charts = tuple(
+        Route(
+            app_page(**_each(OK, holders)),
+            position=key,
+            path=_panel_url(key),
+            allowed=CHART_ALLOWED.get(key, frozenset()),
+        )
+        for key, holders in CHART_HOLDERS.items()
+    )
+    # A period outside the allowlist falls back to the default: the same answers.
+    bad_period = Route(
+        app_page(**_each(OK, REVIEWERS)),
+        position="decisions, invalid period",
+        path=lambda world: reverse("dashboard:panel", kwargs={"key": "decisions"}) + "?weeks=5",
+    )
     unknown = Route(
         app_page(**_each(NOT_FOUND, SESSION_ACTORS)),
         position="unknown panel",
         path=_panel_url("no-such-panel"),
     )
-    return (*panels, unknown)
+    return (*panels, *charts, bad_period, unknown)
 
 
 def ui_preference_routes() -> tuple[Route, ...]:
@@ -804,6 +835,23 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         ),
     ),
     "dashboard:panel": dashboard_routes(),
+    # The key figures (M8b.5): every signed-in session, each tile through its own scope.
+    "dashboard:tiles": (
+        Route(
+            same(
+                expect(OK, signed_out=LOGIN, no_mfa=STEP_UP),
+                expect(NOT_ALLOWED, no_mfa=DENIED),
+            )
+        ),
+        Route(
+            same(
+                expect(OK, signed_out=LOGIN, no_mfa=STEP_UP),
+                expect(NOT_ALLOWED, no_mfa=DENIED),
+            ),
+            position="invalid period",
+            path=lambda world: reverse("dashboard:tiles") + "?weeks=abc",
+        ),
+    ),
     "core:ui_preferences": ui_preference_routes(),
     "audit:list": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
     "audit:object": audit_routes(),

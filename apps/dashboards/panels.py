@@ -27,6 +27,8 @@ from django.utils.translation import gettext_lazy
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
 from apps.core.listing import head
+from apps.dashboards.chart import ChartPanel
+from apps.dashboards.charts import CHARTS
 from apps.handovers import selectors as handover_selectors
 from apps.material_requests import selectors as request_selectors
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
@@ -72,6 +74,8 @@ class Panel:
     alert: bool = False
     # A query string for the link ("?assigned=1": the same screen, filtered).
     query: str = ""
+    requires: tuple[str, ...] = ()
+    kind: str = "list"
 
 
 # --- formatting ---------------------------------------------------------------------------
@@ -358,7 +362,7 @@ def overview(ctx: AccessContext) -> Content:
 # --- the registry ---------------------------------------------------------------------------
 
 C = Capability
-PANELS: tuple[Panel, ...] = (
+LISTS: tuple[Panel, ...] = (
     Panel(
         "my-requests",
         gettext_lazy("My requests"),
@@ -483,9 +487,16 @@ PANELS: tuple[Panel, ...] = (
         gettext_lazy("There is no active branch."),
     ),
 )
+#: Every panel: the charts (M8b.5) and the task lists, each loaded from ``dashboard:panel``.
+PANELS: tuple[Panel | ChartPanel, ...] = (*CHARTS, *LISTS)
 BY_KEY = {panel.key: panel for panel in PANELS}
 
 
-def visible(ctx: AccessContext) -> list[Panel]:
-    """The panels whose capability the user holds somewhere."""
-    return [panel for panel in PANELS if ctx.has(panel.capability)]
+def capabilities(panel: Panel | ChartPanel) -> tuple[str, ...]:
+    """Every capability the panel reads with: it is offered to who holds them all."""
+    return (panel.capability, *panel.requires)
+
+
+def visible(ctx: AccessContext) -> list[Panel | ChartPanel]:
+    """The panels whose capabilities the user holds somewhere."""
+    return [panel for panel in PANELS if all(ctx.has(each) for each in capabilities(panel))]

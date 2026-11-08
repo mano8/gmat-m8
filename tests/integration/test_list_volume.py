@@ -122,6 +122,41 @@ PANELS = (
     panel("overview", "group_admin"),
 )
 
+
+def chart(key: str, *actors: str) -> Screen:
+    """A chart panel (M8b.5): its "size" is the period, so the same number of queries at
+    12 weeks (``?weeks=10`` falls back to it) and 26, and the budget at 26 and 4."""
+    return Screen(
+        f"chart-{key}",
+        reverse_("dashboard:panel", key),
+        actors,
+        {"weeks": "4"},
+        size="weeks",
+        largest="26",
+    )
+
+
+CHARTS = (
+    chart("request-progress", "tech_mad"),
+    chart("decisions", "mm_mad", "group_admin"),
+    chart("inbox-age", "mm_mad", "group_admin"),
+    chart("orders-receipts", "mm_mad", "wo_mad"),
+    chart("on-time", "mm_mad"),
+    chart("overdue-suppliers", "mm_mad", "wo_mad"),
+    chart("receipts-handovers", "wo_mad", "site_manager"),
+    chart("handover-projects", "wo_mad", "group_admin", "site_manager"),
+    chart("branch-requests", "group_admin"),
+    chart("branch-people", "group_admin"),
+    Screen(
+        "key-figures",
+        reverse_("dashboard:tiles"),
+        ("tech_mad", "mm_mad", "wo_mad", "group_admin", "site_manager"),
+        {"weeks": "4"},
+        size="weeks",
+        largest="26",
+    ),
+)
+
 SCREENS = (
     Screen("catalog", reverse_("catalog:list"), ("mm_mad", "group_admin"), {"q": "cable 12"}),
     Screen("suppliers", reverse_("suppliers:list"), ("mm_mad",), {"q": "volumen 01"}),
@@ -244,6 +279,7 @@ SCREENS = (
         conditional=1,
     ),
     *PANELS,
+    *CHARTS,
     Screen(
         "audit-history",
         lambda w: reverse(

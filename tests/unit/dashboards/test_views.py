@@ -1,17 +1,22 @@
 """The home page and the panel fragments (plan M7.2)."""
 
 import time
+from datetime import timedelta
 from io import StringIO
 
 import pytest
 from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
+from apps.access.context import AccessContext
 from apps.accounts.models import User
 from apps.dashboards import panels
-from tests.org import Org, People, client_for
+from apps.purchasing.models import PurchaseOrder
+from tests.org import Org, People, Sentinel, build_sentinel_order, client_for
 from tests.support import enroll_totp
+from tests.unit.dashboards.conftest import Requests
 from tests.unit.purchasing.conftest import MakeLine
 
 pytestmark = pytest.mark.django_db
@@ -32,7 +37,7 @@ class TestHome:
         response = client_for(people.tech_mad, mfa=False).get(reverse("core:home"))
         html = response.content.decode()
         assert response.status_code == 200
-        assert placeholders(html) == {"my-requests"}
+        assert placeholders(html) == {"my-requests", "request-progress"}
         assert f'hx-get="{panel_url("my-requests")}"' in html
         assert 'hx-trigger="load"' in html
 
@@ -115,3 +120,128 @@ def test_every_panel_answers_within_budget_with_the_demo_data(group_admin: User)
         elapsed = time.perf_counter() - started
         assert response.status_code == 200, key
         assert elapsed < PANEL_BUDGET, f"{key}: {elapsed:.3f}s"
+
+
+# --- M8b.5: key figures, charts and the period -------------------------------------------
+
+
+def tiles_url(weeks: str = "") -> str:
+    return reverse("dashboard:tiles") + (f"?weeks={weeks}" if weeks else "")
+
+
+CHART_SCRIPT = "vendor/chartjs/chart.umd"
+
+
+class TestPeriodAndCharts:
+    def test_the_home_page_offers_the_period_and_loads_the_chart_library(
+        self, people: People
+    ) -> None:
+        html = client_for(people.mm_mad).get(reverse("core:home"), {"weeks": "4"}).content.decode()
+        assert CHART_SCRIPT in html and "js/charts.js" in html
+        assert '<a href="?weeks=4"\n                 aria-current="true">' in html or (
+            'href="?weeks=4"' in html and 'aria-current="true"' in html
+        )
+        assert f'hx-get="{panel_url("decisions")}?weeks=4"' in html
+        assert f'hx-get="{tiles_url("4")}"' in html
+
+    @pytest.mark.parametrize(
+        "weeks", ["7", "abc", "-12", ""], ids=["7", "text", "negative", "none"]
+    )
+    def test_a_period_outside_the_allowlist_falls_back_to_twelve(
+        self, people: People, requests: Requests, weeks: str
+    ) -> None:
+        requests.make(status="APPROVED", decided=timezone.now(), lines=("APPROVED",))
+        client = client_for(people.mm_mad)
+        html = client.get(reverse("core:home"), {"weeks": weeks}).content.decode()
+        assert f'hx-get="{panel_url("decisions")}?weeks=12"' in html
+        chart = client.get(panel_url("decisions"), {"weeks": weeks}).content.decode()
+        assert chart.count('<th scope="row">') == 12
+
+    def test_a_requester_without_a_chart_gets_no_chart_library(self, people: People) -> None:
+        html = client_for(people.tech_mad, mfa=False).get(reverse("core:home")).content.decode()
+        assert CHART_SCRIPT not in html
+        assert 'data-testid="period"' not in html
+        assert 'data-testid="key-figures"' in html
+
+    def test_an_account_without_a_role_gets_no_figures(self, people: People) -> None:
+        client = client_for(people.nobody, mfa=False)
+        html = client.get(reverse("core:home")).content.decode()
+        assert 'data-testid="key-figures"' not in html
+        response = client.get(tiles_url())
+        assert response.status_code == 200
+        assert 'data-testid="tile-' not in response.content.decode()
+
+    def test_the_key_figures_fragment(self, people: People) -> None:
+        client = client_for(people.mm_mad)
+        html = client.get(tiles_url("26")).content.decode()
+        for key in ("inbox", "decision-time", "to-purchase", "overdue"):
+            assert f'data-testid="tile-{key}"' in html
+        assert client.post(tiles_url()).status_code == 405
+        response = Client().get(tiles_url())
+        assert response.status_code == 302 and "login" in response["Location"]
+
+    def test_a_chart_fragment_carries_its_data_as_an_attribute_and_a_table(
+        self, people: People, requests: Requests
+    ) -> None:
+        requests.make(status="APPROVED", decided=timezone.now(), lines=("APPROVED",))
+        html = (
+            client_for(people.mm_mad).get(panel_url("decisions"), {"weeks": "4"}).content.decode()
+        )
+        assert '<canvas data-chart="{&quot;type&quot;:&quot;bar&quot;' in html
+        assert 'role="img"' in html and 'aria-label="' in html
+        assert "<script" not in html  # htmx would strip it: the data is an attribute
+        assert html.count('<th scope="row">') == 4
+        assert "data-chart-table" in html and " open " in html
+
+    def test_a_meters_panel_draws_meters(self, people: People, make_line: MakeLine) -> None:
+        make_line("4")
+        html = (
+            client_for(people.tech_mad, mfa=False)
+            .get(panel_url("request-progress"))
+            .content.decode()
+        )
+        assert "<meter" in html and "data-chart=" not in html
+
+    def test_a_chart_needs_every_capability_it_reads_with(self, people: People) -> None:
+        assert client_for(people.mm_mad).get(panel_url("branch-requests")).status_code == 403
+        assert client_for(people.wo_mad).get(panel_url("request-progress")).status_code == 403
+        assert client_for(people.group_admin).get(panel_url("branch-people")).status_code == 200
+
+
+class TestChartLeaks:
+    """Per projection (plan §8.2): a chart never carries a price or another project's
+    quantity, and a supplier only to ``supplier.view`` holders."""
+
+    @pytest.mark.parametrize(
+        ("actor", "allowed"),
+        [
+            ("tech_mad", frozenset()),
+            ("partner", frozenset()),
+            ("site_manager", frozenset()),
+            ("wo_mad", frozenset({Sentinel.SUPPLIER_NAME})),
+            ("mm_mad", frozenset({Sentinel.SUPPLIER_NAME})),
+            ("group_admin", frozenset({Sentinel.SUPPLIER_NAME})),
+        ],
+        ids=["technician", "partner", "site-manager", "warehouse", "manager", "admin"],
+    )
+    def test_no_sentinel_outside_the_projection(
+        self, org: Org, people: People, actor: str, allowed: frozenset[Sentinel]
+    ) -> None:
+        sentinel = build_sentinel_order(org, people)
+        PurchaseOrder.objects.filter(pk=sentinel.order.pk).update(
+            expected_date=timezone.localdate() - timedelta(days=5)
+        )
+        user = getattr(people, actor)
+        client = client_for(user, mfa=actor in {"wo_mad", "mm_mad", "group_admin"})
+        ctx = AccessContext.for_user(user)
+        pages = [tiles_url()] + [
+            panel_url(panel.key) for panel in panels.visible(ctx) if panel.kind != "list"
+        ]
+        for url in pages:
+            html = client.get(url).content.decode()
+            for found in Sentinel:
+                if found not in allowed:
+                    assert not found.found_in(html), (actor, url, found)
+        if Sentinel.SUPPLIER_NAME in allowed:
+            html = client.get(panel_url("overdue-suppliers")).content.decode()
+            assert Sentinel.SUPPLIER_NAME.found_in(html)

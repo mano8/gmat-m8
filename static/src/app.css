@@ -848,14 +848,15 @@
     }
   }
 }
-/* The theme choice (System, Light, Dark) and any short group of exclusive buttons. */
+/* The theme choice (System, Light, Dark), the dashboard's period and any short group of exclusive
+   buttons or links (a link marks the current one with aria-current). */
 @utility seg {
   display: flex;
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
   background-color: var(--surface-raised);
-  & > button {
+  & > :is(button, a) {
     display: inline-flex;
     min-height: 2.75rem;
     flex: 1 1 0%;
@@ -867,6 +868,8 @@
     padding-inline: 0.75rem;
     color: var(--ink-soft);
     font-size: 0.875rem;
+    text-decoration: none;
+    white-space: nowrap;
     font-weight: 500;
     &:last-child {
       border-right: 0;
@@ -876,7 +879,7 @@
         background-color: var(--surface-sunken);
       }
     }
-    &[aria-pressed="true"] {
+    &:is([aria-pressed="true"], [aria-current="true"]) {
       background-color: var(--brand-soft);
       color: var(--brand);
       font-weight: 600;
@@ -999,6 +1002,130 @@
     stroke: var(--surface-raised);
     stroke-width: 2;
   }
+}
+
+@utility stat-note {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+/* --- dashboard (M8b.5): the key figures, the charts grid and a chart card ------------------------ */
+/* Phone: the tiles scroll sideways inside their row (snapping), never the page; from a 40rem
+   column two per line, from 60rem four. The row's parent is an @container. */
+@utility kpi-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(12.5rem, 78%);
+  gap: 0.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.25rem;
+  & > * {
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+  & .stat-tile {
+    height: 100%;
+  }
+  @container (min-width: 40rem) {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+  @container (min-width: 60rem) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@utility charts-grid {
+  display: grid;
+  gap: 0.75rem;
+  @container (min-width: 48rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    & > .chart-wide {
+      grid-column: 1 / -1;
+    }
+  }
+}
+@utility chart-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 0.75rem;
+}
+@utility chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  & .chart-hint {
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+  }
+  & .chart-more {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    margin-block: -0.75rem;
+    margin-left: auto;
+    font-size: 0.875rem;
+  }
+}
+/* The canvas is sized by Chart.js through the CSSOM (style-src 'self' allows it). */
+@utility chart-box {
+  position: relative;
+  height: 14rem;
+  & canvas {
+    display: block;
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+  }
+  & canvas:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+@utility chart-data {
+  font-size: 0.8125rem;
+  & > summary {
+    display: inline-flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    align-items: center;
+    color: var(--brand);
+    font-weight: 500;
+  }
+  & .chart-table {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  & table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  & :is(th, td) {
+    border-bottom: 1px solid var(--line);
+    padding: 0.375rem 0.5rem;
+    text-align: left;
+  }
+  & thead th {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+  & tbody th {
+    font-weight: 500;
+  }
+  & .num {
+    text-align: right;
+  }
+}
+@utility chart-meter {
+  display: grid;
+  gap: 0.25rem;
+  min-height: 2.75rem;
+  color: inherit;
+  text-decoration: none;
 }
 
 /* --- progress: a <meter> with its text (received of ordered) ------------------------------------ */

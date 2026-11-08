@@ -1,0 +1,9 @@
+{% load i18n %}
+{% comment %}The row of key figures, replacing its placeholder. Context: tiles (dashboards.tiles.Tile).{% endcomment %}
+<div class="kpi-row mb-4" data-testid="key-figures">
+  {% for tile in tiles %}
+    <div data-testid="tile-{{ tile.key }}">
+      {% include "components/stat_tile.html" with label=tile.label value=tile.value href=tile.href icon=tile.icon change=tile.change direction=tile.direction good=tile.good spark=tile.spark note=tile.note %}
+    </div>
+  {% endfor %}
+</div>

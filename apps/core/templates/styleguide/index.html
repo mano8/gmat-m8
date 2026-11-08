@@ -184,7 +184,7 @@
           {% include "components/stat_tile.html" with label="To approve" value="7" icon="clipboard-check" change="2 more than last week" direction="up" good=False spark=spark_up href="#" %}
           {% include "components/stat_tile.html" with label="Overdue" value="3" icon="clock" change="1 fewer than last week" direction="down" good=True spark=spark_down %}
           {% include "components/stat_tile.html" with label="Awaiting receipt" value="99+" icon="truck" change="no change" direction="flat" %}
-          {% include "components/stat_tile.html" with label="Open requests" value="24" %}
+          {% include "components/stat_tile.html" with label="Open requests" value="24" note="3 for more than a week" %}
         </div>
       </section>
       <section id="progress"

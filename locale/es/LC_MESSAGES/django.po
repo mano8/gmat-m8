@@ -6322,3 +6322,253 @@ msgstr "Revisar y enviar"
 
 msgid "Progress"
 msgstr "Progreso"
+
+msgid "lines delivered of lines approved"
+msgstr "líneas entregadas de las aprobadas"
+
+msgid "Under 1 day"
+msgstr "Menos de 1 día"
+
+msgid "1 to 3 days"
+msgstr "De 1 a 3 días"
+
+msgid "3 to 7 days"
+msgstr "De 3 a 7 días"
+
+msgid "Over 7 days"
+msgstr "Más de 7 días"
+
+#, python-format
+msgid "Requests waiting for a decision: %(total)d; more than 7 days: %(old)d."
+msgstr "Solicitudes pendientes de decisión: %(total)d; más de 7 días: %(old)d."
+
+#, python-format
+msgid "%(total)d waiting"
+msgstr "%(total)d pendientes"
+
+msgid "Waiting"
+msgstr "En espera"
+
+#, python-format
+msgid "Lines decided in the last %(weeks)d weeks: %(approved)d approved, %(rejected)d rejected."
+msgstr "Líneas decididas en las últimas %(weeks)d semanas: %(approved)d aprobadas, %(rejected)d rechazadas."
+
+msgid "lines approved and rejected"
+msgstr "líneas aprobadas y rechazadas"
+
+msgid "Week of"
+msgstr "Semana del"
+
+msgid "Orders issued"
+msgstr "Pedidos emitidos"
+
+msgid "Receipts posted"
+msgstr "Recepciones registradas"
+
+#, python-format
+msgid "In the last %(weeks)d weeks: %(orders)d orders issued, %(receipts)d receipts posted."
+msgstr "En las últimas %(weeks)d semanas: %(orders)d pedidos emitidos, %(receipts)d recepciones registradas."
+
+msgid "per week"
+msgstr "por semana"
+
+msgid "By the expected date"
+msgstr "En la fecha prevista"
+
+msgid "Late"
+msgstr "Con retraso"
+
+#, python-format
+msgid "Receipt lines of the last %(weeks)d weeks that arrived by the expected date: %(on_time)d of %(lines)d (%(share)d%%)."
+msgstr "Líneas recibidas en las últimas %(weeks)d semanas que llegaron en la fecha prevista: %(on_time)d de %(lines)d (%(share)d %%)."
+
+#, python-format
+msgid "%(share)d%% on time"
+msgstr "%(share)d %% a tiempo"
+
+#, python-format
+msgid "Overdue orders: %(count)d; the most with %(name)s: %(top)d."
+msgstr "Pedidos con retraso: %(count)d; el proveedor con más, %(name)s: %(top)d."
+
+#, python-format
+msgid "%(count)d overdue, %(rest)d with other suppliers"
+msgstr "%(count)d con retraso, %(rest)d de otros proveedores"
+
+#, python-format
+msgid "%(count)d overdue"
+msgstr "%(count)d con retraso"
+
+#, python-format
+msgid "Posted in the last %(weeks)d weeks: %(receipts)d receipts, %(handovers)d handovers."
+msgstr "Registradas en las últimas %(weeks)d semanas: %(receipts)d recepciones, %(handovers)d entregas."
+
+msgid "posted per week"
+msgstr "registradas por semana"
+
+#, python-format
+msgid "Requests awaiting handover: %(count)d; the most for %(name)s: %(top)d."
+msgstr "Solicitudes pendientes de entrega: %(count)d; la obra con más, %(name)s: %(top)d."
+
+#, python-format
+msgid "%(count)d in all, %(rest)d for other projects"
+msgstr "%(count)d en total, %(rest)d de otras obras"
+
+msgid "by project"
+msgstr "por obra"
+
+msgid "Other branches"
+msgstr "Otras delegaciones"
+
+#, python-format
+msgid "Requests submitted in the last %(weeks)d weeks: %(count)d, from %(branches)d branches."
+msgstr "Solicitudes enviadas en las últimas %(weeks)d semanas: %(count)d, de %(branches)d delegaciones."
+
+msgid "by procurement branch"
+msgstr "por delegación de compras"
+
+#, python-format
+msgid "People with a valid role: %(count)d, in %(branches)d branches."
+msgstr "Personas con un rol vigente: %(count)d, en %(branches)d delegaciones."
+
+#, python-format
+msgid "valid today, %(rest)d in other branches"
+msgstr "vigentes hoy, %(rest)d en otras delegaciones"
+
+msgid "valid today"
+msgstr "vigentes hoy"
+
+msgid "Decisions per week"
+msgstr "Decisiones por semana"
+
+msgid "No line was decided in these weeks."
+msgstr "No se decidió ninguna línea en estas semanas."
+
+msgid "Inbox by age"
+msgstr "Bandeja por antigüedad"
+
+msgid "Nothing is waiting for a decision."
+msgstr "Nada está pendiente de decisión."
+
+msgid "Orders issued and receipts posted"
+msgstr "Pedidos emitidos y recepciones registradas"
+
+msgid "No order was issued and no receipt posted in these weeks."
+msgstr "No se emitió ningún pedido ni se registró ninguna recepción en estas semanas."
+
+msgid "On-time receipts"
+msgstr "Recepciones a tiempo"
+
+msgid "No receipt of an order with an expected date in these weeks."
+msgstr "Ninguna recepción de un pedido con fecha prevista en estas semanas."
+
+msgid "Overdue orders by supplier"
+msgstr "Pedidos con retraso por proveedor"
+
+msgid "Receipts and handovers"
+msgstr "Recepciones y entregas"
+
+msgid "No receipt or handover was posted in these weeks."
+msgstr "No se registró ninguna recepción ni entrega en estas semanas."
+
+msgid "Requests submitted per branch"
+msgstr "Solicitudes enviadas por delegación"
+
+msgid "No request was submitted in these weeks."
+msgstr "No se envió ninguna solicitud en estas semanas."
+
+msgid "People per branch"
+msgstr "Personas por delegación"
+
+msgid "No branch has anyone with a valid role."
+msgstr "Ninguna delegación tiene a nadie con un rol vigente."
+
+msgid "Approved and delivered"
+msgstr "Aprobado y entregado"
+
+msgid "None of your requests is approved yet."
+msgstr "Ninguna de tus solicitudes está aprobada todavía."
+
+msgid "Lines delivered"
+msgstr "Líneas entregadas"
+
+msgid "lines"
+msgstr "líneas"
+
+msgid "Show the data"
+msgstr "Ver los datos"
+
+#, python-format
+msgid "Hello, %(name)s"
+msgstr "Hola, %(name)s"
+
+msgid "Period"
+msgstr "Periodo"
+
+#, python-format
+msgid "%(weeks)s weeks"
+msgstr "%(weeks)s semanas"
+
+#, python-format
+msgid "%(n)d min"
+msgstr "%(n)d min"
+
+#, python-format
+msgid "%(n)d h"
+msgstr "%(n)d h"
+
+#, python-format
+msgid "%(n)s d"
+msgstr "%(n)s d"
+
+msgid "Waiting for review"
+msgstr "Pendientes de revisión"
+
+#, python-format
+msgid "%(n)d for more than a week"
+msgstr "%(n)d desde hace más de una semana"
+
+msgid "Nothing to compare with yet"
+msgstr "Aún no hay con qué comparar"
+
+#, python-format
+msgid "As in the %(weeks)d weeks before"
+msgstr "Igual que en las %(weeks)d semanas anteriores"
+
+#, python-format
+msgid "%(time)s faster than the %(weeks)d weeks before"
+msgstr "%(time)s menos que en las %(weeks)d semanas anteriores"
+
+#, python-format
+msgid "%(time)s slower than the %(weeks)d weeks before"
+msgstr "%(time)s más que en las %(weeks)d semanas anteriores"
+
+msgid "Median time to a decision"
+msgstr "Tiempo mediano hasta la decisión"
+
+msgid "None yet"
+msgstr "Ninguna aún"
+
+msgid "approved lines still to buy"
+msgstr "líneas aprobadas aún por comprar"
+
+#, python-format
+msgid "expected since %(day)s"
+msgstr "prevista desde el %(day)s"
+
+msgid "none past its expected date"
+msgstr "ninguno pasada su fecha prevista"
+
+msgid "Awaiting receipt"
+msgstr "Pendientes de recepción"
+
+msgid "issued orders still to receive"
+msgstr "pedidos emitidos aún por recibir"
+
+msgid "lines with goods to hand over"
+msgstr "líneas con material por entregar"
+
+msgid "My drafts"
+msgstr "Mis borradores"
+
+msgid "in the last 30 days"
+msgstr "en los últimos 30 días"

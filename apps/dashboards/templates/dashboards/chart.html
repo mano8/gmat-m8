@@ -1,0 +1,63 @@
+{% load i18n %}
+{% comment %}
+  A chart panel, the fragment that replaces its placeholder. Context: panel (ChartPanel), chart
+  (dashboards.chart.Chart), period. static/js/charts.js draws the canvas from its data-chart
+  attribute (JSON, escaped like any attribute: htmx removes every script element from a
+  swapped fragment, json_script blocks included, ADR-0027); until it is (and without JavaScript) the data
+  table is open and the canvas hidden. A METERS panel draws meter elements, no library.
+{% endcomment %}
+<section class="card chart-card{% if panel.wide %} chart-wide{% endif %}"
+         data-testid="panel-{{ panel.key }}">
+  <div class="chart-head">
+    <h2 class="card-title mb-0">{{ panel.title }}</h2>
+    {% if chart.hint and not chart.empty %}<span class="chart-hint">{{ chart.hint }}</span>{% endif %}
+    <a href="{% url panel.link %}{{ panel.query }}" class="chart-more">{% translate "See all" %}</a>
+  </div>
+  {% if chart.empty %}
+    <p class="text-soft">{{ panel.empty }}</p>
+  {% elif chart.kind == "meters" %}
+    <ul class="grid gap-3">
+      {% for meter in chart.meters %}
+        <li>
+          <a href="{{ meter.href }}" class="chart-meter">
+            <span class="flex flex-wrap items-baseline gap-x-2">
+              <span class="doc-no text-brand">{{ meter.label }}</span>
+              <span class="text-sm text-soft">{{ meter.detail }}</span>
+            </span>
+            {% include "components/progress.html" with value=meter.value maximum=meter.maximum label=_("Lines delivered") unit=_("lines") %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="chart-box" hidden data-chart-box>
+      <canvas data-chart="{{ chart.payload_json }}"
+              data-testid="chart-{{ panel.key }}"
+              role="img"
+              tabindex="0"
+              aria-label="{{ chart.summary }}"></canvas>
+    </div>
+    <details class="chart-data" open data-chart-table>
+      <summary>{% translate "Show the data" %}</summary>
+      <div class="chart-table">
+        <table>
+          <caption class="sr-only">{{ chart.summary }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{{ chart.label_head }}</th>
+              {% for series in chart.series %}<th scope="col" class="num">{{ series.label }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for label, values in chart.rows %}
+              <tr>
+                <th scope="row">{{ label }}</th>
+                {% for value in values %}<td class="num">{{ value }}</td>{% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  {% endif %}
+</section>
