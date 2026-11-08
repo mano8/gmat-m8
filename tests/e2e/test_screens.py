@@ -115,6 +115,7 @@ def test_list_filters_in_a_sheet_on_a_phone_and_as_chips(browsing: Browsing, vie
     else:
         expect(admin.get_by_test_id("filters-open")).to_be_hidden()
         expect(sheet).to_be_visible()  # the plain inline form
+        expect(sheet.locator(".filter-sheet-head")).to_be_hidden()  # its head is the sheet's
     admin.locator("#id_q").fill("mm-")
     admin.locator("#id_status").select_option(label="Active")
     expect(admin.get_by_test_id("active-filters")).to_contain_text("mm-")

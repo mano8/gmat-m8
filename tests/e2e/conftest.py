@@ -222,3 +222,17 @@ def browsing(
 @pytest.fixture(scope="session")
 def mailbox(stack: Stack) -> Mailbox:
     return Mailbox(stack)
+
+
+_DOCUMENTS: list[Any] = []
+
+
+@pytest.fixture
+def documents(browsing: Browsing) -> Any:
+    """The pages of ``tests.e2e.documents``, made through the screens the first time a test asks
+    for them and kept for the rest of the run."""
+    if not _DOCUMENTS:
+        from tests.e2e.documents import build  # it imports this module
+
+        _DOCUMENTS.append(build(browsing))
+    return _DOCUMENTS[0]
