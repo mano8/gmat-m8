@@ -93,6 +93,9 @@ uv run python scripts/check_security_floors.py
 uv run python scripts/check_trivyignore.py
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
+# or faster, as CI runs it: the tests across your cores, then the time-sensitive ones alone
+uv run python manage.py compilemessages
+uv run pytest -n auto -m "not serial" --cov --cov-report= --cov-fail-under=0 && uv run pytest -m serial --cov --cov-append --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
 ```
 
 Tests run on PostgreSQL only. Coverage stays at 90 % or more overall, and at 100 % for `apps/access` and every `services` and `selectors` module.
