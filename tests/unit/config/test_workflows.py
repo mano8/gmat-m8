@@ -146,7 +146,7 @@ def test_the_parallel_shards_split_what_is_not_serial() -> None:
     assert shards.keys() == {"access-integration", "unit", "serial", "volume"}
     selected, rest = shards["access-integration"], shards["unit"]
     for args in (selected, rest):
-        assert args[:3] == ["-n", "auto", "--dist"]
+        assert args[:4] == ["-n", "auto", "--dist", "load"]  # transactional tests last (ci.yaml)
         assert " ".join(args[4:13]) == "-m not live and not e2e and not serial"
     assert _paths(rest) == {"tests"}
     assert _ignored(rest) == _paths(selected)

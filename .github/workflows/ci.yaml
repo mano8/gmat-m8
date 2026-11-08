@@ -166,6 +166,10 @@ jobs:
   # that are not `serial` (`unit` ignores exactly what the other runs) and spread them over the
   # runner's cores with pytest-xdist, each worker on its own test database; the `serial` tests
   # depend on wall-clock time and run alone, the volume list test in a job of its own.
+  # `--dist load`, never `worksteal`: pytest-django runs the transactional tests last, as their
+  # flush empties every table, the rows the migrations seeded included (units of measure).
+  # `load` hands each worker its tests in that order; `worksteal` gives the last worker the
+  # transactional tail first and then other tests, which find the seeded rows gone.
   test-shard:
     name: test-shard (${{ matrix.shard }})
     runs-on: ubuntu-latest
@@ -175,11 +179,11 @@ jobs:
         include:
           - shard: access-integration
             pytest: >-
-              -n auto --dist worksteal -m "not live and not e2e and not serial"
+              -n auto --dist load -m "not live and not e2e and not serial"
               tests/access tests/integration tests/unit/docker
           - shard: unit
             pytest: >-
-              -n auto --dist worksteal -m "not live and not e2e and not serial"
+              -n auto --dist load -m "not live and not e2e and not serial"
               tests --ignore=tests/access --ignore=tests/integration --ignore=tests/unit/docker
           - shard: serial
             pytest: >-
