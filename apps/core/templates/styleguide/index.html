@@ -245,6 +245,34 @@
           {% include "components/error_summary.html" with form=dialog_form %}
         </div>
       </section>
+      <section id="flows" class="grid gap-3" aria-labelledby="h-flows">
+        <h2 id="h-flows">Action dialogs, stepper and action bar</h2>
+        <p class="text-soft">
+          A page's secondary actions are action dialogs: the consequences in a list, a warning if
+          something deserves more attention, the way out focused when the action is destructive.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          {% include "components/dialog_button.html" with dialog=action_dialog.id label="Void the receipt" variant="danger" icon="ban" testid="sg-open-action" %}
+          {% include "components/dialog_button.html" with dialog=action_dialog.id label="Small, secondary" variant="secondary" size="sm" %}
+        </div>
+        {% include "components/action_dialog.html" with d=action_dialog %}
+        <div class="card grid gap-3">
+          <h3 class="card-title">The steps of a short flow</h3>
+          {% include "components/request_steps.html" with current=2 %}
+          {% steps "Receive" "Check" "Post" as flow %}
+          {% include "components/stepper.html" with steps=flow current=3 label="Receiving" %}
+        </div>
+        <div class="card grid gap-3">
+          <h3 class="card-title">The main action of a phone page</h3>
+          <p class="text-soft">It sticks above the bottom bar on a phone and is a plain bar from 48rem.</p>
+          <div class="action-bar">
+            <p class="action-bar-sum">
+              <span>3 lines</span><span>No prices shown</span>
+            </p>
+            {% include "components/button.html" with type="button" label="Post the receipt" icon="package-check" variant="primary" block=True %}
+          </div>
+        </div>
+      </section>
       <section id="icons" class="grid gap-3" aria-labelledby="h-icons">
         <h2 id="h-icons">Icons ({{ icons|length }})</h2>
         <ul class="m-0 grid list-none grid-cols-3 gap-2 p-0 sm:grid-cols-6">

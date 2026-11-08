@@ -5954,3 +5954,187 @@ msgid "Correct one thing to continue."
 msgid_plural "Correct %(counter)s things to continue."
 msgstr[0] ""
 msgstr[1] ""
+
+# --- M8b.4: screens in dialogs ---
+
+msgid "The file can no longer be downloaded."
+msgstr ""
+
+msgid "Its name stays on the page, marked as removed."
+msgstr ""
+
+msgid "Keep the file"
+msgstr ""
+
+msgid "Deactivate the material"
+msgstr ""
+
+msgid "The material is hidden from searches and new documents."
+msgstr ""
+
+msgid "Existing documents keep it. It can be reactivated."
+msgstr ""
+
+msgid "Keep it active"
+msgstr ""
+
+#, python-format
+msgid "%(counter)s line to hand over"
+msgid_plural "%(counter)s lines to hand over"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "The material counts as not handed over again."
+msgstr ""
+
+msgid "The requests it served reopen."
+msgstr ""
+
+msgid "Hand it over again if it was only wrong."
+msgstr ""
+
+msgid "Keep the handover"
+msgstr ""
+
+#, python-format
+msgid "%(counter)s line waits for a decision"
+msgid_plural "%(counter)s lines wait for a decision"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "The request goes back to a draft and every decision on its lines is cleared."
+msgstr ""
+
+msgid "The requester reads your note, changes the request and sends it again."
+msgstr ""
+
+msgid "Keep the request"
+msgstr ""
+
+msgid "Every line still open is closed short."
+msgstr ""
+
+msgid "Reopening the request restores them."
+msgstr ""
+
+msgid "Keep it open"
+msgstr ""
+
+#, python-format
+msgid "At least %(floor)s %(unit)s (delivered, received or on order)."
+msgstr ""
+
+msgid "What has not arrived is given up; the line stops waiting for goods."
+msgstr ""
+
+msgid "Keep the line"
+msgstr ""
+
+msgid "The draft and its lines are thrown away."
+msgstr ""
+
+msgid "Nothing has been sent to a reviewer yet."
+msgstr ""
+
+msgid "Keep the draft"
+msgstr ""
+
+msgid "Revoke the role"
+msgstr ""
+
+msgid "The person loses what this role gives, at once."
+msgstr ""
+
+msgid "The role stays in the history, marked as revoked."
+msgstr ""
+
+msgid "Keep the role"
+msgstr ""
+
+msgid "The account is deactivated and its sessions end."
+msgstr ""
+
+msgid "Every role, project, pending invitation and email change is revoked."
+msgstr ""
+
+msgid "That includes the invitations and email changes this person issued."
+msgstr ""
+
+msgid "Keep the account"
+msgstr ""
+
+msgid "Revoke the email change"
+msgstr ""
+
+msgid "The address stays as it is and the pending confirmation is cancelled."
+msgstr ""
+
+msgid "Keep the change"
+msgstr ""
+
+msgid "Revoke access to the project"
+msgstr ""
+
+msgid "The person stops seeing this project through this assignment, at once."
+msgstr ""
+
+msgid "The assignment stays in the history, marked as revoked."
+msgstr ""
+
+msgid "Keep the access"
+msgstr ""
+
+msgid "Project details"
+msgstr ""
+
+msgid "The quantities it reserves are released."
+msgstr ""
+
+msgid "Only possible while no goods have been received."
+msgstr ""
+
+msgid "Every allocation is released."
+msgstr ""
+
+msgid "Emails to the supplier that were not sent yet are cancelled."
+msgstr ""
+
+msgid "Keep the order"
+msgstr ""
+
+msgid "The line and the quantities it reserves are removed from the draft."
+msgstr ""
+
+msgid "Raise the allocation"
+msgstr ""
+
+msgid "Lower the allocation"
+msgstr ""
+
+msgid "The worker makes a new attempt to send it to the supplier."
+msgstr ""
+
+msgid "Deactivate the supplier"
+msgstr ""
+
+msgid "The supplier is no longer offered for new orders."
+msgstr ""
+
+msgid "Existing orders and documents keep it. It can be reactivated."
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Show the results"
+msgstr ""
+
+#, python-format
+msgid "Remove the filter %(label)s: %(value)s"
+msgstr ""
+
+msgid "Review and submit"
+msgstr ""
+
+msgid "Progress"
+msgstr ""

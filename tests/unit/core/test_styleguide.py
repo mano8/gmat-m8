@@ -81,6 +81,11 @@ class TestTheStyleGuide:
             "dialog_cancel": 'data-testid="dialog-cancel"',
             "dialog_problem": 'data-testid="dialog-problem"',
             "error_summary": "data-error-summary",
+            "action_dialog": 'data-testid="sg-action-dialog"',
+            "dialog_form": 'data-testid="consequences"',
+            "dialog_button": 'data-testid="sg-open-action"',
+            "stepper": 'data-testid="stepper"',
+            "request_steps": "Review and submit",
         }
         drawn = {path.stem for path in COMPONENTS.glob("*.html")}
         # sort_header sits in a table header and messages needs a request: own tests.

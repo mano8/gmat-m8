@@ -6176,3 +6176,187 @@ msgid "Correct one thing to continue."
 msgid_plural "Correct %(counter)s things to continue."
 msgstr[0] "Corrigez une chose pour continuer."
 msgstr[1] "Corrigez %(counter)s choses pour continuer."
+
+# --- M8b.4: screens in dialogs ---
+
+msgid "The file can no longer be downloaded."
+msgstr "Le fichier ne peut plus être téléchargé."
+
+msgid "Its name stays on the page, marked as removed."
+msgstr "Son nom reste sur la page, marqué comme supprimé."
+
+msgid "Keep the file"
+msgstr "Garder le fichier"
+
+msgid "Deactivate the material"
+msgstr "Désactiver le matériel"
+
+msgid "The material is hidden from searches and new documents."
+msgstr "Le matériel est masqué des recherches et des nouveaux documents."
+
+msgid "Existing documents keep it. It can be reactivated."
+msgstr "Les documents existants le conservent. Il peut être réactivé."
+
+msgid "Keep it active"
+msgstr "Le garder actif"
+
+#, python-format
+msgid "%(counter)s line to hand over"
+msgid_plural "%(counter)s lines to hand over"
+msgstr[0] "%(counter)s ligne à remettre"
+msgstr[1] "%(counter)s lignes à remettre"
+
+msgid "The material counts as not handed over again."
+msgstr "Le matériel compte de nouveau comme non remis."
+
+msgid "The requests it served reopen."
+msgstr "Les demandes qu'il servait sont rouvertes."
+
+msgid "Hand it over again if it was only wrong."
+msgstr "Remettez-le de nouveau s'il s'agissait seulement d'une erreur."
+
+msgid "Keep the handover"
+msgstr "Garder la remise"
+
+#, python-format
+msgid "%(counter)s line waits for a decision"
+msgid_plural "%(counter)s lines wait for a decision"
+msgstr[0] "%(counter)s ligne attend une décision"
+msgstr[1] "%(counter)s lignes attendent une décision"
+
+msgid "The request goes back to a draft and every decision on its lines is cleared."
+msgstr "La demande redevient un brouillon et toutes les décisions sur ses lignes sont effacées."
+
+msgid "The requester reads your note, changes the request and sends it again."
+msgstr "Le demandeur lit votre note, modifie la demande et la renvoie."
+
+msgid "Keep the request"
+msgstr "Garder la demande"
+
+msgid "Every line still open is closed short."
+msgstr "Chaque ligne encore ouverte est clôturée à court."
+
+msgid "Reopening the request restores them."
+msgstr "Rouvrir la demande les rétablit."
+
+msgid "Keep it open"
+msgstr "La laisser ouverte"
+
+#, python-format
+msgid "At least %(floor)s %(unit)s (delivered, received or on order)."
+msgstr "Au moins %(floor)s %(unit)s (livré, reçu ou commandé)."
+
+msgid "What has not arrived is given up; the line stops waiting for goods."
+msgstr "Ce qui n'est pas arrivé est abandonné ; la ligne n'attend plus de marchandises."
+
+msgid "Keep the line"
+msgstr "Garder la ligne"
+
+msgid "The draft and its lines are thrown away."
+msgstr "Le brouillon et ses lignes sont jetés."
+
+msgid "Nothing has been sent to a reviewer yet."
+msgstr "Rien n'a encore été envoyé à un valideur."
+
+msgid "Keep the draft"
+msgstr "Garder le brouillon"
+
+msgid "Revoke the role"
+msgstr "Révoquer le rôle"
+
+msgid "The person loses what this role gives, at once."
+msgstr "La personne perd aussitôt ce que ce rôle donne."
+
+msgid "The role stays in the history, marked as revoked."
+msgstr "Le rôle reste dans l'historique, marqué comme révoqué."
+
+msgid "Keep the role"
+msgstr "Garder le rôle"
+
+msgid "The account is deactivated and its sessions end."
+msgstr "Le compte est désactivé et ses sessions prennent fin."
+
+msgid "Every role, project, pending invitation and email change is revoked."
+msgstr "Tous les rôles, projets, invitations en attente et changements d'e-mail sont révoqués."
+
+msgid "That includes the invitations and email changes this person issued."
+msgstr "Cela inclut les invitations et les changements d'e-mail émis par cette personne."
+
+msgid "Keep the account"
+msgstr "Garder le compte"
+
+msgid "Revoke the email change"
+msgstr "Révoquer le changement d'e-mail"
+
+msgid "The address stays as it is and the pending confirmation is cancelled."
+msgstr "L'adresse reste telle quelle et la confirmation en attente est annulée."
+
+msgid "Keep the change"
+msgstr "Garder le changement"
+
+msgid "Revoke access to the project"
+msgstr "Révoquer l'accès au projet"
+
+msgid "The person stops seeing this project through this assignment, at once."
+msgstr "La personne cesse aussitôt de voir ce projet par cette affectation."
+
+msgid "The assignment stays in the history, marked as revoked."
+msgstr "L'affectation reste dans l'historique, marquée comme révoquée."
+
+msgid "Keep the access"
+msgstr "Garder l'accès"
+
+msgid "Project details"
+msgstr "Détails du projet"
+
+msgid "The quantities it reserves are released."
+msgstr "Les quantités qu'il réserve sont libérées."
+
+msgid "Only possible while no goods have been received."
+msgstr "Possible uniquement tant qu'aucune marchandise n'a été reçue."
+
+msgid "Every allocation is released."
+msgstr "Chaque allocation est libérée."
+
+msgid "Emails to the supplier that were not sent yet are cancelled."
+msgstr "Les e-mails au fournisseur qui n'étaient pas encore envoyés sont annulés."
+
+msgid "Keep the order"
+msgstr "Garder la commande"
+
+msgid "The line and the quantities it reserves are removed from the draft."
+msgstr "La ligne et les quantités qu'elle réserve sont retirées du brouillon."
+
+msgid "Raise the allocation"
+msgstr "Augmenter l'allocation"
+
+msgid "Lower the allocation"
+msgstr "Réduire l'allocation"
+
+msgid "The worker makes a new attempt to send it to the supplier."
+msgstr "Le processus d'arrière-plan fait une nouvelle tentative d'envoi au fournisseur."
+
+msgid "Deactivate the supplier"
+msgstr "Désactiver le fournisseur"
+
+msgid "The supplier is no longer offered for new orders."
+msgstr "Le fournisseur n'est plus proposé pour les nouvelles commandes."
+
+msgid "Existing orders and documents keep it. It can be reactivated."
+msgstr "Les commandes et documents existants le conservent. Il peut être réactivé."
+
+msgid "Filters"
+msgstr "Filtres"
+
+msgid "Show the results"
+msgstr "Voir les résultats"
+
+#, python-format
+msgid "Remove the filter %(label)s: %(value)s"
+msgstr "Retirer le filtre %(label)s : %(value)s"
+
+msgid "Review and submit"
+msgstr "Vérifier et envoyer"
+
+msgid "Progress"
+msgstr "Progression"

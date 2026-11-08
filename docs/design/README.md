@@ -80,3 +80,9 @@ menu open).
 | --- | --- | --- |
 | 360 px | ![App shell, 360 px, light](screenshots/shell-360-light.webp) | ![App shell, 360 px, dark](screenshots/shell-360-dark.webp) |
 | 1280 px | ![App shell, 1280 px, light](screenshots/shell-1280-light.webp) | ![App shell, 1280 px, dark](screenshots/shell-1280-dark.webp) |
+
+## Where actions open (M8b.4)
+
+[`dialog-inventory.md`](dialog-inventory.md) lists every form that used to sit in a fold-out section
+or on a page of its own, and how it opens now: an inline dialog, a lazy one, a form that stays, or a
+disclosure that stays with its reason.

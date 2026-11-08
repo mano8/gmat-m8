@@ -20,6 +20,7 @@ from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.utils import timezone, translation
 
+from apps.core.dialogs import ActionDialog
 from apps.core.listing import CURSOR_START, CursorPage, ListScope, paginate
 from apps.core.templatetags.ui_tags import icon_names
 
@@ -102,6 +103,24 @@ def _context() -> dict[str, Any]:
         "reason_form": ReasonSample(auto_id="sg_reason_%s"),
         "dialog_form": SampleForm(
             data={"reference": "", "quantity": "x", "kind": "a"}, auto_id="sg_dialog_%s"
+        ),
+        # An action dialog (M8b.4): what the pages build from apps.core.dialogs.ActionDialog.
+        "action_dialog": ActionDialog(
+            id="sg-action-dialog",
+            title="Void the receipt",
+            description="REC-MAD-000124",
+            icon="ban",
+            tone="danger",
+            action="#",
+            submit="Void the receipt",
+            form=ReasonSample(auto_id="sg_action_%s"),
+            consequences=(
+                "The goods leave the receipts of the order.",
+                "The requests they served wait for them again.",
+            ),
+            warning="A handover made on site from these goods is voided with it.",
+            cancel="Keep the receipt",
+            testid="sg-action-form",
         ),
         "table_columns": ["Material", "Ordered", "Received"],
         "table_rows": [["Copper cable 3x2.5", "120", "80"], ["Plug, type F", "40", "40"]],
