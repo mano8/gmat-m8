@@ -1410,7 +1410,7 @@ msgstr "Connecté en tant que %(email)s."
 msgid "New request"
 msgstr "Nouvelle demande"
 
-#: apps/dashboards/templates/dashboards/home.html:25
+#: templates/components/skeleton.html:7
 msgid "Loading…"
 msgstr "Chargement…"
 
@@ -6065,3 +6065,548 @@ msgid ""
 msgstr ""
 "Ces demandes figurent déjà sur des commandes de l'agence d'achat actuelle : "
 "%(requests)s"
+
+#: templates/components/page_header.html:15
+msgid "Breadcrumb"
+msgstr "Fil d'Ariane"
+
+#: templates/components/page_header.html:43
+msgid "More actions"
+msgstr "Plus d'actions"
+
+#: templates/components/tabs.html:7
+msgid "Sections"
+msgstr "Sections"
+
+#: apps/core/navigation.py:58
+msgid "Work"
+msgstr "Travail"
+
+#: apps/core/navigation.py:83
+msgid "Purchasing"
+msgstr "Achats"
+
+#: apps/core/navigation.py:107
+msgid "Site & warehouse"
+msgstr "Chantier et entrepôt"
+
+#: apps/core/navigation.py:111
+msgid "Receiving"
+msgstr "Réception"
+
+#: apps/core/navigation.py:140
+msgid "Organization"
+msgstr "Organisation"
+
+#: apps/core/navigation.py:174
+msgid "Insights"
+msgstr "Analyses"
+
+#: templates/layouts/app.html:65
+msgid "Show the menu"
+msgstr "Afficher le menu"
+
+#: templates/layouts/app.html:65
+msgid "Hide the menu"
+msgstr "Masquer le menu"
+
+#: templates/layouts/app.html:97
+msgid "Account menu"
+msgstr "Menu du compte"
+
+#: templates/layouts/app.html:122
+msgid "More"
+msgstr "Plus"
+
+#: templates/partials/theme_switch.html:14
+msgid "Theme"
+msgstr "Thème"
+
+#: templates/partials/theme_switch.html:23
+msgid "System"
+msgstr "Système"
+
+#: templates/partials/theme_switch.html:30
+msgid "Light"
+msgstr "Clair"
+
+#: templates/partials/theme_switch.html:37
+msgid "Dark"
+msgstr "Sombre"
+
+#: templates/components/dialog.html
+msgid "Close"
+msgstr "Fermer"
+
+#: templates/components/dialog.html
+msgid "This cannot be done from here any more."
+msgstr "Cela ne peut plus être fait d'ici."
+
+#: templates/components/dialog.html templates/components/dialog_problem.html
+msgid "Reload the page"
+msgstr "Recharger la page"
+
+#: templates/components/dialog_problem.html
+msgid "The page is out of date"
+msgstr "La page n'est plus à jour"
+
+#: templates/components/dialog_problem.html
+msgid "Someone else changed this, or the form expired or was already sent. Reload the page to see where things stand, then try again."
+msgstr "Quelqu'un d'autre l'a modifié, ou le formulaire a expiré ou a déjà été envoyé. Rechargez la page pour voir où en sont les choses, puis réessayez."
+
+#: templates/components/dialog_problem.html
+msgid "This form cannot be sent"
+msgstr "Ce formulaire ne peut pas être envoyé"
+
+#: templates/components/dialog_problem.html
+msgid "Reload the page and fill in the form again."
+msgstr "Rechargez la page et remplissez à nouveau le formulaire."
+
+#: apps/receiving/templates/receiving/detail.html
+msgid "Void the receipt?"
+msgstr "Annuler la réception ?"
+
+#: apps/receiving/templates/receiving/detail.html
+msgid "Keep the receipt"
+msgstr "Garder la réception"
+
+#: templates/components/error_summary.html
+#, python-format
+msgid "Correct one thing to continue."
+msgid_plural "Correct %(counter)s things to continue."
+msgstr[0] "Corrigez une chose pour continuer."
+msgstr[1] "Corrigez %(counter)s choses pour continuer."
+
+# --- M8b.4: screens in dialogs ---
+
+msgid "The file can no longer be downloaded."
+msgstr "Le fichier ne peut plus être téléchargé."
+
+msgid "Its name stays on the page, marked as removed."
+msgstr "Son nom reste sur la page, marqué comme supprimé."
+
+msgid "Keep the file"
+msgstr "Garder le fichier"
+
+msgid "Deactivate the material"
+msgstr "Désactiver le matériel"
+
+msgid "The material is hidden from searches and new documents."
+msgstr "Le matériel est masqué des recherches et des nouveaux documents."
+
+msgid "Existing documents keep it. It can be reactivated."
+msgstr "Les documents existants le conservent. Il peut être réactivé."
+
+msgid "Keep it active"
+msgstr "Le garder actif"
+
+#, python-format
+msgid "%(counter)s line to hand over"
+msgid_plural "%(counter)s lines to hand over"
+msgstr[0] "%(counter)s ligne à remettre"
+msgstr[1] "%(counter)s lignes à remettre"
+
+msgid "The material counts as not handed over again."
+msgstr "Le matériel compte de nouveau comme non remis."
+
+msgid "The requests it served reopen."
+msgstr "Les demandes qu'il servait sont rouvertes."
+
+msgid "Hand it over again if it was only wrong."
+msgstr "Remettez-le de nouveau s'il s'agissait seulement d'une erreur."
+
+msgid "Keep the handover"
+msgstr "Garder la remise"
+
+#, python-format
+msgid "%(counter)s line waits for a decision"
+msgid_plural "%(counter)s lines wait for a decision"
+msgstr[0] "%(counter)s ligne attend une décision"
+msgstr[1] "%(counter)s lignes attendent une décision"
+
+msgid "The request goes back to a draft and every decision on its lines is cleared."
+msgstr "La demande redevient un brouillon et toutes les décisions sur ses lignes sont effacées."
+
+msgid "The requester reads your note, changes the request and sends it again."
+msgstr "Le demandeur lit votre note, modifie la demande et la renvoie."
+
+msgid "Keep the request"
+msgstr "Garder la demande"
+
+msgid "Every line still open is closed short."
+msgstr "Chaque ligne encore ouverte est clôturée à court."
+
+msgid "Reopening the request restores them."
+msgstr "Rouvrir la demande les rétablit."
+
+msgid "Keep it open"
+msgstr "La laisser ouverte"
+
+#, python-format
+msgid "At least %(floor)s %(unit)s (delivered, received or on order)."
+msgstr "Au moins %(floor)s %(unit)s (livré, reçu ou commandé)."
+
+msgid "What has not arrived is given up; the line stops waiting for goods."
+msgstr "Ce qui n'est pas arrivé est abandonné ; la ligne n'attend plus de marchandises."
+
+msgid "Keep the line"
+msgstr "Garder la ligne"
+
+msgid "The draft and its lines are thrown away."
+msgstr "Le brouillon et ses lignes sont jetés."
+
+msgid "Nothing has been sent to a reviewer yet."
+msgstr "Rien n'a encore été envoyé à un valideur."
+
+msgid "Keep the draft"
+msgstr "Garder le brouillon"
+
+msgid "Revoke the role"
+msgstr "Révoquer le rôle"
+
+msgid "The person loses what this role gives, at once."
+msgstr "La personne perd aussitôt ce que ce rôle donne."
+
+msgid "The role stays in the history, marked as revoked."
+msgstr "Le rôle reste dans l'historique, marqué comme révoqué."
+
+msgid "Keep the role"
+msgstr "Garder le rôle"
+
+msgid "The account is deactivated and its sessions end."
+msgstr "Le compte est désactivé et ses sessions prennent fin."
+
+msgid "Every role, project, pending invitation and email change is revoked."
+msgstr "Tous les rôles, projets, invitations en attente et changements d'e-mail sont révoqués."
+
+msgid "That includes the invitations and email changes this person issued."
+msgstr "Cela inclut les invitations et les changements d'e-mail émis par cette personne."
+
+msgid "Keep the account"
+msgstr "Garder le compte"
+
+msgid "Revoke the email change"
+msgstr "Révoquer le changement d'e-mail"
+
+msgid "The address stays as it is and the pending confirmation is cancelled."
+msgstr "L'adresse reste telle quelle et la confirmation en attente est annulée."
+
+msgid "Keep the change"
+msgstr "Garder le changement"
+
+msgid "Revoke access to the project"
+msgstr "Révoquer l'accès au projet"
+
+msgid "The person stops seeing this project through this assignment, at once."
+msgstr "La personne cesse aussitôt de voir ce projet par cette affectation."
+
+msgid "The assignment stays in the history, marked as revoked."
+msgstr "L'affectation reste dans l'historique, marquée comme révoquée."
+
+msgid "Keep the access"
+msgstr "Garder l'accès"
+
+msgid "Project details"
+msgstr "Détails du projet"
+
+msgid "The quantities it reserves are released."
+msgstr "Les quantités qu'il réserve sont libérées."
+
+msgid "Only possible while no goods have been received."
+msgstr "Possible uniquement tant qu'aucune marchandise n'a été reçue."
+
+msgid "Every allocation is released."
+msgstr "Chaque allocation est libérée."
+
+msgid "Emails to the supplier that were not sent yet are cancelled."
+msgstr "Les e-mails au fournisseur qui n'étaient pas encore envoyés sont annulés."
+
+msgid "Keep the order"
+msgstr "Garder la commande"
+
+msgid "The line and the quantities it reserves are removed from the draft."
+msgstr "La ligne et les quantités qu'elle réserve sont retirées du brouillon."
+
+msgid "Raise the allocation"
+msgstr "Augmenter l'allocation"
+
+msgid "Lower the allocation"
+msgstr "Réduire l'allocation"
+
+msgid "The worker makes a new attempt to send it to the supplier."
+msgstr "Le processus d'arrière-plan fait une nouvelle tentative d'envoi au fournisseur."
+
+msgid "Deactivate the supplier"
+msgstr "Désactiver le fournisseur"
+
+msgid "The supplier is no longer offered for new orders."
+msgstr "Le fournisseur n'est plus proposé pour les nouvelles commandes."
+
+msgid "Existing orders and documents keep it. It can be reactivated."
+msgstr "Les commandes et documents existants le conservent. Il peut être réactivé."
+
+msgid "Filters"
+msgstr "Filtres"
+
+msgid "Show the results"
+msgstr "Voir les résultats"
+
+#, python-format
+msgid "Remove the filter %(label)s: %(value)s"
+msgstr "Retirer le filtre %(label)s : %(value)s"
+
+msgid "Review and submit"
+msgstr "Vérifier et envoyer"
+
+msgid "Progress"
+msgstr "Progression"
+
+msgid "lines delivered of lines approved"
+msgstr "lignes livrées sur les lignes approuvées"
+
+msgid "Under 1 day"
+msgstr "Moins d’un jour"
+
+msgid "1 to 3 days"
+msgstr "De 1 à 3 jours"
+
+msgid "3 to 7 days"
+msgstr "De 3 à 7 jours"
+
+msgid "Over 7 days"
+msgstr "Plus de 7 jours"
+
+#, python-format
+msgid "Requests waiting for a decision: %(total)d; more than 7 days: %(old)d."
+msgstr "Demandes en attente de décision : %(total)d ; depuis plus de 7 jours : %(old)d."
+
+#, python-format
+msgid "%(total)d waiting"
+msgstr "%(total)d en attente"
+
+msgid "Waiting"
+msgstr "Attente"
+
+#, python-format
+msgid "Lines decided in the last %(weeks)d weeks: %(approved)d approved, %(rejected)d rejected."
+msgstr "Lignes décidées ces %(weeks)d dernières semaines : %(approved)d approuvées, %(rejected)d refusées."
+
+msgid "lines approved and rejected"
+msgstr "lignes approuvées et refusées"
+
+msgid "Week of"
+msgstr "Semaine du"
+
+msgid "Orders issued"
+msgstr "Commandes émises"
+
+msgid "Receipts posted"
+msgstr "Réceptions enregistrées"
+
+#, python-format
+msgid "In the last %(weeks)d weeks: %(orders)d orders issued, %(receipts)d receipts posted."
+msgstr "Ces %(weeks)d dernières semaines : %(orders)d commandes émises, %(receipts)d réceptions enregistrées."
+
+msgid "per week"
+msgstr "par semaine"
+
+msgid "By the expected date"
+msgstr "À la date prévue"
+
+msgid "Late"
+msgstr "En retard"
+
+#, python-format
+msgid "Receipt lines of the last %(weeks)d weeks that arrived by the expected date: %(on_time)d of %(lines)d (%(share)d%%)."
+msgstr "Lignes reçues ces %(weeks)d dernières semaines arrivées à la date prévue : %(on_time)d sur %(lines)d (%(share)d %%)."
+
+#, python-format
+msgid "%(share)d%% on time"
+msgstr "%(share)d %% à l’heure"
+
+#, python-format
+msgid "Overdue orders: %(count)d; the most with %(name)s: %(top)d."
+msgstr "Commandes en retard : %(count)d ; le fournisseur qui en a le plus, %(name)s : %(top)d."
+
+#, python-format
+msgid "%(count)d overdue, %(rest)d with other suppliers"
+msgstr "%(count)d en retard, %(rest)d chez d’autres fournisseurs"
+
+#, python-format
+msgid "%(count)d overdue"
+msgstr "%(count)d en retard"
+
+#, python-format
+msgid "Posted in the last %(weeks)d weeks: %(receipts)d receipts, %(handovers)d handovers."
+msgstr "Enregistrées ces %(weeks)d dernières semaines : %(receipts)d réceptions, %(handovers)d remises."
+
+msgid "posted per week"
+msgstr "enregistrées par semaine"
+
+#, python-format
+msgid "Requests awaiting handover: %(count)d; the most for %(name)s: %(top)d."
+msgstr "Demandes en attente de remise : %(count)d ; le projet qui en a le plus, %(name)s : %(top)d."
+
+#, python-format
+msgid "%(count)d in all, %(rest)d for other projects"
+msgstr "%(count)d au total, %(rest)d pour d’autres projets"
+
+msgid "by project"
+msgstr "par projet"
+
+msgid "Other branches"
+msgstr "Autres agences"
+
+#, python-format
+msgid "Requests submitted in the last %(weeks)d weeks: %(count)d, from %(branches)d branches."
+msgstr "Demandes envoyées ces %(weeks)d dernières semaines : %(count)d, de %(branches)d agences."
+
+msgid "by procurement branch"
+msgstr "par agence d’achat"
+
+#, python-format
+msgid "People with a valid role: %(count)d, in %(branches)d branches."
+msgstr "Personnes avec un rôle valide : %(count)d, dans %(branches)d agences."
+
+#, python-format
+msgid "valid today, %(rest)d in other branches"
+msgstr "valides aujourd’hui, %(rest)d dans d’autres agences"
+
+msgid "valid today"
+msgstr "valides aujourd’hui"
+
+msgid "Decisions per week"
+msgstr "Décisions par semaine"
+
+msgid "No line was decided in these weeks."
+msgstr "Aucune ligne n’a été décidée ces semaines-ci."
+
+msgid "Inbox by age"
+msgstr "Corbeille par ancienneté"
+
+msgid "Nothing is waiting for a decision."
+msgstr "Rien n’attend de décision."
+
+msgid "Orders issued and receipts posted"
+msgstr "Commandes émises et réceptions enregistrées"
+
+msgid "No order was issued and no receipt posted in these weeks."
+msgstr "Aucune commande émise ni réception enregistrée ces semaines-ci."
+
+msgid "On-time receipts"
+msgstr "Réceptions à l’heure"
+
+msgid "No receipt of an order with an expected date in these weeks."
+msgstr "Aucune réception d’une commande avec date prévue ces semaines-ci."
+
+msgid "Overdue orders by supplier"
+msgstr "Commandes en retard par fournisseur"
+
+msgid "Receipts and handovers"
+msgstr "Réceptions et remises"
+
+msgid "No receipt or handover was posted in these weeks."
+msgstr "Aucune réception ni remise enregistrée ces semaines-ci."
+
+msgid "Requests submitted per branch"
+msgstr "Demandes envoyées par agence"
+
+msgid "No request was submitted in these weeks."
+msgstr "Aucune demande envoyée ces semaines-ci."
+
+msgid "People per branch"
+msgstr "Personnes par agence"
+
+msgid "No branch has anyone with a valid role."
+msgstr "Aucune agence n’a de personne avec un rôle valide."
+
+msgid "Approved and delivered"
+msgstr "Approuvé et livré"
+
+msgid "None of your requests is approved yet."
+msgstr "Aucune de vos demandes n’est encore approuvée."
+
+msgid "Lines delivered"
+msgstr "Lignes livrées"
+
+msgid "lines"
+msgstr "lignes"
+
+msgid "Show the data"
+msgstr "Voir les données"
+
+#, python-format
+msgid "Hello, %(name)s"
+msgstr "Bonjour, %(name)s"
+
+msgid "Period"
+msgstr "Période"
+
+#, python-format
+msgid "%(weeks)s weeks"
+msgstr "%(weeks)s semaines"
+
+#, python-format
+msgid "%(n)d min"
+msgstr "%(n)d min"
+
+#, python-format
+msgid "%(n)d h"
+msgstr "%(n)d h"
+
+#, python-format
+msgid "%(n)s d"
+msgstr "%(n)s j"
+
+msgid "Waiting for review"
+msgstr "En attente de revue"
+
+#, python-format
+msgid "%(n)d for more than a week"
+msgstr "%(n)d depuis plus d’une semaine"
+
+msgid "Nothing to compare with yet"
+msgstr "Rien à comparer pour l’instant"
+
+#, python-format
+msgid "As in the %(weeks)d weeks before"
+msgstr "Comme les %(weeks)d semaines précédentes"
+
+#, python-format
+msgid "%(time)s faster than the %(weeks)d weeks before"
+msgstr "%(time)s de moins que les %(weeks)d semaines précédentes"
+
+#, python-format
+msgid "%(time)s slower than the %(weeks)d weeks before"
+msgstr "%(time)s de plus que les %(weeks)d semaines précédentes"
+
+msgid "Median time to a decision"
+msgstr "Délai médian de décision"
+
+msgid "None yet"
+msgstr "Aucune encore"
+
+msgid "approved lines still to buy"
+msgstr "lignes approuvées encore à acheter"
+
+#, python-format
+msgid "expected since %(day)s"
+msgstr "prévue depuis le %(day)s"
+
+msgid "none past its expected date"
+msgstr "aucune après sa date prévue"
+
+msgid "Awaiting receipt"
+msgstr "En attente de réception"
+
+msgid "issued orders still to receive"
+msgstr "commandes émises encore à recevoir"
+
+msgid "lines with goods to hand over"
+msgstr "lignes avec du matériel à remettre"
+
+msgid "My drafts"
+msgstr "Mes brouillons"
+
+msgid "in the last 30 days"
+msgstr "ces 30 derniers jours"

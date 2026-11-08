@@ -1,219 +1,1854 @@
-/* Tailwind v4 entry. `source(none)` plus explicit @source lines keep the scan to the
-   templates, the apps' templates and the one small JS file. Colours are semantic tokens
-   (surface, ink, brand...) defined once for light and dark. */
+/* Tailwind v4 entry (ADR-0027). `source(none)` plus explicit @source lines keep the scan to the
+   templates, the apps (their templates and the few class names written in Python) and the small
+   JS file.
+
+   Colours are semantic tokens defined once in OKLCH and re-mapped for the dark theme; templates
+   never use a raw colour. `scripts/check_contrast.py` reads the three token blocks below and
+   fails under WCAG 2.2 AA, so edit values there, not in components. The dark palette has to be
+   spelled twice (CSS cannot share a declaration list between a media query and an attribute
+   selector): the System choice and the explicit Dark choice; the gate fails if they differ.
+
+   Mobile first: unprefixed classes are the phone layout (360 px); wider screens only add,
+   through min-width media queries and container queries. */
 @import "tailwindcss" source(none);
 @source "../../templates";
 @source "../../apps";
 @source "../js";
 
-:root {
-  color-scheme: light dark;
-  --surface: #f6f7f9;
-  --surface-raised: #ffffff;
-  --surface-sunken: #eceff3;
-  --line: #d5dae1;
-  --ink: #17202b;
-  --ink-soft: #4b5766;
-  --brand: #0b5cad;
-  --brand-ink: #ffffff;
-  --brand-soft: #dcebf9;
-  --danger: #b42318;
-  --danger-soft: #fde8e6;
-  --ok: #1a7f37;
-  --ok-soft: #dff3e4;
-  --warn: #8a5a00;
-  --warn-soft: #fcefd0;
+/* --- typeface: Inter, self-hosted (static/vendor/fonts), system stack as fallback ------- */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../vendor/fonts/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../vendor/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* --- tokens: light (the default) ------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+
+  /* Scales (OKLCH). Theme-independent: the semantic tokens below pick steps from them. */
+  --neutral-50: oklch(0.975 0.004 255);
+  --neutral-100: oklch(0.955 0.006 255);
+  --neutral-200: oklch(0.925 0.009 255);
+  --neutral-300: oklch(0.88 0.012 255);
+  --neutral-400: oklch(0.72 0.02 255);
+  --neutral-500: oklch(0.58 0.025 255);
+  --neutral-600: oklch(0.49 0.028 255);
+  --neutral-700: oklch(0.4 0.03 255);
+  --neutral-800: oklch(0.3 0.03 255);
+  --neutral-900: oklch(0.23 0.03 255);
+  --neutral-950: oklch(0.18 0.028 255);
+  --brand-50: oklch(0.97 0.015 250);
+  --brand-100: oklch(0.94 0.03 250);
+  --brand-200: oklch(0.88 0.06 250);
+  --brand-300: oklch(0.8 0.1 250);
+  --brand-400: oklch(0.7 0.14 252);
+  --brand-500: oklch(0.6 0.16 254);
+  --brand-600: oklch(0.5 0.15 255);
+  --brand-700: oklch(0.43 0.13 255);
+  --brand-800: oklch(0.35 0.1 255);
+  --brand-900: oklch(0.28 0.07 255);
+  --brand-950: oklch(0.2 0.05 255);
+
+  /* Surfaces and lines. `line` is a divider; `line-strong` is the border of a control (3:1). */
+  --surface: var(--neutral-50);
+  --surface-raised: oklch(1 0 0);
+  --surface-sunken: var(--neutral-100);
+  --line: var(--neutral-200);
+  --line-strong: var(--neutral-500);
+  --ink: var(--neutral-900);
+  --ink-soft: var(--neutral-600);
+  --focus: var(--brand-600);
+  --backdrop: oklch(0.2 0.03 255 / 0.45);
+
+  /* Brand and status colours, each with its -soft background for chips and notices. */
+  --brand: var(--brand-600);
+  --brand-hover: var(--brand-700);
+  --brand-ink: oklch(1 0 0);
+  --brand-soft: var(--brand-100);
+  --ok: oklch(0.5 0.12 150);
+  --ok-soft: oklch(0.95 0.04 150);
+  --warn: oklch(0.48 0.1 75);
+  --warn-soft: oklch(0.95 0.05 90);
+  --danger: oklch(0.5 0.19 27);
+  --danger-hover: oklch(0.43 0.17 27);
+  --danger-ink: oklch(1 0 0);
+  --danger-soft: oklch(0.95 0.03 25);
+  --info: oklch(0.48 0.09 215);
+  --info-soft: oklch(0.95 0.03 215);
+
+  /* Elevation: 1 cards, 2 menus and toasts, 3 dialogs. */
+  --shadow-1: 0 1px 2px oklch(0.2 0.03 255 / 0.07), 0 1px 1px oklch(0.2 0.03 255 / 0.04);
+  --shadow-2: 0 4px 12px oklch(0.2 0.03 255 / 0.1), 0 1px 3px oklch(0.2 0.03 255 / 0.06);
+  --shadow-3: 0 18px 48px oklch(0.2 0.03 255 / 0.22), 0 4px 12px oklch(0.2 0.03 255 / 0.1);
+
+  /* Charts: six categorical colours (blue, orange, bluish green, reddish purple, sky blue, maroon),
+     chosen so that neither normal vision nor protan, deutan or tritan vision confuses two of them,
+     each 3:1 on a card; and a sequential ramp, low to high. */
+  --chart-1: oklch(0.5 0.17 258);
+  --chart-2: oklch(0.66 0.17 52);
+  --chart-3: oklch(0.56 0.12 160);
+  --chart-4: oklch(0.5 0.17 330);
+  --chart-5: oklch(0.64 0.09 225);
+  --chart-6: oklch(0.4 0.1 25);
+  --seq-1: oklch(0.94 0.03 250);
+  --seq-2: oklch(0.82 0.08 252);
+  --seq-3: oklch(0.7 0.13 254);
+  --seq-4: oklch(0.57 0.16 255);
+  --seq-5: oklch(0.43 0.14 255);
+}
+
+/* --- tokens: dark. System (no stored choice) follows the device ------------------------------- */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --surface: #0f141a;
-    --surface-raised: #18202a;
-    --surface-sunken: #121920;
-    --line: #2d3947;
-    --ink: #e8edf3;
-    --ink-soft: #a7b3c2;
-    --brand: #6cb2f2;
-    --brand-ink: #08233f;
-    --brand-soft: #16304a;
-    --danger: #ff8a80;
-    --danger-soft: #3b1714;
-    --ok: #62d27e;
-    --ok-soft: #12301b;
-    --warn: #f2c261;
-    --warn-soft: #3a2b0a;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: oklch(0.17 0.012 255);
+    --surface-raised: oklch(0.215 0.015 255);
+    --surface-sunken: oklch(0.195 0.013 255);
+    --line: oklch(0.31 0.02 255);
+    --line-strong: oklch(0.56 0.025 255);
+    --ink: oklch(0.95 0.01 255);
+    --ink-soft: oklch(0.76 0.02 255);
+    --focus: oklch(0.74 0.12 250);
+    --backdrop: oklch(0 0 0 / 0.6);
+    --brand: oklch(0.74 0.12 250);
+    --brand-hover: oklch(0.8 0.1 250);
+    --brand-ink: oklch(0.2 0.05 255);
+    --brand-soft: oklch(0.29 0.06 252);
+    --ok: oklch(0.8 0.15 150);
+    --ok-soft: oklch(0.27 0.06 150);
+    --warn: oklch(0.84 0.13 85);
+    --warn-soft: oklch(0.28 0.06 80);
+    --danger: oklch(0.76 0.15 25);
+    --danger-hover: oklch(0.82 0.13 25);
+    --danger-ink: oklch(0.2 0.05 25);
+    --danger-soft: oklch(0.27 0.07 25);
+    --info: oklch(0.78 0.1 215);
+    --info-soft: oklch(0.27 0.05 215);
+    --shadow-1: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-2: 0 4px 12px oklch(0 0 0 / 0.45), 0 1px 3px oklch(0 0 0 / 0.4);
+    --shadow-3: 0 18px 48px oklch(0 0 0 / 0.55), 0 4px 12px oklch(0 0 0 / 0.4);
+    --chart-1: oklch(0.7 0.14 255);
+    --chart-2: oklch(0.74 0.15 50);
+    --chart-3: oklch(0.76 0.12 170);
+    --chart-4: oklch(0.72 0.15 330);
+    --chart-5: oklch(0.82 0.09 225);
+    --chart-6: oklch(0.85 0.13 95);
+    --seq-1: oklch(0.3 0.06 255);
+    --seq-2: oklch(0.45 0.1 254);
+    --seq-3: oklch(0.6 0.13 253);
+    --seq-4: oklch(0.74 0.12 252);
+    --seq-5: oklch(0.88 0.08 250);
   }
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: oklch(0.17 0.012 255);
+  --surface-raised: oklch(0.215 0.015 255);
+  --surface-sunken: oklch(0.195 0.013 255);
+  --line: oklch(0.31 0.02 255);
+  --line-strong: oklch(0.56 0.025 255);
+  --ink: oklch(0.95 0.01 255);
+  --ink-soft: oklch(0.76 0.02 255);
+  --focus: oklch(0.74 0.12 250);
+  --backdrop: oklch(0 0 0 / 0.6);
+  --brand: oklch(0.74 0.12 250);
+  --brand-hover: oklch(0.8 0.1 250);
+  --brand-ink: oklch(0.2 0.05 255);
+  --brand-soft: oklch(0.29 0.06 252);
+  --ok: oklch(0.8 0.15 150);
+  --ok-soft: oklch(0.27 0.06 150);
+  --warn: oklch(0.84 0.13 85);
+  --warn-soft: oklch(0.28 0.06 80);
+  --danger: oklch(0.76 0.15 25);
+  --danger-hover: oklch(0.82 0.13 25);
+  --danger-ink: oklch(0.2 0.05 25);
+  --danger-soft: oklch(0.27 0.07 25);
+  --info: oklch(0.78 0.1 215);
+  --info-soft: oklch(0.27 0.05 215);
+  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.4);
+  --shadow-2: 0 4px 12px oklch(0 0 0 / 0.45), 0 1px 3px oklch(0 0 0 / 0.4);
+  --shadow-3: 0 18px 48px oklch(0 0 0 / 0.55), 0 4px 12px oklch(0 0 0 / 0.4);
+  --chart-1: oklch(0.7 0.14 255);
+  --chart-2: oklch(0.74 0.15 50);
+  --chart-3: oklch(0.76 0.12 170);
+  --chart-4: oklch(0.72 0.15 330);
+  --chart-5: oklch(0.82 0.09 225);
+  --chart-6: oklch(0.85 0.13 95);
+  --seq-1: oklch(0.3 0.06 255);
+  --seq-2: oklch(0.45 0.1 254);
+  --seq-3: oklch(0.6 0.13 253);
+  --seq-4: oklch(0.74 0.12 252);
+  --seq-5: oklch(0.88 0.08 250);
+}
 
+/* --- theme: what Tailwind generates utilities from ----------------------------------------- */
+@theme {
+  /* The default palette is removed: only the semantic tokens below exist as colours. */
+  --color-*: initial;
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.3, 0, 0, 1);
+}
 @theme inline {
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --color-surface: var(--surface);
   --color-raised: var(--surface-raised);
   --color-sunken: var(--surface-sunken);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-ink: var(--ink);
   --color-soft: var(--ink-soft);
+  --color-focus: var(--focus);
   --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
   --color-brand-ink: var(--brand-ink);
   --color-brand-soft: var(--brand-soft);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-backdrop: var(--backdrop);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-seq-1: var(--seq-1);
+  --color-seq-2: var(--seq-2);
+  --color-seq-3: var(--seq-3);
+  --color-seq-4: var(--seq-4);
+  --color-seq-5: var(--seq-5);
 }
 
+/* The rare rule that is not a token (an image, a canvas): the same two spellings as the tokens. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+/* htmx marks the element that sent a request (and the ones it names) with this class. */
+@custom-variant htmx-request (&:where(.htmx-request, .htmx-request *));
+
+/* --- base ------------------------------------------------------------------------------------ */
 @layer base {
+  :root {
+    /* Spacing rhythm: the page gutter and the padding of a card grow from the phone. */
+    --gutter: 1rem;
+    --card-pad: 1rem;
+    --dur-fast: 120ms;
+    --dur-base: 180ms;
+    --dur-slow: 280ms;
+  }
+  @media (min-width: 48rem) {
+    :root {
+      --gutter: 1.5rem;
+      --card-pad: 1.25rem;
+    }
+  }
   html {
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-surface font-sans text-ink antialiased;
+    font-size: 0.9375rem;
+    line-height: 1.5;
   }
   a {
     @apply text-brand underline-offset-2 hover:underline;
   }
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-brand;
+    @apply outline-2 outline-offset-2 outline-focus;
   }
   h1 {
-    @apply text-xl font-semibold tracking-tight sm:text-2xl;
+    @apply text-xl font-semibold tracking-tight text-balance sm:text-2xl;
   }
   h2 {
-    @apply text-lg font-semibold;
+    @apply text-lg font-semibold text-balance;
+  }
+  h3 {
+    @apply font-semibold;
+  }
+  /* Document numbers, references and codes. */
+  code,
+  kbd,
+  samp {
+    @apply font-mono text-[0.92em];
+  }
+  ::placeholder {
+    @apply text-soft;
+    opacity: 1;
   }
 }
 
-@layer components {
-  /* --- buttons ------------------------------------------------------------------- */
-  .btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-raised px-4 py-2 text-base font-medium text-ink no-underline hover:bg-sunken hover:no-underline disabled:opacity-50;
-  }
-  .btn-primary {
-    @apply border-brand bg-brand text-brand-ink hover:bg-brand/90;
-  }
-  .btn-danger {
-    @apply border-danger bg-danger-soft text-danger hover:bg-danger-soft/70;
-  }
-  .btn-link {
-    @apply border-transparent bg-transparent text-brand hover:bg-transparent hover:underline;
-  }
-  .btn-block {
-    @apply w-full;
-  }
+/* --- small utilities ------------------------------------------------------------------------- */
+/* A number column or figure: tabular figures, aligned right. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* A document number (REC-…, ENT-…): the mono face. */
+@utility doc-no {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  letter-spacing: -0.01em;
+}
+@utility elev-1 {
+  box-shadow: var(--shadow-1);
+}
+@utility elev-2 {
+  box-shadow: var(--shadow-2);
+}
+@utility elev-3 {
+  box-shadow: var(--shadow-3);
+}
+/* The page's side gutter, once, as the plan of the viewport asks. */
+@utility page-pad {
+  padding-inline: var(--gutter);
+}
 
-  /* --- surfaces -------------------------------------------------------------------- */
-  .card {
-    @apply rounded-xl border border-line bg-raised p-4 shadow-sm sm:p-6;
-  }
-  .card-title {
-    @apply mb-3 text-lg font-semibold;
-  }
-  .chip {
-    @apply inline-flex items-center rounded-full bg-sunken px-2.5 py-0.5 text-sm font-medium text-soft;
-  }
-  .chip-ok {
-    @apply bg-ok-soft text-ok;
-  }
-  .chip-warn {
-    @apply bg-warn-soft text-warn;
-  }
-  .chip-danger {
-    @apply bg-danger-soft text-danger;
-  }
-  .chip-brand {
-    @apply bg-brand-soft text-brand;
-  }
-
-  /* --- forms ------------------------------------------------------------------------ */
-  .field {
-    @apply mb-4;
-  }
-  .field label {
-    @apply mb-1 block text-sm font-medium;
-  }
-  .field input:not([type="checkbox"], [type="radio"], [type="hidden"]),
-  .field select,
-  .field textarea {
-    @apply block min-h-11 w-full rounded-lg border border-line bg-raised px-3 py-2 text-base text-ink placeholder:text-soft;
-  }
-  .field input[type="checkbox"],
-  .field input[type="radio"] {
-    @apply mr-2 size-5 align-middle accent-brand;
-  }
-  .field a {
-    @apply inline-flex min-h-11 items-center;
-  }
-  .field .helptext {
-    @apply mt-1 text-sm text-soft;
-  }
-  .field .helptext ul {
-    @apply list-disc pl-5;
-  }
-  .field-error input,
-  .field-error select,
-  .field-error textarea {
-    @apply border-danger;
-  }
-  .errorlist {
-    @apply mb-2 list-none text-sm text-danger;
-  }
-
-  /* --- messages (toasts) --------------------------------------------------------- */
-  .toast {
-    @apply flex items-start gap-3 rounded-lg border border-line bg-raised p-3 text-base shadow-md;
-  }
-  .toast-success {
-    @apply border-ok bg-ok-soft;
-  }
-  .toast-error {
-    @apply border-danger bg-danger-soft;
-  }
-  .toast-warning {
-    @apply border-warn bg-warn-soft;
-  }
-
-  /* --- table that collapses to cards below the sm breakpoint --------------------- */
-  .table-responsive {
-    @apply w-full border-collapse text-left;
-  }
-  .table-responsive th {
-    @apply px-3 py-2 text-sm font-semibold text-soft;
-  }
-  .table-responsive td {
-    @apply px-3 py-2;
-  }
-  @media (max-width: 639px) {
-    .table-responsive thead {
-      @apply sr-only;
+/* --- buttons --------------------------------------------------------------------------------- */
+/* .btn is the secondary look; a variant only sets --btn-* so the order of the rules never matters.
+   Busy: htmx marks the form (or the button) that sent a request; a submit button shows a spinner. */
+@utility btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--btn-border, var(--line));
+  border-radius: var(--radius-md);
+  background-color: var(--btn-bg, var(--surface-raised));
+  color: var(--btn-fg, var(--ink));
+  box-shadow: var(--shadow-1);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--btn-bg-hover, var(--surface-sunken));
+      text-decoration: none;
     }
-    .table-responsive tr {
-      @apply mb-3 block rounded-xl border border-line bg-raised p-2;
+  }
+  @media (pointer: coarse) {
+    min-height: 3rem;
+  }
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  &.htmx-request,
+  &[aria-busy="true"],
+  :where(.htmx-request) &[type="submit"] {
+    color: transparent;
+    pointer-events: none;
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 1.1rem;
+      height: 1.1rem;
+      margin: -0.55rem 0 0 -0.55rem;
+      border: 2px solid var(--btn-fg, var(--ink));
+      border-right-color: transparent;
+      border-radius: 9999px;
+      @media (prefers-reduced-motion: no-preference) {
+        animation: spin 0.7s linear infinite;
+      }
     }
-    .table-responsive td {
-      @apply flex justify-between gap-4 border-b border-line/60 px-2 py-2 last:border-b-0;
-      /* A long identifier (an audit object type) wraps instead of widening the table. */
-      overflow-wrap: anywhere;
+  }
+}
+@utility btn-primary {
+  --btn-bg: var(--brand);
+  --btn-bg-hover: var(--brand-hover);
+  --btn-fg: var(--brand-ink);
+  --btn-border: var(--brand);
+}
+@utility btn-secondary {
+  --btn-bg: var(--surface-raised);
+  --btn-bg-hover: var(--surface-sunken);
+  --btn-fg: var(--ink);
+  --btn-border: var(--line);
+}
+@utility btn-ghost {
+  --btn-bg: transparent;
+  --btn-bg-hover: var(--surface-sunken);
+  --btn-fg: var(--ink-soft);
+  --btn-border: transparent;
+  box-shadow: none;
+}
+@utility btn-danger {
+  --btn-bg: var(--danger);
+  --btn-bg-hover: var(--danger-hover);
+  --btn-fg: var(--danger-ink);
+  --btn-border: var(--danger);
+}
+@utility btn-link {
+  --btn-bg: transparent;
+  --btn-bg-hover: transparent;
+  --btn-fg: var(--brand);
+  --btn-border: transparent;
+  box-shadow: none;
+  @media (hover: hover) {
+    &:hover {
+      text-decoration: underline;
     }
-    .table-responsive td::before {
+  }
+}
+@utility btn-sm {
+  min-height: 2.25rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+  @media (pointer: coarse) {
+    min-height: 2.75rem;
+  }
+}
+@utility btn-icon {
+  width: 2.75rem;
+  padding: 0;
+  @media (pointer: coarse) {
+    width: 3rem;
+  }
+}
+@utility btn-block {
+  width: 100%;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- surfaces ---------------------------------------------------------------------------------- */
+@utility card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  padding: var(--card-pad);
+}
+@utility card-title {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+/* A band that sits inside a card or a dialog: secondary information, a footer of actions. */
+@utility band {
+  border-top: 1px solid var(--line);
+  background-color: var(--surface-sunken);
+  padding: 0.75rem var(--card-pad);
+}
+
+/* --- status chips: tone + icon + text, never colour alone -------------------------------------- */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background-color: var(--chip-bg, var(--surface-sunken));
+  color: var(--chip-fg, var(--ink-soft));
+  padding: 0.125rem 0.5rem 0.125rem 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  white-space: nowrap;
+  & > svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex: none;
+  }
+}
+@utility chip-ok {
+  --chip-bg: var(--ok-soft);
+  --chip-fg: var(--ok);
+}
+@utility chip-warn {
+  --chip-bg: var(--warn-soft);
+  --chip-fg: var(--warn);
+}
+@utility chip-danger {
+  --chip-bg: var(--danger-soft);
+  --chip-fg: var(--danger);
+}
+@utility chip-brand {
+  --chip-bg: var(--brand-soft);
+  --chip-fg: var(--brand);
+}
+@utility chip-info {
+  --chip-bg: var(--info-soft);
+  --chip-fg: var(--info);
+}
+
+/* --- forms ------------------------------------------------------------------------------------- */
+@utility field {
+  margin-bottom: 1rem;
+  & label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  /* 16 px text so a phone does not zoom in on focus; 44 px high. */
+  & input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="file"]),
+  & select,
+  & textarea {
+    display: block;
+    width: 100%;
+    min-height: 2.75rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-raised);
+    padding: 0.5rem 0.75rem;
+    color: var(--ink);
+    font-size: 1rem;
+    transition:
+      border-color var(--dur-fast) var(--ease-standard),
+      box-shadow var(--dur-fast) var(--ease-standard);
+    &:focus-visible {
+      border-color: var(--focus);
+      outline: 2px solid var(--focus);
+      outline-offset: 0;
+    }
+    &:disabled {
+      background-color: var(--surface-sunken);
+      color: var(--ink-soft);
+    }
+    /* Errors show once the person has touched the field (or the server sent them back). */
+    &[aria-invalid="true"],
+    &:user-invalid {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px var(--danger-soft);
+    }
+  }
+  & textarea {
+    field-sizing: content;
+    min-height: 5rem;
+  }
+  & input[type="checkbox"],
+  & input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    accent-color: var(--brand);
+  }
+  & a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+  & .helptext {
+    margin-top: 0.25rem;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+  }
+  & .helptext ul {
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+}
+@utility field-error {
+  & input:not([type="checkbox"], [type="radio"], [type="hidden"]),
+  & select,
+  & textarea {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px var(--danger-soft);
+  }
+}
+@utility errorlist {
+  margin-bottom: 0.5rem;
+  list-style: none;
+  color: var(--danger);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+/* A required field is marked with a star after the label text (decorative, the control has `required`). */
+@utility req-mark {
+  &::after {
+    content: " *";
+    color: var(--danger);
+  }
+}
+
+/* --- messages (toasts) -------------------------------------------------------------------------- */
+@utility toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid var(--toast-line, var(--line));
+  border-radius: var(--radius-md);
+  background-color: var(--toast-bg, var(--surface-raised));
+  box-shadow: var(--shadow-2);
+  padding: 0.75rem;
+  @starting-style {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity var(--dur-slow) var(--ease-standard);
+  }
+}
+@utility toast-success {
+  --toast-line: var(--ok);
+  --toast-bg: var(--ok-soft);
+}
+@utility toast-error {
+  --toast-line: var(--danger);
+  --toast-bg: var(--danger-soft);
+}
+@utility toast-warning {
+  --toast-line: var(--warn);
+  --toast-bg: var(--warn-soft);
+}
+
+/* --- table: cards on a phone, a table from 40rem. Hand-written tables follow the viewport. ---- */
+@utility table-responsive {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  & thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  & tbody {
+    display: block;
+  }
+  & tr {
+    display: block;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    box-shadow: var(--shadow-1);
+    padding: 0.5rem;
+  }
+  & td {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+    padding: 0.5rem;
+    /* A long identifier (an audit object type) wraps instead of widening the table. */
+    overflow-wrap: anywhere;
+    &:last-child {
+      border-bottom: 0;
+    }
+    &[data-label]::before {
       content: attr(data-label);
-      @apply font-medium text-soft;
+      flex: none;
+      color: var(--ink-soft);
+      font-weight: 500;
     }
   }
-  @media (min-width: 640px) {
-    .table-responsive tbody tr {
-      @apply border-t border-line;
+  & th {
+    padding: 0.625rem 0.75rem;
+    background-color: var(--surface-sunken);
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  & .num {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (min-width: 40rem) {
+    & thead {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      clip-path: none;
+      white-space: normal;
+    }
+    & tbody {
+      display: table-row-group;
+    }
+    & tr {
+      display: table-row;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background-color: transparent;
+      box-shadow: none;
+      padding: 0;
+    }
+    & tbody tr {
+      border-top: 1px solid var(--line);
+    }
+    & td {
+      display: table-cell;
+      border-bottom: 0;
+      padding: 0.75rem;
+      vertical-align: middle;
+      &[data-label]::before {
+        content: none;
+      }
+    }
+    & th {
+      position: sticky;
+      top: var(--table-sticky-top, 0px);
+      z-index: 1;
+    }
+    & .num {
+      text-align: right;
     }
   }
+}
 
-  /* --- navigation ---------------------------------------------------------------------- */
-  .nav-link {
-    @apply flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 text-sm font-medium text-soft no-underline hover:bg-sunken hover:no-underline md:flex-none md:flex-row md:justify-start md:gap-3 md:px-3 md:text-base;
+/* --- app shell (M8b.2): left menu of category dropdowns, top bar, phone bar, theme switch -------- */
+/* A hidden attribute always wins over a display set by a class (the menu hidden by the cookie). */
+@layer base {
+  [hidden] {
+    display: none !important;
   }
-  .nav-link[aria-current="page"] {
-    @apply bg-brand-soft text-brand;
+}
+/* A row of the menu or of the More sheet: icon and label, the current page in the brand tint. */
+@utility nav-link {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: var(--radius-md);
+  padding-inline: 0.75rem;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  & > svg {
+    color: var(--ink-soft);
   }
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--surface-sunken);
+      text-decoration: none;
+    }
+  }
+  &[aria-current="page"] {
+    background-color: var(--brand-soft);
+    color: var(--brand);
+    & > svg {
+      color: var(--brand);
+    }
+  }
+}
+/* A category: a native details element, the summary is the dropdown's label. */
+@utility nav-group {
+  & > summary {
+    display: flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-md);
+    padding-inline: 0.75rem;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    user-select: none;
+    &::-webkit-details-marker {
+      display: none;
+    }
+    @media (hover: hover) {
+      &:hover {
+        background-color: var(--surface-sunken);
+        color: var(--ink);
+      }
+    }
+    & > svg {
+      margin-left: auto;
+      @media (prefers-reduced-motion: no-preference) {
+        transition: transform var(--dur-base) var(--ease-standard);
+      }
+    }
+  }
+  &:not([open]) > summary > svg {
+    transform: rotate(-90deg);
+  }
+  & > .nav-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding-block: 0.125rem 0.5rem;
+  }
+}
+/* The phone's bottom bar: an icon over a label, the current one in a pill. */
+@utility bar-link {
+  display: flex;
+  min-height: 3.5rem;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  border-radius: var(--radius-md);
+  padding: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  & > svg {
+    box-sizing: content-box;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.875rem;
+  }
+  &[aria-current="page"] {
+    color: var(--brand);
+    & > svg {
+      background-color: var(--brand-soft);
+    }
+  }
+}
+/* The theme choice (System, Light, Dark), the dashboard's period and any short group of exclusive
+   buttons or links (a link marks the current one with aria-current). */
+@utility seg {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+  & > :is(button, a) {
+    display: inline-flex;
+    min-height: 2.75rem;
+    flex: 1 1 0%;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-right: 1px solid var(--line);
+    padding-inline: 0.75rem;
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+    text-decoration: none;
+    white-space: nowrap;
+    font-weight: 500;
+    &:last-child {
+      border-right: 0;
+    }
+    @media (hover: hover) {
+      &:hover {
+        background-color: var(--surface-sunken);
+      }
+    }
+    &:is([aria-pressed="true"], [aria-current="true"]) {
+      background-color: var(--brand-soft);
+      color: var(--brand);
+      font-weight: 600;
+    }
+  }
+}
+
+/* --- page header: title, status and actions; the actions wrap under the title on a phone -------- */
+@utility page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  & .page-head-main {
+    min-width: 0;
+    flex: 1 1 16rem;
+  }
+  & .page-head-actions {
+    display: flex;
+    flex: 0 1 auto;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  & .page-head-sub {
+    margin-top: 0.125rem;
+    color: var(--ink-soft);
+  }
+}
+@utility crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  /* The link is 44 px high to tap; the negative margin keeps the row as tall as its text. */
+  & a {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    margin-block: -0.875rem;
+    color: var(--ink-soft);
+  }
+  & [aria-current="page"] {
+    color: var(--ink);
+    font-weight: 500;
+  }
+}
+
+/* --- stat tile: a number, how it moved, an optional sparkline ------------------------------------ */
+@utility stat-tile {
+  display: grid;
+  gap: 0.375rem;
+  color: inherit;
+  text-decoration: none;
+  @media (hover: hover) {
+    &:is(a):hover {
+      border-color: var(--line-strong);
+      text-decoration: none;
+    }
+  }
+  & .stat-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+  & .stat-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  & .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  & .stat-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  & .stat-change[data-good="true"] {
+    color: var(--ok);
+  }
+  & .stat-change[data-good="false"] {
+    color: var(--danger);
+  }
+}
+@utility spark {
+  width: 5.25rem;
+  height: 1.75rem;
+  overflow: visible;
+  & polyline {
+    fill: none;
+    stroke: var(--chart-1);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  & .spark-area {
+    fill: var(--chart-1);
+    opacity: 0.12;
+    stroke: none;
+  }
+  & circle {
+    fill: var(--chart-1);
+    stroke: var(--surface-raised);
+    stroke-width: 2;
+  }
+}
+
+@utility stat-note {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+/* --- dashboard (M8b.5): the key figures, the charts grid and a chart card ------------------------ */
+/* Phone: the tiles scroll sideways inside their row (snapping), never the page; from a 40rem
+   column two per line, from 60rem four. The row's parent is an @container. */
+@utility kpi-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(12.5rem, 78%);
+  gap: 0.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.25rem;
+  & > * {
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+  & .stat-tile {
+    height: 100%;
+  }
+  @container (min-width: 40rem) {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+  @container (min-width: 60rem) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@utility charts-grid {
+  display: grid;
+  gap: 0.75rem;
+  @container (min-width: 48rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    & > .chart-wide {
+      grid-column: 1 / -1;
+    }
+  }
+}
+@utility chart-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 0.75rem;
+}
+@utility chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  & .chart-hint {
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+  }
+  & .chart-more {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    margin-block: -0.75rem;
+    margin-left: auto;
+    font-size: 0.875rem;
+  }
+}
+/* The canvas is sized by Chart.js through the CSSOM (style-src 'self' allows it). */
+@utility chart-box {
+  position: relative;
+  height: 14rem;
+  & canvas {
+    display: block;
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+  }
+  & canvas:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+@utility chart-data {
+  font-size: 0.8125rem;
+  & > summary {
+    display: inline-flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    align-items: center;
+    color: var(--brand);
+    font-weight: 500;
+  }
+  & .chart-table {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  & table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  & :is(th, td) {
+    border-bottom: 1px solid var(--line);
+    padding: 0.375rem 0.5rem;
+    text-align: left;
+  }
+  & thead th {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+  & tbody th {
+    font-weight: 500;
+  }
+  & .num {
+    text-align: right;
+  }
+}
+@utility chart-meter {
+  display: grid;
+  gap: 0.25rem;
+  min-height: 2.75rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* --- progress: a <meter> with its text (received of ordered) ------------------------------------ */
+@utility progress {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  & meter {
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 0.5rem;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--surface-sunken);
+  }
+  & meter::-webkit-meter-bar {
+    height: 0.5rem;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--surface-sunken);
+  }
+  & meter::-webkit-meter-optimum-value,
+  & meter::-webkit-meter-suboptimum-value,
+  & meter::-webkit-meter-even-less-good-value {
+    border-radius: 9999px;
+    background: var(--ok);
+  }
+  & meter::-moz-meter-bar {
+    border-radius: 9999px;
+    background: var(--ok);
+  }
+  /* Partly done is the neutral series colour; complete is green. */
+  &[data-state="partial"] meter::-webkit-meter-optimum-value,
+  &[data-state="partial"] meter::-webkit-meter-suboptimum-value,
+  &[data-state="partial"] meter::-webkit-meter-even-less-good-value {
+    background: var(--chart-1);
+  }
+  &[data-state="partial"] meter::-moz-meter-bar {
+    background: var(--chart-1);
+  }
+  & .progress-text {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* --- skeleton: a placeholder while htmx loads a panel ------------------------------------------- */
+@utility skeleton {
+  display: block;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-sunken);
+  @media (prefers-reduced-motion: no-preference) {
+    animation: skeleton-pulse 1.4s var(--ease-standard) infinite;
+  }
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* --- menu: a popover opened by a button; a bottom sheet on a phone, anchored from 40rem --------- */
+@utility menu {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-3);
+  padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  color: var(--ink);
+  inset: auto 0 0 0;
+  width: 100%;
+  &::backdrop {
+    background-color: var(--backdrop);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity var(--dur-base) var(--ease-standard),
+      transform var(--dur-base) var(--ease-standard),
+      overlay var(--dur-base) allow-discrete,
+      display var(--dur-base) allow-discrete;
+    @starting-style {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+    &:not(:popover-open) {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+  }
+  @media (min-width: 40rem) {
+    inset: auto;
+    top: 4rem;
+    right: 1rem;
+    width: auto;
+    min-width: 13rem;
+    border-radius: var(--radius-lg);
+    padding: 0.375rem;
+    @supports (position-area: bottom) {
+      /* The button that opened it is the anchor (the popover's implicit anchor). */
+      inset: auto;
+      position-area: bottom span-left;
+      margin-top: 0.375rem;
+    }
+  }
+}
+/* A bottom sheet at every width the phone bar exists (the More sheet): `menu` anchors under its
+   button from 40rem, which would push a sheet opened from the bottom bar off the screen. */
+@utility sheet {
+  margin: 0;
+  max-height: 80dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-3);
+  padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  color: var(--ink);
+  inset: auto 0 0 0;
+  width: 100%;
+  &::backdrop {
+    background-color: var(--backdrop);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity var(--dur-base) var(--ease-standard),
+      transform var(--dur-base) var(--ease-standard),
+      overlay var(--dur-base) allow-discrete,
+      display var(--dur-base) allow-discrete;
+    @starting-style {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+    &:not(:popover-open) {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+  }
+}
+@utility menu-item {
+  display: flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--surface-sunken);
+      text-decoration: none;
+    }
+  }
+  &[data-tone="danger"] {
+    color: var(--danger);
+  }
+  & > svg {
+    flex: none;
+    color: var(--ink-soft);
+  }
+}
+
+/* --- dialog (M8b.3): a native <dialog>; a bottom sheet on a phone, centred from 40rem ------------ */
+@utility dialog {
+  /* The phone: a sheet along the bottom edge, as tall as its content up to 90 % of the screen. */
+  margin: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 90dvh;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-3);
+  padding: 0;
+  color: var(--ink);
+  &[open] {
+    display: flex;
+  }
+  &::backdrop {
+    background-color: var(--backdrop);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity var(--dur-base) var(--ease-standard),
+      transform var(--dur-base) var(--ease-standard),
+      overlay var(--dur-base) allow-discrete,
+      display var(--dur-base) allow-discrete;
+    &::backdrop {
+      transition:
+        opacity var(--dur-base) var(--ease-standard),
+        overlay var(--dur-base) allow-discrete,
+        display var(--dur-base) allow-discrete;
+    }
+    @starting-style {
+      &[open] {
+        opacity: 0;
+        transform: translateY(1.5rem);
+      }
+      &[open]::backdrop {
+        opacity: 0;
+      }
+    }
+    &:not([open]) {
+      opacity: 0;
+      transform: translateY(1.5rem);
+    }
+  }
+  @media (min-width: 40rem) {
+    margin: auto;
+    width: calc(100% - 2rem);
+    max-width: 32rem;
+    max-height: calc(100dvh - 4rem);
+    border-bottom: 1px solid var(--line);
+    border-radius: var(--radius-2xl);
+    @media (prefers-reduced-motion: no-preference) {
+      @starting-style {
+        &[open] {
+          transform: scale(0.97);
+        }
+      }
+      &:not([open]) {
+        transform: scale(0.97);
+      }
+    }
+  }
+}
+@utility dialog-lg {
+  @media (min-width: 40rem) {
+    max-width: 42rem;
+  }
+}
+/* The grab handle says "sheet" on a phone; a centred dialog has none. */
+@utility dialog-grab {
+  flex: none;
+  margin: 0.5rem auto 0;
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: 9999px;
+  background-color: var(--line);
+  @media (min-width: 40rem) {
+    display: none;
+  }
+}
+@utility dialog-head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.5rem 0.5rem 0 1rem;
+  @media (min-width: 40rem) {
+    padding: 1rem 0.75rem 0 1.25rem;
+  }
+}
+@utility dialog-badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  margin-top: 0.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-color: var(--danger-soft);
+  color: var(--danger);
+}
+@utility dialog-title {
+  padding-top: 0.625rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+@utility dialog-desc {
+  margin-top: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  text-wrap: pretty;
+}
+@utility dialog-close {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-soft);
+}
+/* What the dialog holds: the content swapped by htmx, a scrolling body and the footer. */
+@utility dialog-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+@utility dialog-body {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+  @media (min-width: 40rem) {
+    padding: 1rem 1.25rem;
+  }
+}
+/* The actions: side by side in thumb reach on a phone (the main one wider and last), right-aligned
+   from 40rem; kept above the phone's safe area. A <fieldset> htmx disables while the form is sent. */
+@utility dialog-foot {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+  margin: 0;
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background-color: var(--surface-sunken);
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  /* A lone action fills the row; with three (Cancel, a second action, the main one) the middle
+     one takes a row of its own above the pair. */
+  & > :only-child,
+  & > :nth-child(2):nth-last-child(2) {
+    grid-column: 1 / -1;
+  }
+  & > :nth-child(2):nth-last-child(2) {
+    order: -1;
+  }
+  @media (min-width: 40rem) {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.875rem 1.25rem;
+    & > :nth-child(2):nth-last-child(2) {
+      order: 0;
+    }
+  }
+}
+/* The server could not answer with a form (a refusal, the network): app.js shows this. */
+@utility dialog-failure {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+  margin: 0.75rem 1rem 0;
+  border-radius: var(--radius-md);
+  background-color: var(--danger-soft);
+  padding: 0.625rem 0.75rem;
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 500;
+  & > svg {
+    flex: none;
+  }
+  & a {
+    color: inherit;
+    text-decoration: underline;
+  }
+}
+/* What a destructive action will do, as a list in its dialog: an icon and a sentence each. */
+@utility consequences {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  & > li {
+    display: grid;
+    grid-template-columns: 1.125rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+  & > li > svg {
+    margin-top: 0.125rem;
+    color: var(--ink-soft);
+  }
+}
+/* A lazy dialog's own page (opened without JavaScript or as a link): the same parts in a panel. */
+@utility dialog-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+/* A message on top of a form: what went wrong (the error summary) or why it cannot be sent. */
+@utility alert {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: 0.5rem;
+  border-radius: var(--radius-md);
+  background-color: var(--danger-soft);
+  padding: 0.625rem 0.75rem;
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 500;
+  & a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  /* The summary's links to the fields are 44 px targets, one per row. */
+  & li > a {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+  }
+  &:focus-visible {
+    outline-offset: 2px;
+  }
+}
+/* A modal dialog locks the page behind it. */
+@layer base {
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+}
+
+/* --- tabs: links, the current one marked with aria-current -------------------------------------- */
+@utility tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+  & a {
+    display: inline-flex;
+    min-height: 2.75rem;
+    flex: none;
+    align-items: center;
+    gap: 0.375rem;
+    border-bottom: 2px solid transparent;
+    padding: 0 0.875rem;
+    color: var(--ink-soft);
+    font-weight: 500;
+    text-decoration: none;
+    @media (hover: hover) {
+      &:hover {
+        color: var(--ink);
+        text-decoration: none;
+      }
+    }
+    &[aria-current="page"] {
+      border-bottom-color: var(--brand);
+      color: var(--brand);
+    }
+  }
+}
+
+/* --- timeline: history and audit entries ------------------------------------------------------- */
+@utility timeline {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  & > li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.5rem 1fr;
+    gap: 0.75rem;
+  }
+  /* The rail runs between the dots. */
+  & > li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: 1.5rem;
+    bottom: -1rem;
+    left: 0.6875rem;
+    width: 2px;
+    background-color: var(--line);
+  }
+  & .timeline-dot {
+    display: grid;
+    width: 1.5rem;
+    height: 1.5rem;
+    place-items: center;
+    border-radius: 9999px;
+    background-color: var(--dot-bg, var(--surface-sunken));
+    color: var(--dot-fg, var(--ink-soft));
+    & > svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+  & .timeline-dot[data-tone="ok"] {
+    --dot-bg: var(--ok-soft);
+    --dot-fg: var(--ok);
+  }
+  & .timeline-dot[data-tone="warn"] {
+    --dot-bg: var(--warn-soft);
+    --dot-fg: var(--warn);
+  }
+  & .timeline-dot[data-tone="danger"] {
+    --dot-bg: var(--danger-soft);
+    --dot-fg: var(--danger);
+  }
+  & .timeline-dot[data-tone="brand"] {
+    --dot-bg: var(--brand-soft);
+    --dot-fg: var(--brand);
+  }
+  & .timeline-when {
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* --- stepper: where a person is in a short flow (M8b.4) ---------------------------------------- */
+@utility stepper {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  & > li {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    border-top: 3px solid var(--line);
+    padding-top: 0.5rem;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+    text-align: center;
+  }
+  & > li[data-state="done"] {
+    border-top-color: var(--ok);
+  }
+  & > li[data-state="current"] {
+    border-top-color: var(--brand);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  & .stepper-dot {
+    display: grid;
+    width: 1.5rem;
+    height: 1.5rem;
+    place-items: center;
+    border-radius: 9999px;
+    background-color: var(--surface-sunken);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  & > li[data-state="done"] .stepper-dot {
+    background-color: var(--ok-soft);
+    color: var(--ok);
+  }
+  & > li[data-state="current"] .stepper-dot {
+    background-color: var(--brand);
+    color: var(--brand-ink);
+  }
+  & .stepper-label {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
+}
+
+/* --- list filters (M8b.4): a chip per filter in force, and the filters in a sheet on a phone ----- */
+@utility filter-chip {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 9999px;
+  background-color: var(--surface-raised);
+  padding: 0 0.75rem 0 1rem;
+  color: var(--ink);
+  font-size: 0.875rem;
+  text-decoration: none;
+  & > svg {
+    flex: none;
+    color: var(--ink-soft);
+  }
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--surface-sunken);
+      text-decoration: none;
+    }
+  }
+}
+/* The filter form is a popover: a sheet along the bottom edge on a phone (the "Filters" button
+   opens it), the plain inline form from 40rem, where nothing opens or closes. */
+@utility filter-sheet {
+  margin: 0;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-height: 85dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-3);
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  color: var(--ink);
+  &::backdrop {
+    background-color: var(--backdrop);
+  }
+  & .filter-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+  }
+  @media (min-width: 40rem) {
+    display: block;
+    position: static;
+    inset: auto;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+    padding: 0;
+    & .filter-sheet-head {
+      display: none;
+    }
+  }
+}
+
+/* --- definition list: a document's facts; the columns follow the card, not the viewport -------- */
+@utility facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0;
+  & dt {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  & dd {
+    margin: 0.125rem 0 0;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  @container (min-width: 40rem) {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0;
+    & > div {
+      border-left: 1px solid var(--line);
+      padding: 0.75rem 1rem;
+    }
+    & > div:first-child,
+    & > .col-span-full {
+      border-left: 0;
+      padding-left: 0;
+    }
+    & > .col-span-full {
+      border-top: 1px solid var(--line);
+    }
+  }
+}
+
+/* --- action bar: the page's one main action (M8b.4) ---------------------------------------------
+   On a phone it sticks above the bottom bar, in thumb reach, with a line saying what it will do; from
+   48rem it is a plain card at the end of the facts. */
+@utility action-bar {
+  position: sticky;
+  bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: grid;
+  gap: 0.375rem;
+  margin: 0 -1rem 1rem;
+  border-block: 1px solid var(--line);
+  background-color: var(--surface-raised);
+  padding: 0.625rem 1rem;
+  & .action-bar-sum {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 0.75rem;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+  }
+  @media (min-width: 48rem) {
+    position: static;
+    margin-inline: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-1);
+    padding: 0.75rem 1rem;
+  }
+  @media print {
+    display: none;
+  }
+}
+
+/* --- avatar: initials ------------------------------------------------------------------------------ */
+@utility avatar {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 9999px;
+  background-color: var(--brand-soft);
+  color: var(--brand);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
 }
 
 /* --- print: black on white, no chrome; the purchase-order page prints from its snapshots --- */

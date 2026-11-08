@@ -76,10 +76,13 @@ uv run pytest -n auto -m "not serial" --cov --cov-report= --cov-fail-under=0 && 
 
 ## Templates, translations and accessibility
 
+- The interface follows one design system ([ADR-0027](docs/adr/0027-ui-design-system.md), mockups in `docs/design/`): colours only as tokens from `static/src/app.css`, components from `templates/components/` (`manage styleguide` draws them all), every page starting with `page_header`, no `style` attribute, inline script or handler. A form that acts on a document opens in a dialog, following the contract in [CLAUDE.md](CLAUDE.md#conventions). A component or page the library lacks is drawn in the style guide first.
+- Mobile first: the unprefixed classes are the 360 px layout and wider screens only add (`min-width` and container queries, never a `max-*` variant).
 - Mobile first: check every page at 360 px and attach a screenshot to the pull request.
 - Every UI string goes through gettext. After adding strings run `uv run python manage.py makemessages -l es -l en -l fr` and `compilemessages`; Spanish is the default language.
 - Rebuild the CSS after editing templates (the dev compose stack runs Tailwind in watch mode).
-- Keep the checklist in [ACCESSIBILITY.md](ACCESSIBILITY.md#for-contributors) true.
+- Keep the checklist in [ACCESSIBILITY.md](ACCESSIBILITY.md#for-contributors) true. A new screen is added to the axe and keyboard tests in `tests/e2e/` (no serious or critical finding, both themes, 360 px and desktop); `uv sync --group e2e` and the commands in [CLAUDE.md](CLAUDE.md#commands) run them against a fresh compose stack.
+- A change to the interface puts its 360 px screenshots first, then the desktop ones, in the pull request (`E2E_SCREENSHOTS=1` saves them).
 
 ## Migrations and dependencies
 

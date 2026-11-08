@@ -44,13 +44,17 @@ class TestRegistry:
 
     def test_requesters_get_their_requests_only(self, people: People) -> None:
         for user in (people.tech_mad, people.partner):
-            assert keys(AccessContext.for_user(user)) == {"my-requests"}
+            assert keys(AccessContext.for_user(user)) == {"my-requests", "request-progress"}
 
     def test_a_site_manager_follows_requests_receipts_and_reviews(self, people: People) -> None:
         assert keys(AccessContext.for_user(people.site_manager)) == {
             "my-requests",
             "inbox",
             "site-surplus",
+            "request-progress",
+            "decisions",
+            "inbox-age",
+            "receipts-handovers",
         }
 
     def test_a_warehouse_operator_gets_goods_and_orders_not_purchasing(
@@ -62,6 +66,11 @@ class TestRegistry:
             "overdue",
             "to-hand-over",
             "site-surplus",
+            "orders-receipts",
+            "on-time",
+            "overdue-suppliers",
+            "receipts-handovers",
+            "handover-projects",
         }
 
     def test_a_material_manager_gets_the_worklists_not_the_overview(
@@ -69,7 +78,8 @@ class TestRegistry:
     ) -> None:
         found = keys(ctx)
         assert {"sourcing", "to-purchase", "stale-drafts", "unallocated", "dispatches"} <= found
-        assert "overview" not in found
+        assert {"decisions", "inbox-age", "orders-receipts", "handover-projects"} <= found
+        assert not {"overview", "branch-requests", "branch-people"} & found
 
     def test_a_group_administrator_gets_every_panel(self, people: People) -> None:
         assert keys(AccessContext.for_user(people.group_admin)) == set(panels.BY_KEY)
@@ -158,7 +168,9 @@ class TestAssigned:
         assert "assigned" in keys(AccessContext.for_user(people.engineer))
         assert "assigned" not in keys(AccessContext.for_user(people.site_manager))
         assert panels.BY_KEY["assigned"].query == "?assigned=1"
-        assert not panels.BY_KEY["assigned"].alert  # rejected requests ask for no action
+        found = panels.BY_KEY["assigned"]
+        assert isinstance(found, panels.Panel)
+        assert not found.alert  # rejected requests ask for no action
 
 
 class TestSourcingAndPurchasing:

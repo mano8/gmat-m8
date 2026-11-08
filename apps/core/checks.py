@@ -211,9 +211,17 @@ def _cookie_errors() -> list[CheckMessage]:
         and settings.SESSION_COOKIE_SECURE
         and settings.CSRF_COOKIE_SECURE
     )
-    if cookies_ok:
-        return []
-    return [Error("Session and CSRF cookies must be Secure __Host- cookies", id="gmat.E015")]
+    errors: list[CheckMessage] = []
+    if not cookies_ok:
+        errors.append(
+            Error("Session and CSRF cookies must be Secure __Host- cookies", id="gmat.E015")
+        )
+    # The display preferences: the prefix stops a subdomain from setting or shadowing it (M8b.2).
+    if not (settings.UI_COOKIE_NAME.startswith("__Host-") and settings.UI_COOKIE_SECURE):
+        errors.append(
+            Error("The display preferences cookie must be a Secure __Host- cookie", id="gmat.E023")
+        )
+    return errors
 
 
 def _hasher_and_mail_errors() -> list[CheckMessage]:

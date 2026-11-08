@@ -2,19 +2,25 @@
 
 The dialog (GET) is one page for changing a line and one for adding a line: the material is
 searched with a GET form and chosen with a link (``?material=``), so the page works without
-JavaScript. Saving, "save and approve" and removing are POST-only URLs of their own that call
-the services of ``editing`` and redirect back to the review page with a flash. The services
+JavaScript. The review page opens the same URL in a dialog (M8b.3): htmx asks for it and gets
+only its ``line_dialog`` fragment. Saving, "save and approve" and removing are POST-only URLs
+of their own that call the services of ``editing`` and redirect back to the review page with a
+flash; sent from the dialog, they answer by the contract of ``apps.core.responses`` (204 and
+``HX-Redirect``, or the form again with its errors, 422). The services
 decide what an edit means (in place, or a replacement of a line that already has orders or
 deliveries); the page only offers the tools.
 """
 
+from dataclasses import dataclass
+from typing import cast
 from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import render
 from django.urls import reverse
+from django.utils.cache import patch_vary_headers
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
@@ -23,8 +29,9 @@ from apps.access.mixins import mutating, require_capability
 from apps.access.roles import Capability
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
+from apps.core.http import is_htmx
 from apps.core.idempotency import IdempotencyError, recorded_result
-from apps.core.responses import idempotency_failure
+from apps.core.responses import Dialog, go, idempotency_failure, varies
 from apps.material_requests import ledger, selectors, services
 from apps.material_requests.forms import (
     LineChangeForm,
@@ -42,18 +49,31 @@ from apps.material_requests.views.common import (
     _on_request,
     _perform,
 )
+from apps.material_requests.views.review_dialogs import line_form_ids, remove_line_dialog
 
 EDIT = Capability.REQUEST_EDIT
 Status = MaterialRequest.Status
 
 
-def _chosen_material(request: HttpRequest) -> Material | None:
-    """The material picked on the dialog (``?material=``), if the user may view it."""
+LINE_DIALOG = "line-dialog"
+DIALOG_TEMPLATE = "material_requests/reviewer_line.html"
+DIALOG_PARTIAL = f"{DIALOG_TEMPLATE}#line_dialog"
+
+
+def _chosen_material(request: HttpRequest, value: str | None) -> Material | None:
+    """The material picked on the dialog (``material``), if the user may view it."""
     try:
-        pk = UUID(request.GET.get("material", ""))
+        pk = UUID(value or "")
     except ValueError:
         return None
     return catalog_selectors.materials(access_for(request)).filter(pk=pk).first()
+
+
+def _in_dialog(request: HttpRequest) -> bool:
+    """htmx asked for the content of the review page's dialog (``HX-Target``, compared, never
+    printed). The change page's own swaps (opened as a link) target its panel, which has no
+    dialog to close."""
+    return is_htmx(request) and request.headers.get("HX-Target") == f"{LINE_DIALOG}-content"
 
 
 def _dialog_url(name: str, target_id: UUID, material: str | None) -> str:
@@ -79,27 +99,43 @@ def _initial(
     return initial
 
 
-def _dialog(
-    request: HttpRequest,
-    found: MaterialRequest,
-    line: MaterialRequestLine | None,
-    *,
-    action: str,
-) -> HttpResponse:
-    """The change dialog of ``line``, or the dialog that adds a line to ``found``."""
+@dataclass(frozen=True)
+class Target:
+    """What the dialog works on: a line to change, or the request a line is added to."""
+
+    request: MaterialRequest
+    line: MaterialRequestLine | None
+
+    @property
+    def page(self) -> str:
+        """The dialog's own GET page (its search and material links stay on it)."""
+        if self.line is not None:
+            return reverse("requests:edit_line", args=[self.line.pk])
+        return reverse("requests:new_line", args=[self.request.pk])
+
+    @property
+    def action(self) -> str:
+        if self.line is not None:
+            return reverse("requests:apply_edit", args=[self.line.pk])
+        return reverse("requests:apply_add", args=[self.request.pk])
+
+
+def _context(
+    request: HttpRequest, target: Target, form: LineChangeForm, chosen: Material | None
+) -> dict[str, object]:
+    """What the dialog's fragment shows: the material search, the chosen material, the form."""
     ctx = access_for(request)
-    chosen = _chosen_material(request)
+    found, line = target.request, target.line
     search = MaterialSearchForm(request.GET or None)
     query = search.cleaned_data["q"].strip() if search.is_valid() else ""
-    form_class = LineChangeForm if line else ReviewerLineAddForm
-    form = form_class(
-        ctx=ctx, line=line, actor_id=ctx.user_id, initial=_initial(found, line, chosen)
-    )
-    context = {
+    return {
         "request_obj": found,
         "line": line,
         "form": form,
-        "action": action,
+        "action": target.action,
+        "page_url": target.page,
+        "dialog_id": LINE_DIALOG if _in_dialog(request) else "",
+        "back_url": _examine_url(found),
         "chosen": chosen,
         "search": search,
         "query": query,
@@ -108,7 +144,34 @@ def _dialog(
         "approved": found.status == Status.APPROVED,
         "described": chosen is None and (line is None or line.material_id is None),
     }
-    return render(request, "material_requests/reviewer_line.html", context)
+
+
+def _dialog(request: HttpRequest, target: Target) -> HttpResponse:
+    """The change dialog of a line, or the dialog that adds a line: the whole page, or only
+    the dialog's content for htmx (the review page's dialog loads it)."""
+    ctx = access_for(request)
+    chosen = _chosen_material(request, request.GET.get("material"))
+    form_class = LineChangeForm if target.line else ReviewerLineAddForm
+    form = form_class(
+        ctx=ctx,
+        line=target.line,
+        actor_id=ctx.user_id,
+        initial=_initial(target.request, target.line, chosen),
+    )
+    template = DIALOG_PARTIAL if is_htmx(request) else DIALOG_TEMPLATE
+    response = varies(render(request, template, _context(request, target, form, chosen)))
+    patch_vary_headers(response, ["HX-Target"])
+    return response
+
+
+def _sent_again(request: HttpRequest, target: Target, form: LineChangeForm) -> Dialog:
+    """The dialog's form as it was sent, to show again with its errors (htmx, 422)."""
+    chosen = _chosen_material(request, request.POST.get("material"))
+    return Dialog(
+        form,
+        DIALOG_PARTIAL,
+        lambda bound: _context(request, target, cast(LineChangeForm, bound), chosen),
+    )
 
 
 def _editable(
@@ -131,10 +194,8 @@ def line_edit(request: HttpRequest, line_id: UUID) -> HttpResponse:
     """The dialog that changes a line: material, description, unit or quantity, a reason."""
     line = _on_line(request, line_id, EDIT)
     if not _editable(request, line.request, line):
-        return redirect(_examine_url(line))
-    return _dialog(
-        request, line.request, line, action=reverse("requests:apply_edit", args=[line.pk])
-    )
+        return go(request, _examine_url(line))
+    return _dialog(request, Target(line.request, line))
 
 
 @mutating(EDIT)
@@ -142,10 +203,12 @@ def line_apply_edit(request: HttpRequest, line_id: UUID) -> HttpResponse:
     """Save the change (or save and approve it, in a submitted request)."""
     ctx = access_for(request)
     line = _on_line(request, line_id, EDIT)
-    dialog = _dialog_url("edit_line", line.pk, request.POST.get("material"))
+    target = Target(line.request, line)
+    dialog_page = _dialog_url("edit_line", line.pk, request.POST.get("material"))
     form = LineChangeForm(request.POST, ctx=ctx, line=line)
+    again = _sent_again(request, target, form)
     if not form.is_valid():
-        return _invalid(request, form, dialog)
+        return _invalid(request, form, dialog_page, dialog=again)
     data = form.cleaned_data
     try:
         # A double tap: the first one changed the line, so what differs from it now is
@@ -157,7 +220,7 @@ def line_apply_edit(request: HttpRequest, line_id: UUID) -> HttpResponse:
         return idempotency_failure(request, exc)
     if done is not None:
         messages.success(request, _("Line %(line)s changed.") % {"line": line.line_no})
-        return redirect(_examine_url(line))
+        return go(request, _examine_url(line))
     edit = LineEdit(
         reason=data["reason"],
         changes=form.changes(),
@@ -171,7 +234,8 @@ def line_apply_edit(request: HttpRequest, line_id: UUID) -> HttpResponse:
         ),
         _("Line %(line)s changed.") % {"line": line.line_no},
         _examine_url(line),
-        failed_to=dialog,
+        failed_to=dialog_page,
+        dialog=again,
     )
 
 
@@ -181,8 +245,8 @@ def line_new(request: HttpRequest, request_id: UUID) -> HttpResponse:
     """The dialog that adds a line to a submitted or approved request."""
     found = _on_request(request, request_id, EDIT)
     if not _editable(request, found, None):
-        return redirect(_examine_url(found))
-    return _dialog(request, found, None, action=reverse("requests:apply_add", args=[found.pk]))
+        return go(request, _examine_url(found))
+    return _dialog(request, Target(found, None))
 
 
 @mutating(EDIT)
@@ -191,10 +255,11 @@ def line_apply_add(request: HttpRequest, request_id: UUID) -> HttpResponse:
     submitted one)."""
     ctx = access_for(request)
     found = _on_request(request, request_id, EDIT)
-    dialog = _dialog_url("new_line", found.pk, request.POST.get("material"))
+    dialog_page = _dialog_url("new_line", found.pk, request.POST.get("material"))
     form = ReviewerLineAddForm(request.POST, ctx=ctx)
+    again = _sent_again(request, Target(found, None), form)
     if not form.is_valid():
-        return _invalid(request, form, dialog)
+        return _invalid(request, form, dialog_page, dialog=again)
     data = form.cleaned_data
     edit = LineEdit(
         reason=data["reason"],
@@ -209,7 +274,8 @@ def line_apply_add(request: HttpRequest, request_id: UUID) -> HttpResponse:
         ),
         _("Line added."),
         _examine_url(found),
-        failed_to=dialog,
+        failed_to=dialog_page,
+        dialog=again,
     )
 
 
@@ -219,9 +285,10 @@ def line_remove_reviewed(request: HttpRequest, line_id: UUID) -> HttpResponse:
     stays on the request, with the reason."""
     ctx = access_for(request)
     line = _on_line(request, line_id, EDIT)
-    form = LineRemoveForm(request.POST)
+    form = LineRemoveForm(request.POST, auto_id=line_form_ids(line, "remove"))
+    dialog = remove_line_dialog(line, form, line.request.status).dialog()
     if not form.is_valid():
-        return _invalid(request, form, _examine_url(line))
+        return _invalid(request, form, _examine_url(line), dialog=dialog)
     data = form.cleaned_data
     return _perform(
         request,
@@ -234,4 +301,5 @@ def line_remove_reviewed(request: HttpRequest, line_id: UUID) -> HttpResponse:
         ),
         _("Line %(line)s removed.") % {"line": line.line_no},
         _examine_url(line),
+        dialog=dialog,
     )

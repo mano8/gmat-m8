@@ -4,13 +4,19 @@
   {% if supplier %}{{ supplier.name }}{% else %}{% translate "New supplier" %}{% endif %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-4">
-    {% if supplier %}
-      {% blocktranslate with name=supplier.name %}Edit supplier {{ name }}{% endblocktranslate %}
-    {% else %}
-      {% translate "New supplier" %}
-    {% endif %}
-  </h1>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'suppliers:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Suppliers") parent_url=crumb_url current=supplier.name|default:_("New supplier") %}
+      <h1>
+        {% if supplier %}
+          {% blocktranslate with name=supplier.name %}Edit supplier {{ name }}{% endblocktranslate %}
+        {% else %}
+          {% translate "New supplier" %}
+        {% endif %}
+      </h1>
+    </div>
+  </header>
   <form method="post"
         class="card max-w-2xl"
         action="{% if supplier %}{% url 'suppliers:update' supplier_id=supplier.pk %}{% else %}{% url 'suppliers:create' %}{% endif %}">

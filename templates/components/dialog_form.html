@@ -1,0 +1,48 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The form of an action dialog (M8b.4): what the dialog holds, and what comes back alone (422)
+  when the form is invalid or the service refuses it. Parameter: d, an apps.core.dialogs.ActionDialog.
+  The consequences are what the action will do, one sentence each; the form's visible fields
+  follow, its hidden ones (idempotency key, seen version) are kept; Cancel closes the dialog and
+  has the focus in a destructive one.
+{% endcomment %}
+<form method="post"
+      action="{{ d.action }}"
+      hx-post="{{ d.action }}"
+      hx-disabled-elt="find [data-dialog-actions]"
+      class="dialog-content"
+      novalidate
+      {% if d.testid %}data-testid="{{ d.testid }}"{% endif %}>
+  <div class="dialog-body">
+    {% include "components/error_summary.html" with form=d.form %}
+    {% csrf_token %}
+    {% for hidden in d.form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% if d.note %}<p class="text-sm text-soft">{{ d.note }}</p>{% endif %}
+    {% if d.warning %}
+      <p class="rounded-lg border border-warn bg-warn-soft p-3 text-sm"
+         role="note"
+         {% if d.warning_testid %}data-testid="{{ d.warning_testid }}"{% endif %}>{{ d.warning }}</p>
+    {% endif %}
+    {% if d.consequences %}
+      <ul class="consequences" data-testid="consequences">
+        {% for text in d.consequences %}
+          <li>
+            {% icon "arrow-right" classes="size-4" %}
+            <span>{{ text }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% for field in d.form.visible_fields %}{{ field.as_field_group }}{% endfor %}
+  </div>
+  <fieldset class="dialog-foot" data-dialog-actions>
+    {% if d.modal %}
+      {% include "components/dialog_cancel.html" with dialog_id=d.id label=d.cancel focus=d.tone %}
+    {% else %}
+      {% include "components/dialog_cancel.html" with back_url=d.back label=d.cancel %}
+    {% endif %}
+    <button type="submit"
+            class="btn {% if d.tone == 'danger' %}btn-danger{% else %}btn-primary{% endif %}"
+            {% if d.submit_testid %}data-testid="{{ d.submit_testid }}"{% endif %}>{{ d.submit }}</button>
+  </fieldset>
+</form>

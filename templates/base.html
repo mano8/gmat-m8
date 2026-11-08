@@ -1,15 +1,19 @@
 {% load i18n static %}
 {% get_current_language as LANGUAGE_CODE %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE }}">
+{# The remembered theme is written on <html> by the server, so the first paint is right; System writes nothing. #}
+<html lang="{{ LANGUAGE_CODE }}"
+      {% if ui_theme %} data-theme="{{ ui_theme }}"{% endif %}>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme"
+          content="{% if ui_theme %}{{ ui_theme }}{% else %}light dark{% endif %}">
     <meta name="robots" content="noindex, nofollow">
     {# htmx is configured here, never inline: no page snapshot is stored (historyCacheSize 0), nothing is evaluated. #}
+    {# responseHandling (M8b.3): a dialog's form comes back with its errors (422) or the reason it is out of date (409) and is swapped in; other errors are not (app.js says so in the dialog). #}
     <meta name="htmx-config"
-          content='{"historyCacheSize": 0, "refreshOnHistoryMiss": true, "includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "selfRequestsOnly": true}'>
+          content='{"historyCacheSize": 0, "refreshOnHistoryMiss": true, "includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "selfRequestsOnly": true, "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "422", "swap": true}, {"code": "409", "swap": true}, {"code": "[45]..", "swap": false, "error": true}, {"code": "...", "swap": false}]}'>
     <title>
       {% block title %}
         {% block head_title %}gmat-m8{% endblock head_title %}
@@ -17,6 +21,11 @@
     </title>
     <link rel="icon"
           href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b5cad'/%3E%3Cpath d='M8 17l5 5 11-12' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="preload"
+          href="{% static 'vendor/fonts/inter-latin-wght-normal.woff2' %}"
+          as="font"
+          type="font/woff2"
+          crossorigin>
     <link rel="stylesheet" href="{% static 'dist/app.css' %}">
     <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
     <script src="{% static 'js/app.js' %}" defer></script>

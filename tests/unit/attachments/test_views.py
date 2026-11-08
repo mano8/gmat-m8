@@ -348,6 +348,34 @@ class TestRemove:
         assert (item.removed_by, item.removal_reason) == (people.mm_mad, "Not ours")
         assert manager.post(url, {"reason": "Again"}).status_code == 403
 
+    def test_the_removal_is_a_dialog_that_asks_a_moderator_for_a_reason(
+        self, people: People, draft: MaterialRequest, tech: SessionPrincipal, attach: Attach
+    ) -> None:
+        item = attach(tech, draft)
+        submit(draft)
+        manager = client_for(people.mm_mad)
+        page = manager.get(reverse("requests:examine", args=[draft.pk])).content.decode()
+        assert (
+            f'id="remove-dialog-{item.pk}"' in page
+            and "<details" not in page.split("<main", 1)[1].split("</main>", 1)[0]
+        )
+        assert f'id="id_remove_{item.pk}_reason"' in page
+        url = f"{reverse('attachments:remove', args=[item.pk])}?back=examine"
+        again = manager.post(url, {"reason": ""}, headers={"HX-Request": "true"})
+        assert again.status_code == 422
+        assert 'data-testid="attachment-remove-form"' in again.content.decode()
+        done = manager.post(url, {"reason": "Not ours"}, headers={"HX-Request": "true"})
+        assert done.status_code == 204
+        assert done["HX-Redirect"] == reverse("requests:examine", args=[draft.pk])
+
+    def test_the_uploader_has_no_reason_to_give_on_a_draft(
+        self, technician: Client, draft: MaterialRequest, tech: SessionPrincipal, attach: Attach
+    ) -> None:
+        item = attach(tech, draft)
+        page = technician.get(reverse("requests:detail", args=[draft.pk])).content.decode()
+        assert f'id="remove-dialog-{item.pk}"' in page
+        assert f'id="id_remove_{item.pk}_reason"' not in page
+
     def test_the_technician_cannot_remove_after_submission(
         self, technician: Client, draft: MaterialRequest, tech: SessionPrincipal, attach: Attach
     ) -> None:
@@ -370,8 +398,9 @@ class TestPanels:
         page = technician.get(reverse("requests:detail", args=[draft.pk])).content.decode()
         assert 'data-testid="attachment-upload"' in page
         assert reverse("attachments:download", args=[item.pk]) in page
-        assert 'data-testid="attachment-remove"' in page
-        assert 'name="reason"' not in page  # the uploader's own draft: no reason asked
+        assert 'data-testid="attachment-remove-open"' in page
+        # The uploader's own draft: removing a file asks for no reason.
+        assert f'id="id_remove_{item.pk}_reason"' not in page
 
     def test_the_review_page_lists_and_moderates(
         self, people: People, draft: MaterialRequest, tech: SessionPrincipal, attach: Attach
@@ -400,7 +429,7 @@ class TestPanels:
         assert 'data-testid="attachment-upload"' in page
         page = operator.get(reverse("handovers:detail", args=[handover.pk])).content.decode()
         assert "entrega.pdf" in page
-        assert 'data-testid="attachment-remove"' not in page  # removal is the managers'
+        assert 'data-testid="attachment-remove-open"' not in page  # removal is the managers'
 
     def test_a_removed_file_is_listed_with_who_removed_it(
         self, people: People, receipt: GoodsReceipt, mm: SessionPrincipal, attach: Attach

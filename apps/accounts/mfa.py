@@ -25,8 +25,9 @@ from apps.accounts.sessions import bump_session_epoch
 from apps.core.db import atomic_with_lock_timeout
 
 # Reachable without session MFA, so that a privileged user can complete it, sign out or
-# change the language: allauth's account and MFA pages, the language switch, health checks.
-MFA_EXEMPT_URL_NAMES = frozenset({"set_language", "healthz", "readyz"})
+# change the language or the theme: allauth's account and MFA pages, the language switch and the
+# display preferences (they write only a cookie), health checks.
+MFA_EXEMPT_URL_NAMES = frozenset({"set_language", "ui_preferences", "healthz", "readyz"})
 MFA_EXEMPT_URL_PREFIXES = ("account_", "mfa_")
 # The token links only store the token's hash and redirect to a token-less page: a step-up
 # from here would carry the token into the ``next`` parameter.

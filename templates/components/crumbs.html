@@ -1,0 +1,28 @@
+{% load i18n ui_tags %}
+{% comment %}
+  Where this page sits: list → document. Either `breadcrumbs`, a list of (label, url) pairs whose
+  last one has an empty url and is the page, or `parent_label` + `parent_url` + `current` for the
+  usual one step down from a list. The page's own label is marked aria-current.
+{% endcomment %}
+<nav aria-label="{% translate 'Breadcrumb' %}" data-testid="breadcrumbs">
+  <ol class="crumbs list-none p-0">
+    {% if breadcrumbs %}
+      {% for label, url in breadcrumbs %}
+        <li class="inline-flex items-center gap-1">
+          {% if url %}
+            <a href="{{ url }}">{{ label }}</a>{% icon "chevron-right" classes="size-3.5" %}
+          {% else %}
+            <span aria-current="page">{{ label }}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    {% else %}
+      <li class="inline-flex items-center gap-1">
+        <a href="{{ parent_url }}">{{ parent_label }}</a>{% icon "chevron-right" classes="size-3.5" %}
+      </li>
+      <li class="inline-flex items-center gap-1">
+        <span aria-current="page">{{ current }}</span>
+      </li>
+    {% endif %}
+  </ol>
+</nav>

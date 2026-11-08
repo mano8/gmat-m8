@@ -1,0 +1,42 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The head of a page. Parameters (all optional but title):
+    title            the page title (h1); title_mono=True draws a document number in the mono face
+    subtitle         one line of context under the title
+    breadcrumbs      a list of (label, url) pairs; the last one has an empty url and is the page,
+                     or parent_label, parent_url and current for one step down from a list
+    chip_label, chip_tone, chip_icon   the status chip beside the title (see status_chip.html)
+    primary_label, primary_href, primary_icon   the one main action (drawn only with both label and
+                     href, so a page can leave the href empty when the user may not do it)
+    status_template, status_obj   a status partial (obj=) drawn beside the title, for pages whose
+                     status is more than one chip
+    menu_id, menu_items   the other actions in a menu (menu.html: items of label, href, icon, tone)
+  Actions wrap under the title on a phone. A page that needs more composes `page-head` by hand.
+{% endcomment %}
+<header class="page-head" data-testid="page-header">
+  <div class="page-head-main">
+    {% if breadcrumbs or parent_label %}
+      {% include "components/crumbs.html" %}
+    {% endif %}
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <h1{% if title_mono %} class="doc-no"{% endif %}>{{ title }}</h1>
+      {% if chip_label %}
+        {% chip chip_label chip_tone chip_icon %}
+      {% endif %}
+      {% if status_template %}
+        {% include status_template with obj=status_obj %}
+      {% endif %}
+    </div>
+    {% if subtitle %}<p class="page-head-sub">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if primary_href or menu_items %}
+    <div class="page-head-actions">
+      {% if primary_label and primary_href %}
+        {% include "components/button.html" with href=primary_href label=primary_label icon=primary_icon variant="primary" %}
+      {% endif %}
+      {% if menu_items %}
+        {% include "components/menu.html" with id=menu_id label=_("More actions") items=menu_items %}
+      {% endif %}
+    </div>
+  {% endif %}
+</header>

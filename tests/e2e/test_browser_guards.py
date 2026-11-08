@@ -39,9 +39,9 @@ def test_back_after_logout_shows_nothing_of_the_first_person(
     page.goto("/")
     expect(page.locator("main").get_by_text(first.email)).to_be_visible()
 
-    page.get_by_role("button", name="Sign out").click()
+    pages.sign_out(page)
     page.wait_for_load_state("networkidle")
-    expect(page.get_by_role("button", name="Sign out")).to_have_count(0)
+    expect(page.get_by_role("button", name="Account menu")).to_have_count(0)
     sign_in(page, second)
 
     mine = ("tech-mad@demo.example", "Tomás Herrero", "SOL-A-MAD")

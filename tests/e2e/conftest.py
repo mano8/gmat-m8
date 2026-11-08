@@ -132,12 +132,15 @@ class Browsing:
     pages: list[Page] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
 
-    def _context(self, viewport: str, state: Any = None) -> BrowserContext:
+    def _context(
+        self, viewport: str, state: Any = None, *, javascript: bool = True
+    ) -> BrowserContext:
         context = self.browser.new_context(
             base_url=BASE_URL,
             ignore_https_errors=True,  # Caddy's internal CA
             locale="en-US",
             storage_state=state,
+            java_script_enabled=javascript,
             **VIEWPORTS[viewport],
         )
         context.expose_function(
@@ -187,6 +190,12 @@ class Browsing:
             first.context.close()
         return self._watch(self._context(viewport, self.states[key]).new_page())
 
+    def without_javascript(self, key: str, viewport: str = "desktop") -> Page:
+        """Like ``as_``, in a browser with scripts switched off: what a form does on its own."""
+        self.as_(key, viewport).context.close()  # makes the session if it is not there yet
+        context = self._context(viewport, self.states[key], javascript=False)
+        return self._watch(context.new_page())
+
 
 @pytest.fixture(scope="session")
 def _sessions(browser: Browser, people: dict[str, Person]) -> dict[str, Any]:
@@ -213,3 +222,17 @@ def browsing(
 @pytest.fixture(scope="session")
 def mailbox(stack: Stack) -> Mailbox:
     return Mailbox(stack)
+
+
+_DOCUMENTS: list[Any] = []
+
+
+@pytest.fixture
+def documents(browsing: Browsing) -> Any:
+    """The pages of ``tests.e2e.documents``, made through the screens the first time a test asks
+    for them and kept for the rest of the run."""
+    if not _DOCUMENTS:
+        from tests.e2e.documents import build  # it imports this module
+
+        _DOCUMENTS.append(build(browsing))
+    return _DOCUMENTS[0]

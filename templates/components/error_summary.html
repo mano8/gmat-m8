@@ -1,0 +1,34 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The errors of a form, on top of it (M8b.3): what went wrong in one place, each field's error
+  a link to that field. app.js moves the focus here when a dialog's form comes back invalid
+  (role="alert" announces it); the link takes the person to the field. Nothing without errors.
+  Parameter: form.
+{% endcomment %}
+{% if form.errors %}
+  <div class="alert" role="alert" tabindex="-1" data-error-summary>
+    {% icon "circle-alert" classes="size-5" %}
+    <div>
+      <p class="font-semibold">
+        {% blocktranslate count counter=form.errors|length trimmed %}
+          Correct one thing to continue.
+        {% plural %}
+          Correct {{ counter }} things to continue.
+        {% endblocktranslate %}
+      </p>
+      <ul class="m-0 list-none p-0">
+        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        {% for field in form.visible_fields %}
+          {% for error in field.errors %}
+            <li>
+              <a href="#{{ field.auto_id }}" data-error-field="{{ field.auto_id }}">{{ field.label }}: {{ error }}</a>
+            </li>
+          {% endfor %}
+        {% endfor %}
+        {% for field in form.hidden_fields %}
+          {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+{% endif %}

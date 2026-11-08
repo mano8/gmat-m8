@@ -464,7 +464,14 @@ class TestRoleBasedMfa:
         assert self.needs_mfa(make_user(), "core:home") is False
 
     @pytest.mark.parametrize(
-        "url_name", ["account_logout", "mfa_index", "mfa_reauthenticate", "set_language"]
+        "url_name",
+        [
+            "account_logout",
+            "mfa_index",
+            "mfa_reauthenticate",
+            "set_language",
+            "core:ui_preferences",
+        ],
     )
     def test_except_where_mfa_is_completed_or_the_session_ends(
         self, manager: User, url_name: str

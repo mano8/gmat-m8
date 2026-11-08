@@ -4,10 +4,16 @@
   {% translate "Link to the catalog" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-1">{% translate "Link to the catalog" %}</h1>
-  <p class="mb-4 text-soft" data-testid="link-line">
-    {{ request_obj.number }} · {{ line.description }} · {{ line.requested_qty|quantity }} {{ line.unit.code }}
-  </p>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'requests:inbox' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Approval inbox") parent_url=crumb_url current=_("Link to the catalog") %}
+      <h1>{% translate "Link to the catalog" %}</h1>
+      <p class="page-head-sub" data-testid="link-line">
+        {{ request_obj.number }} · {{ line.description }} · {{ line.requested_qty|quantity }} {{ line.unit.code }}
+      </p>
+    </div>
+  </header>
   <p class="mb-3 text-sm text-soft">{% translate "Only materials measured in the same unit can be linked." %}</p>
   <form method="get"
         action="{% url 'requests:link' line_id=line.pk %}"

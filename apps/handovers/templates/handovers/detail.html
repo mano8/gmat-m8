@@ -4,40 +4,50 @@
   {{ handover.number }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1 data-testid="handover-number">{{ handover.number }}</h1>
-    <p class="mt-1 flex flex-wrap gap-2">
-      {% include "handovers/status.html" with obj=handover %}
-      <span class="chip">{{ handover.get_kind_display }}</span>
-    </p>
-  </div>
-  <section class="card mb-4" aria-label="{% translate 'Handover details' %}">
-    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'handovers:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Handovers") parent_url=crumb_url current=handover.number %}
+      <h1 class="doc-no" data-testid="handover-number">{{ handover.number }}</h1>
+      <p class="mt-1 flex flex-wrap gap-2">
+        {% include "handovers/status.html" with obj=handover %}
+        <span class="chip">{{ handover.get_kind_display }}</span>
+      </p>
+    </div>
+    {% if menu_items %}
+      <div class="page-head-actions">
+        {% include "components/menu.html" with id="handover-menu" label=_("More actions") items=menu_items %}
+      </div>
+    {% endif %}
+  </header>
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Handover details' %}">
+    <dl class="facts">
       <div>
-        <dt class="text-sm text-soft">{% translate "Project" %}</dt>
+        <dt>{% translate "Project" %}</dt>
         <dd data-field="project">
           {{ handover.project.code }} · {{ handover.project.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "From" %}</dt>
+        <dt>{% translate "From" %}</dt>
         <dd data-field="source">
           {{ handover.source_location.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Received by" %}</dt>
+        <dt>{% translate "Received by" %}</dt>
         <dd data-field="received-by">{% if handover.received_by %}{{ handover.received_by.full_name|default:handover.received_by.email }}{% else %}{{ handover.received_by_name }}{% endif %}</dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Handed over" %}</dt>
+        <dt>{% translate "Handed over" %}</dt>
         <dd>
           {{ handover.handed_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.handed_by.full_name|default:handover.handed_by.email }}
         </dd>
       </div>
       {% if handover.goods_receipt %}
-        <div class="sm:col-span-2">
-          <dt class="text-sm text-soft">{% translate "Goods receipt" %}</dt>
+        <div class="col-span-full">
+          <dt>{% translate "Goods receipt" %}</dt>
           <dd>
             {% can "receipt.view" handover.goods_receipt %}
               <a href="{% url 'receiving:detail' receipt_id=handover.goods_receipt_id %}">{{ handover.goods_receipt.number }}</a>
@@ -48,8 +58,8 @@
         </div>
       {% endif %}
       {% if handover.status == "VOIDED" %}
-        <div class="sm:col-span-2" data-testid="void-reason">
-          <dt class="text-sm text-soft">{% translate "Voided" %}</dt>
+        <div class="col-span-full" data-testid="void-reason">
+          <dt>{% translate "Voided" %}</dt>
           <dd>
             {{ handover.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.voided_by.full_name|default:handover.voided_by.email }}
             <span class="block whitespace-pre-line">{{ handover.void_reason }}</span>
@@ -72,22 +82,7 @@
   </section>
   {% include "attachments/panel.html" with panel=attachments %}
   {% if can_void %}
-    <section class="card mb-4" aria-label="{% translate 'Void the handover' %}">
-      <details>
-        <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Void the handover" %}</summary>
-        <p class="mb-2 text-sm text-soft">
-          {% translate "The material counts as not handed over again and the requests reopen. Hand it over again if it was only wrong." %}
-        </p>
-        <form method="post"
-              action="{% url 'handovers:void' handover_id=handover.pk %}"
-              data-once
-              data-testid="void-form">
-          {% csrf_token %}
-          {{ void_form.reason.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Void the handover") variant="danger" %}
-        </form>
-      </details>
-    </section>
+    {% include "components/action_dialog.html" with d=void_dialog %}
   {% elif handover.kind == "DIRECT_RECEIPT" and handover.status == "POSTED" %}
     <p class="text-sm text-soft" data-testid="direct-note">
       {% translate "This material was received on site: it is voided together with its goods receipt." %}

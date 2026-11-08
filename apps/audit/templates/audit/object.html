@@ -4,10 +4,14 @@
   {% translate "History" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1>{% translate "History" %}</h1>
-    <p class="text-soft">{{ object_type }} · {{ object_id }}</p>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'audit:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Audit") parent_url=crumb_url current=_("History") %}
+      <h1>{% translate "History" %}</h1>
+      <p class="page-head-sub">{{ object_type }} · {{ object_id }}</p>
+    </div>
+  </header>
   {% url 'audit:object' object_type=object_type object_id=object_id as history_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#history-results" action=history_url grid="sm:grid-cols-[1fr_9rem_9rem_auto]" %}
   {% partialdef results inline %}

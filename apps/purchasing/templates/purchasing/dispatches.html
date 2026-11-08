@@ -2,7 +2,7 @@
 {% comment %}
   The order's supplier dispatches (M5.3): status, attempts and, for po.manage, the decision
   on a dispatch the worker left uncertain or failed. Parameters: order, dispatches (rows with
-  their note form), managing, dispatch_on, awaiting_decision, notice_awaited.
+  their dialogs for the decision), managing, dispatch_on, awaiting_decision, notice_awaited.
 {% endcomment %}
 <section class="mb-4"
          aria-label="{% translate 'Sent to the supplier' %}"
@@ -20,7 +20,7 @@
   {% endif %}
   {% if dispatches %}
     <ol class="card">
-      {% for row, form in dispatches %}
+      {% for row, resend, confirm in dispatches %}
         <li class="border-b border-line py-2 last:border-b-0"
             data-testid="dispatch">
           <p class="flex flex-wrap items-center gap-2">
@@ -39,28 +39,20 @@
           </p>
           {% if row.dispatch.last_error %}<p class="text-sm text-soft">{{ row.dispatch.last_error }}</p>{% endif %}
           {% if managing and row.actionable %}
-            <details class="mt-2">
-              <summary class="min-h-11 cursor-pointer py-2 font-medium">{% translate "Decide" %}</summary>
-              <form method="post"
-                    class="mb-2"
-                    action="{% url 'purchasing:resend_dispatch' dispatch_id=row.dispatch.pk %}"
-                    data-testid="dispatch-resend-form">
-                {% csrf_token %}
-                {{ form.note.as_field_group }}
-                <div class="flex flex-wrap gap-3">
-                  {% if row.resendable %}
-                    {% include "components/button.html" with type="submit" label=_("Send again") %}
-                  {% endif %}
-                  {% if row.confirmable %}
-                    {% url 'purchasing:confirm_dispatch' dispatch_id=row.dispatch.pk as confirm_url %}
-                    <button type="submit"
-                            class="btn btn-primary"
-                            formaction="{{ confirm_url }}"
-                            data-testid="dispatch-confirm">{% translate "The supplier has it" %}</button>
-                  {% endif %}
-                </div>
-              </form>
-            </details>
+            <div class="mt-2 flex flex-wrap gap-2">
+              {% if row.resendable %}
+                {% include "components/dialog_button.html" with dialog=resend.id label=_("Send again") variant="secondary" icon="send" testid="dispatch-resend-open" %}
+              {% endif %}
+              {% if row.confirmable %}
+                {% include "components/dialog_button.html" with dialog=confirm.id label=_("The supplier has it") variant="primary" icon="circle-check" testid="dispatch-confirm-open" %}
+              {% endif %}
+            </div>
+            {% if row.resendable %}
+              {% include "components/action_dialog.html" with d=resend %}
+            {% endif %}
+            {% if row.confirmable %}
+              {% include "components/action_dialog.html" with d=confirm %}
+            {% endif %}
           {% endif %}
         </li>
       {% endfor %}

@@ -1,19 +1,26 @@
 {% load ui_tags %}
 {% comment %}
   A table that collapses to cards on phones. Parameters: columns (header labels) and rows (a
-  list of lists, one cell per column). Cells are escaped; for links or chips write the table
-  by hand with the `table-responsive` class and a `data-label` on each cell.
+  list of lists, one cell per column); numeric (optional, the positions of the number columns,
+  right-aligned in tabular figures). Cells are escaped; for links or chips write the table by
+  hand with the `table-responsive` class and a `data-label` on each cell.
 {% endcomment %}
 <table class="table-responsive">
   <thead>
     <tr>
-      {% for column in columns %}<th scope="col">{{ column }}</th>{% endfor %}
+      {% for column in columns %}
+        <th scope="col"
+            {% if forloop.counter0 in numeric %}class="num"{% endif %}>{{ column }}</th>
+      {% endfor %}
     </tr>
   </thead>
   <tbody>
     {% for row in rows %}
       <tr>
-        {% for cell in row %}<td data-label="{{ columns|at:forloop.counter0 }}">{{ cell }}</td>{% endfor %}
+        {% for cell in row %}
+          <td data-label="{{ columns|at:forloop.counter0 }}"
+              {% if forloop.counter0 in numeric %}class="num"{% endif %}>{{ cell }}</td>
+        {% endfor %}
       </tr>
     {% endfor %}
   </tbody>

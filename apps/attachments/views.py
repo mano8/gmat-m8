@@ -43,7 +43,7 @@ from apps.access.exceptions import AccessDenied
 from apps.access.middleware import access_for
 from apps.access.mixins import require
 from apps.attachments import files, selectors, services
-from apps.attachments.forms import RemoveForm
+from apps.attachments.dialogs import remove_dialog, remove_form
 from apps.attachments.parents import ParentType, parent_of, parent_type, type_of
 from apps.attachments.uploads import ReservingUploadHandler, UploadAborted
 from apps.core.idempotency import IdempotencyError
@@ -226,11 +226,12 @@ def remove(request: HttpRequest, attachment_id: UUID) -> HttpResponseBase:
     if not selectors.can_remove(ctx, item):
         raise AccessDenied(type_of(of).moderate)
     to = type_of(of).page(of, request.GET.get("back", ""))
-    form = RemoveForm(request.POST)
-    reason = form.cleaned_data["reason"] if form.is_valid() else ""
+    form = remove_form(item, needs_reason=selectors.needs_reason(ctx, item), data=request.POST)
+    reason = form.cleaned_data.get("reason", "") if form.is_valid() else ""
     return perform(
         request,
         lambda: services.remove_attachment(ctx.principal, item.pk, reason=reason),
         _("%(name)s removed.") % {"name": item.file_name},
         to,
+        dialog=remove_dialog(item, form, request.GET.get("back", "")).dialog(),
     )

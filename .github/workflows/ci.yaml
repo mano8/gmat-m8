@@ -71,6 +71,10 @@ jobs:
       - name: Trivy exceptions are valid and unexpired
         run: uv run python scripts/check_trivyignore.py
 
+      # ADR-0027: the design tokens keep WCAG 2.2 AA in both themes (static/src/app.css).
+      - name: Contrast of the design tokens
+        run: uv run python scripts/check_contrast.py
+
       # ADR-0026: every ADR names the files it governs, and each entry still matches one.
       - name: ADR records (governed files, numbering, index)
         run: uv run python scripts/check_adr_alignment.py check

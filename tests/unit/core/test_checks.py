@@ -179,6 +179,8 @@ class TestDeploymentChecks:
             ({"CSRF_TRUSTED_ORIGINS": ["http://app.example.org"]}, "gmat.E014"),
             ({"SESSION_COOKIE_NAME": "sessionid"}, "gmat.E015"),
             ({"CSRF_COOKIE_SECURE": False}, "gmat.E015"),
+            ({"UI_COOKIE_NAME": "ui"}, "gmat.E023"),
+            ({"UI_COOKIE_SECURE": False}, "gmat.E023"),
             ({"PASSWORD_HASHERS": ["django.contrib.auth.hashers.MD5PasswordHasher"]}, "gmat.E016"),
             ({"PASSWORD_HASHERS": []}, "gmat.E016"),
             ({"MAILERS": {**GOOD_MAILERS, "default": SMTP}}, "gmat.E017"),

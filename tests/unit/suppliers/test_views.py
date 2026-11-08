@@ -169,3 +169,26 @@ class TestScreens:
                 client.get(reverse(f"suppliers:{name}", args=[org.supplier.pk])).status_code == 405
             )
         assert client.get(reverse("suppliers:create")).status_code == 405
+
+
+class TestDeactivateDialog:
+    def test_the_page_confirms_in_a_dialog_that_states_the_consequence(
+        self, org: Org, people: People
+    ) -> None:
+        page = client_for(people.mm_mad, HTTP_ACCEPT_LANGUAGE="en").get(
+            reverse("suppliers:detail", args=[org.supplier.pk])
+        )
+        body = page.content.decode()
+        assert 'id="deactivate-dialog"' in body
+        assert "Existing orders and documents keep it." in body
+        # The warehouse operator reads the page and sees no way to deactivate it.
+        reader = client_for(people.wo_mad).get(reverse("suppliers:detail", args=[org.supplier.pk]))
+        assert 'id="deactivate-dialog"' not in reader.content.decode()
+
+    def test_sent_from_the_dialog_it_navigates(self, org: Org, people: People) -> None:
+        target = reverse("suppliers:deactivate", args=[org.supplier.pk])
+        response = client_for(people.mm_mad).post(target, headers={"HX-Request": "true"})
+        assert response.status_code == 204
+        assert response["HX-Redirect"] == reverse("suppliers:detail", args=[org.supplier.pk])
+        org.supplier.refresh_from_db()
+        assert not org.supplier.is_active

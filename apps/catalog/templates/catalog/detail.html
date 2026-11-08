@@ -4,65 +4,65 @@
   {{ material.reference }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'catalog:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Catalog") parent_url=crumb_url current=material.reference %}
       <h1>{{ material.reference }} · {{ material.name }}</h1>
       <p class="mt-1">{% include "catalog/status.html" %}</p>
     </div>
-    {% if manageable %}
-      <div class="flex flex-wrap gap-3">
-        {% url 'catalog:edit' material_id=material.pk as edit_url %}
-        {% include "components/button.html" with href=edit_url label=_("Edit") %}
-        {% if material.is_active %}
-          <form method="post"
-                action="{% url 'catalog:deactivate' material_id=material.pk %}">
-            {% csrf_token %}
-            {% include "components/button.html" with type="submit" label=_("Deactivate") variant="danger" %}
-          </form>
-        {% else %}
-          <form method="post"
-                action="{% url 'catalog:reactivate' material_id=material.pk %}">
-            {% csrf_token %}
-            {% include "components/button.html" with type="submit" label=_("Reactivate") %}
-          </form>
-        {% endif %}
-      </div>
-    {% endif %}
-  </div>
-  <section class="card">
-    <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+    <div class="page-head-actions">
+      {% if manageable %}
+        <div class="flex flex-wrap gap-3">
+          {% url 'catalog:edit' material_id=material.pk as edit_url %}
+          {% include "components/button.html" with href=edit_url label=_("Edit") %}
+          {% if material.is_active %}
+            {% include "components/dialog_button.html" with dialog="deactivate-dialog" label=_("Deactivate") variant="danger" icon="ban" testid="deactivate-open" %}
+          {% else %}
+            <form method="post"
+                  action="{% url 'catalog:reactivate' material_id=material.pk %}">
+              {% csrf_token %}
+              {% include "components/button.html" with type="submit" label=_("Reactivate") %}
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </header>
+  <section class="@container card">
+    <dl class="facts">
       <div>
-        <dt class="text-sm text-soft">{% translate "Category" %}</dt>
+        <dt>{% translate "Category" %}</dt>
         <dd>
           {{ material.category|default:"—" }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Unit of measure" %}</dt>
+        <dt>{% translate "Unit of measure" %}</dt>
         <dd>
           {{ material.unit.label }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Manufacturer" %}</dt>
+        <dt>{% translate "Manufacturer" %}</dt>
         <dd>
           {{ material.manufacturer|default:"—" }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Manufacturer reference" %}</dt>
+        <dt>{% translate "Manufacturer reference" %}</dt>
         <dd>
           {{ material.manufacturer_ref|default:"—" }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "EAN / barcode" %}</dt>
+        <dt>{% translate "EAN / barcode" %}</dt>
         <dd>
           {{ material.ean|default:"—" }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Stock item" %}</dt>
+        <dt>{% translate "Stock item" %}</dt>
         <dd>
           {% if material.is_stock_item %}
             {% translate "Yes" %}
@@ -71,12 +71,15 @@
           {% endif %}
         </dd>
       </div>
-      <div class="sm:col-span-2">
-        <dt class="text-sm text-soft">{% translate "Description" %}</dt>
+      <div class="col-span-full">
+        <dt>{% translate "Description" %}</dt>
         <dd>
           {{ material.description|default:"—"|linebreaksbr }}
         </dd>
       </div>
     </dl>
   </section>
+  {% if deactivate_dialog and material.is_active %}
+    {% include "components/action_dialog.html" with d=deactivate_dialog %}
+  {% endif %}
 {% endblock content %}

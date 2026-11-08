@@ -11,6 +11,10 @@ gmat-m8 is a web application for any company that buys materials for its project
 
 It fits a single company with one office as well as a group of companies with several branches, partners and joint ventures, whatever the trade.
 
+![The home page on a desktop: key figures, charts and the menu](docs/screenshots/dashboard.webp)
+
+<img src="docs/screenshots/request-on-a-phone.webp" alt="A request on a phone: its facts and its lines as a card" width="320">
+
 > **Status:** not released yet. The features below are built and tested, and the first version is being prepared. No image has been published so far, so for now you run it from this repository.
 
 ## How it works
@@ -39,7 +43,7 @@ A person can hold several roles, each limited to its own branch or projects. Gro
 ## What you get
 
 - **Quantities that add up.** What was received, delivered or is still pending is worked out from the documents and never stored, so it cannot drift. A delivery above what was ordered is recorded as surplus.
-- **Made for the worksite.** The screens are designed for a phone first and work on a desktop too, in Spanish, English and French. See [ACCESSIBILITY.md](ACCESSIBILITY.md).
+- **Made for the worksite.** The screens are designed for a phone first and work on a desktop too, in a light or a dark theme, in Spanish, English and French. Forms that act on a document open in a sheet on top of it, and the home page shows what needs you now, with charts beside their data. Accessibility is tested in a browser on every screen: see [ACCESSIBILITY.md](ACCESSIBILITY.md).
 - **Records you can trust.** Posted receipts and handovers are never edited: they are voided with a reason and entered again. The audit trail is append-only.
 - **Your existing data.** Import the catalog, suppliers and projects from CSV or Excel files, using the [templates](docs/import-templates/README.md). A file with any error writes nothing.
 - **Security by default.** Access is checked on every page and every write. Uploaded files are scanned for malware before anything else happens to them, and images are decoded in an isolated container. Read more in [docs/security.md](docs/security.md).

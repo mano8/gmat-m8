@@ -24,12 +24,23 @@ The screens (M6.3) read the rest from here, every row through ``visible_to``:
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import Q, QuerySet, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import (
+    Count,
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Sum,
+    Value,
+)
+from django.db.models.functions import Coalesce, Least
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
@@ -40,13 +51,15 @@ from apps.access.scopes import object_in_scope
 from apps.accounts.models import User
 from apps.catalog.models import Material
 from apps.core.listing import seek_after
+from apps.core.stats import weekly
 from apps.handovers.models import Handover, HandoverLine
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.organizations.models import Membership
 from apps.projects.models import Project, ProjectAssignment
-from apps.receiving.models import GoodsReceipt, GoodsReceiptLine
+from apps.purchasing.models import PurchaseOrder
+from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
 
 VIEW, POST, VOID = Capability.HANDOVER_VIEW, Capability.HANDOVER_POST, Capability.HANDOVER_VOID
 ZERO = Decimal("0")
@@ -385,3 +398,76 @@ def receivers(project: Project) -> list[User]:
         for user in candidates
         if object_in_scope(project, AccessContext.for_user(user).scope_for(Capability.PROJECT_VIEW))
     ]
+
+
+# --- the dashboard's counts (M8b.5) -------------------------------------------------------
+
+
+def posted_by_week(ctx: AccessContext, *, since: datetime) -> dict[date, int]:
+    """Handovers of both kinds posted per week (a voided one counts for nothing)."""
+    rows = Handover.objects.visible_to(ctx, VIEW).filter(status=Handover.Status.POSTED)
+    return weekly(rows, "handed_at", since)
+
+
+def _received() -> Subquery:
+    """R of the outer request line: attributed on posted receipts over its live allocations
+    (the ledger's ``received``, ``purchasing.ledger.LIVE``), in SQL."""
+    rows = (
+        ReceiptAttribution.objects.filter(
+            allocation__request_line=OuterRef("pk"),
+            allocation__qty__gt=0,
+            receipt_line__receipt__status=GoodsReceipt.Status.POSTED,
+        )
+        .exclude(allocation__po_line__po__status=PurchaseOrder.Status.CANCELLED)
+        .order_by()
+        .values("allocation__request_line")
+        .annotate(total=Sum("qty"))
+        .values("total")
+    )
+    return Subquery(rows, output_field=DecimalField(max_digits=12, decimal_places=3))
+
+
+def _delivered() -> Subquery:
+    """D of the outer request line: handed over on posted handovers of both kinds."""
+    rows = (
+        HandoverLine.objects.filter(
+            request_line=OuterRef("pk"), handover__status=Handover.Status.POSTED
+        )
+        .order_by()
+        .values("request_line")
+        .annotate(total=Sum("qty"))
+        .values("total")
+    )
+    return Subquery(rows, output_field=DecimalField(max_digits=12, decimal_places=3))
+
+
+def _awaiting_lines(ctx: AccessContext) -> QuerySet[MaterialRequestLine]:
+    """Open lines in ``handover.view`` scope with goods received and not handed over:
+    min(R, A) - D > 0, the ledger's *awaiting handover* worked out in the database."""
+    quantity = DecimalField(max_digits=12, decimal_places=3)
+    zero = Value(ZERO, output_field=quantity)
+    received = Least(Coalesce(_received(), zero), F("approved_qty"), output_field=quantity)
+    return (
+        MaterialRequestLine.objects.visible_to(ctx, VIEW)
+        .filter(request_ledger.open_q())
+        .annotate(
+            awaiting=ExpressionWrapper(
+                received - Coalesce(_delivered(), zero), output_field=quantity
+            )
+        )
+        .filter(awaiting__gt=0)
+    )
+
+
+def awaiting_by_project(ctx: AccessContext, *, limit: int) -> tuple[list[tuple[str, int]], int]:
+    """The ``limit`` projects with the most requests awaiting handover (most first, then by
+    code), each as its name and that count, and how many requests the others hold."""
+    lines = _awaiting_lines(ctx).order_by()
+    top = list(
+        lines.values("project__code", "project__name")
+        .annotate(total=Count("request_id", distinct=True))
+        .order_by("-total", "project__code")
+        .values_list("project__name", "total")[:limit]
+    )
+    every = lines.aggregate(total=Count("request_id", distinct=True))["total"]
+    return top, every - sum(total for _, total in top)

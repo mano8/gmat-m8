@@ -49,18 +49,23 @@ from apps.organizations.models import Company, Membership
 from tests.access.matrix import (
     ACTOR_NAMES,
     ADMIN_LOGIN,
+    BAD_REQUEST,
     DENIED,
     GROUPS,
     HOME,
     LOGIN,
+    NO_CONTENT,
     NOT_ALLOWED,
     NOT_FOUND,
     OK,
     OTHER_METHODS,
     REAUTHENTICATE,
     REDIRECT,
+    SEE_OTHER,
+    SEE_OTHER_HOME,
     STEP_UP,
     TABLE_METHODS,
+    UNPROCESSABLE,
     Expect,
     Outcome,
     Route,
@@ -77,6 +82,9 @@ from tests.org import Sentinel
 pytestmark = pytest.mark.django_db
 
 # --- row helpers -------------------------------------------------------------------------
+
+# The header htmx sends: a dialog's fragment or form (M8b.3) is asked for with it.
+HTMX = {"HX-Request": "true"}
 
 
 def same(outcomes: Expect, post: Expect | None = None) -> dict[str, Expect]:
@@ -492,6 +500,22 @@ PANEL_HOLDERS: dict[str, tuple[str, ...]] = {
     "dispatches": PO_MANAGERS,
     "overview": ("group_admin",),
 }
+# Chart panels (M8b.5): offered to who holds every capability the chart reads with; counts
+# and durations only, so no sentinel may show but the supplier's name on the ranking of
+# overdue orders (its readers all hold supplier.view).
+CHART_HOLDERS: dict[str, tuple[str, ...]] = {
+    "request-progress": REQUEST_CREATORS,
+    "decisions": REVIEWERS,
+    "inbox-age": REVIEWERS,
+    "orders-receipts": PO_VIEWERS,
+    "on-time": PO_VIEWERS,
+    "overdue-suppliers": PO_VIEWERS,
+    "receipts-handovers": RECEIPT_HOLDERS,
+    "handover-projects": HANDOVER_POSTERS,
+    "branch-requests": ("group_admin",),
+    "branch-people": ("group_admin",),
+}
+CHART_ALLOWED: dict[str, frozenset[Sentinel]] = {"overdue-suppliers": SUPPLIER_NAME}
 # An unknown panel is a 404 for every signed-in session that passed the MFA guard.
 SESSION_ACTORS = tuple(
     name for name in ACTOR_NAMES if name not in (*GROUPS["signed_out"], *GROUPS["no_mfa"])
@@ -512,12 +536,62 @@ def dashboard_routes() -> tuple[Route, ...]:
         )
         for key, holders in PANEL_HOLDERS.items()
     )
+    charts = tuple(
+        Route(
+            app_page(**_each(OK, holders)),
+            position=key,
+            path=_panel_url(key),
+            allowed=CHART_ALLOWED.get(key, frozenset()),
+        )
+        for key, holders in CHART_HOLDERS.items()
+    )
+    # A period outside the allowlist falls back to the default: the same answers.
+    bad_period = Route(
+        app_page(**_each(OK, REVIEWERS)),
+        position="decisions, invalid period",
+        path=lambda world: reverse("dashboard:panel", kwargs={"key": "decisions"}) + "?weeks=5",
+    )
     unknown = Route(
         app_page(**_each(NOT_FOUND, SESSION_ACTORS)),
         position="unknown panel",
         path=_panel_url("no-such-panel"),
     )
-    return (*panels, unknown)
+    return (*panels, *charts, bad_period, unknown)
+
+
+def ui_preference_routes() -> tuple[Route, ...]:
+    """``/ui/preferences/`` (M8b.2, Q69): open to everyone, including a privileged session without
+    MFA (it writes only the display cookie): GET and HEAD are refused, a POST answers 303 back (or
+    204 to htmx), a value outside the allowlist 400, a foreign ``next`` falls back to the home page.
+    No actor sees a sentinel: it renders nothing of the application's data."""
+
+    def post(outcome: Outcome, **data: str) -> Route:
+        return Route(
+            {
+                "GET": expect(NOT_ALLOWED),
+                "HEAD": expect(NOT_ALLOWED),
+                "POST": expect(outcome),
+            },
+            position=" ".join(f"{key}={value}" for key, value in data.items()) or "empty",
+            data=lambda world: dict(data),
+        )
+
+    htmx = replace(
+        post(NO_CONTENT, theme="dark", next="/requests/"),
+        position="htmx",
+        headers={"HX-Request": "true"},
+    )
+    return (
+        post(SEE_OTHER),
+        post(SEE_OTHER, theme="dark", next="/requests/"),
+        post(SEE_OTHER, theme="system"),
+        post(SEE_OTHER, menu="hidden"),
+        post(SEE_OTHER, fold="insights", state="closed"),
+        htmx,
+        post(SEE_OTHER_HOME, theme="light", next="https://evil.example/"),
+        post(BAD_REQUEST, theme="purple"),
+        post(BAD_REQUEST, fold="nowhere", state="open"),
+    )
 
 
 # Audit (M7.3): audit.view is the group administrators' and the material managers'; an event
@@ -676,6 +750,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=_project_url("projects:assign", "hospital"),
             note="an empty form: the detail page with errors",
         ),
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, UNPROCESSABLE),
+            position="htmx",
+            path=_project_url("projects:assign", "hospital"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "projects:revoke_assignment": (
         Route(
@@ -683,12 +764,52 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=_object_url("projects:revoke_assignment", "projectassignment"),
             note="the hospital's site manager; revoked once, then reported",
         ),
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("projects:revoke_assignment", "projectassignment"),
+            headers=HTMX,
+            note="already revoked by the plain row: refused on the dialog's form",
+        ),
     ),
     "projects:assignment_validity": (
         Route(
             project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, REDIRECT),
             path=_object_url("projects:assignment_validity", "projectassignment"),
             note="an empty form: reported, then back to the project",
+        ),
+        Route(
+            project_action(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS, UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("projects:assignment_validity", "projectassignment"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
+    "projects:edit_assignment_validity": (
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            path=_object_url("projects:edit_assignment_validity", "projectassignment"),
+        ),
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            position="htmx",
+            path=_object_url("projects:edit_assignment_validity", "projectassignment"),
+            headers=HTMX,
+            note="the page's dialog asks for the same URL with htmx",
+        ),
+    ),
+    "projects:confirm_revoke_assignment": (
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            path=_object_url("projects:confirm_revoke_assignment", "projectassignment"),
+        ),
+        Route(
+            project_page(PROJECT_MANAGERS, HOSPITAL_VIEWERS, HOSPITAL_MANAGERS),
+            position="htmx",
+            path=_object_url("projects:confirm_revoke_assignment", "projectassignment"),
+            headers=HTMX,
+            note="the page's dialog asks for the same URL with htmx",
         ),
     ),
     # Catalog (M3.1): installation-wide master data. Every valid membership views it (also a
@@ -714,6 +835,24 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         ),
     ),
     "dashboard:panel": dashboard_routes(),
+    # The key figures (M8b.5): every signed-in session, each tile through its own scope.
+    "dashboard:tiles": (
+        Route(
+            same(
+                expect(OK, signed_out=LOGIN, no_mfa=STEP_UP),
+                expect(NOT_ALLOWED, no_mfa=DENIED),
+            )
+        ),
+        Route(
+            same(
+                expect(OK, signed_out=LOGIN, no_mfa=STEP_UP),
+                expect(NOT_ALLOWED, no_mfa=DENIED),
+            ),
+            position="invalid period",
+            path=lambda world: reverse("dashboard:tiles") + "?weeks=abc",
+        ),
+    ),
+    "core:ui_preferences": ui_preference_routes(),
     "audit:list": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
     "audit:object": audit_routes(),
     "exports:index": (Route(app_page(**_each(OK, AUDIT_HOLDERS))),),
@@ -762,6 +901,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         Route(
             app_action(**_each(REDIRECT, CATALOG_MANAGERS)),
             path=_object_url("catalog:deactivate", "material"),
+        ),
+        Route(
+            app_action(**_each(NO_CONTENT, CATALOG_MANAGERS)),
+            position="htmx",
+            path=_object_url("catalog:deactivate", "material"),
+            headers=HTMX,
+            note="deactivated again from the dialog (no change): the page navigates",
         ),
     ),
     "catalog:reactivate": (
@@ -881,6 +1027,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=request_url("requests:add_free_line", "materialrequest"),
             note="an empty form: back to the request",
         ),
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", UNPROCESSABLE),
+            position="own draft, htmx",
+            path=request_url("requests:add_free_line", "materialrequest"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "requests:submit": (
         Route(
@@ -900,6 +1053,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             request_own_action(PARTNER_REQUEST_VIEWERS, "partner", REDIRECT),
             position="the partner's draft",
             path=request_url("requests:cancel", "partner_request"),
+        ),
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", DENIED),
+            position="own draft, htmx",
+            path=request_url("requests:cancel", "materialrequest"),
+            headers=HTMX,
+            note="already discarded by the plain row: the owner may no longer act on it",
         ),
     ),
     # The reviewer (M4.4): inbox and review page, then one POST per action. An empty form is
@@ -938,6 +1098,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=request_url("requests:return_to_draft", "review_request"),
             note="an empty note: back to the page",
         ),
+        Route(
+            review_action(UNPROCESSABLE),
+            position="a submitted request, htmx",
+            path=request_url("requests:return_to_draft", "review_request"),
+            headers=HTMX,
+            note="an empty note from the dialog: the form again with its errors",
+        ),
     ),
     "requests:decide_line": (
         Route(
@@ -953,6 +1120,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a line of an approved request",
             path=line_of("requests:reduce_line", "approved_request_line"),
             note="an empty form: back to the page",
+        ),
+        Route(
+            review_action(UNPROCESSABLE),
+            position="a line of an approved request, htmx",
+            path=line_of("requests:reduce_line", "approved_request_line"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
         ),
     ),
     "requests:set_sourcing": (
@@ -985,6 +1159,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=line_of("requests:close_line", "approved_request_line"),
             note="no reason: back to the page",
         ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a line of an approved request, htmx",
+            path=line_of("requests:close_line", "approved_request_line"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
     ),
     "requests:reopen_line": (
         Route(
@@ -992,6 +1173,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a line of an approved request",
             path=line_of("requests:reopen_line", "approved_request_line"),
             note="no reason: back to the page",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a line of an approved request, htmx",
+            path=line_of("requests:reopen_line", "approved_request_line"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
         ),
     ),
     "requests:schedule": (
@@ -1009,6 +1197,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=request_url("requests:close", "approved_request"),
             note="no reason: back to the page",
         ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="an approved request, htmx",
+            path=request_url("requests:close", "approved_request"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
     ),
     "requests:reopen": (
         Route(
@@ -1016,6 +1211,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="an approved request",
             path=request_url("requests:reopen", "approved_request"),
             note="no reason: back to the page",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="an approved request, htmx",
+            path=request_url("requests:reopen", "approved_request"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
         ),
     ),
     "requests:cancel_any": (
@@ -1036,12 +1238,27 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=request_url("requests:assign_reviewer", "review_request"),
             note="an empty form: back to the page",
         ),
+        Route(
+            review_action(UNPROCESSABLE),
+            position="a submitted request, htmx",
+            path=request_url("requests:assign_reviewer", "review_request"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "requests:edit_line": (
         Route(
             source_page(),
             position="a live line of an approved request",
             path=line_of("requests:edit_line", "approved_request_line"),
+        ),
+        # M8b.3's lazy dialog pilot: the review page's dialog asks for the same URL with htmx
+        # and gets its fragment; the outcomes and sentinels are the plain page's.
+        Route(
+            source_page(),
+            position="a live line of an approved request, htmx",
+            path=line_of("requests:edit_line", "approved_request_line"),
+            headers=HTMX,
         ),
     ),
     "requests:apply_edit": (
@@ -1050,6 +1267,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a live line of an approved request",
             path=line_of("requests:apply_edit", "approved_request_line"),
             note="an empty form: back to the dialog",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a live line of an approved request, htmx",
+            path=line_of("requests:apply_edit", "approved_request_line"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
         ),
     ),
     "requests:new_line": (
@@ -1073,6 +1297,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a live line of an approved request",
             path=line_of("requests:remove_reviewed_line", "approved_request_line"),
             note="no reason: back to the page",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a live line of an approved request, htmx",
+            path=line_of("requests:remove_reviewed_line", "approved_request_line"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
         ),
     ),
     "requests:withdraw": (
@@ -1148,6 +1379,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         Route(
             app_action(**_each(REDIRECT, SUPPLIER_MANAGERS)),
             path=_supplier_url("suppliers:deactivate"),
+        ),
+        Route(
+            app_action(**_each(NO_CONTENT, SUPPLIER_MANAGERS)),
+            position="htmx",
+            path=_supplier_url("suppliers:deactivate"),
+            headers=HTMX,
+            note="deactivated again from the dialog (no change): the page navigates",
         ),
     ),
     "suppliers:reactivate": (
@@ -1226,9 +1464,24 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     ),
     "purchasing:update": (
         Route(order_action(), path=purchase_url("purchasing:update", "draftorder")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:update", "draftorder"),
+            headers=HTMX,
+            allowed=SUPPLIER_SENTINELS,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:add_lines": (
         Route(order_action(), path=purchase_url("purchasing:add_lines", "draftorder")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:add_lines", "draftorder"),
+            headers=HTMX,
+            note="nothing ticked from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:issue": (
         Route(
@@ -1255,6 +1508,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     ),
     "purchasing:update_line": (
         Route(order_action(), path=purchase_url("purchasing:update_line", "draftline")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:update_line", "draftline"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:remove_line": (
         Route(
@@ -1262,20 +1522,48 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=purchase_url("purchasing:remove_line", "purchaseorderline"),
             note="an issued line: refused, nothing is removed",
         ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:remove_line", "purchaseorderline"),
+            headers=HTMX,
+            note="an issued line: refused on the dialog's form, nothing is removed",
+        ),
     ),
     "purchasing:close_line": (
         Route(order_action(), path=purchase_url("purchasing:close_line", "purchaseorderline")),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:close_line", "purchaseorderline"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:increase_allocation": (
         Route(
             order_action(),
             path=purchase_url("purchasing:increase_allocation", "draftallocation"),
         ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:increase_allocation", "draftallocation"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
     ),
     "purchasing:unallocate": (
         Route(
             order_action(),
             path=purchase_url("purchasing:unallocate", "draftallocation"),
+        ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:unallocate", "draftallocation"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
         ),
     ),
     # M5.3: the issued order's dispatch, left AMBIGUOUS by the worker.
@@ -1397,6 +1685,30 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="warehouse",
             path=_object_url("receiving:void", "warehousereceipt"),
         ),
+        # M8b.3's inline dialog pilot: the void form posted with htmx.
+        Route(
+            project_action(
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                UNPROCESSABLE,
+            ),
+            position="worksite, htmx",
+            path=_object_url("receiving:void", "goodsreceipt"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
+        Route(
+            project_action(
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                UNPROCESSABLE,
+            ),
+            position="warehouse, htmx",
+            path=_object_url("receiving:void", "warehousereceipt"),
+            headers=HTMX,
+        ),
     ),
     # Handovers (M6.3): handover.view also reaches an assigned project (the site manager reads,
     # never posts); handover.post and handover.void are the branch's.
@@ -1468,6 +1780,18 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="received on site",
             path=_object_url("handovers:void", "handover"),
             note="no reason: back to the handover (it goes with its receipt)",
+        ),
+        Route(
+            project_action(
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer"),
+                UNPROCESSABLE,
+            ),
+            position="from a warehouse, htmx",
+            path=_object_url("handovers:void", "warehousehandover"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
         ),
     ),
     "attachments:upload_request": (
@@ -1544,6 +1868,15 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="worksite receipt",
             path=_attachment_url("attachments:remove", "attachment"),
         ),
+        # M8b.4: the remove dialog posts with htmx. A moderator must give a reason, so an empty
+        # form comes back on the dialog (before the plain row removes the file).
+        Route(
+            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, UNPROCESSABLE),
+            position="handover, htmx",
+            path=_attachment_url("attachments:remove", "handoverattachment"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again, nothing removed",
+        ),
         Route(
             project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, REDIRECT),
             position="handover",
@@ -1553,22 +1886,78 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # Group administrators only (org.manage); the target is the A-MAD technician.
     "org:people": (Route(org_page()),),
     "org:person": (Route(org_page(), path=_person_url("org:person")),),
-    "org:grant_membership": (Route(org_action(), path=_person_url("org:grant_membership")),),
+    "org:grant_membership": (
+        Route(org_action(), path=_person_url("org:grant_membership")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:grant_membership"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
     "org:set_employer": (Route(org_action(), path=_person_url("org:set_employer")),),
     "org:offboard": (
         Route(org_action(), path=_person_url("org:offboard"), note="unconfirmed: nothing happens"),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:offboard"),
+            headers=HTMX,
+            note="unconfirmed from the dialog: the form again with its errors",
+        ),
     ),
     "org:request_email_change": (
         Route(org_action(), path=_person_url("org:request_email_change")),
     ),
     "org:revoke_membership": (
         Route(org_action(), path=_object_url("org:revoke_membership", "membership")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("org:revoke_membership", "membership"),
+            headers=HTMX,
+            note="already revoked by the plain row: refused on the dialog's form",
+        ),
     ),
     "org:membership_validity": (
         Route(org_action(), path=_object_url("org:membership_validity", "membership")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("org:membership_validity", "membership"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
+    # M8b.4: the lazy dialogs of a role's rows; the page's dialog asks for the same URL with htmx.
+    "org:edit_membership_validity": (
+        Route(org_page(), path=_object_url("org:edit_membership_validity", "membership")),
+        Route(
+            org_page(),
+            position="htmx",
+            path=_object_url("org:edit_membership_validity", "membership"),
+            headers=HTMX,
+        ),
+    ),
+    "org:confirm_revoke_membership": (
+        Route(org_page(), path=_object_url("org:confirm_revoke_membership", "membership")),
+        Route(
+            org_page(),
+            position="htmx",
+            path=_object_url("org:confirm_revoke_membership", "membership"),
+            headers=HTMX,
+        ),
     ),
     "org:revoke_email_change": (
         Route(org_action(), path=_object_url("org:revoke_email_change", "emailchangerequest")),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_object_url("org:revoke_email_change", "emailchangerequest"),
+            headers=HTMX,
+            note="already revoked by the plain row: refused on the dialog's form",
+        ),
     ),
     "org:invitations": (Route(org_page()),),
     "org:invitation_delivery": (

@@ -1,0 +1,24 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The steps of a short flow, as a numbered row (M8b.4). Parameters: steps (a list of labels),
+  current (the number of the step the page is, from 1), label (the nav's accessible name).
+  A finished step shows a check, the current one carries aria-current="step"; the text says
+  where the person is, the colour only echoes it.
+{% endcomment %}
+<nav aria-label="{{ label|default:_("Progress") }}" class="mb-4">
+  <ol class="stepper" data-testid="stepper">
+    {% for step in steps %}
+      <li {% if forloop.counter == current %}aria-current="step"{% endif %}
+          data-state="{% if forloop.counter < current %}done{% elif forloop.counter == current %}current{% else %}todo{% endif %}">
+        <span class="stepper-dot" aria-hidden="true">
+          {% if forloop.counter < current %}
+            {% icon "check" classes="size-4" %}
+          {% else %}
+            {{ forloop.counter }}
+          {% endif %}
+        </span>
+        <span class="stepper-label">{{ step }}</span>
+      </li>
+    {% endfor %}
+  </ol>
+</nav>

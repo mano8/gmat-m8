@@ -4,10 +4,14 @@
   {% translate "Sessions" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-2">{% translate "Sessions" %}</h1>
-  <p class="mb-4 text-soft">
-    {% translate "Where you are signed in. If you do not recognise one, end it and change your password." %}
-  </p>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Sessions" %}</h1>
+      <p class="page-head-sub">
+        {% translate "Where you are signed in. If you do not recognise one, end it and change your password." %}
+      </p>
+    </div>
+  </header>
   <ul class="mb-4 grid gap-3" data-testid="sessions">
     {% for item in sessions %}
       <li class="card" data-testid="session-row">

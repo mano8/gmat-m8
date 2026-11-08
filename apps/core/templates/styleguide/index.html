@@ -1,0 +1,325 @@
+{% load i18n ui_tags list_tags %}
+{% comment %}
+  The component library, drawn (manage styleguide). Not served by the app: it is written to
+  build/styleguide/ and opened as a file, against the built CSS. Every component of
+  templates/components/ appears in each variant and state.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="en"
+      {% if theme != "system" %} data-theme="{{ theme }}"{% endif %}>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>gmat-m8 style guide</title>
+    <link rel="stylesheet" href="static/dist/app.css">
+    <script src="styleguide.js" defer></script>
+  </head>
+  <body class="bg-surface text-ink">
+    <div class="page-pad mx-auto flex max-w-5xl flex-col gap-10 py-6" id="top">
+      <header class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1>Style guide</h1>
+          <p class="text-soft">Components of templates/components/, tokens of static/src/app.css.</p>
+        </div>
+        <div class="inline-flex rounded-full border border-line bg-raised p-1"
+             role="group"
+             aria-label="Theme">
+          <button type="button"
+                  class="btn btn-sm btn-ghost rounded-full"
+                  data-theme-choice="system"
+                  aria-pressed="{% if theme == 'system' %}true{% else %}false{% endif %}">System</button>
+          <button type="button"
+                  class="btn btn-sm btn-ghost rounded-full"
+                  data-theme-choice="light"
+                  aria-pressed="{% if theme == 'light' %}true{% else %}false{% endif %}">Light</button>
+          <button type="button"
+                  class="btn btn-sm btn-ghost rounded-full"
+                  data-theme-choice="dark"
+                  aria-pressed="{% if theme == 'dark' %}true{% else %}false{% endif %}">Dark</button>
+        </div>
+      </header>
+      <section id="tokens" class="grid gap-4" aria-labelledby="h-tokens">
+        <h2 id="h-tokens">Colour tokens</h2>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div class="rounded-md border border-line bg-surface p-3 text-sm">surface</div>
+          <div class="rounded-md border border-line bg-raised p-3 text-sm">raised</div>
+          <div class="rounded-md border border-line bg-sunken p-3 text-sm">sunken</div>
+          <div class="rounded-md border border-line-strong bg-raised p-3 text-sm">line-strong</div>
+          <div class="rounded-md bg-brand p-3 text-sm text-brand-ink">brand</div>
+          <div class="rounded-md bg-brand-soft p-3 text-sm text-brand">brand-soft</div>
+          <div class="rounded-md bg-ok-soft p-3 text-sm text-ok">ok</div>
+          <div class="rounded-md bg-warn-soft p-3 text-sm text-warn">warn</div>
+          <div class="rounded-md bg-danger-soft p-3 text-sm text-danger">danger</div>
+          <div class="rounded-md bg-info-soft p-3 text-sm text-info">info</div>
+          <div class="rounded-md bg-danger p-3 text-sm text-danger-ink">danger solid</div>
+          <div class="rounded-md bg-raised p-3 text-sm text-soft elev-2">elevation 2</div>
+        </div>
+        <h3>Chart colours (colour-blind safe) and the sequential ramp</h3>
+        <div class="grid grid-cols-6 gap-2">
+          <span class="h-10 rounded-md bg-chart-1"></span><span class="h-10 rounded-md bg-chart-2"></span>
+          <span class="h-10 rounded-md bg-chart-3"></span><span class="h-10 rounded-md bg-chart-4"></span>
+          <span class="h-10 rounded-md bg-chart-5"></span><span class="h-10 rounded-md bg-chart-6"></span>
+        </div>
+        <div class="grid grid-cols-5 gap-2">
+          <span class="h-10 rounded-md bg-seq-1"></span><span class="h-10 rounded-md bg-seq-2"></span>
+          <span class="h-10 rounded-md bg-seq-3"></span><span class="h-10 rounded-md bg-seq-4"></span>
+          <span class="h-10 rounded-md bg-seq-5"></span>
+        </div>
+      </section>
+      <section id="type" class="grid gap-2" aria-labelledby="h-type">
+        <h2 id="h-type">Type</h2>
+        <h1>Heading 1: request MR-000123</h1>
+        <h2>Heading 2: materials</h2>
+        <h3>Heading 3: delivery</h3>
+        <p>Body text in Inter at 15 px. Accents: áéíóú ñ ü àâçèêëîôùû œ.</p>
+        <p class="text-soft">Secondary text.</p>
+        <p><span class="doc-no">REC-MAD-000124</span> · <span class="tabular-nums">1 234,500 m</span> · <code>manage seed_demo</code></p>
+      </section>
+      <section id="buttons" class="grid gap-3" aria-labelledby="h-buttons">
+        <h2 id="h-buttons">Buttons</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          {% include "components/button.html" with label="Primary" variant="primary" %}
+          {% include "components/button.html" with label="Secondary" variant="secondary" %}
+          {% include "components/button.html" with label="Default" %}
+          {% include "components/button.html" with label="Ghost" variant="ghost" %}
+          {% include "components/button.html" with label="Danger" variant="danger" %}
+          {% include "components/button.html" with label="Link" variant="link" %}
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          {% include "components/button.html" with label="With icon" variant="primary" icon="plus" %}
+          {% include "components/button.html" with label="Small" size="sm" %}
+          {% include "components/button.html" with label="Download" icon="download" href="#" %}
+          {% include "components/button.html" with label="More" icon="ellipsis" icon_only=True %}
+          <button type="button" class="btn btn-primary" disabled>Disabled</button>
+          <button type="button" class="btn btn-primary" aria-busy="true">Busy</button>
+        </div>
+        <div>
+          {% include "components/button.html" with label="Block, as the main action of a phone form" variant="primary" block=True type="submit" %}
+        </div>
+      </section>
+      <section id="chips" class="grid gap-3" aria-labelledby="h-chips">
+        <h2 id="h-chips">Status chips</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          {% include "components/status_chip.html" with label="Approved" tone="ok" %}
+          {% include "components/status_chip.html" with label="Closed short" tone="warn" %}
+          {% include "components/status_chip.html" with label="Rejected" tone="danger" %}
+          {% include "components/status_chip.html" with label="Edited" tone="brand" %}
+          {% include "components/status_chip.html" with label="Sent" tone="info" %}
+          {% include "components/status_chip.html" with label="Pending" %}
+          {% chip "Tag form" "ok" %}
+          {% chip "Custom icon" "warn" "clock" %}
+        </div>
+      </section>
+      <section id="cards"
+               class="grid gap-3 sm:grid-cols-2"
+               aria-labelledby="h-cards">
+        <h2 id="h-cards" class="sm:col-span-2">Cards</h2>
+        {% include "components/card.html" with title="Card" text="A title and a plain-text body." %}
+        <div class="card p-0">
+          <div class="p-4">
+            <h3 class="card-title">Card with a band</h3>
+            <p class="text-soft">Secondary information sits on a sunken band.</p>
+          </div>
+          <div class="band flex justify-end gap-2 rounded-b-lg">
+            {% include "components/button.html" with label="Cancel" %}
+            {% include "components/button.html" with label="Save" variant="primary" %}
+          </div>
+        </div>
+        <div class="sm:col-span-2">
+          {% include "components/empty_state.html" with title="Nothing here yet" text="Requests will appear here once the first one is sent." href="#" label="New request" icon="clipboard-list" %}
+        </div>
+      </section>
+      <section id="forms" class="grid gap-3" aria-labelledby="h-forms">
+        <h2 id="h-forms">Fields</h2>
+        <div class="grid gap-x-4 sm:grid-cols-2">
+          <form class="card" novalidate>
+            <h3 class="card-title">Plain, helped</h3>
+            {% for field in form %}
+              {% include "components/field.html" with field=field %}
+            {% endfor %}
+          </form>
+          <form class="card" novalidate>
+            <h3 class="card-title">With errors</h3>
+            {% for field in invalid_form %}
+              {% include "components/field.html" with field=field %}
+            {% endfor %}
+          </form>
+        </div>
+      </section>
+      <section id="messages" class="grid gap-2" aria-labelledby="h-messages">
+        <h2 id="h-messages">Messages (toasts)</h2>
+        <div class="toast toast-success">{% icon "circle-check" classes="text-ok" %}<p class="flex-1">Receipt REC-MAD-000124 posted.</p></div>
+        <div class="toast toast-warning">{% icon "triangle-alert" classes="text-warn" %}<p class="flex-1">Less than the known stock: tick the box to confirm.</p></div>
+        <div class="toast toast-error" role="alert">{% icon "circle-alert" classes="text-danger" %}<p class="flex-1">The quantity exceeds what the order still expects.</p></div>
+        <div class="toast">{% icon "info" classes="text-info" %}<p class="flex-1">A plain message.</p></div>
+      </section>
+      <section id="tables" class="grid gap-3" aria-labelledby="h-tables">
+        <h2 id="h-tables">Table (cards on a phone)</h2>
+        {% include "components/table.html" with columns=table_columns rows=table_rows numeric=numeric_columns %}
+      </section>
+      <section id="lists" class="grid gap-2" aria-labelledby="h-lists">
+        <h2 id="h-lists">List toolbar, summary and pagination</h2>
+        {% include "components/list_toolbar.html" with form=filter_form listing=counted target="#results" action="/styleguide/" %}
+        {% include "components/list_summary.html" with form=filter_form listing=counted %}
+        {% include "components/pagination.html" with listing=counted %}
+        <h3 class="mt-4">Cursor pagination (middle page, then the first)</h3>
+        {% include "components/cursor_pagination.html" with listing=cursor %}
+        {% include "components/cursor_pagination.html" with listing=last_cursor %}
+      </section>
+      <section id="page-header" class="grid gap-3" aria-labelledby="h-header">
+        <h2 id="h-header">Page header</h2>
+        <div class="card">
+          {% include "components/page_header.html" with title="REC-MAD-000124" title_mono=True subtitle="Cables Ibéricos S.A. · Nave 3 Getafe · received by Elena Navarro" breadcrumbs=breadcrumbs chip_label="Posted" chip_tone="ok" primary_label="Receive more" primary_href="#" primary_icon="package-check" menu_id="sg-menu" menu_items=menu_items %}
+        </div>
+        <div class="card">
+          {% include "components/page_header.html" with title="Requests" subtitle="Everything you asked for" breadcrumbs=None menu_items=None chip_label=None primary_label="New request" primary_href="#" primary_icon="plus" title_mono=False %}
+        </div>
+        <div class="card">
+          {% include "components/page_header.html" with title="MR-000123" title_mono=True parent_label="Requests" parent_url="#" current="MR-000123" subtitle="One step down from a list: the crumbs name the list and the page" breadcrumbs=None menu_items=None chip_label="Approved" chip_tone="ok" primary_label="" primary_href="" %}
+        </div>
+      </section>
+      <section id="tiles" class="grid gap-3" aria-labelledby="h-tiles">
+        <h2 id="h-tiles">Stat tiles</h2>
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {% include "components/stat_tile.html" with label="To approve" value="7" icon="clipboard-check" change="2 more than last week" direction="up" good=False spark=spark_up href="#" %}
+          {% include "components/stat_tile.html" with label="Overdue" value="3" icon="clock" change="1 fewer than last week" direction="down" good=True spark=spark_down %}
+          {% include "components/stat_tile.html" with label="Awaiting receipt" value="99+" icon="truck" change="no change" direction="flat" %}
+          {% include "components/stat_tile.html" with label="Open requests" value="24" note="3 for more than a week" %}
+        </div>
+      </section>
+      <section id="progress"
+               class="grid gap-3 sm:grid-cols-3"
+               aria-labelledby="h-progress">
+        <h2 id="h-progress" class="sm:col-span-3">Progress</h2>
+        {% include "components/progress.html" with label="Received" value=80 maximum=120 unit="m" %}
+        {% include "components/progress.html" with label="Received" value=40 maximum=40 unit="u" %}
+        {% include "components/progress.html" with label="Received" value=0 maximum=12 unit="kg" %}
+      </section>
+      <section id="navigation" class="grid gap-4" aria-labelledby="h-nav">
+        <h2 id="h-nav">Tabs, menu, avatar</h2>
+        {% include "components/tabs.html" with items=tab_items label="Order sections" %}
+        <div class="flex items-center gap-3">
+          {% include "components/menu.html" with id="sg-menu-2" label="More actions" items=menu_items %}
+          {% include "components/avatar.html" with name="Elena Navarro" %}
+          {% include "components/avatar.html" with name="mex.serra@example.com" %}
+        </div>
+      </section>
+      <section id="timeline" class="card grid gap-3" aria-labelledby="h-timeline">
+        <h2 id="h-timeline">Timeline and facts</h2>
+        {% include "components/timeline.html" with entries=entries %}
+        {% include "components/definition_list.html" with facts=facts %}
+      </section>
+      <section id="skeleton" class="grid gap-3" aria-labelledby="h-skeleton">
+        <h2 id="h-skeleton">Skeleton</h2>
+        <div class="card">{% include "components/skeleton.html" %}</div>
+      </section>
+      <section id="dialogs" class="grid gap-3" aria-labelledby="h-dialogs">
+        <h2 id="h-dialogs">Dialogs</h2>
+        <p class="text-soft">
+          A bottom sheet on a phone, centred from 40rem. The buttons open them (invoker commands, no script).
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button"
+                  class="btn btn-danger"
+                  commandfor="sg-dialog-danger"
+                  command="show-modal">Destructive confirmation</button>
+          <button type="button"
+                  class="btn"
+                  commandfor="sg-dialog-form"
+                  command="show-modal">Form with errors</button>
+          <button type="button"
+                  class="btn"
+                  commandfor="sg-dialog-problem"
+                  command="show-modal">Out of date (409)</button>
+          <button type="button"
+                  class="btn"
+                  commandfor="sg-dialog-lazy"
+                  command="show-modal">Loading (lazy)</button>
+        </div>
+        {% include "components/dialog.html" with id="sg-dialog-danger" title="Close the cable line short?" description="Cable RZ1-K 3G2,5 mm² on PED-A-2026-00087: 380 of 500 m received." tone="danger" content="styleguide/index.html#sg_danger" %}
+        {% include "components/dialog.html" with id="sg-dialog-form" title="Change a line" size="lg" content="styleguide/index.html#sg_form" %}
+        {% include "components/dialog.html" with id="sg-dialog-problem" title="Change a line" content="components/dialog_problem.html" status=409 %}
+        {% include "components/dialog.html" with id="sg-dialog-lazy" title="Change a line" %}
+        <div class="card grid gap-3">
+          <h3 class="card-title">The error summary, on top of a form</h3>
+          {% include "components/error_summary.html" with form=dialog_form %}
+        </div>
+      </section>
+      <section id="flows" class="grid gap-3" aria-labelledby="h-flows">
+        <h2 id="h-flows">Action dialogs, stepper and action bar</h2>
+        <p class="text-soft">
+          A page's secondary actions are action dialogs: the consequences in a list, a warning if
+          something deserves more attention, the way out focused when the action is destructive.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          {% include "components/dialog_button.html" with dialog=action_dialog.id label="Void the receipt" variant="danger" icon="ban" testid="sg-open-action" %}
+          {% include "components/dialog_button.html" with dialog=action_dialog.id label="Small, secondary" variant="secondary" size="sm" %}
+        </div>
+        {% include "components/action_dialog.html" with d=action_dialog %}
+        <div class="card grid gap-3">
+          <h3 class="card-title">The steps of a short flow</h3>
+          {% include "components/request_steps.html" with current=2 %}
+          {% steps "Receive" "Check" "Post" as flow %}
+          {% include "components/stepper.html" with steps=flow current=3 label="Receiving" %}
+        </div>
+        <div class="card grid gap-3">
+          <h3 class="card-title">The main action of a phone page</h3>
+          <p class="text-soft">It sticks above the bottom bar on a phone and is a plain bar from 48rem.</p>
+          <div class="action-bar">
+            <p class="action-bar-sum">
+              <span>3 lines</span><span>No prices shown</span>
+            </p>
+            {% include "components/button.html" with type="button" label="Post the receipt" icon="package-check" variant="primary" block=True %}
+          </div>
+        </div>
+      </section>
+      <section id="icons" class="grid gap-3" aria-labelledby="h-icons">
+        <h2 id="h-icons">Icons ({{ icons|length }})</h2>
+        <ul class="m-0 grid list-none grid-cols-3 gap-2 p-0 sm:grid-cols-6">
+          {% for name in icons %}
+            <li class="grid justify-items-center gap-1 rounded-md border border-line bg-raised p-2 text-center text-xs text-soft">
+              {% icon name classes="size-6 text-ink" %}{{ name }}
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+    {% partialdef sg_danger %}
+      <form class="dialog-content" novalidate>
+        <div class="dialog-body">
+          <ul class="consequences">
+            <li>
+              {% icon "undo-2" classes="size-4" %}<span>The <b class="num">120 m</b> still due are no longer expected from this supplier; their 2 requests show them as still to purchase.</span>
+            </li>
+            <li>
+              {% icon "check" classes="size-4" %}<span>The <b class="num">380 m</b> already received stay with their requests.</span>
+            </li>
+            <li>
+              {% icon "paperclip" classes="size-4" %}<span>The reason is kept in the order's history.</span>
+            </li>
+          </ul>
+          {% include "components/field.html" with field=reason_form.reason %}
+        </div>
+        <fieldset class="dialog-foot" data-dialog-actions>
+          {% include "components/dialog_cancel.html" with dialog_id="sg-dialog-danger" label="Keep the line open" focus=True %}
+          <button type="button" class="btn btn-danger">Close short</button>
+        </fieldset>
+      </form>
+    {% endpartialdef %}
+    {% partialdef sg_form %}
+      <form class="dialog-content" novalidate>
+        <div class="dialog-body">
+          {% include "components/error_summary.html" with form=dialog_form %}
+          {% for field in dialog_form %}
+            {% include "components/field.html" with field=field %}
+          {% endfor %}
+        </div>
+        <fieldset class="dialog-foot" data-dialog-actions>
+          {% include "components/dialog_cancel.html" with dialog_id="sg-dialog-form" %}
+          <button type="button" class="btn btn-secondary">Save and approve</button>
+          <button type="button" class="btn btn-primary">Save</button>
+        </fieldset>
+      </form>
+    {% endpartialdef %}
+  </body>
+</html>

@@ -20,6 +20,18 @@ def line_of(page: Page, reference: str) -> Locator:
     return page.locator("#draft-lines [data-line]", has_text=reference)
 
 
+def filter_list(page: Page, selector: str, value: str) -> None:
+    """Type into a filter of a list. On a phone the filters sit in a sheet (M8b.4): open it,
+    type, and ask for the results, which closes it; on a desktop the form is on the page."""
+    opener = page.get_by_test_id("filters-open").first
+    in_sheet = opener.is_visible()
+    if in_sheet:
+        opener.click()
+    page.fill(selector, value)
+    if in_sheet:
+        page.get_by_role("button", name="Show the results").first.click()
+
+
 # --- requester ----------------------------------------------------------------------------
 
 
@@ -135,11 +147,15 @@ def order_from_worklist(
 
 
 def issue_order(page: Page, unit_price: str = "1.25") -> None:
-    for editor in page.locator("main details", has_text="Edit the line").all():
-        editor.locator("summary").click()
-        editor.locator("input[name=unit_price]").fill(unit_price)
-        editor.get_by_role("button").first.click()
+    # Each line's price is entered in its own dialog; saving navigates, so the openers are
+    # found again by position.
+    for index in range(page.get_by_test_id("line-edit-open").count()):
+        page.get_by_test_id("line-edit-open").nth(index).click()
+        dialog = page.locator("dialog[open]")
+        dialog.locator("input[name=unit_price]").fill(unit_price)
+        dialog.get_by_test_id("line-save").click()
         page.wait_for_load_state()
+        expect(page.locator("dialog[open]")).to_have_count(0)
     page.locator("[data-testid=issue-form] input[name=confirm]").check()
     page.locator("[data-testid=issue-form] button[type=submit]").click()
     expect(page.locator("main")).to_contain_text("Issued")
@@ -150,7 +166,7 @@ def issue_order(page: Page, unit_price: str = "1.25") -> None:
 
 def open_receipt_form(page: Page, order_number: str) -> None:
     page.goto("/receiving/orders/")
-    page.fill("#id_q", order_number)
+    filter_list(page, "#id_q", order_number)
     row = page.get_by_test_id("receivable-order").filter(has_text=order_number)
     row.get_by_role("link", name="Receive").click()
     page.wait_for_url("**/receive/")
@@ -204,17 +220,33 @@ def receive_at_worksite(
     return post_receipt(page, quantities)
 
 
+def open_line_dialog(page: Page, reference: str) -> Locator:
+    """``Change the line`` opens the review page's dialog and loads the line's form into it."""
+    review_line(page, reference).get_by_test_id("edit-line").click()
+    dialog = page.get_by_test_id("line-dialog")
+    expect(dialog).to_be_visible()
+    expect(dialog.get_by_test_id("line-form")).to_be_visible()
+    return dialog
+
+
+def send_dialog(page: Page, dialog: Locator, button: str) -> None:
+    """Send a dialog's form that will be accepted: the whole page navigates (``HX-Redirect``)."""
+    with page.expect_navigation():
+        dialog.get_by_test_id(button).click()
+    expect(dialog).to_be_hidden()
+
+
 def change_line(
     page: Page, reference: str, quantity: str, reason: str, *, approve: bool = False
 ) -> None:
-    """A reviewer's edit of a line (``Change the line``), saved, or saved and approved."""
-    review_line(page, reference).get_by_test_id("edit-line").click()
-    page.wait_for_url("**/edit/")
-    form = page.get_by_test_id("line-form")
+    """A reviewer's edit of a line (``Change the line``, a dialog), saved, or saved and
+    approved; the review page reloads with the edit."""
+    dialog = open_line_dialog(page, reference)
+    form = dialog.get_by_test_id("line-form")
     form.locator("input[name=requested_qty]").fill(quantity)
     form.locator("[name=reason]").fill(reason)
-    form.get_by_test_id("save-and-approve" if approve else "save-edit").click()
-    page.wait_for_url("**/examine/")
+    send_dialog(page, dialog, "save-and-approve" if approve else "save-edit")
+    expect(page).to_have_url(re.compile(r"/examine/$"))
 
 
 def invite(
@@ -231,6 +263,17 @@ def invite(
         page.select_option("#id_branch", label=branch)
     page.get_by_role("button", name="Send invitation").click()
     page.wait_for_url(lambda url: "/invitations/new/" not in url)
+
+
+def open_user_menu(page: Page) -> None:
+    """The account menu (sessions, language, theme, sign out) on a phone or a desktop."""
+    page.get_by_role("button", name="Account menu").click()
+    expect(page.locator("#user-menu")).to_be_visible()
+
+
+def sign_out(page: Page) -> None:
+    open_user_menu(page)
+    page.get_by_role("button", name="Sign out").click()
 
 
 def _settle(page: Page, move: Callable[[], object]) -> None:

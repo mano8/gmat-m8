@@ -561,6 +561,83 @@ class TestVoid:
         assert receipt.status == "POSTED"
 
 
+class TestVoidDialog:
+    """The inline dialog pilot of M8b.3: the void form sits in the page's dialog, opened by a
+    button with no script, and posts with htmx (204 + HX-Redirect, or 422 with its errors)."""
+
+    HTMX = {"HX-Request": "true"}
+
+    def test_the_page_holds_the_dialog_and_its_opener(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, receive: Receive
+    ) -> None:
+        receipt = receive(buy((make_line("4"), "4")), "4")
+        html = page(client_for(people.mm_mad), "detail", receipt.pk)
+        assert 'commandfor="void-dialog"' in html and 'command="show-modal"' in html
+        assert '<dialog id="void-dialog"' in html and 'aria-labelledby="void-dialog-title"' in html
+        assert f'hx-post="{reverse("receiving:void", args=[receipt.pk])}"' in html
+        # A destructive dialog: Cancel ("Keep the receipt") has the focus when it opens.
+        cancel = re.search(r'<button[^>]*data-testid="dialog-cancel"', html, re.S)
+        assert cancel is not None and "autofocus" in cancel.group(0)
+        assert "<details>" not in html.split('id="void-dialog"')[1]
+
+    def test_without_a_reason_the_form_comes_back_in_the_dialog(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, receive: Receive
+    ) -> None:
+        receipt = receive(buy((make_line("4"), "4")), "4")
+        response = client_for(people.mm_mad).post(
+            reverse("receiving:void", args=[receipt.pk]), {"reason": " "}, headers=self.HTMX
+        )
+        assert response.status_code == 422 and "HX-Request" in response["Vary"]
+        html = response.content.decode()
+        assert "<html" not in html and 'data-testid="void-form"' in html
+        assert "Give a reason." in html and 'href="#id_void_reason"' in html
+        receipt.refresh_from_db()
+        assert receipt.status == "POSTED"
+
+    def test_voided_the_page_navigates_and_shows_the_flash(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, receive: Receive
+    ) -> None:
+        receipt = receive(buy((make_line("4"), "4")), "4")
+        mm = client_for(people.mm_mad)
+        response = mm.post(
+            reverse("receiving:void", args=[receipt.pk]), {"reason": "Wrong"}, headers=self.HTMX
+        )
+        assert response.status_code == 204
+        assert response["HX-Redirect"] == reverse("receiving:detail", args=[receipt.pk])
+        receipt.refresh_from_db()
+        assert receipt.status == "VOIDED"
+        assert any("voided" in message for message in messages_of(mm.get(response["HX-Redirect"])))
+
+    def test_a_service_refusal_is_shown_on_the_form(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, receive: Receive, mm: Any
+    ) -> None:
+        from apps.receiving import services
+
+        receipt = receive(buy((make_line("4"), "4")), "4")
+        services.void_receipt(mm, receipt.pk, reason="First")
+        response = client_for(people.mm_mad).post(
+            reverse("receiving:void", args=[receipt.pk]), {"reason": "Again"}, headers=self.HTMX
+        )
+        assert response.status_code == 422
+        assert "data-error-summary" in response.content.decode()
+
+    def test_refusals_keep_their_status_and_never_draw_the_form(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, receive: Receive
+    ) -> None:
+        receipt = receive(buy((make_line("4"), "4")), "4")
+        url = reverse("receiving:void", args=[receipt.pk])
+        denied = client_for(people.wo_mad).post(url, {"reason": "x"}, headers=self.HTMX)
+        assert denied.status_code == 403
+        unseen = client_for(people.mm_sev).post(url, {"reason": "x"}, headers=self.HTMX)
+        assert unseen.status_code == 404
+        signed_out = Client().post(url, {"reason": "x"}, headers=self.HTMX)
+        assert signed_out.status_code == 302 and "/accounts/login/" in signed_out["Location"]
+        for response in (denied, unseen):
+            assert 'data-testid="void-form"' not in response.content.decode()
+        receipt.refresh_from_db()
+        assert receipt.status == "POSTED"
+
+
 # --- the expected deliveries -------------------------------------------------------------------
 
 

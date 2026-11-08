@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n list_tags ui_tags %}
 {% comment %}
   A GET filter form that refreshes `target` through htmx as the user types or picks, and still
   works without JavaScript (its button). Parameters: form, target (a CSS selector), action, and
@@ -10,19 +10,47 @@
   results to take out of the full page the server answers with (hx-select). A scoped form does not
   push its URL: that URL would hold only its own fields and drop the state of the other sections.
 {% endcomment %}
-<form method="get"
-      id="{{ form_id|default:'list-filter' }}"
-      action="{{ action }}"
-      class="mb-4 grid gap-x-3 {{ grid|default:'sm:grid-cols-[1fr_12rem_auto]' }} sm:items-end"
-      hx-get="{{ action }}"
-      hx-target="{{ target }}"
-      {% if select %}hx-select="{{ select }}"{% endif %}
-      hx-swap="outerHTML"
-      {% if scoped %}hx-trigger="input changed delay:300ms from:closest .list-scope, change from:closest .list-scope, submit"{% else %}hx-trigger="input changed delay:300ms from:input, change from:select, submit"{% endif %}
-      hx-push-url="{% if scoped %}false{% else %}true{% endif %}"
-      role="search">
-  {% for field in form %}{{ field.as_field_group }}{% endfor %}
-  <div class="field">
-    <button type="submit" class="btn">{% translate "Filter" %}</button>
+{% active_filter_count form as filter_count %}
+{# On a phone the filters open in a sheet (a popover, no script); from 40rem the form is drawn inline. #}
+<div class="mb-3 sm:hidden">
+  <button type="button"
+          class="btn btn-secondary"
+          popovertarget="{{ form_id|default:'list-filter' }}-sheet"
+          data-testid="filters-open">
+    {% icon "funnel" classes="size-5" %}
+    {% translate "Filters" %}
+    {% if filter_count %}<span class="chip tabular-nums">{{ filter_count }}</span>{% endif %}
+  </button>
+</div>
+<div id="{{ form_id|default:'list-filter' }}-sheet"
+     popover
+     class="filter-sheet">
+  <div class="filter-sheet-head">
+    <span>{% translate "Filters" %}</span>
+    <button type="button"
+            class="btn btn-ghost btn-icon"
+            popovertarget="{{ form_id|default:'list-filter' }}-sheet"
+            popovertargetaction="hide"
+            aria-label="{% translate 'Close' %}">{% icon "x" classes="size-5" %}</button>
   </div>
-</form>
+  <form method="get"
+        id="{{ form_id|default:'list-filter' }}"
+        action="{{ action }}"
+        class="mb-4 grid gap-x-3 {{ grid|default:'sm:grid-cols-[1fr_12rem_auto]' }} sm:items-end"
+        hx-get="{{ action }}"
+        hx-target="{{ target }}"
+        {% if select %}hx-select="{{ select }}"{% endif %}
+        hx-swap="outerHTML"
+        {% if scoped %}hx-trigger="input changed delay:300ms from:closest .list-scope, change from:closest .list-scope, submit"{% else %}hx-trigger="input changed delay:300ms from:input, change from:select, submit"{% endif %}
+        hx-push-url="{% if scoped %}false{% else %}true{% endif %}"
+        role="search">
+    {% for field in form %}{{ field.as_field_group }}{% endfor %}
+    <div class="field">
+      <button type="submit" class="btn">{% translate "Filter" %}</button>
+    </div>
+  </form>
+  <button type="button"
+          class="btn btn-primary btn-block mt-2 sm:hidden"
+          popovertarget="{{ form_id|default:'list-filter' }}-sheet"
+          popovertargetaction="hide">{% translate "Show the results" %}</button>
+</div>

@@ -36,6 +36,9 @@ from apps.receiving.views.common import chosen_place, order_for_receipt, receive
 
 # --- receipts -------------------------------
 
+# The void dialog's fields, apart from any other form of the page.
+VOID_FIELD_IDS = "id_void_%s"
+
 
 @require_safe
 @require_capability(VIEW)
@@ -74,7 +77,7 @@ def receipt_detail(request: HttpRequest, receipt_id: UUID) -> HttpResponse:
         "lines": selectors.receipt_lines(ctx, found),
         "handover": selectors.direct_handover(ctx, found),
         "can_void": can_void,
-        "void_form": RequiredReasonForm(auto_id="id_void_%s") if can_void else None,
+        "void_form": RequiredReasonForm(auto_id=VOID_FIELD_IDS) if can_void else None,
         "attachments": attachment_selectors.panel(ctx, found),
     }
     return render(request, "receiving/detail.html", context)

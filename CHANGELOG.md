@@ -198,6 +198,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - `manage reencrypt_mfa` moves every stored second-factor secret to the newest key, so an old key can leave `MFA_ENCRYPTION_KEYS` (M8.5).
 - CI sends the coverage report to Codecov and Codacy after a green `test` (job `coverage-upload`, secrets `CODECOV_TOKEN` and `CODACY_PROJECT_TOKEN`). It is not a required check, runs nothing of the project's and skips a service it has no token for, so a fork's or Dependabot's pull request still passes. Exception X14 records that Codacy's action fetches its reporter when it runs.
 - The hourly `sessions` housekeeping deletes expired sessions and rows of the session list without a session: nothing purged them before.
+- A modern interface (M8b, #50, ADR-0027), the same screens and rules with a new look and new ways to act:
+  - one design system: colour tokens for a light and a dark theme (OKLCH, checked against WCAG 2.2 AA by `scripts/check_contrast.py`, in CI), Inter and a Lucide icon subset served from the application, a component library drawn by `manage styleguide`, and the approved mockups kept in `docs/design/`;
+  - a new shell: a left menu of category dropdowns that can be hidden, a top bar with breadcrumbs, a quick action and the account menu, and on phones a bottom bar of four entries with a More sheet; the theme (System, Light, Dark), the hidden menu and the folded categories are remembered in one `__Host-ui` cookie, and nothing needs a script to be read;
+  - actions open in dialogs (a bottom sheet on a phone): void a receipt, change, assign, return, reduce, close, issue, amend, cancel, deactivate, hand over, revoke; a form that is wrong comes back in its dialog with its errors, and a page that is out of date says so; list filters open in a sheet on a phone and show as removable chips; the new-request flow shows its steps;
+  - a dashboard with four key figures and ten charts (requests, decisions, orders, receipts, handovers, people per branch) over a period of 4, 12 or 26 weeks, each beside its data table, drawn with Chart.js only on the pages that have a chart; every figure is counted from what the person may see;
+  - accessibility checks in the browser tests: axe-core on the entrance pages, every role's home page and lists and the document pages (a dialog open included), in both themes at 360 px and on a desktop, and a keyboard walk of the tab order, the dialogs and the menus. `E2E_SCREENSHOTS=1` saves the main screens at 360 and 1280 px in both themes.
 
 ### Changed
 
@@ -237,6 +243,8 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- Accessibility findings of the first axe run: a disabled pagination link carried an `aria-label` its role does not allow (it is now a `role="link"`, as is the current page), the review page's facts list held a paragraph where a list may hold only terms and definitions, the theme switch was a `role="group"` form (the group is now its buttons), and the sign-in pages' header and theme switch were outside any landmark.
+- The filter sheet's own title and Close button showed above the filters from 40 rem wide, where the filters are a plain form. A menu or sheet that is a popover now closes when the keyboard moves past it, instead of staying open over the page.
 - A nightly image scan that does not finish now says so in the scan issue; a failed `targets` used to stay silent. The remaining Codacy findings are cleared.
 - The VPS runbook asked for a fine-grained token to pull the images, which GHCR refuses after a successful login.
 - The admin's lists accept only the filters they offer: a query-string lookup on a hidden column (a password hash, a token hash, an MFA secret, a price) could be read back from the result count. The audit admin no longer shows event payloads or client addresses (M8.3).

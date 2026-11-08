@@ -4,81 +4,113 @@
   {% if line %}{% translate "Change a line" %}{% else %}{% translate "Add a line" %}{% endif %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-1">
-    {% if line %}
-      {% translate "Change a line" %}
-    {% else %}
-      {% translate "Add a line" %}
-    {% endif %}
-  </h1>
-  <p class="mb-4 text-soft" data-testid="edit-target">
-    {{ request_obj.number }}
-    {% if line %}· {{ line.line_no }}. {{ line.description }} · {{ line.requested_qty|quantity }} {{ line.unit.code }}{% endif %}
-  </p>
-  {% if approved and line %}
-    <p class="mb-3 text-sm text-soft">
-      {% translate "The request is approved: your change is approved with it. A new material for a line that already has orders or deliveries closes it short and adds a new line for the rest." %}
-    </p>
-  {% elif approved %}
-    <p class="mb-3 text-sm text-soft">{% translate "The request is approved: the new line is approved with it." %}</p>
-  {% endif %}
-  <section class="card mb-4" aria-label="{% translate 'Material' %}">
-    <h2 class="card-title">{% translate "Material" %}</h2>
-    {% if chosen %}
-      <p class="mb-2" data-testid="chosen-material">
-        {{ chosen.name }}
-        <span class="block text-sm text-soft">{{ chosen.reference }} · {{ chosen.unit.code }}</span>
-      </p>
-    {% endif %}
-    <form method="get" role="search" class="mb-3">
-      {% if chosen %}<input type="hidden" name="material" value="{{ chosen.pk }}">{% endif %}
-      {{ search.q.as_field_group }}
-      <button type="submit" class="btn">{% translate "Search" %}</button>
-    </form>
-    <ul class="grid gap-2" data-testid="material-candidates">
-      {% for material in materials %}
-        <li class="card" data-material="{{ material.reference }}">
-          <a class="flex items-center justify-between gap-3"
-             href="?material={{ material.pk }}">
-            <span>
-              {{ material.name }}
-              <span class="block text-sm text-soft">{{ material.reference }} · {{ material.unit.code }}</span>
-            </span>
-            <span class="btn">{% translate "Use" %}</span>
-          </a>
-        </li>
-      {% empty %}
-        {% if query %}
-          {% include "components/empty_state.html" with title=_("No material found") text=_("No active material matches your search.") %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>
+        {% if line %}
+          {% translate "Change a line" %}
+        {% else %}
+          {% translate "Add a line" %}
         {% endif %}
-      {% endfor %}
-    </ul>
-  </section>
-  <form method="post"
-        action="{{ action }}"
-        class="card mb-4"
-        data-testid="line-form">
-    {% csrf_token %}
-    {{ form.idempotency_key }}
-    {{ form.seen_version }}
-    {{ form.material }}
-    {% if described %}
-      {{ form.free_text.as_field_group }}
-      {{ form.unit.as_field_group }}
-    {% endif %}
-    {{ form.requested_qty.as_field_group }}
-    {{ form.reason.as_field_group }}
-    <div class="grid gap-2 sm:grid-cols-2">
-      <button type="submit" class="btn btn-primary" data-testid="save-edit">{% translate "Save" %}</button>
-      {% if can_approve %}
-        <button type="submit"
-                name="decision"
-                value="APPROVED"
-                class="btn btn-primary"
-                data-testid="save-and-approve">{% translate "Save and approve" %}</button>
-      {% endif %}
+      </h1>
     </div>
-  </form>
-  {% url 'requests:examine' request_id=request_obj.pk as back_url %}
-  {% include "components/button.html" with href=back_url label=_("Back to the request") variant="link" %}
+  </header>
+  {# The page holds the same fragment as the review page's dialog, swapped in the same way. #}
+  <div class="dialog-page mb-4"
+       data-dialog-content
+       hx-target="this"
+       hx-swap="innerHTML">{% partial line_dialog %}</div>
 {% endblock content %}
+{% comment %}
+  The dialog's content (M8b.3): this page's body, and what the review page's dialog loads with
+  htmx. Links and the search stay on the dialog's own URL (page_url); the form posts to action.
+{% endcomment %}
+{% partialdef line_dialog %}
+  <div class="dialog-body">
+    {% include "components/error_summary.html" with form=form %}
+    <p class="text-sm text-soft" data-testid="edit-target">
+      {{ request_obj.number }}
+      {% if line %}· {{ line.line_no }}. {{ line.description }} · {{ line.requested_qty|quantity }} {{ line.unit.code }}{% endif %}
+    </p>
+    {% if approved and line %}
+      <p class="text-sm text-soft">
+        {% translate "The request is approved: your change is approved with it. A new material for a line that already has orders or deliveries closes it short and adds a new line for the rest." %}
+      </p>
+    {% elif approved %}
+      <p class="text-sm text-soft">{% translate "The request is approved: the new line is approved with it." %}</p>
+    {% endif %}
+    {# The material picker is part of the dialog's body (one level: it never opens another dialog). #}
+    <section class="grid gap-3" aria-label="{% translate 'Material' %}">
+      <h3>{% translate "Material" %}</h3>
+      {% if chosen %}
+        <p data-testid="chosen-material">
+          {{ chosen.name }}
+          <span class="block text-sm text-soft">{{ chosen.reference }} · {{ chosen.unit.code }}</span>
+        </p>
+      {% endif %}
+      <form method="get"
+            action="{{ page_url }}"
+            hx-get="{{ page_url }}"
+            role="search"
+            class="grid gap-2">
+        {% if chosen %}<input type="hidden" name="material" value="{{ chosen.pk }}">{% endif %}
+        {{ search.q.as_field_group }}
+        <button type="submit" class="btn">{% translate "Search" %}</button>
+      </form>
+      <ul class="grid gap-2" data-testid="material-candidates">
+        {% for material in materials %}
+          <li class="card" data-material="{{ material.reference }}">
+            <a class="flex items-center justify-between gap-3"
+               href="{{ page_url }}?material={{ material.pk }}"
+               hx-get="{{ page_url }}?material={{ material.pk }}">
+              <span>
+                {{ material.name }}
+                <span class="block text-sm text-soft">{{ material.reference }} · {{ material.unit.code }}</span>
+              </span>
+              <span class="btn">{% translate "Use" %}</span>
+            </a>
+          </li>
+        {% empty %}
+          {% if query %}
+            {% include "components/empty_state.html" with title=_("No material found") text=_("No active material matches your search.") %}
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </section>
+    {# The footer's buttons belong to this form through form="line-form" (the search above is a form of its own). #}
+    <form method="post"
+          action="{{ action }}"
+          hx-post="{{ action }}"
+          hx-disabled-elt="#line-form-actions"
+          class="grid gap-3"
+          novalidate
+          id="line-form"
+          data-testid="line-form">
+      {% csrf_token %}
+      {{ form.idempotency_key }}
+      {{ form.seen_version }}
+      {{ form.material }}
+      {% if described %}
+        {{ form.free_text.as_field_group }}
+        {{ form.unit.as_field_group }}
+      {% endif %}
+      {{ form.requested_qty.as_field_group }}
+      {{ form.reason.as_field_group }}
+    </form>
+  </div>
+  <fieldset class="dialog-foot" id="line-form-actions" data-dialog-actions>
+    {% include "components/dialog_cancel.html" with dialog_id=dialog_id back_url=back_url %}
+    {% if can_approve %}
+      <button type="submit"
+              form="line-form"
+              name="decision"
+              value="APPROVED"
+              class="btn btn-secondary"
+              data-testid="save-and-approve">{% translate "Save and approve" %}</button>
+    {% endif %}
+    <button type="submit"
+            form="line-form"
+            class="btn btn-primary"
+            data-testid="save-edit">{% translate "Save" %}</button>
+  </fieldset>
+{% endpartialdef %}

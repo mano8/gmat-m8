@@ -4,13 +4,15 @@
   {% translate "Ledger" %} · {{ request_obj.number|default:_("Request") }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'requests:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("My requests") parent_url=crumb_url current=request_obj.number|default:_("Request") %}
       <h1>{% translate "Ledger" %} · {{ request_obj.number|default:_("Request") }}</h1>
-      <p class="mt-1 text-soft">{{ request_obj.project.code }} · {{ request_obj.project.name }}</p>
+      <p class="page-head-sub">{{ request_obj.project.code }} · {{ request_obj.project.name }}</p>
+      <p class="mt-1 flex flex-wrap gap-2">{% include "material_requests/status.html" with obj=request_obj %}</p>
     </div>
-    {% include "material_requests/status.html" with obj=request_obj %}
-  </div>
+  </header>
   {% for entry, trims in entries %}
     {% with line=entry.line flows=entry.flows unit=entry.line.unit.code %}
       <article class="card mb-3"

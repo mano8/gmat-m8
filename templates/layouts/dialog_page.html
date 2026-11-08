@@ -1,0 +1,21 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% comment %}
+  A lazy dialog's own page (M8b.4): the form of an action opened as a link or without JavaScript.
+  The same fragment the page's dialog loads with htmx. Parameter: d (an ActionDialog).
+{% endcomment %}
+{% block head_title %}
+  {{ d.title }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{{ d.title }}</h1>
+      {% if d.description %}<p class="page-head-sub">{{ d.description }}</p>{% endif %}
+    </div>
+  </header>
+  <div class="dialog-page mb-4"
+       data-dialog-content
+       hx-target="this"
+       hx-swap="innerHTML">{% include "components/dialog_form.html" %}</div>
+{% endblock content %}

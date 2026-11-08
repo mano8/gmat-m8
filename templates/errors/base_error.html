@@ -1,27 +1,32 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n ui_tags %}
 {% comment %}
   Shared by 400/403/404/405/409/429/500. Shows a code, a short heading and a generic sentence,
   never a path, a query, an exception or a user. 500 renders without a request, so nothing here
-  depends on one.
+  depends on one (no navigation, no account menu).
 {% endcomment %}
 {% block body %}
-  <main id="main"
-        class="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
-    <p class="text-5xl font-bold text-brand" aria-hidden="true">
-      {% block code %}
-      {% endblock code %}
-    </p>
-    <h1>
-      {% block heading %}
-      {% endblock heading %}
-    </h1>
-    <p class="text-soft">
-      {% block message %}
-      {% endblock message %}
-    </p>
-    <div>
-      <a class="btn btn-primary" href="/">{% translate "Back to the start" %}</a>
-    </div>
-  </main>
+  <div class="min-h-dvh bg-linear-to-b from-brand-soft to-surface">
+    <main id="main"
+          class="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4 py-8">
+      <div class="card flex flex-col items-center gap-3 text-center">
+        <span class="grid size-12 place-items-center rounded-full bg-warn-soft text-warn">{% icon "triangle-alert" classes="size-6" %}</span>
+        <p class="doc-no text-4xl font-bold text-brand" aria-hidden="true">
+          {% block code %}
+          {% endblock code %}
+        </p>
+        <h1>
+          {% block heading %}
+          {% endblock heading %}
+        </h1>
+        <p class="text-soft text-pretty">
+          {% block message %}
+          {% endblock message %}
+        </p>
+        <div>
+          <a class="btn btn-primary" href="/">{% translate "Back to the start" %}</a>
+        </div>
+      </div>
+    </main>
+  </div>
 {% endblock body %}

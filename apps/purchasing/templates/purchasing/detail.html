@@ -4,9 +4,11 @@
   {{ order.number|default:_("Draft order") }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
-      <h1 data-testid="order-number">{{ order.number|default:_("Draft order") }}</h1>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'purchasing:orders' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Purchase orders") parent_url=crumb_url current=order.number|default:_("Draft order") %}
+      <h1 class="doc-no" data-testid="order-number">{{ order.number|default:_("Draft order") }}</h1>
       <p class="mt-1 flex flex-wrap gap-2">
         {% include "purchasing/status.html" with obj=order %}
         {% if progress %}
@@ -17,57 +19,61 @@
         {% endif %}
       </p>
     </div>
-    <div class="flex flex-wrap gap-3">
+    <div class="page-head-actions">
       {% if printable %}
         {% url 'purchasing:print' po_id=order.pk as print_url %}
-        {% include "components/button.html" with href=print_url label=_("Printable page") %}
+        {% include "components/button.html" with href=print_url label=_("Printable page") icon="printer" variant="secondary" %}
       {% endif %}
       {% if order.status == "ISSUED" %}
         {% can "receipt.post" order %}
           {% url 'receiving:receive' po_id=order.pk as receive_url %}
-          {% include "components/button.html" with href=receive_url label=_("Receive goods") %}
+          {% include "components/button.html" with href=receive_url label=_("Receive goods") icon="package-check" variant="secondary" %}
         {% endcan %}
       {% endif %}
       {% if managing and order.status == "ISSUED" %}
         {% url 'purchasing:amendment' po_id=order.pk as amend_url %}
-        {% include "components/button.html" with href=amend_url label=_("Amend") variant="primary" %}
+        {% include "components/button.html" with href=amend_url label=_("Amend") icon="pencil" variant="primary" %}
+      {% endif %}
+      {% if menu_items %}
+        {% include "components/menu.html" with id="order-menu" label=_("More actions") items=menu_items %}
       {% endif %}
     </div>
-  </div>
+  </header>
   {% if order.status == "DRAFT" and stale %}
     <p class="card mb-4" data-testid="stale-draft">
       {% blocktranslate with days=stale_days %}This draft is older than {{ days }} days and still reserves quantities. Issue it or discard it.{% endblocktranslate %}
     </p>
   {% endif %}
-  <section class="card mb-4" aria-label="{% translate 'Order details' %}">
-    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Order details' %}">
+    <dl class="facts">
       <div>
-        <dt class="text-sm text-soft">{% translate "Buyer" %}</dt>
+        <dt>{% translate "Buyer" %}</dt>
         <dd>
           {{ order.buyer_company.code }} · {{ order.branch.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Supplier" %}</dt>
+        <dt>{% translate "Supplier" %}</dt>
         <dd data-testid="order-supplier">
           {{ order.supplier.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Ship to" %}</dt>
+        <dt>{% translate "Ship to" %}</dt>
         <dd>
           {{ order.ship_to.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Expected date" %}</dt>
+        <dt>{% translate "Expected date" %}</dt>
         <dd>
           {{ order.expected_date|date:"SHORT_DATE_FORMAT"|default:"—" }}
         </dd>
       </div>
       {% if order.supplier_ref %}
         <div>
-          <dt class="text-sm text-soft">{% translate "Supplier reference" %}</dt>
+          <dt>{% translate "Supplier reference" %}</dt>
           <dd>
             {{ order.supplier_ref }}
           </dd>
@@ -75,50 +81,37 @@
       {% endif %}
       {% if order.issued_at %}
         <div>
-          <dt class="text-sm text-soft">{% translate "Issued" %}</dt>
+          <dt>{% translate "Issued" %}</dt>
           <dd>
             {{ order.issued_at|date:"SHORT_DATETIME_FORMAT" }}
           </dd>
         </div>
       {% endif %}
       {% if order.notes %}
-        <div class="sm:col-span-2">
-          <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
-          <dd class="whitespace-pre-line">
+        <div class="col-span-full">
+          <dt>{% translate "Notes" %}</dt>
+          <dd class="whitespace-pre-line font-normal">
             {{ order.notes }}
           </dd>
         </div>
       {% endif %}
       {% if order_total is not None %}
         <div>
-          <dt class="text-sm text-soft">{% translate "Total" %}</dt>
-          <dd class="font-semibold" data-testid="order-total">
+          <dt>{% translate "Total" %}</dt>
+          <dd class="tabular-nums" data-testid="order-total">
             {{ order_total }} {{ order.currency }}
           </dd>
         </div>
       {% endif %}
     </dl>
   </section>
-  {% if managing and order.status == "DRAFT" %}
-    <section class="card mb-4" aria-label="{% translate 'Edit the draft' %}">
-      <details>
-        <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Edit supplier, destination and notes" %}</summary>
-        <form method="post"
-              action="{% url 'purchasing:update' po_id=order.pk %}"
-              data-testid="header-form">
-          {% csrf_token %}
-          {{ header_form.supplier.as_field_group }}
-          {{ header_form.ship_to.as_field_group }}
-          {{ header_form.expected_date.as_field_group }}
-          {{ header_form.supplier_ref.as_field_group }}
-          {{ header_form.notes.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Save the draft") %}
-        </form>
-      </details>
-    </section>
-  {% endif %}
   <section class="mb-4" aria-label="{% translate 'Lines' %}">
-    <h2 class="mb-2">{% translate "Lines" %}</h2>
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2>{% translate "Lines" %}</h2>
+      {% if managing and order.status == "DRAFT" and items_form.rows %}
+        {% include "components/dialog_button.html" with dialog="add-lines-dialog" label=_("Add request lines to buy") variant="secondary" icon="plus" testid="add-lines-open" %}
+      {% endif %}
+    </div>
     <div data-testid="order-lines">
       {% for line in lines %}
         {% include "purchasing/line.html" with lv=line %}
@@ -131,82 +124,8 @@
       {% endfor %}
     </div>
   </section>
-  {% if managing and order.status == "DRAFT" %}
-    {% if items_form.rows %}
-      <section class="card mb-4" aria-label="{% translate 'Add request lines' %}">
-        <details>
-          <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Add request lines to buy" %}</summary>
-          <form method="post"
-                action="{% url 'purchasing:add_lines' po_id=order.pk %}"
-                data-testid="add-lines-form">
-            {% csrf_token %}
-            {{ items_form.idempotency_key }}
-            {% for entry in items_form.entries %}
-              {% with line=entry.row.line %}
-                <div class="flex items-start gap-3 border-t border-line py-2">
-                  <span class="field mb-0 mt-1">{{ entry.pick }}</span>
-                  <div class="flex-1">
-                    <p class="font-medium">{{ line.description }}</p>
-                    <p class="text-sm text-soft">
-                      {{ line.request.number }} · {{ line.project.code }} · {% translate "To purchase" %}
-                      {{ entry.row.to_purchase|quantity }} {{ line.unit.code }}
-                    </p>
-                    <div class="field mb-0 mt-2 max-w-40">
-                      <label for="{{ entry.qty.id_for_label }}">{% translate "Quantity" %}</label>
-                      {{ entry.qty }}
-                    </div>
-                  </div>
-                </div>
-              {% endwith %}
-            {% endfor %}
-            {% include "components/button.html" with type="submit" label=_("Add the ticked lines") %}
-          </form>
-        </details>
-      </section>
-    {% else %}
-      {% include "purchasing/no_candidates.html" with hint=no_candidates draft=True %}
-    {% endif %}
-    <section class="card mb-4" aria-label="{% translate 'Issue the order' %}">
-      {% if lines %}
-        <form method="post"
-              action="{% url 'purchasing:issue' po_id=order.pk %}"
-              data-testid="issue-form">
-          {% csrf_token %}
-          {{ issue_form.idempotency_key }}
-          {{ issue_form.confirm.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Issue the order") variant="primary" block=True %}
-        </form>
-      {% else %}
-        <p class="text-soft" data-testid="issue-blocked">{% translate "Add at least one line before issuing." %}</p>
-      {% endif %}
-      <details class="mt-3">
-        <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Discard the draft" %}</summary>
-        <form method="post"
-              action="{% url 'purchasing:cancel' po_id=order.pk %}"
-              data-testid="discard-form">
-          {% csrf_token %}
-          {{ discard_form.reason.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Discard the draft") variant="danger" %}
-        </form>
-      </details>
-    </section>
-  {% endif %}
-  {% if managing and order.status == "ISSUED" %}
-    <section class="card mb-4" aria-label="{% translate 'Cancel the order' %}">
-      <details>
-        <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Cancel the order" %}</summary>
-        <p class="mb-2 text-sm text-soft">
-          {% translate "Only possible while no goods have been received. Every allocation is released." %}
-        </p>
-        <form method="post"
-              action="{% url 'purchasing:cancel' po_id=order.pk %}"
-              data-testid="cancel-form">
-          {% csrf_token %}
-          {{ cancel_form.reason.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Cancel the order") variant="danger" %}
-        </form>
-      </details>
-    </section>
+  {% if managing and order.status == "DRAFT" and not items_form.rows %}
+    {% include "purchasing/no_candidates.html" with hint=no_candidates draft=True %}
   {% endif %}
   {% if dispatches or dispatch_on and order.number %}
     {% include "purchasing/dispatches.html" %}
@@ -214,17 +133,82 @@
   {% if history %}
     <section class="mb-4" aria-label="{% translate 'History' %}">
       <h2 class="mb-2">{% translate "History" %}</h2>
-      <ol class="card" data-testid="order-history">
-        {% for entry in history %}
-          <li class="border-b border-line py-2 last:border-b-0">
-            <p>
-              <span class="font-medium">{{ entry.label }}</span>
-              <span class="text-sm text-soft">· {{ entry.actor }} · {{ entry.occurred_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-            </p>
-            {% if entry.detail %}<p class="text-sm text-soft">{{ entry.detail }}</p>{% endif %}
-          </li>
-        {% endfor %}
-      </ol>
+      <div class="card">{% include "components/timeline.html" with entries=history testid="order-history" %}</div>
     </section>
   {% endif %}
+  {% if managing and order.status == "DRAFT" %}
+    <div class="action-bar" data-testid="issue-bar">
+      {% if lines %}
+        <form method="post"
+              action="{% url 'purchasing:issue' po_id=order.pk %}"
+              class="grid gap-2"
+              data-testid="issue-form">
+          {% csrf_token %}
+          {{ issue_form.idempotency_key }}
+          {{ issue_form.confirm.as_field_group }}
+          {% include "components/button.html" with type="submit" label=_("Issue the order") icon="send" variant="primary" block=True %}
+        </form>
+      {% else %}
+        <p class="text-soft" data-testid="issue-blocked">{% translate "Add at least one line before issuing." %}</p>
+      {% endif %}
+    </div>
+  {% endif %}
+  {# The order's own dialogs, opened from the menu above or the buttons of the lines. #}
+  {% if header_dialog %}
+    {% include "components/action_dialog.html" with d=header_dialog %}
+  {% endif %}
+  {% if discard_dialog %}
+    {% include "components/action_dialog.html" with d=discard_dialog %}
+  {% endif %}
+  {% if cancel_dialog %}
+    {% include "components/action_dialog.html" with d=cancel_dialog %}
+  {% endif %}
+  {% if managing and order.status == "DRAFT" and items_form.rows %}
+    {% include "components/dialog.html" with id="add-lines-dialog" title=_("Add request lines to buy") size="lg" content="purchasing/detail.html#add_lines_form" testid="add-lines-dialog" %}
+  {% endif %}
 {% endblock content %}
+{% comment %}
+  The add-lines dialog's form (M8b.4): the worklist's candidates as a tick and a quantity each.
+  Drawn in the page's dialog, and sent back alone with its errors (422) when nothing is ticked or
+  the service refuses. Parameters: order, items_form.
+{% endcomment %}
+{% partialdef add_lines_form %}
+  {% url 'purchasing:add_lines' po_id=order.pk as add_url %}
+  <form method="post"
+        action="{{ add_url }}"
+        hx-post="{{ add_url }}"
+        hx-disabled-elt="find [data-dialog-actions]"
+        class="dialog-content"
+        novalidate
+        data-testid="add-lines-form">
+    <div class="dialog-body">
+      {% include "components/error_summary.html" with form=items_form %}
+      {% csrf_token %}
+      {{ items_form.idempotency_key }}
+      {% for entry in items_form.entries %}
+        {% with line=entry.row.line %}
+          <div class="flex items-start gap-3 border-t border-line pt-3 first:border-t-0 first:pt-0">
+            <span class="field mb-0 mt-1">{{ entry.pick }}</span>
+            <div class="flex-1">
+              <p class="font-medium">{{ line.description }}</p>
+              <p class="text-sm text-soft">
+                {{ line.request.number }} · {{ line.project.code }} · {% translate "To purchase" %}
+                {{ entry.row.to_purchase|quantity }} {{ line.unit.code }}
+              </p>
+              <div class="field mb-0 mt-2 max-w-40">
+                <label for="{{ entry.qty.id_for_label }}">{% translate "Quantity" %}</label>
+                {{ entry.qty }}
+              </div>
+            </div>
+          </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+    <fieldset class="dialog-foot" data-dialog-actions>
+      {% include "components/dialog_cancel.html" with dialog_id="add-lines-dialog" %}
+      <button type="submit"
+              class="btn btn-primary"
+              data-testid="add-lines-submit">{% translate "Add the ticked lines" %}</button>
+    </fieldset>
+  </form>
+{% endpartialdef %}

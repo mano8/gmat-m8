@@ -4,12 +4,16 @@
   {% translate "Amend" %} {{ order.number }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4">
-    <h1>{% blocktranslate with number=order.number revision=order.revision %}Amend {{ number }} (revision {{ revision }}){% endblocktranslate %}</h1>
-    <p class="mt-1 text-soft">
-      {% translate "Only what you change is sent. The supplier, the buyer and the destination never change: cancel and create a new order instead." %}
-    </p>
-  </div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'purchasing:orders' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Purchase orders") parent_url=crumb_url current=order.number %}
+      <h1>{% blocktranslate with number=order.number revision=order.revision %}Amend {{ number }} (revision {{ revision }}){% endblocktranslate %}</h1>
+      <p class="page-head-sub">
+        {% translate "Only what you change is sent. The supplier, the buyer and the destination never change: cancel and create a new order instead." %}
+      </p>
+    </div>
+  </header>
   <form method="post"
         action="{% url 'purchasing:amend' po_id=order.pk %}"
         data-testid="amend-form">

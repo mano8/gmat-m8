@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
@@ -35,7 +36,8 @@ from apps.material_requests.forms import (
     SubmitForm,
 )
 from apps.material_requests.models import MaterialRequest
-from apps.material_requests.views.common import _own_draft, _own_line_request
+from apps.material_requests.views.common import _invalid, _own_draft, _own_line_request, _perform
+from apps.material_requests.views.review_dialogs import discard_draft_dialog, free_line_dialog
 
 VIEW, CREATE, WITHDRAW = (
     Capability.REQUEST_VIEW,
@@ -139,6 +141,9 @@ def request_start(request: HttpRequest) -> HttpResponse:
 # --- the request: materials of a draft, or the status page -------------------------------
 
 
+DISCARD_IDS = "id_discard_%s"
+
+
 def _draft_context(
     request: HttpRequest,
     found: MaterialRequest,
@@ -154,7 +159,10 @@ def _draft_context(
         "lines": selectors.lines(ctx, [found])[found.pk],
         "error": error,
         "editable": editable,
-        "free_form": free_form or FreeLineForm(ctx=ctx, actor_id=ctx.user_id),
+        "discard_dialog": discard_draft_dialog(found, ReasonForm(auto_id=DISCARD_IDS)),
+        "free_dialog": free_line_dialog(
+            found, free_form or FreeLineForm(ctx=ctx, actor_id=ctx.user_id)
+        ),
         "search": MaterialSearchForm(),
         "materials": selectors.recent_materials(ctx) if editable else [],
         "query": "",
@@ -270,30 +278,30 @@ def line_add(request: HttpRequest, request_id: UUID) -> HttpResponse:
 
 @mutating(CREATE)
 def line_add_free(request: HttpRequest, request_id: UUID) -> HttpResponse:
-    """A material that is not in the catalog: described, with its unit and quantity."""
+    """A material that is not in the catalog: described, with its unit and quantity. Sent from
+    its dialog (M8b.4) it answers by the contract of ``apps.core.responses``."""
     ctx = access_for(request)
     found = _own_draft(request, request_id)
     form = FreeLineForm(request.POST, ctx=ctx)
+    dialog = free_line_dialog(found, form).dialog()
+    to = reverse("requests:detail", args=[found.pk])
     if not form.is_valid():
-        return _lines_answer(request, found, error=form_error_text(form), free_form=form)
+        return _invalid(request, form, to, dialog=dialog)
     data = form.cleaned_data
-    try:
-        services.add_line(
+    return _perform(
+        request,
+        lambda: services.add_line(
             ctx.principal,
             found.pk,
             free_text=data["free_text"],
             unit_id=data["unit"].pk,
             requested_qty=data["requested_qty"],
             idempotency_key=data["idempotency_key"],
-        )
-    except ValidationError as exc:
-        add_service_errors(form, exc)
-        return _lines_answer(request, found, error=form_error_text(form), free_form=form)
-    except IdempotencyError as exc:
-        return idempotency_failure(request, exc)
-    except RetryExhausted:
-        return conflict(request)
-    return _lines_answer(request, found)
+        ),
+        _("Line added."),
+        to,
+        dialog=dialog,
+    )
 
 
 @mutating(CREATE)
@@ -390,14 +398,13 @@ def request_cancel(request: HttpRequest, request_id: UUID) -> HttpResponse:
     """Discard a draft (or cancel an own request no reviewer has decided yet)."""
     ctx = access_for(request)
     found = _own_draft(request, request_id)
-    form = ReasonForm(request.POST)
+    form = ReasonForm(request.POST, auto_id=DISCARD_IDS)
     reason = form.cleaned_data["reason"] if form.is_valid() else ""
-    try:
-        services.cancel(ctx.principal, found.pk, reason=reason)
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-        return redirect("requests:detail", request_id=found.pk)
-    except RetryExhausted:
-        return conflict(request)
-    messages.success(request, _("Request discarded."))
-    return redirect("requests:list")
+    return _perform(
+        request,
+        lambda: services.cancel(ctx.principal, found.pk, reason=reason),
+        _("Request discarded."),
+        reverse("requests:list"),
+        failed_to=reverse("requests:detail", args=[found.pk]),
+        dialog=discard_draft_dialog(found, form).dialog(),
+    )

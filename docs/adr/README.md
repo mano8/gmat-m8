@@ -30,3 +30,4 @@ Each ADR names the files it governs (`- **Governs:**`). A pull request that touc
 - [ADR-0024](0024-session-idle-limits-own-sessions-credential-notices.md): Idle limits, one's own sessions and credential-change notices
 - [ADR-0025](0025-ci-test-shards.md): CI runs the tests in four shards at once; time-dependent tests run alone
 - [ADR-0026](0026-adrs-stay-aligned.md): Every change answers the ADRs that govern what it touches
+- [ADR-0027](0027-ui-design-system.md): The UI follows one design system: tokens, a component library, vendored assets

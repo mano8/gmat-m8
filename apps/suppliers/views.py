@@ -10,18 +10,21 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
-from apps.core.forms import add_service_errors, error_text
+from apps.core.dialogs import ActionDialog
+from apps.core.forms import add_service_errors
 from apps.core.idempotency import IdempotencyError
 from apps.core.listing import paginate, render_list
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict, idempotency_failure
+from apps.core.responses import conflict, idempotency_failure, perform
 from apps.suppliers import selectors, services
 from apps.suppliers.forms import SupplierCreateForm, SupplierFilterForm, SupplierForm
 from apps.suppliers.models import Supplier
@@ -60,7 +63,12 @@ def supplier_list(request: HttpRequest) -> HttpResponse:
 def supplier_detail(request: HttpRequest, supplier_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     supplier = selectors.supplier(ctx, supplier_id)
-    context = {"supplier": supplier, "manageable": selectors.manageable(ctx, supplier)}
+    manageable = selectors.manageable(ctx, supplier)
+    context = {
+        "supplier": supplier,
+        "manageable": manageable,
+        "deactivate_dialog": deactivate_dialog(supplier, Form()) if manageable else None,
+    }
     return render(request, "suppliers/detail.html", context)
 
 
@@ -116,24 +124,44 @@ def supplier_update(request: HttpRequest, supplier_id: UUID) -> HttpResponse:
     return render(request, "suppliers/form.html", {"form": form, "supplier": supplier})
 
 
+def deactivate_dialog(supplier: Supplier, form: Form) -> ActionDialog:
+    """Deactivating a supplier, as a confirmation dialog of its page (M8b.4)."""
+    return ActionDialog(
+        id="deactivate-dialog",
+        title=_("Deactivate the supplier"),
+        description=supplier.name,
+        icon="ban",
+        tone="danger",
+        action=reverse("suppliers:deactivate", args=[supplier.pk]),
+        submit=_("Deactivate"),
+        form=form,
+        consequences=(
+            _("The supplier is no longer offered for new orders."),
+            _("Existing orders and documents keep it. It can be reactivated."),
+        ),
+        cancel=_("Keep it active"),
+        testid="deactivate-form",
+        submit_testid="deactivate-submit",
+    )
+
+
 def _set_active(request: HttpRequest, supplier_id: UUID, *, active: bool) -> HttpResponse:
     ctx = access_for(request)
     supplier = _manageable(request, supplier_id)
     action = services.reactivate_supplier if active else services.deactivate_supplier
-    try:
-        action(ctx.principal, supplier.pk)
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(
-            request,
-            _("Supplier %(name)s reactivated.") % {"name": supplier.name}
-            if active
-            else _("Supplier %(name)s deactivated.") % {"name": supplier.name},
-        )
-    return redirect("suppliers:detail", supplier_id=supplier.pk)
+    form = Form(request.POST)
+    form.is_valid()  # no fields: a service refusal can then be shown on it
+    return perform(
+        request,
+        lambda: action(ctx.principal, supplier.pk),
+        _("Supplier %(name)s reactivated.") % {"name": supplier.name}
+        if active
+        else _("Supplier %(name)s deactivated.") % {"name": supplier.name},
+        reverse("suppliers:detail", args=[supplier.pk]),
+        dialog=None
+        if active
+        else deactivate_dialog(supplier, form).dialog(),  # only that one is a dialog
+    )
 
 
 @mutating(MANAGE)

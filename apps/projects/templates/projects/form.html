@@ -4,13 +4,19 @@
   {% if project %}{{ project.code }}{% else %}{% translate "New project" %}{% endif %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-4">
-    {% if project %}
-      {% blocktranslate with code=project.code %}Edit project {{ code }}{% endblocktranslate %}
-    {% else %}
-      {% translate "New project" %}
-    {% endif %}
-  </h1>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'projects:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Projects") parent_url=crumb_url current=project.code|default:_("New project") %}
+      <h1>
+        {% if project %}
+          {% blocktranslate with code=project.code %}Edit project {{ code }}{% endblocktranslate %}
+        {% else %}
+          {% translate "New project" %}
+        {% endif %}
+      </h1>
+    </div>
+  </header>
   <form method="post"
         class="card max-w-2xl"
         action="{% if project %}{% url 'projects:update' project_id=project.pk %}{% else %}{% url 'projects:create' %}{% endif %}">

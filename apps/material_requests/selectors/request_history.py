@@ -64,6 +64,18 @@ class HistoryEntry:
     line_no: int | None
     detail: str
 
+    @property
+    def when(self) -> datetime:
+        """The time, as the ``timeline`` component names it."""
+        return self.occurred_at
+
+    @property
+    def title(self) -> str:
+        """What happened, with its line (the ``timeline`` component's headline)."""
+        if self.line_no is None:
+            return str(self.label)
+        return f"{self.label} · " + str(_("line %(line)s") % {"line": self.line_no})
+
 
 def _quantity(value: Any) -> str:
     return f"{Decimal(str(value)).normalize():f}"

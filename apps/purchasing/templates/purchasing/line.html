@@ -4,13 +4,13 @@
   Parameter: lv (a views.pages.LineView). The page's `order`, `managing` and `prices` apply.
 {% endcomment %}
 {% with line=lv.row.line totals=lv.row.totals %}
-  <article class="card mb-3"
+  <article class="@container card mb-3"
            data-line="{{ line.line_no }}"
            data-testid="order-line">
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div>
         <span class="font-semibold">{{ line.line_no }}. {{ lv.row.name }}</span>
-        <span class="block text-sm text-soft">{{ lv.row.reference }}</span>
+        <span class="block font-mono text-sm text-soft">{{ lv.row.reference }}</span>
       </div>
       <span class="flex flex-wrap gap-1">
         {% if line.closed_short_at %}
@@ -24,7 +24,7 @@
         {% endif %}
       </span>
     </div>
-    <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+    <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm tabular-nums @sm:grid-cols-4">
       <div>
         <dt class="text-soft">{% translate "Ordered" %}</dt>
         <dd data-field="ordered">
@@ -86,6 +86,11 @@
         </div>
       {% endif %}
     </dl>
+    {% if order.status != "DRAFT" and totals.ordered %}
+      <div class="mt-3">
+        {% include "components/progress.html" with value=totals.received maximum=totals.ordered label=_("Received") unit=line.unit.code %}
+      </div>
+    {% endif %}
     {% if line.closed_short_at %}
       <p class="mt-2 text-sm text-soft" data-testid="line-closure">
         {{ line.closed_short_at|date:"SHORT_DATETIME_FORMAT" }} · {{ line.close_reason }}
@@ -115,68 +120,36 @@
                 {% endif %}
                 {% if alloc.qty == 0 %}· {% translate "trimmed to zero" %}{% endif %}
               </p>
-              {% if av.raise_form %}
-                <details>
-                  <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium text-brand">{% translate "Change the allocation" %}</summary>
-                  <div class="grid gap-2 sm:grid-cols-2">
-                    <form method="post"
-                          action="{% url 'purchasing:increase_allocation' allocation_id=alloc.pk %}"
-                          class="flex items-end gap-2">
-                      {% csrf_token %}
-                      <div class="field mb-0 flex-1">
-                        <label for="{{ av.raise_form.qty.id_for_label }}">{% translate "Raise to" %}</label>
-                        {{ av.raise_form.qty }}
-                      </div>
-                      {% include "components/button.html" with type="submit" label=_("Raise") %}
-                    </form>
-                    <form method="post"
-                          action="{% url 'purchasing:unallocate' allocation_id=alloc.pk %}"
-                          class="flex items-end gap-2">
-                      {% csrf_token %}
-                      <div class="field mb-0 flex-1">
-                        <label for="{{ av.lower_form.qty.id_for_label }}">{% translate "Lower to (0 removes it)" %}</label>
-                        {{ av.lower_form.qty }}
-                      </div>
-                      {% include "components/button.html" with type="submit" label=_("Lower") %}
-                    </form>
-                  </div>
-                </details>
+              {% if av.raise_it %}
+                <div class="mt-1 flex flex-wrap gap-2">
+                  {% include "components/dialog_button.html" with dialog=av.raise_it.id label=_("Raise") variant="secondary" size="sm" icon="arrow-up" testid="allocation-raise-open" %}
+                  {% include "components/dialog_button.html" with dialog=av.lower.id label=_("Lower") variant="secondary" size="sm" icon="arrow-down" testid="allocation-lower-open" %}
+                </div>
+                {% include "components/action_dialog.html" with d=av.raise_it %}
+                {% include "components/action_dialog.html" with d=av.lower %}
               {% endif %}
             </li>
           {% endwith %}
         {% endfor %}
       </ul>
     {% endif %}
-    {% if lv.form %}
-      <details class="mt-2">
-        <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium text-brand">{% translate "Edit the line" %}</summary>
-        <form method="post"
-              action="{% url 'purchasing:update_line' line_id=line.pk %}">
-          {% csrf_token %}
-          {% for field in lv.form %}{{ field.as_field_group }}{% endfor %}
-          {% include "components/button.html" with type="submit" label=_("Save the line") %}
-        </form>
-        <form method="post"
-              action="{% url 'purchasing:remove_line' line_id=line.pk %}"
-              class="mt-2">
-          {% csrf_token %}
-          {% include "components/button.html" with type="submit" label=_("Remove the line") variant="danger" %}
-        </form>
-      </details>
-    {% endif %}
-    {% if lv.close_form %}
-      <details class="mt-2">
-        <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium text-brand">{% translate "Close the line short" %}</summary>
-        <p class="mb-2 text-sm text-soft">
-          {% translate "Give up what has not arrived (agreed with the supplier). Its allocations keep only what was received." %}
-        </p>
-        <form method="post"
-              action="{% url 'purchasing:close_line' line_id=line.pk %}">
-          {% csrf_token %}
-          {{ lv.close_form.reason.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Close the line short") variant="danger" %}
-        </form>
-      </details>
+    {% if lv.edit or lv.close %}
+      <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        {% if lv.edit %}
+          {% include "components/dialog_button.html" with dialog=lv.edit.id label=_("Edit the line") variant="secondary" icon="pencil" testid="line-edit-open" %}
+          {% include "components/dialog_button.html" with dialog=lv.remove.id label=_("Remove the line") variant="ghost" icon="trash" testid="line-remove-open" %}
+        {% endif %}
+        {% if lv.close %}
+          {% include "components/dialog_button.html" with dialog=lv.close.id label=_("Close the line short") variant="secondary" icon="circle-check" testid="line-close-open" %}
+        {% endif %}
+      </div>
+      {% if lv.edit %}
+        {% include "components/action_dialog.html" with d=lv.edit %}
+        {% include "components/action_dialog.html" with d=lv.remove %}
+      {% endif %}
+      {% if lv.close %}
+        {% include "components/action_dialog.html" with d=lv.close %}
+      {% endif %}
     {% endif %}
   </article>
 {% endwith %}

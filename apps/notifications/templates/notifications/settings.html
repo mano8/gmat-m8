@@ -4,7 +4,11 @@
   {% translate "Notifications" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-4">{% translate "Notifications" %}</h1>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Notifications" %}</h1>
+    </div>
+  </header>
   <form method="post"
         class="card max-w-2xl"
         action="{% url 'notifications:save' %}"

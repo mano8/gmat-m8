@@ -367,35 +367,39 @@ class TestMaterials:
             "idempotency_key": key_of(page),
         }
         url = reverse("requests:add_free_line", args=[draft.pk])
+        # Sent from its dialog (M8b.4): saved, the page navigates (204 + HX-Redirect).
         added = client.post(url, data, **HTMX)
-        assert added.status_code == 200
-        assert client.post(url, data, **HTMX).status_code == 200  # a double tap: one line
+        assert added.status_code == 204
+        assert added["HX-Redirect"] == reverse("requests:detail", args=[draft.pk])
+        assert client.post(url, data, **HTMX).status_code == 204  # a double tap: one line
         line = draft.lines.get()
         assert (line.free_text, line.material_id, line.requested_qty) == (
             "Soporte especial",
             None,
             Decimal("4"),
         )
-        # The answer carries a fresh key for the next line, so adding another works.
-        fresh = key_of(added)
+        # The page carries a fresh key for the next line, so adding another works.
+        reloaded = client.get(added["HX-Redirect"])
+        fresh = key_of(reloaded)
         assert fresh != data["idempotency_key"]
-        second = client.post(
-            url, {**data, "free_text": "Tornillos", "idempotency_key": fresh}, **HTMX
-        )
+        client.post(url, {**data, "free_text": "Tornillos", "idempotency_key": fresh}, **HTMX)
         assert draft.lines.count() == 2
+        # A form that cannot be sent comes back in its dialog (422) with its errors.
         invalid = client.post(url, {**data, "free_text": "", "idempotency_key": "x"}, **HTMX)
-        assert 'data-testid="lines-error"' in invalid.content.decode()
-        assert "<details" in invalid.content.decode() and " open" in invalid.content.decode()
+        assert invalid.status_code == 422
+        assert 'data-testid="free-line-form"' in invalid.content.decode()
+        assert "data-error-summary" in invalid.content.decode()
         precision = client.post(
             url,
             {
                 **data,
                 "free_text": "Otro",
                 "requested_qty": "1.5",
-                "idempotency_key": key_of(second),
+                "idempotency_key": key_of(client.get(added["HX-Redirect"])),
             },
             **HTMX,
         )
+        assert precision.status_code == 422
         assert "at most 0 decimals" in precision.content.decode()
         assert draft.lines.count() == 2
 

@@ -4,8 +4,15 @@
   {% translate "Review request" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <h1 class="mb-1">{% translate "Review request" %}</h1>
-  <p class="mb-4 text-soft">{{ request_obj.project.code }} · {{ request_obj.project.name }}</p>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'requests:inbox' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Approval inbox") parent_url=crumb_url current=_("Review request") %}
+      <h1>{% translate "Review request" %}</h1>
+      <p class="page-head-sub">{{ request_obj.project.code }} · {{ request_obj.project.name }}</p>
+    </div>
+  </header>
+  {% include "components/request_steps.html" with current=3 %}
   <section class="card mb-4" aria-label="{% translate 'Lines' %}">
     <h2 class="card-title">{% translate "Lines" %}</h2>
     <ul class="divide-y divide-line">
@@ -25,6 +32,8 @@
         class="card">
     {% csrf_token %}
     {{ form }}
-    {% include "components/button.html" with label=_("Submit request") type="submit" variant="primary" block=True %}
+    <div class="action-bar" data-testid="submit-bar">
+      {% include "components/button.html" with label=_("Submit request") type="submit" icon="send" variant="primary" block=True %}
+    </div>
   </form>
 {% endblock content %}

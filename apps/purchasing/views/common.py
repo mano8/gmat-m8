@@ -1,22 +1,13 @@
 """Shared helpers of the purchasing screens: scope-then-capability lookups, flash, redirect."""
 
-from collections.abc import Callable
 from uuid import UUID
 
-from django.contrib import messages
-from django.core.exceptions import ValidationError
-from django.forms import Form
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect
+from django.http import HttpRequest
 from django.urls import reverse
-from django.utils.translation import gettext as _
 
 from apps.access.middleware import access_for
 from apps.access.mixins import require
-from apps.core.forms import error_text, form_error_text
-from apps.core.idempotency import IdempotencyError
-from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict, idempotency_failure
+from apps.core.responses import invalid, perform
 from apps.notifications.models import EmailOutbox
 from apps.purchasing import selectors
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
@@ -64,28 +55,7 @@ def _detail_url(
     return reverse("purchasing:detail", args=[po_id])
 
 
-def _perform(
-    request: HttpRequest,
-    call: Callable[[], object],
-    done: str,
-    to: str,
-    *,
-    failed_to: str = "",
-) -> HttpResponse:
-    """Run a service call: flash its outcome and go to ``to`` (``failed_to`` if it failed)."""
-    try:
-        call()
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-        return redirect(failed_to or to)
-    except IdempotencyError as exc:
-        return idempotency_failure(request, exc)
-    except RetryExhausted:
-        return conflict(request)
-    messages.success(request, done)
-    return redirect(to)
-
-
-def _invalid(request: HttpRequest, form: Form, to: str) -> HttpResponse:
-    messages.error(request, form_error_text(form) or _("Check the form."))
-    return redirect(to)
+# One implementation of the POST answers for every screen (``apps.core.responses``, M8b.3):
+# flashed and redirected, or the htmx dialog contract.
+_perform = perform
+_invalid = invalid

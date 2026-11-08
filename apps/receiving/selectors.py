@@ -30,18 +30,19 @@ The screens (M6.3) read the rest from here:
 
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import BooleanField, ExpressionWrapper, Q, QuerySet, Value
-from django.db.models.functions import Coalesce
+from django.db.models import BooleanField, ExpressionWrapper, F, Q, QuerySet, Value
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
 from apps.core.listing import seek_after
+from apps.core.stats import weekly, weekly_by
 from apps.handovers.models import Handover
 from apps.locations.models import Location
 from apps.material_requests import ledger as request_ledger
@@ -626,3 +627,31 @@ def receipt_rows(ctx: AccessContext, of: PurchaseOrder, location: Location) -> l
         if book.order_lines[line.pk].has_capacity
     )
     return [row for row in rows if row is not None]
+
+
+# --- the dashboard's counts (M8b.5) -------------------------------------------------------
+
+
+def posted_by_week(ctx: AccessContext, *, since: datetime) -> dict[date, int]:
+    """Receipts posted per week (a voided receipt counts for nothing), ``receipt.view``."""
+    rows = GoodsReceipt.objects.visible_to(ctx, VIEW).filter(status=GoodsReceipt.Status.POSTED)
+    return weekly(rows, "received_at", since)
+
+
+def on_time_by_week(ctx: AccessContext, *, since: datetime) -> dict[tuple[date, bool], int]:
+    """Lines of posted receipts per week, split by whether they arrived by their order's
+    expected date (the local day of the receipt; orders without a date are left out)."""
+    lines = (
+        GoodsReceiptLine.objects.visible_to(ctx, VIEW)
+        .filter(
+            receipt__status=GoodsReceipt.Status.POSTED,
+            receipt__po__expected_date__isnull=False,
+        )
+        .annotate(arrived=TruncDate("receipt__received_at"))
+        .annotate(
+            on_time=ExpressionWrapper(
+                Q(arrived__lte=F("receipt__po__expected_date")), output_field=BooleanField()
+            )
+        )
+    )
+    return weekly_by(lines, "receipt__received_at", since, "on_time")

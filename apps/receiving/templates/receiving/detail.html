@@ -4,45 +4,60 @@
   {{ receipt.number }} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
-      <h1 data-testid="receipt-number">{{ receipt.number }}</h1>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'receiving:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Receipts") parent_url=crumb_url current=receipt.number %}
+      <h1 class="doc-no" data-testid="receipt-number">{{ receipt.number }}</h1>
       <p class="mt-1 flex flex-wrap gap-2">{% include "receiving/status.html" with obj=receipt %}</p>
     </div>
-    {% can "po.view" receipt.po %}
-      {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
-      {% include "components/button.html" with href=order_url label=_("Purchase order") %}
-    {% endcan %}
-  </div>
-  <section class="card mb-4" aria-label="{% translate 'Receipt details' %}">
-    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+    <div class="page-head-actions">
+      {% can "po.view" receipt.po %}
+        {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
+        {% include "components/button.html" with href=order_url label=_("Purchase order") %}
+      {% endcan %}
+      {% if can_void %}
+        <button type="button"
+                class="btn btn-danger"
+                commandfor="void-dialog"
+                command="show-modal"
+                data-testid="void-open">
+          {% icon "ban" classes="size-5" %}
+          {% translate "Void the receipt" %}
+        </button>
+      {% endif %}
+    </div>
+  </header>
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Receipt details' %}">
+    <dl class="facts">
       <div>
-        <dt class="text-sm text-soft">{% translate "Order" %}</dt>
+        <dt>{% translate "Order" %}</dt>
         <dd data-field="order">
           {{ receipt.po.number }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Supplier" %}</dt>
+        <dt>{% translate "Supplier" %}</dt>
         <dd data-field="supplier">
           {{ receipt.po.supplier_snapshot.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Where" %}</dt>
+        <dt>{% translate "Where" %}</dt>
         <dd data-field="location">
           {{ receipt.location.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Received" %}</dt>
+        <dt>{% translate "Received" %}</dt>
         <dd>
           {{ receipt.received_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.received_by.full_name|default:receipt.received_by.email }}
         </dd>
       </div>
       {% if receipt.delivery_note_ref %}
         <div>
-          <dt class="text-sm text-soft">{% translate "Delivery note" %}</dt>
+          <dt>{% translate "Delivery note" %}</dt>
           <dd data-field="delivery-note">
             {{ receipt.delivery_note_ref }}
           </dd>
@@ -50,23 +65,23 @@
       {% endif %}
       {% if handover %}
         <div>
-          <dt class="text-sm text-soft">{% translate "Handed over on site" %}</dt>
+          <dt>{% translate "Handed over on site" %}</dt>
           <dd>
             <a href="{% url 'handovers:detail' handover_id=handover.pk %}">{{ handover.number }}</a>
           </dd>
         </div>
       {% endif %}
       {% if receipt.notes %}
-        <div class="sm:col-span-2">
-          <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
+        <div class="col-span-full">
+          <dt>{% translate "Notes" %}</dt>
           <dd class="whitespace-pre-line">
             {{ receipt.notes }}
           </dd>
         </div>
       {% endif %}
       {% if receipt.status == "VOIDED" %}
-        <div class="sm:col-span-2" data-testid="void-reason">
-          <dt class="text-sm text-soft">{% translate "Voided" %}</dt>
+        <div class="col-span-full" data-testid="void-reason">
+          <dt>{% translate "Voided" %}</dt>
           <dd>
             {{ receipt.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.voided_by.full_name|default:receipt.voided_by.email }}
             <span class="block whitespace-pre-line">{{ receipt.void_reason }}</span>
@@ -130,21 +145,31 @@
   </section>
   {% include "attachments/panel.html" with panel=attachments %}
   {% if can_void %}
-    <section class="card mb-4" aria-label="{% translate 'Void the receipt' %}">
-      <details>
-        <summary class="min-h-11 cursor-pointer py-2 font-medium text-danger">{% translate "Void the receipt" %}</summary>
-        <p class="mb-2 text-sm text-soft">
-          {% translate "A void takes the goods out of the receipts (and out of the handover made on site). Enter the receipt again if it was only wrong." %}
-        </p>
-        <form method="post"
-              action="{% url 'receiving:void' receipt_id=receipt.pk %}"
-              data-once
-              data-testid="void-form">
-          {% csrf_token %}
-          {{ void_form.reason.as_field_group }}
-          {% include "components/button.html" with type="submit" label=_("Void the receipt") variant="danger" %}
-        </form>
-      </details>
-    </section>
+    {# An inline dialog (M8b.3): the form is in the page, the button opens it with no script. #}
+    {% include "components/dialog.html" with id="void-dialog" title=_("Void the receipt?") description=_("A void takes the goods out of the receipts (and out of the handover made on site). Enter the receipt again if it was only wrong.") tone="danger" content="receiving/detail.html#void_form" testid="void-dialog" %}
   {% endif %}
 {% endblock content %}
+{% comment %}
+  The void dialog's form (M8b.3): drawn in the page's dialog, and sent back alone with its
+  errors (422) when the reason is missing or the service refuses the void.
+{% endcomment %}
+{% partialdef void_form %}
+  {% url 'receiving:void' receipt_id=receipt.pk as void_url %}
+  <form method="post"
+        action="{{ void_url }}"
+        hx-post="{{ void_url }}"
+        hx-disabled-elt="find [data-dialog-actions]"
+        class="dialog-content"
+        novalidate
+        data-testid="void-form">
+    <div class="dialog-body">
+      {% include "components/error_summary.html" with form=void_form %}
+      {% csrf_token %}
+      {{ void_form.reason.as_field_group }}
+    </div>
+    <fieldset class="dialog-foot" data-dialog-actions>
+      {% include "components/dialog_cancel.html" with dialog_id="void-dialog" label=_("Keep the receipt") focus=True %}
+      <button type="submit" class="btn btn-danger" data-testid="void-submit">{% translate "Void the receipt" %}</button>
+    </fieldset>
+  </form>
+{% endpartialdef %}

@@ -1,32 +1,83 @@
 {% extends "layouts/app.html" %}
-{% load i18n access %}
+{% load i18n static %}
 {% block head_title %}
   {% translate "Home" %} · gmat-m8
 {% endblock head_title %}
-{% block content %}
-  <h1 class="mb-1">{% translate "Home" %}</h1>
-  <p class="mb-4 text-soft">{% blocktranslate with email=request.user.email %}Signed in as {{ email }}.{% endblocktranslate %}</p>
-  {% can "request.create" %}
-    <div class="mb-4">
-      {% url 'requests:new' as new_url %}
-      {% include "components/button.html" with href=new_url label=_("New request") variant="primary" block=True %}
-    </div>
-  {% endcan %}
-  {% if panels %}
-    <div class="grid gap-3 md:grid-cols-2" data-testid="dashboard">
-      {% for panel in panels %}
-        <section class="card"
-                 data-testid="panel-{{ panel.key }}"
-                 aria-busy="true"
-                 hx-get="{% url 'dashboard:panel' key=panel.key %}"
-                 hx-trigger="load"
-                 hx-swap="outerHTML">
-          <h2 class="card-title">{{ panel.title }}</h2>
-          <p class="text-soft">{% translate "Loading…" %}</p>
-        </section>
-      {% endfor %}
-    </div>
-  {% else %}
-    {% include "components/empty_state.html" with title=_("Nothing here yet") text=_("Your requests and tasks will appear here once the first features are switched on.") %}
+{% block extra_head %}
+  {% if draws_charts %}
+    {# Chart.js and its driver load only on a page that draws a chart (ADR-0027, Q63). #}
+    <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" defer></script>
+    <script src="{% static 'js/charts.js' %}" defer></script>
   {% endif %}
+{% endblock extra_head %}
+{% block content %}
+  <div class="@container">
+    <header class="page-head" data-testid="page-header">
+      <div class="page-head-main">
+        <h1>{% blocktranslate %}Hello, {{ name }}{% endblocktranslate %}</h1>
+        <p class="page-head-sub">{% blocktranslate with email=request.user.email %}Signed in as {{ email }}.{% endblocktranslate %}</p>
+      </div>
+      <div class="page-head-actions">
+        {% if draws_charts %}
+          <nav class="seg"
+               aria-label="{% translate 'Period' %}"
+               data-testid="period">
+            {% for weeks in periods %}
+              <a href="?weeks={{ weeks }}"
+                 {% if weeks == period.weeks %}aria-current="true"{% endif %}>
+                {% blocktranslate %}{{ weeks }} weeks{% endblocktranslate %}
+              </a>
+            {% endfor %}
+          </nav>
+        {% endif %}
+      </div>
+    </header>
+    {% if has_tiles %}
+      <div class="kpi-row mb-4"
+           data-testid="key-figures"
+           aria-busy="true"
+           hx-get="{% url 'dashboard:tiles' %}?weeks={{ period.weeks }}"
+           hx-trigger="load"
+           hx-swap="outerHTML">
+        {% for slot in "1234" %}
+          <div class="card stat-tile">
+            <span class="skeleton h-4 w-2/3"></span>
+            <span class="skeleton h-8 w-1/3"></span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if charts %}
+      <div class="charts-grid mb-4" data-testid="charts">
+        {% for panel in charts %}
+          <section class="card chart-card{% if panel.wide %} chart-wide{% endif %}"
+                   data-testid="panel-{{ panel.key }}"
+                   aria-busy="true"
+                   hx-get="{% url 'dashboard:panel' key=panel.key %}?weeks={{ period.weeks }}"
+                   hx-trigger="load"
+                   hx-swap="outerHTML">
+            <h2 class="card-title">{{ panel.title }}</h2>
+            {% include "components/skeleton.html" %}
+          </section>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if panels %}
+      <div class="grid gap-3 md:grid-cols-2" data-testid="dashboard">
+        {% for panel in panels %}
+          <section class="card"
+                   data-testid="panel-{{ panel.key }}"
+                   aria-busy="true"
+                   hx-get="{% url 'dashboard:panel' key=panel.key %}"
+                   hx-trigger="load"
+                   hx-swap="outerHTML">
+            <h2 class="card-title">{{ panel.title }}</h2>
+            {% include "components/skeleton.html" %}
+          </section>
+        {% endfor %}
+      </div>
+    {% elif not charts %}
+      {% include "components/empty_state.html" with title=_("Nothing here yet") text=_("Your requests and tasks will appear here once the first features are switched on.") %}
+    {% endif %}
+  </div>
 {% endblock content %}

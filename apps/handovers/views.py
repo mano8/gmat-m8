@@ -16,6 +16,7 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -26,6 +27,7 @@ from apps.access.exceptions import NotInScope
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require, require_capability
 from apps.attachments import selectors as attachment_selectors
+from apps.core.dialogs import ActionDialog
 from apps.core.forms import add_service_errors
 from apps.core.idempotency import IdempotencyError, recorded_result
 from apps.core.listing import paginate, render_list
@@ -82,11 +84,13 @@ def handover_detail(request: HttpRequest, handover_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     found = selectors.handover(ctx, handover_id)
     can_void = selectors.can_void(ctx, found)
+    void = void_dialog(found, RequiredReasonForm(auto_id=VOID_FIELD_IDS)) if can_void else None
     context = {
         "handover": found,
         "lines": selectors.handover_lines(ctx, found),
         "can_void": can_void,
-        "void_form": RequiredReasonForm(auto_id="id_void_%s") if can_void else None,
+        "void_dialog": void,
+        "menu_items": [void.menu_item()] if void else [],
         "attachments": attachment_selectors.panel(ctx, found),
     }
     return render(request, "handovers/detail.html", context)
@@ -98,14 +102,41 @@ def handover_void(request: HttpRequest, handover_id: UUID) -> HttpResponse:
     found = selectors.handover(ctx, handover_id)
     require(request, VOID, found, read=VIEW)
     to = reverse("handovers:detail", args=[found.pk])
-    form = RequiredReasonForm(request.POST)
+    form = RequiredReasonForm(request.POST, auto_id=VOID_FIELD_IDS)
+    dialog = void_dialog(found, form).dialog()
     if not form.is_valid():
-        return invalid(request, form, to)
+        return invalid(request, form, to, dialog=dialog)
     return perform(
         request,
         lambda: services.void_handover(ctx.principal, found.pk, reason=form.cleaned_data["reason"]),
         _("Handover %(number)s voided.") % {"number": found.number},
         to,
+        dialog=dialog,
+    )
+
+
+# The void dialog's fields, apart from any other form of the page.
+VOID_FIELD_IDS = "id_void_%s"
+
+
+def void_dialog(found: Handover, form: Form) -> ActionDialog:
+    """Voiding a warehouse handover, as a dialog of its page (M8b.4)."""
+    return ActionDialog(
+        id="void-dialog",
+        title=_("Void the handover"),
+        icon="ban",
+        tone="danger",
+        action=reverse("handovers:void", args=[found.pk]),
+        submit=_("Void the handover"),
+        form=form,
+        consequences=(
+            _("The material counts as not handed over again."),
+            _("The requests it served reopen."),
+            _("Hand it over again if it was only wrong."),
+        ),
+        cancel=_("Keep the handover"),
+        testid="void-form",
+        submit_testid="void-submit",
     )
 
 

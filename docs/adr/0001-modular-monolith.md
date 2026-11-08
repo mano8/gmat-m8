@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-26
 - **Governs:** `pyproject.toml`, `static/vendor/`
+- **Amended by:** [ADR-0027](0027-ui-design-system.md) (what is vendored besides htmx)
 
 ## Context
 
@@ -13,7 +14,7 @@ About 30 users on one inexpensive VPS. The app needs forms, sessions, CSRF, migr
 One Django project and one PostgreSQL database, with an app per domain under `apps/`. Business logic lives in `services.py`, reads in `selectors.py`, and views stay thin.
 
 - **Backend:** Django 6.1; move to 6.2 LTS when it ships.
-- **Frontend:** server-rendered templates with htmx 2.x, vendored and pinned, history cache disabled. No SPA, no Alpine.js (it needs `unsafe-eval` under CSP).
+- **Frontend:** server-rendered templates with htmx 2.x, vendored and pinned, history cache disabled. No SPA, no Alpine.js (it needs `unsafe-eval` under CSP). `static/vendor/` also holds the chart library (Chart.js 4), the typeface (Inter) and an icon subset (Lucide), under the same rule: fetched by hand, checked against the registry, recorded with a sha256 test, never loaded from a CDN (ADR-0027).
 - **CSS:** Tailwind v4 standalone CLI in a Docker build stage. No Node.js in the repository or at runtime.
 - **Database:** PostgreSQL 18 with psycopg 3 and `scram-sha-256`. CHECK constraints, composite foreign keys, row locks, advisory locks, exported snapshots, `pg_trgm` + `unaccent` and triggers are used on purpose.
 - **Python:** 3.14 only; this is an application shipped as one image.

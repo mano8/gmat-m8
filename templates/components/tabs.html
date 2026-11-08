@@ -1,0 +1,15 @@
+{% load i18n %}
+{% comment %}
+  Tabs as links: each one is a page (or a section of a page) of its own, so they work without
+  script. Parameters: items (a list of dicts: label, href, current true/false, count optional),
+  label (the nav's accessible name).
+{% endcomment %}
+<nav class="tabs" aria-label="{{ label|default:_("Sections") }}">
+  {% for item in items %}
+    <a href="{{ item.href }}"
+       {% if item.current %}aria-current="page"{% endif %}>
+      {{ item.label }}
+      {% if item.count is not None %}<span class="chip tabular-nums">{{ item.count }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</nav>

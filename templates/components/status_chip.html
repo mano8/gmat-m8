@@ -1,2 +1,7 @@
-{% comment %}A status chip. Parameters: label, tone ("ok", "warn", "danger", "brand" or empty).{% endcomment %}
-<span class="chip{% if tone %} chip-{{ tone }}{% endif %}">{{ label }}</span>
+{% load ui_tags %}
+{% comment %}
+  A status chip: tone, icon and text, never colour alone. Parameters: label, tone ("ok", "warn",
+  "danger", "brand", "info" or empty for neutral); icon (optional, a Lucide name: each tone has
+  its own). In lists drawn by the hundred use {% chip label tone %} instead.
+{% endcomment %}
+{% chip label tone icon %}

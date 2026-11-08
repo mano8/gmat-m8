@@ -1,0 +1,73 @@
+{% load i18n ui_tags %}
+{% comment %}
+  A modal dialog (M8b.3): a native <dialog>, a bottom sheet on a phone, centred from 40rem.
+  Parameters:
+    id           unique on the page; the title is "<id>-title", the content "<id>-content"
+    title        the dialog's name (its accessible name)
+    description  optional, one line under the title (aria-describedby)
+    tone         "danger" for a destructive confirmation: the danger badge beside the title
+    size         "lg" for a wide form (42rem instead of 32rem from 40rem)
+    content      the template the dialog holds, usually a page's partial ("app/page.html#form");
+                 empty for a lazy dialog, whose opener loads it (a skeleton until then)
+    testid       optional data-testid
+  Inline: a <button type="button" commandfor="<id>" command="show-modal"> opens it, with no script.
+  Lazy: a link to the form's own GET page with hx-get (the same URL), hx-target="#<id>-content"
+  and data-dialog-open="<id>"; without JavaScript the link opens the page. The view answers its
+  fragment to htmx; it knows the fragment goes into this dialog when HX-Target is "<id>-content"
+  (then its Cancel closes the dialog; on the form's own page it is a link back).
+  The content's elements inherit hx-target (the content) and hx-swap: a form posting with htmx
+  is swapped back into the dialog when invalid (422) or refused (409); a success navigates.
+  The form ends with a <fieldset class="dialog-foot" data-dialog-actions> holding Cancel
+  (components/dialog_cancel.html) and the main action last; the fieldset is what htmx disables
+  while the form is sent (hx-disabled-elt="find [data-dialog-actions]").
+{% endcomment %}
+<dialog id="{{ id }}"
+        class="dialog{% if size == 'lg' %} dialog-lg{% endif %}"
+        aria-labelledby="{{ id }}-title"
+        {% if description %}aria-describedby="{{ id }}-desc"{% endif %}
+        data-dialog
+        {% if testid %}data-testid="{{ testid }}"{% endif %}>
+  <div class="dialog-grab" aria-hidden="true"></div>
+  <header class="dialog-head">
+    {% if tone == "danger" %}
+      <span class="dialog-badge">{% icon "triangle-alert" classes="size-5" %}</span>
+    {% endif %}
+    <div class="min-w-0 flex-1">
+      <h2 id="{{ id }}-title" class="dialog-title">{{ title }}</h2>
+      {% if description %}
+        <p id="{{ id }}-desc" class="dialog-desc">{{ description }}</p>
+      {% endif %}
+    </div>
+    <form method="dialog" class="dialog-close">
+      <button type="submit"
+              class="btn btn-ghost btn-icon"
+              aria-label="{% translate 'Close' %}"
+              data-testid="dialog-close">{% icon "x" classes="size-5" %}</button>
+    </form>
+  </header>
+  {# Shown by app.js when the server refused without a form to show (400, 403, 404, 5xx) or the network failed. #}
+  <div class="dialog-failure" role="alert" data-dialog-failure hidden>
+    {% icon "circle-alert" classes="size-5" %}
+    <p>
+      {% translate "This cannot be done from here any more." %}
+      <a href="">{% translate "Reload the page" %}</a>
+    </p>
+  </div>
+  <div id="{{ id }}-content"
+       class="dialog-content"
+       data-dialog-content
+       hx-target="this"
+       hx-swap="innerHTML">
+    {% if content %}
+      {% include content %}
+    {% else %}
+      <div class="dialog-body">{% include "components/skeleton.html" %}</div>
+    {% endif %}
+  </div>
+  {% if not content %}
+    {# A lazy dialog shows this again each time it opens, until its content arrives. #}
+    <template data-dialog-placeholder>
+      <div class="dialog-body">{% include "components/skeleton.html" %}</div>
+    </template>
+  {% endif %}
+</dialog>

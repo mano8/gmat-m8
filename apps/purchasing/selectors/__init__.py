@@ -67,6 +67,12 @@ from apps.purchasing.selectors.purchase_orders import (
     shows_prices,
     stale_drafts,
 )
+from apps.purchasing.selectors.trends import (
+    Overdue,
+    issued_by_week,
+    overdue_by_supplier,
+    overdue_summary,
+)
 from apps.purchasing.selectors.worklist import (
     ATTRIBUTION_ORDER,
     DRAFTS_SCOPE,
@@ -123,6 +129,7 @@ __all__ = [
     "LineRow",
     "MaterialGroup",
     "NoCandidates",
+    "Overdue",
     "Progress",
     "RequestTrim",
     "Status",
@@ -146,6 +153,7 @@ __all__ = [
     "final_qty",
     "history",
     "is_stale",
+    "issued_by_week",
     "line_total",
     "lines",
     "no_candidates",
@@ -155,6 +163,8 @@ __all__ = [
     "order_projects",
     "orders",
     "overdue",
+    "overdue_by_supplier",
+    "overdue_summary",
     "progress",
     "progress_of",
     "request_trims",

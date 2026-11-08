@@ -4,16 +4,20 @@
   {% translate "Receive goods" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'receiving:list' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Receipts") parent_url=crumb_url current=_("Receive goods") %}
       <h1>{% translate "Receive goods" %}</h1>
-      <p class="mt-1 text-soft">{% translate "Find the purchase order the goods belong to." %}</p>
+      <p class="page-head-sub">{% translate "Find the purchase order the goods belong to." %}</p>
     </div>
-    <div class="flex flex-wrap gap-3">
-      {% url 'receiving:projects' as projects_url %}
-      {% include "components/button.html" with href=projects_url label=_("Expected on site") %}
+    <div class="page-head-actions">
+      <div class="flex flex-wrap gap-3">
+        {% url 'receiving:projects' as projects_url %}
+        {% include "components/button.html" with href=projects_url label=_("Expected on site") %}
+      </div>
     </div>
-  </div>
+  </header>
   {% url 'receiving:orders' as orders_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_auto]" %}
   {% partialdef results inline %}

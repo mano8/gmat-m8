@@ -6,6 +6,7 @@ import re
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
+from tests.e2e import pages
 from tests.e2e.conftest import Browsing
 
 DASH = "\N{EN DASH}"  # the pager writes "Showing 1, 10 of 204" with it
@@ -42,7 +43,7 @@ def test_catalog_toolbar_and_back(browsing: Browsing, viewport: str) -> None:
     default_size = page.locator("#list-filter-per-page").input_value()
 
     # Filter: the URL carries it, the list shrinks, the document stays the same one.
-    page.fill("#id_q", "cable")
+    pages.filter_list(page, "#id_q", "cable")
     expect(page).to_have_url(re.compile(r"[?&]q=cable"))
     expect(page.locator("main [data-list-count]").first).not_to_have_text(total)
 
@@ -105,7 +106,7 @@ def test_audit_toolbar_and_back(browsing: Browsing, viewport: str) -> None:
     page.select_option("#list-filter-per-page", str(size))  # still leaves more than one page
     expect(page).to_have_url(re.compile(rf"per_page={size}"))
     expect(rows).to_have_count(size)
-    page.fill("#id_q", "material")
+    pages.filter_list(page, "#id_q", "material")
     expect(page).to_have_url(re.compile(r"q=material"))
     expect(showing(page, 1, size)).to_be_visible()
     page.get_by_role("link", name="Next").click()
