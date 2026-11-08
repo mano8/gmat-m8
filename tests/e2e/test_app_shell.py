@@ -157,10 +157,12 @@ def test_the_more_sheet_opens_under_the_bar_and_closes_with_escape(browsing: Bro
     expect(sheet).to_be_visible()
     expect(sheet.get_by_role("link", name="Suppliers")).to_be_visible()
     assert overflow(page) <= 0
-    # Every target is 44 px high at least.
+    # Every target is 44 px high at least (to the layout's sub-pixel rounding, once the sheet
+    # has finished opening: a box measured mid-animation is not its final size).
+    sheet.evaluate("s => Promise.all(s.getAnimations().map(a => a.finished.catch(() => null)))")
     for link in sheet.get_by_role("link").all():
         box = link.bounding_box()
-        assert box is not None and box["height"] >= 44
+        assert box is not None and box["height"] >= 43.5
     page.keyboard.press("Escape")
     expect(sheet).to_be_hidden()
     expect(opener).to_be_focused()

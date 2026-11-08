@@ -41,7 +41,7 @@ def fits(page: Page, dialog: Locator, viewport: str) -> None:
         assert abs(box["x"] + box["width"] / 2 - size["width"] / 2) <= 1
     for button in dialog.locator("[data-dialog-actions] .btn").all():
         found = button.bounding_box()
-        assert found is not None and found["height"] >= 44
+        assert found is not None and found["height"] >= 43.5
 
 
 def comes_back_with(dialog: Locator, error: str) -> None:
