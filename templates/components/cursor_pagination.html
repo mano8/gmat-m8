@@ -1,4 +1,4 @@
-{% load i18n list_tags %}
+{% load i18n list_tags ui_tags %}
 {% comment %}
   The pager of a list read from a cursor (apps.core.listing.cursor_page, Q40): First, Previous and
   Next, no page numbers and no total. Parameter: listing (the CursorPage). Links keep the filters
@@ -11,20 +11,26 @@
       {% cursor_url listing "" as first_url %}
       <a class="btn"
          href="{{ first_url }}"
-         aria-label="{% translate 'First page' %}">«</a>
+         aria-label="{% translate 'First page' %}">{% icon "chevrons-left" classes="size-4" %}</a>
       {% cursor_previous listing as previous_url %}
-      <a class="btn" href="{{ previous_url }}" rel="prev">{% translate "Previous" %}</a>
+      <a class="btn"
+         href="{{ previous_url }}"
+         rel="prev">{% icon "chevron-left" classes="size-4" %}{% translate "Previous" %}</a>
     {% else %}
       <span class="btn pointer-events-none opacity-50"
             aria-disabled="true"
-            aria-label="{% translate 'First page' %}">«</span>
-      <span class="btn pointer-events-none opacity-50" aria-disabled="true">{% translate "Previous" %}</span>
+            aria-label="{% translate 'First page' %}">{% icon "chevrons-left" classes="size-4" %}</span>
+      <span class="btn pointer-events-none opacity-50"
+            aria-disabled="true">{% icon "chevron-left" classes="size-4" %}{% translate "Previous" %}</span>
     {% endif %}
     {% if listing.next %}
       {% cursor_next listing as next_url %}
-      <a class="btn" href="{{ next_url }}" rel="next">{% translate "Next" %}</a>
+      <a class="btn"
+         href="{{ next_url }}"
+         rel="next">{% translate "Next" %}{% icon "chevron-right" classes="size-4" %}</a>
     {% else %}
-      <span class="btn pointer-events-none opacity-50" aria-disabled="true">{% translate "Next" %}</span>
+      <span class="btn pointer-events-none opacity-50"
+            aria-disabled="true">{% translate "Next" %}{% icon "chevron-right" classes="size-4" %}</span>
     {% endif %}
   </nav>
 {% endif %}

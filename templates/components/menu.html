@@ -1,0 +1,28 @@
+{% load ui_tags %}
+{% comment %}
+  A menu of links in a popover (no script): the button opens it, Escape or a tap outside closes
+  it. A bottom sheet on a phone, a dropdown under the button from 40rem.
+  Parameters: id (unique on the page), label (the button's accessible name), items (a list of
+  dicts: label, href, icon optional, tone "danger" optional), icon (the button's icon, default
+  "ellipsis"), variant ("secondary" default, or "ghost").
+{% endcomment %}
+<button type="button"
+        class="btn {% if variant == 'ghost' %}btn-ghost{% else %}btn-secondary{% endif %} btn-icon"
+        popovertarget="{{ id }}"
+        aria-label="{{ label }}">{% icon icon|default:"ellipsis" %}</button>
+<div id="{{ id }}" popover class="menu">
+  <ul class="m-0 list-none p-0">
+    {% for item in items %}
+      <li>
+        <a class="menu-item"
+           href="{{ item.href }}"
+           {% if item.tone %}data-tone="{{ item.tone }}"{% endif %}>
+          {% if item.icon %}
+            {% icon item.icon classes="size-5" %}
+          {% endif %}
+          {{ item.label }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+</div>

@@ -1,0 +1,19 @@
+{% load i18n l10n ui_tags %}
+{% comment %}
+  Progress with its figures, e.g. received of ordered. Parameters: value, maximum (numbers),
+  label (what is counted, the meter's accessible name), unit (optional, shown after the figures).
+  Complete is green, partial is the neutral series colour; the figures always say it in words.
+{% endcomment %}
+<div class="progress"
+     data-state="{% if value >= maximum %}done{% else %}partial{% endif %}">
+  {% if maximum %}
+    <meter min="0"
+           max="{{ maximum|unlocalize }}"
+           value="{{ value|unlocalize }}"
+           aria-label="{{ label }}"></meter>
+  {% endif %}
+  <p class="progress-text">
+    <span>{{ label }}</span>
+    <span>{{ value|quantity }} / {{ maximum|quantity }}{% if unit %} {{ unit }}{% endif %}</span>
+  </p>
+</div>

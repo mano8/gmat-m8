@@ -1,14 +1,26 @@
+{% load ui_tags %}
 {% comment %}
   Button or link styled as a button.
-  Parameters: label; variant ("primary", "danger", "link" or empty); type ("submit" or "button",
-  default "button"); href (renders a link instead); block (true for full width).
+  Parameters: label; variant ("primary", "secondary", "ghost", "danger", "link" or empty, which
+  is secondary); size ("sm" or empty for the 44 px default); icon (a Lucide name, drawn before the
+  label); icon_only (true hides the label visually, it stays the accessible name); type ("submit"
+  or "button", default "button"); href (renders a link instead); block (true for full width).
+  A submit button shows a spinner while htmx sends its form.
 {% endcomment %}
 {% if href %}
   <a href="{{ href }}"
-     class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if block %} btn-block{% endif %}">{{ label }}</a>
+     class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'secondary' %} btn-secondary{% elif variant == 'ghost' %} btn-ghost{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if size == 'sm' %} btn-sm{% endif %}{% if icon_only %} btn-icon{% endif %}{% if block %} btn-block{% endif %}">
+    {% if icon %}
+      {% icon icon classes="size-5" %}
+    {% endif %}
+    {% if icon_only %}<span class="sr-only">{{ label }}</span>{% else %}{{ label }}{% endif %}
+  </a>
 {% else %}
   <button type="{{ type|default:'button' }}"
-          class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if block %} btn-block{% endif %}">
-    {{ label }}
+          class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'secondary' %} btn-secondary{% elif variant == 'ghost' %} btn-ghost{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if size == 'sm' %} btn-sm{% endif %}{% if icon_only %} btn-icon{% endif %}{% if block %} btn-block{% endif %}">
+    {% if icon %}
+      {% icon icon classes="size-5" %}
+    {% endif %}
+    {% if icon_only %}<span class="sr-only">{{ label }}</span>{% else %}{{ label }}{% endif %}
   </button>
 {% endif %}

@@ -1410,7 +1410,7 @@ msgstr "Connecté en tant que %(email)s."
 msgid "New request"
 msgstr "Nouvelle demande"
 
-#: apps/dashboards/templates/dashboards/home.html:25
+#: templates/components/skeleton.html:7
 msgid "Loading…"
 msgstr "Chargement…"
 
@@ -6065,3 +6065,15 @@ msgid ""
 msgstr ""
 "Ces demandes figurent déjà sur des commandes de l'agence d'achat actuelle : "
 "%(requests)s"
+
+#: templates/components/page_header.html:15
+msgid "Breadcrumb"
+msgstr "Fil d'Ariane"
+
+#: templates/components/page_header.html:43
+msgid "More actions"
+msgstr "Plus d'actions"
+
+#: templates/components/tabs.html:7
+msgid "Sections"
+msgstr "Sections"

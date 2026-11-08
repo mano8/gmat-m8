@@ -1,0 +1,11 @@
+{% load i18n %}
+{% comment %}
+  A placeholder while htmx loads a panel; the swapped-in content replaces it. No parameters.
+  Announced as busy, with a visually hidden "Loading…".
+{% endcomment %}
+<div class="grid gap-2" role="status" aria-busy="true">
+  <span class="sr-only">{% translate "Loading…" %}</span>
+  <span class="skeleton h-4 w-3/4"></span>
+  <span class="skeleton h-4 w-full"></span>
+  <span class="skeleton h-4 w-1/2"></span>
+</div>

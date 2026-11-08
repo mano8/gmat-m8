@@ -1,7 +1,14 @@
-{% comment %}Nothing to show yet. Parameters: title, text, and optionally href + label for the call to action.{% endcomment %}
-<div class="rounded-xl border border-dashed border-line bg-raised px-4 py-10 text-center">
-  <p class="text-lg font-semibold">{{ title }}</p>
-  {% if text %}<p class="mt-1 text-soft">{{ text }}</p>{% endif %}
+{% load ui_tags %}
+{% comment %}
+  Nothing to show yet: an icon, one sentence and the next action. Parameters: title, text,
+  icon (a Lucide name, default "inbox"), and optionally href + label for the call to action.
+{% endcomment %}
+<div class="grid justify-items-center gap-1 rounded-xl border border-dashed border-line-strong bg-raised px-4 py-10 text-center">
+  <span class="mb-2 grid size-12 place-items-center rounded-full bg-sunken text-soft">
+    {% icon icon|default:"inbox" classes="size-6" %}
+  </span>
+  <p class="text-lg font-semibold text-balance">{{ title }}</p>
+  {% if text %}<p class="max-w-prose text-soft text-pretty">{{ text }}</p>{% endif %}
   {% if href %}
     <div class="mt-4">{% include "components/button.html" with href=href label=label variant="primary" %}</div>
   {% endif %}

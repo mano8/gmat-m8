@@ -1,0 +1,38 @@
+{% load ui_tags %}
+{% comment %}
+  A number and how it moved. Parameters: label, value, href (optional: the tile becomes a link),
+  icon (optional, before the label), change (the change in words, e.g. "3 more than last week"),
+  direction ("up", "down" or "flat": the arrow), good (true when the move is good news, false
+  when bad, empty when neither: it colours the change, the words still say it), spark (a list of
+  numbers, oldest first, for a sparkline). Counts stop at "99+" upstream (apps.core.listing.head).
+{% endcomment %}
+{% partialdef tile_body %}
+  <span class="stat-label">
+    {% if icon %}
+      {% icon icon classes="size-4" %}
+    {% endif %}
+    {{ label }}
+  </span>
+  <span class="stat-row">
+    <span class="stat-value">{{ value }}</span>
+    {% sparkline spark %}
+  </span>
+  {% if change %}
+    <span class="stat-change"
+          {% if good is True %}data-good="true"{% elif good is False %}data-good="false"{% endif %}>
+      {% if direction == "up" %}
+        {% icon "arrow-up-right" classes="size-3.5" %}
+      {% elif direction == "down" %}
+        {% icon "arrow-down-right" classes="size-3.5" %}
+      {% else %}
+        {% icon "minus" classes="size-3.5" %}
+      {% endif %}
+      {{ change }}
+    </span>
+  {% endif %}
+{% endpartialdef %}
+{% if href %}
+  <a href="{{ href }}" class="card stat-tile" data-testid="stat-tile">{% partial tile_body %}</a>
+{% else %}
+  <div class="card stat-tile" data-testid="stat-tile">{% partial tile_body %}</div>
+{% endif %}

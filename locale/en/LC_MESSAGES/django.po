@@ -1363,7 +1363,7 @@ msgstr ""
 msgid "New request"
 msgstr ""
 
-#: apps/dashboards/templates/dashboards/home.html:25
+#: templates/components/skeleton.html:7
 msgid "Loading…"
 msgstr ""
 
@@ -5842,4 +5842,16 @@ msgstr ""
 msgid ""
 "These requests are already on purchase orders of the current procurement "
 "branch: %(requests)s"
+msgstr ""
+
+#: templates/components/page_header.html:15
+msgid "Breadcrumb"
+msgstr ""
+
+#: templates/components/page_header.html:43
+msgid "More actions"
+msgstr ""
+
+#: templates/components/tabs.html:7
+msgid "Sections"
 msgstr ""

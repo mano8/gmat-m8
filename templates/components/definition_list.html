@@ -1,0 +1,17 @@
+{% comment %}
+  A document's facts as label and value pairs. Parameters: facts (a list of (label, value)
+  pairs; values are escaped), card (true draws it in a card). Two columns on a phone; wider
+  than 40rem (of the container, not the viewport) the facts sit in one row.
+{% endcomment %}
+<div class="@container{% if card %} card{% endif %}">
+  <dl class="facts" data-testid="facts">
+    {% for label, value in facts %}
+      <div>
+        <dt>{{ label }}</dt>
+        <dd>
+          {{ value }}
+        </dd>
+      </div>
+    {% endfor %}
+  </dl>
+</div>

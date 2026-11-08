@@ -1403,7 +1403,7 @@ msgstr "Sesión iniciada como %(email)s."
 msgid "New request"
 msgstr "Nueva solicitud"
 
-#: apps/dashboards/templates/dashboards/home.html:25
+#: templates/components/skeleton.html:7
 msgid "Loading…"
 msgstr "Cargando…"
 
@@ -6027,3 +6027,15 @@ msgid ""
 msgstr ""
 "Estas solicitudes ya están en pedidos de compra de la delegación de compras "
 "actual: %(requests)s"
+
+#: templates/components/page_header.html:15
+msgid "Breadcrumb"
+msgstr "Ruta de navegación"
+
+#: templates/components/page_header.html:43
+msgid "More actions"
+msgstr "Más acciones"
+
+#: templates/components/tabs.html:7
+msgid "Sections"
+msgstr "Secciones"
