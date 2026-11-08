@@ -20,6 +20,18 @@ def line_of(page: Page, reference: str) -> Locator:
     return page.locator("#draft-lines [data-line]", has_text=reference)
 
 
+def filter_list(page: Page, selector: str, value: str) -> None:
+    """Type into a filter of a list. On a phone the filters sit in a sheet (M8b.4): open it,
+    type, and ask for the results, which closes it; on a desktop the form is on the page."""
+    opener = page.get_by_test_id("filters-open").first
+    in_sheet = opener.is_visible()
+    if in_sheet:
+        opener.click()
+    page.fill(selector, value)
+    if in_sheet:
+        page.get_by_role("button", name="Show the results").first.click()
+
+
 # --- requester ----------------------------------------------------------------------------
 
 
@@ -154,7 +166,7 @@ def issue_order(page: Page, unit_price: str = "1.25") -> None:
 
 def open_receipt_form(page: Page, order_number: str) -> None:
     page.goto("/receiving/orders/")
-    page.fill("#id_q", order_number)
+    filter_list(page, "#id_q", order_number)
     row = page.get_by_test_id("receivable-order").filter(has_text=order_number)
     row.get_by_role("link", name="Receive").click()
     page.wait_for_url("**/receive/")

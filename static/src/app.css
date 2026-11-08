@@ -1663,9 +1663,13 @@
       border-left: 1px solid var(--line);
       padding: 0.75rem 1rem;
     }
-    & > div:first-child {
+    & > div:first-child,
+    & > .col-span-full {
       border-left: 0;
       padding-left: 0;
+    }
+    & > .col-span-full {
+      border-top: 1px solid var(--line);
     }
   }
 }

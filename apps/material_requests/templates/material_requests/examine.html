@@ -52,7 +52,7 @@
         </dd>
       </div>
       {% if request_obj.status == "SUBMITTED" or request_obj.status == "APPROVED" %}
-        <div data-testid="assignment">
+        <div class="col-span-full" data-testid="assignment">
           <dt>{% translate "Assigned reviewer" %}</dt>
           <dd data-testid="assignee">
             {% if assignee %}

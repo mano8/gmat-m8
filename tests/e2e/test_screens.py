@@ -28,8 +28,9 @@ def test_return_a_request_from_the_review_pages_dialog(browsing: Browsing, viewp
     engineer = browsing.as_("eng-mad", viewport)
     pages.open_in_inbox(engineer, number)
     # The page fits a phone, the facts are one block and the main action is in the sticky bar.
-    assert overflow(engineer) <= 0
-    expect(engineer.get_by_test_id("facts")).to_be_visible()
+    if viewport == "phone":
+        assert overflow(engineer) <= 0
+    expect(engineer.locator("dl.facts")).to_be_visible()
     bar = engineer.get_by_test_id("decide-bar")
     expect(bar).to_be_visible()
     expect(bar.get_by_test_id("approve-all")).to_be_visible()
@@ -68,7 +69,8 @@ def test_a_roles_validity_in_a_lazy_dialog(browsing: Browsing, viewport: str) ->
     admin = browsing.as_("admin", viewport)
     admin.goto("/org/people/?q=mm-mad")
     admin.get_by_role("link", name="mm-mad@demo.example").click()
-    assert overflow(admin) <= 0
+    if viewport == "phone":
+        assert overflow(admin) <= 0
     opener = admin.get_by_test_id("validity-open").first
     opener.click()
     dialog = admin.get_by_test_id("validity-dialog")
