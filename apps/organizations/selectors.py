@@ -5,12 +5,15 @@ user's scope for the capability it serves. Companies and memberships are install
 data that only ``org.manage`` (group administrators, S2) reads here.
 """
 
+from collections.abc import Collection
 from uuid import UUID
 
-from django.db.models import QuerySet
+from django.db.models import Count, IntegerField, OuterRef, QuerySet, Subquery
+from django.db.models.functions import Coalesce
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
+from apps.access.policy import valid_now
 from apps.access.roles import Capability
 from apps.accounts.models import User
 from apps.core.listing import OPEN_FIRST, by_revocation
@@ -55,3 +58,38 @@ def membership(ctx: AccessContext, membership_id: UUID) -> Membership:
     if found is None:
         raise NotInScope(Capability.ORG_MANAGE)
     return found
+
+
+def people_per_branch(ctx: AccessContext) -> list[tuple[Branch, int]]:
+    """For administrators: each active branch with the people holding a valid role on it
+    (an active account with a membership valid now, S8), by company and code. Group
+    administrators and partners hold company-wide roles, so no branch counts them."""
+    if not ctx.has(Capability.ORG_MANAGE):
+        return []
+    people = (
+        Membership.objects.filter(
+            valid_now(),
+            branch=OuterRef("pk"),
+            user__is_active=True,
+            user__offboarded_at__isnull=True,
+        )
+        .order_by()
+        .values("branch")
+        .annotate(total=Count("user", distinct=True))
+        .values("total")
+    )
+    rows = branches(ctx, Capability.ORG_MANAGE).annotate(
+        people=Coalesce(Subquery(people, output_field=IntegerField()), 0)
+    )
+    return [(branch, branch.people) for branch in rows]
+
+
+def branch_labels(ctx: AccessContext, ids: Collection[UUID]) -> dict[UUID, str]:
+    """ "<company code> · <branch name>" of these branches, for administrators (inactive ones
+    too: a chart of past weeks may count them)."""
+    if not ctx.has(Capability.ORG_MANAGE):
+        return {}
+    rows = Branch.objects.visible_to(ctx, Capability.ORG_MANAGE).filter(pk__in=list(ids))
+    return {
+        pk: f"{code} · {name}" for pk, code, name in rows.values_list("pk", "company__code", "name")
+    }
