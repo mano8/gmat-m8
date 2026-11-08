@@ -19,6 +19,8 @@ WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.y*ml"))
 SHA_PIN = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 REQUIRED_JOBS = {"lint", "typecheck", "security", "test", "trivy-image", "secret-scan"}
 COVERAGE_JOB = "coverage-upload"
+# What a broken shard rule points to: the decision and the working rules.
+SHARDS = "the test layout of ADR-0025 (docs/adr/0025-ci-test-shards.md, tests/CLAUDE.md)"
 COVERAGE_TOKENS = {"CODECOV_TOKEN", "CODACY_PROJECT_TOKEN"}
 
 
@@ -143,49 +145,50 @@ def _ignored(args: list[str]) -> set[str]:
 def test_the_parallel_shards_split_what_is_not_serial() -> None:
     """Issue #42: `unit` ignores exactly what `access-integration` runs, so each test runs once."""
     shards = _shards()
-    assert shards.keys() == {"access-integration", "unit", "serial", "volume"}
+    assert shards.keys() == {"access-integration", "unit", "serial", "volume"}, SHARDS
     selected, rest = shards["access-integration"], shards["unit"]
     for args in (selected, rest):
-        assert args[:4] == ["-n", "auto", "--dist", "load"]  # transactional tests last (ci.yaml)
-        assert " ".join(args[4:13]) == "-m not live and not e2e and not serial"
-    assert _paths(rest) == {"tests"}
-    assert _ignored(rest) == _paths(selected)
+        # `load`, never `worksteal`: each worker runs the transactional tests last.
+        assert args[:4] == ["-n", "auto", "--dist", "load"], SHARDS
+        assert " ".join(args[4:13]) == "-m not live and not e2e and not serial", SHARDS
+    assert _paths(rest) == {"tests"}, SHARDS
+    assert _ignored(rest) == _paths(selected), SHARDS
 
 
 def test_the_serial_tests_run_alone_in_two_shards() -> None:
     shards = _shards()
     serial, volume = shards["serial"], shards["volume"]
     for args in (serial, volume):
-        assert "-n" not in args
-        assert " ".join(args[:8]) == "-m serial and not live and not e2e"
-    assert _paths(serial) == {"tests"}
-    assert _ignored(serial) == _paths(volume) == {"tests/integration/test_list_volume.py"}
+        assert "-n" not in args, SHARDS
+        assert " ".join(args[:8]) == "-m serial and not live and not e2e", SHARDS
+    assert _paths(serial) == {"tests"}, SHARDS
+    assert _ignored(serial) == _paths(volume) == {"tests/integration/test_list_volume.py"}, SHARDS
 
 
 def test_each_shard_leaves_its_coverage_data_without_the_floor() -> None:
     steps = _ci_jobs()["test-shard"]["steps"]
     tests = next(step for step in steps if "uv run pytest" in step.get("run", ""))
-    assert tests["run"].endswith("--cov --cov-report= --cov-fail-under=0")
+    assert tests["run"].endswith("--cov --cov-report= --cov-fail-under=0"), SHARDS
     upload = next(step for step in steps if _uses(step, "actions/upload-artifact"))
-    assert upload["with"]["name"] == "coverage-data-${{ matrix.shard }}"
-    assert upload["with"]["if-no-files-found"] == "error"
+    assert upload["with"]["name"] == "coverage-data-${{ matrix.shard }}", SHARDS
+    assert upload["with"]["if-no-files-found"] == "error", SHARDS
 
 
 def test_the_required_test_job_fails_unless_every_shard_passed() -> None:
     """A skipped required check counts as passed: `test` runs whatever the shards did."""
     jobs = _ci_jobs()
     job = jobs["test"]
-    assert job["needs"] == "test-shard"
-    assert job["if"] == "${{ !cancelled() }}"
-    assert job["steps"][0]["env"]["SHARDS"] == "${{ needs.test-shard.result }}"
-    assert '[ "$SHARDS" != "success" ]' in job["steps"][0]["run"]
-    assert "services" not in job  # it runs no test, only reads the shards' data
+    assert job["needs"] == "test-shard", SHARDS
+    assert job["if"] == "${{ !cancelled() }}", SHARDS
+    assert job["steps"][0]["env"]["SHARDS"] == "${{ needs.test-shard.result }}", SHARDS
+    assert '[ "$SHARDS" != "success" ]' in job["steps"][0]["run"], SHARDS
+    assert "services" not in job, SHARDS  # it runs no test, only reads the shards' data
     count = next(
         step for step in job["steps"] if step.get("name") == "Four shards of coverage data"
     )
-    assert count["run"].endswith(f"= {len(_shards())}")
+    assert count["run"].endswith(f"= {len(_shards())}"), SHARDS
     gate = next(step for step in job["steps"] if "check_coverage_gates.py" in step.get("run", ""))
-    assert gate["run"].endswith("coverage.json")
+    assert gate["run"].endswith("coverage.json"), SHARDS
 
 
 def test_ci_defines_the_required_checks() -> None:
