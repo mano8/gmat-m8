@@ -16,16 +16,18 @@ The project makes no formal conformance claim. [WCAG 2.2](https://www.w3.org/TR/
 | Pagination | Labelled `<nav>`; unavailable links are marked `aria-disabled` | `templates/components/pagination.html` |
 | Icons | Decorative SVG icons are `aria-hidden="true"` | `templates/components/icon.html` |
 | Small screens | Mobile-first layouts, checked at 360 px with no horizontal scrolling; tables turn into cards on narrow screens; tap targets are at least 44 px high (`min-h-11`) | `templates/components/table.html`, `static/src/app.css` |
-| Colour | Light and dark themes follow the system setting (`color-scheme: light dark`) and come from shared colour tokens | `static/src/app.css` |
+| Colour | Light and dark themes follow the system setting and come from shared colour tokens (OKLCH, defined once); a gate fails the build under WCAG 2.2 AA for body and secondary text, links, chips, notices, buttons, control borders, the focus ring, status icons and chart colours in both themes, and when two chart colours look alike with protan, deutan or tritan vision | `static/src/app.css`, `scripts/check_contrast.py` |
+| Status | A status is a chip with an icon and a word, never colour alone; an error is an icon and a message, not only a red border | `templates/components/status_chip.html`, `templates/components/messages.html` |
+| Type | Inter, self-hosted, with tabular figures for quantities and the system stack as fallback; inputs use a 16 px font so phones do not zoom | `static/src/app.css`, `static/vendor/fonts/` |
+| Motion | Animations (spinner, skeleton, toasts, menus) only under `prefers-reduced-motion: no-preference`; nothing needs them to be understood | `static/src/app.css` |
 | No script required to read | Pages are rendered on the server; htmx only enhances them | `templates/` |
 
-Unit tests assert parts of this (landmark labels, `aria-current`, hidden icons) in `tests/unit/core/test_ui_shell.py`.
+Unit tests assert parts of this (landmark labels, `aria-current`, hidden icons) in `tests/unit/core/test_ui_shell.py` and `tests/unit/core/test_components.py`; the contrast gate (`uv run python scripts/check_contrast.py`, in CI's `lint` job) has its own tests.
 
 ## Known gaps
 
 - The Lighthouse accessibility score (target: 90 or more on the login and home pages) has not been measured yet.
 - No audit with a screen reader (NVDA, VoiceOver, TalkBack) has been done.
-- The contrast of the colour tokens in both themes has not been checked with a tool.
 
 These are tracked as work, not accepted as permanent.
 
@@ -39,7 +41,8 @@ A change to a template or to `static/src/app.css` should keep the list above tru
 
 - reachable and usable with the keyboard alone, in a logical order, with a visible focus;
 - a visible label for every control (a placeholder is not a label), and a text alternative for every meaningful icon or image;
-- state not conveyed by colour alone (status chips also carry text);
+- state not conveyed by colour alone (status chips also carry an icon and text);
+- colours only as tokens, and a changed token passes `scripts/check_contrast.py` (it prints every pair with `--table`);
 - usable at 360 px wide and with text zoomed to 200 %, in both themes;
 - new strings translated (`makemessages -l es -l en -l fr`, then `compilemessages`);
 - content swapped by htmx keeps focus in a sensible place and announces outcomes through the messages region.

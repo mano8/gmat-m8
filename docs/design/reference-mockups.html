@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gmat-m8 M8b Mockups</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a review sheet. Each view sits in a device frame with its notes beside it;
+   the frames use the app tokens proposed in M8b.1, so light/dark shows both themes. */
+:root {
+  --surface: #f3f5f8;
+  --raised: #ffffff;
+  --sunken: #e9edf2;
+  --line: #d8dee6;
+  --ink: #131b26;
+  --soft: #536071;
+  --brand: #0b5cad;
+  --brand-ink: #ffffff;
+  --brand-soft: #e1ecf9;
+  --ok: #17733a;
+  --ok-soft: #e0f3e6;
+  --warn: #8a5a00;
+  --warn-soft: #fbefd0;
+  --danger: #b42318;
+  --danger-soft: #fde7e4;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --backdrop: rgb(19 27 38 / 0.45);
+  --shadow-1: 0 1px 2px rgb(19 27 38 / 0.06), 0 1px 1px rgb(19 27 38 / 0.04);
+  --shadow-3: 0 18px 48px rgb(19 27 38 / 0.22), 0 4px 12px rgb(19 27 38 / 0.10);
+  --page: #e6eaf0;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #0e141b;
+    --raised: #172029;
+    --sunken: #111921;
+    --line: #2a3644;
+    --ink: #e8edf3;
+    --soft: #a3b0c0;
+    --brand: #6cb2f2;
+    --brand-ink: #08233f;
+    --brand-soft: #15304a;
+    --ok: #62d27e;
+    --ok-soft: #12301b;
+    --warn: #f2c261;
+    --warn-soft: #3a2b0a;
+    --danger: #ff8a80;
+    --danger-soft: #3b1714;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --backdrop: rgb(0 0 0 / 0.6);
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-3: 0 18px 48px rgb(0 0 0 / 0.55);
+    --page: #080c11;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #0e141b;
+  --raised: #172029;
+  --sunken: #111921;
+  --line: #2a3644;
+  --ink: #e8edf3;
+  --soft: #a3b0c0;
+  --brand: #6cb2f2;
+  --brand-ink: #08233f;
+  --brand-soft: #15304a;
+  --ok: #62d27e;
+  --ok-soft: #12301b;
+  --warn: #f2c261;
+  --warn-soft: #3a2b0a;
+  --danger: #ff8a80;
+  --danger-soft: #3b1714;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --backdrop: rgb(0 0 0 / 0.6);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-3: 0 18px 48px rgb(0 0 0 / 0.55);
+  --page: #080c11;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+svg.i { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.sm { width: 16px; height: 16px; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-size: 0.92em; letter-spacing: -0.01em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- review sheet chrome ---------- */
+.sheet { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+.intro { display: grid; gap: 20px; grid-template-columns: 1fr auto; align-items: end; }
+@media (max-width: 760px) { .intro { grid-template-columns: 1fr; } }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); margin: 0 0 6px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 10px; text-wrap: balance; }
+.intro p { margin: 0; max-width: 68ch; color: var(--soft); }
+.intro p a { color: var(--brand); }
+.themes { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--raised); }
+.themes button { font: inherit; font-size: 13px; font-weight: 500; border: 0; background: transparent; color: var(--soft); padding: 6px 14px; border-radius: 999px; cursor: pointer; min-height: 32px; }
+.themes button[aria-pressed="true"] { background: var(--ink); color: var(--raised); }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.toc a { font-size: 13px; color: var(--ink); text-decoration: none; border: 1px solid var(--line); background: var(--raised); padding: 5px 12px; border-radius: 999px; }
+.toc a:hover { border-color: var(--brand); color: var(--brand); }
+
+.view { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 16px; }
+.view-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; border-top: 1px solid var(--line); padding-top: 18px; }
+.view-head h2 { font-size: 20px; letter-spacing: -0.01em; margin: 0; }
+.view-head .who { color: var(--soft); font-size: 13px; }
+.tags { display: flex; gap: 6px; margin-left: auto; }
+.tag { font-family: var(--font-mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--raised); border: 1px solid var(--line); color: var(--soft); }
+.notes { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: 13.5px; color: var(--soft); max-width: 70ch; }
+.notes li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; }
+.notes li b { color: var(--ink); font-weight: 600; }
+.notes .k { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--raised); font-size: 11.5px; font-weight: 600; display: grid; place-items: center; margin-top: 1px; }
+.scroll-x { overflow-x: auto; padding-bottom: 6px; }
+
+/* desktop frame */
+.browser { min-width: 1080px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow-3); background: var(--surface); position: relative; }
+.browser-bar { height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--sunken); border-bottom: 1px solid var(--line); }
+.browser-bar .url { font-family: var(--font-mono); font-size: 12px; color: var(--soft); background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 2px 12px; flex: 0 1 460px; }
+
+/* phone frame */
+.phones { display: flex; flex-wrap: wrap; gap: 40px 36px; align-items: flex-start; }
+.phone-col { display: flex; flex-direction: column; gap: 14px; width: 360px; max-width: 100%; }
+.phone-col h3 { font-size: 15px; margin: 0; }
+.phone { width: 360px; height: 760px; border-radius: 30px; overflow: hidden; position: relative; background: var(--surface); box-shadow: 0 0 0 7px #1b222c, 0 0 0 8px #3b4552, var(--shadow-3); }
+.status-bar { height: 28px; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 12px; font-weight: 600; background: var(--raised); }
+
+/* ---------- the app (proposed M8b look) ---------- */
+.app-desk { display: grid; grid-template-columns: 228px 1fr; min-height: 900px; }
+.side { background: var(--raised); border-right: 1px solid var(--line); padding: 16px 12px; display: flex; flex-direction: column; gap: 14px; }
+.wordmark { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; padding: 4px 8px; }
+.wordmark .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font-size: 13px; }
+.nav-cats { display: flex; flex-direction: column; gap: 4px; }
+.nav-group > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--soft); cursor: pointer; user-select: none; }
+.nav-group > summary::-webkit-details-marker { display: none; }
+.nav-group > summary:hover { background: var(--sunken); color: var(--ink); }
+.nav-group > summary .chev { margin-left: auto; transition: transform 150ms; }
+.nav-group:not([open]) > summary .chev { transform: rotate(-90deg); }
+.nav-items { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 8px; }
+.app-desk[data-side="hidden"] { grid-template-columns: 1fr; }
+.app-desk[data-side="hidden"] .side { display: none; }
+.side-toggle { margin-left: -8px; color: var(--soft); }
+.nav-link { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: 8px; color: var(--ink); text-decoration: none; font-weight: 500; font-size: 13.5px; }
+.nav-link svg { color: var(--soft); }
+.nav-link[aria-current="page"] { background: var(--brand-soft); color: var(--brand); }
+.nav-link[aria-current="page"] svg { color: var(--brand); }
+.nav-link .count { margin-left: auto; font-size: 12px; color: var(--soft); }
+
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: var(--raised); border-bottom: 1px solid var(--line); }
+.crumbs { display: flex; align-items: center; gap: 6px; color: var(--soft); font-size: 13px; }
+.crumbs a { color: var(--soft); text-decoration: none; }
+.crumbs b { color: var(--ink); font-weight: 500; }
+.spacer { flex: 1; }
+.user { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 6px 4px 4px; border-radius: 999px; border: 1px solid var(--line); }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-size: 11.5px; font-weight: 700; }
+.content { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 9px; font: inherit; font-weight: 600; font-size: 13.5px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.btn-primary { background: var(--brand); color: var(--brand-ink); box-shadow: var(--shadow-1); }
+.btn-secondary { background: var(--raised); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow-1); }
+.btn-ghost { background: transparent; color: var(--soft); }
+.btn-danger { background: var(--danger); color: var(--raised); }
+.btn-block { width: 100%; min-height: 48px; font-size: 15px; }
+.btn.icon-only { padding: 0; width: 40px; }
+.btn.focused { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
+.page-head h1, .page-head .title { font-size: 24px; margin: 0; letter-spacing: -0.02em; line-height: 1.2; }
+.page-head .sub { color: var(--soft); margin: 2px 0 0; font-size: 13.5px; }
+.page-head .actions { margin-left: auto; display: flex; gap: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--raised); }
+.seg span { padding: 7px 12px; font-size: 13px; color: var(--soft); border-right: 1px solid var(--line); }
+.seg span:last-child { border-right: 0; }
+.seg span.on { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+
+.card { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
+.card-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 0; }
+.card-head h3 { margin: 0; font-size: 14.5px; font-weight: 600; }
+.card-head .hint { color: var(--soft); font-size: 12.5px; }
+.card-head .more { margin-left: auto; font-size: 13px; color: var(--brand); text-decoration: none; font-weight: 500; }
+.card-body { padding: 12px 16px 16px; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.kpi { padding: 14px 16px; display: grid; gap: 6px; text-decoration: none; color: inherit; }
+.kpi .label { color: var(--soft); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.kpi .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.kpi .value { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.kpi .delta { font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; color: var(--soft); }
+.kpi .delta.up-bad, .kpi .delta.down-bad { color: var(--danger); }
+.kpi .delta.down-good, .kpi .delta.up-good { color: var(--ok); }
+.kpi svg.spark { width: 84px; height: 28px; overflow: visible; }
+.kpi svg.spark polyline { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.kpi svg.spark .area { fill: var(--series-1); opacity: 0.12; stroke: none; }
+.kpi svg.spark circle { fill: var(--series-1); stroke: var(--raised); stroke-width: 2; }
+
+.charts { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+.chart-box { position: relative; height: 210px; }
+.chart-box.tall { height: 230px; }
+.data-toggle { margin-top: 8px; font-size: 12.5px; color: var(--soft); }
+.data-toggle summary { cursor: pointer; width: fit-content; }
+.data-toggle table { margin-top: 8px; border-collapse: collapse; font-size: 12px; }
+.data-toggle td, .data-toggle th { padding: 3px 10px 3px 0; text-align: left; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px 2px 6px; border-radius: 999px; white-space: nowrap; line-height: 18px; }
+.chip svg { width: 14px; height: 14px; }
+.chip.info { background: var(--brand-soft); color: var(--brand); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.danger { background: var(--danger-soft); color: var(--danger); }
+.chip.neutral { background: var(--sunken); color: var(--soft); }
+
+.rows { display: flex; flex-direction: column; }
+.row-item { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 4px 14px; padding: 10px 0; border-top: 1px solid var(--line); }
+.row-item:first-child { border-top: 0; }
+.row-item .t { font-weight: 500; }
+.row-item .s { color: var(--soft); font-size: 12.5px; }
+.age { font-size: 12.5px; color: var(--soft); font-variant-numeric: tabular-nums; }
+
+meter { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border: 0; border-radius: 999px; background: var(--sunken); display: block; }
+meter::-webkit-meter-bar { background: var(--sunken); border: 0; border-radius: 999px; height: 8px; }
+meter::-webkit-meter-optimum-value, meter::-webkit-meter-suboptimum-value { background: var(--ok); border-radius: 999px; }
+meter::-moz-meter-bar { background: var(--ok); border-radius: 999px; }
+meter.partial::-webkit-meter-optimum-value { background: var(--series-1); }
+meter.partial::-moz-meter-bar { background: var(--series-1); }
+
+.facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin: 0; }
+.facts div { padding: 12px 16px; border-left: 1px solid var(--line); }
+.facts div:first-child { border-left: 0; }
+.facts dt { font-size: 12px; color: var(--soft); font-weight: 500; }
+.facts dd { margin: 2px 0 0; font-weight: 500; }
+
+table.lines { width: 100%; border-collapse: collapse; }
+table.lines th { font-size: 12px; text-align: left; color: var(--soft); font-weight: 600; padding: 10px 16px; background: var(--sunken); border-bottom: 1px solid var(--line); }
+table.lines td { padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.lines tr:last-child td { border-bottom: 0; }
+table.lines .r { text-align: right; font-variant-numeric: tabular-nums; }
+.recv { display: grid; gap: 5px; min-width: 150px; font-size: 12.5px; }
+
+/* dialog (desktop, centred) */
+.backdrop { position: absolute; inset: 36px 0 0 0; background: var(--backdrop); backdrop-filter: blur(2px); display: grid; place-items: center; }
+.dialog { width: 500px; background: var(--raised); border-radius: 16px; box-shadow: var(--shadow-3); border: 1px solid var(--line); overflow: hidden; }
+.dialog-head { display: flex; align-items: flex-start; gap: 14px; padding: 20px 20px 0; }
+.dialog-head .badge { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--danger-soft); color: var(--danger); flex: none; }
+.dialog-head h4 { margin: 0; font-size: 17px; letter-spacing: -0.01em; line-height: 1.3; }
+.dialog-head p { margin: 4px 0 0; color: var(--soft); font-size: 13.5px; }
+.dialog-head .x { margin-left: auto; color: var(--soft); }
+.dialog-body { padding: 16px 20px 4px 74px; display: grid; gap: 14px; }
+.consequences { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 13.5px; }
+.consequences li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; }
+.consequences svg { color: var(--soft); margin-top: 2px; }
+.dialog-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; margin-top: 12px; background: var(--sunken); border-top: 1px solid var(--line); }
+
+.field { display: grid; gap: 6px; }
+.field label { font-weight: 600; font-size: 13.5px; }
+.field .help { color: var(--soft); font-size: 12.5px; }
+.input { display: flex; align-items: center; min-height: 46px; border: 1px solid var(--line); border-radius: 9px; background: var(--raised); padding: 0 12px; font-size: 16px; gap: 8px; }
+.input .unit { margin-left: auto; color: var(--soft); font-size: 14px; }
+.input.invalid { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+.input.area { min-height: 72px; align-items: flex-start; padding-top: 10px; font-size: 15px; }
+.err { display: flex; align-items: center; gap: 6px; color: var(--danger); font-size: 13px; font-weight: 500; }
+
+/* phone app */
+.p-top { height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--raised); border-bottom: 1px solid var(--line); }
+.p-top .t { font-weight: 600; font-size: 15px; }
+.p-content { padding: 16px; display: flex; flex-direction: column; gap: 16px; height: calc(760px - 28px - 52px - 64px); overflow: hidden; }
+.p-content > * { flex-shrink: 0; }
+.p-nav { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: var(--raised); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr); padding: 4px 6px 8px; }
+.p-nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; font-weight: 500; color: var(--soft); text-decoration: none; border-radius: 10px; }
+.p-nav a[aria-current="page"] { color: var(--brand); }
+.p-nav a[aria-current="page"] svg { background: var(--brand-soft); border-radius: 999px; width: 44px; height: 26px; padding: 3px 12px; }
+.p-greet h2 { font-size: 21px; margin: 0; letter-spacing: -0.02em; }
+.p-greet p { margin: 2px 0 0; color: var(--soft); font-size: 13px; }
+.snap { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; }
+.snap .kpi { flex: 0 0 132px; scroll-snap-align: start; padding: 12px 14px; }
+.snap .kpi .value { font-size: 26px; }
+.sec-title { display: flex; align-items: center; justify-content: space-between; }
+.sec-title h3 { margin: 0; font-size: 15px; }
+.sec-title a { font-size: 13px; color: var(--brand); text-decoration: none; font-weight: 500; }
+.req { padding: 12px 14px; display: grid; gap: 8px; }
+.req .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.req .project { font-weight: 600; }
+.req .meta { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--soft); }
+
+.p-dim { position: absolute; inset: 0; background: var(--backdrop); }
+.p-sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--raised); border-radius: 20px 20px 0 0; box-shadow: var(--shadow-3); display: flex; flex-direction: column; }
+.grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 8px auto 2px; }
+.p-sheet .sh-head { display: flex; align-items: center; gap: 10px; padding: 8px 16px 0; }
+.p-sheet .sh-head h4 { margin: 0; font-size: 17px; }
+.p-sheet .sh-head .x { margin-left: auto; width: 44px; height: 44px; display: grid; place-items: center; color: var(--soft); }
+.p-sheet .sh-body { padding: 4px 16px 12px; display: grid; gap: 14px; }
+.p-sheet .sh-foot { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; padding: 12px 16px 20px; border-top: 1px solid var(--line); }
+.alert-box { display: grid; grid-template-columns: 20px 1fr; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 13px; font-weight: 500; }
+
+.line-card { padding: 12px 14px; display: grid; gap: 8px; }
+.line-card .name { font-weight: 600; line-height: 1.35; }
+.line-card .ref { color: var(--soft); font-size: 12px; }
+.qty-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.qty-grid div { background: var(--sunken); border-radius: 8px; padding: 6px 8px; }
+.qty-grid dt { font-size: 11px; color: var(--soft); }
+.qty-grid dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+.facts-p { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 0; font-size: 13px; }
+.facts-p dt { color: var(--soft); font-size: 12px; }
+.facts-p dd { margin: 0; font-weight: 500; }
+.sticky-act { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 16px 18px; background: var(--raised); border-top: 1px solid var(--line); display: grid; gap: 6px; }
+.sticky-act .sum { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--soft); }
+.recv-line { padding: 12px 14px; display: grid; gap: 10px; }
+.recv-line .head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.recv-line .out { font-size: 12.5px; color: var(--soft); white-space: nowrap; }
+.split { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--soft); }
+.issue { font-size: 13px; font-weight: 500; color: var(--brand); display: inline-flex; align-items: center; gap: 4px; }
+.where { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--brand-soft); color: var(--brand); border-radius: 10px; font-size: 13px; font-weight: 500; }
+.step-tabs { display: flex; gap: 6px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .toc a, .themes button { transition: background-color 120ms, color 120ms, border-color 120ms; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h4"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2 2h3l2.6 12.4a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.6L22 6H6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
+    <symbol id="i-build" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+  </defs>
+</svg>
+
+<div class="sheet">
+
+  <header class="intro">
+    <div>
+      <p class="eyebrow">Issue #50 · phase M8b · direction for review</p>
+      <h1>How gmat-m8 could look after M8b</h1>
+      <p>Five screens drawn with the tokens M8b.1 proposes: the current brand blue and status colours, refined, with Inter and tabular figures for quantities. Phone screens are 360&nbsp;px wide, the size every step must design for first. The data comes from <span class="mono">seed_demo</span>; the interface is shown in English, while the app defaults to Spanish. The charts are drawn by Chart.js&nbsp;4, the library Q63 settles on, and each has its data table. Switch the theme to see both palettes.</p>
+      <nav class="toc" aria-label="Views">
+        <a href="#v-dash">Dashboard · desktop</a>
+        <a href="#v-phones">Phone: home, review sheet, receive</a>
+        <a href="#v-order">Order page with a confirmation</a>
+      </nav>
+    </div>
+    <div class="themes" role="group" aria-label="Theme of the mockups">
+      <button type="button" id="th-system" data-th="system" aria-pressed="true">System</button>
+      <button type="button" id="th-light" data-th="light" aria-pressed="false">Light</button>
+      <button type="button" id="th-dark" data-th="dark" aria-pressed="false">Dark</button>
+    </div>
+  </header>
+
+  <!-- ===================== VIEW 1: desktop dashboard ===================== -->
+  <section class="view" id="v-dash">
+    <div class="view-head">
+      <h2>Home dashboard</h2>
+      <span class="who">Elena Navarro, engineer at Alfa Madrid · 1280&nbsp;px</span>
+      <span class="tags"><span class="tag">M8b.2</span><span class="tag">M8b.5</span></span>
+    </div>
+    <div class="scroll-x">
+      <div class="browser">
+        <div class="browser-bar"><span class="url">gmat.example.com/</span></div>
+        <div class="app-desk">
+          <aside class="side" id="side-dash" aria-label="Main navigation">
+            <div class="wordmark"><span class="mark">g</span>gmat-m8</div>
+            <nav class="nav-cats">
+              <details class="nav-group" open>
+                <summary>Work<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" aria-current="page" href="#v-dash"><svg class="i"><use href="#i-home"/></svg>Home</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-clip"/></svg>Requests</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-inbox"/></svg>Inbox</a>
+                </div>
+              </details>
+              <details class="nav-group" open>
+                <summary>Purchasing<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-cart"/></svg>To purchase</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-file"/></svg>Orders</a>
+                </div>
+              </details>
+              <details class="nav-group">
+                <summary>Site &amp; warehouse<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-box"/></svg>Receiving</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-cal"/></svg>Expected deliveries</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-swap"/></svg>Handovers</a>
+                </div>
+              </details>
+              <details class="nav-group">
+                <summary>Organization<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-folder"/></svg>Projects</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-book"/></svg>Catalog</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-build"/></svg>Suppliers</a>
+                </div>
+              </details>
+              <details class="nav-group">
+                <summary>Insights<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-shield"/></svg>Audit</a>
+                  <a class="nav-link" href="#v-dash"><svg class="i"><use href="#i-down"/></svg>Exports</a>
+                </div>
+              </details>
+            </nav>
+          </aside>
+          <div class="main">
+            <div class="topbar">
+              <button type="button" class="btn btn-ghost icon-only side-toggle" data-side-toggle aria-controls="side-dash" aria-expanded="true" aria-label="Hide the menu"><svg class="i"><use href="#i-panel"/></svg></button>
+              <div class="crumbs"><b>Home</b></div>
+              <span class="spacer"></span>
+              <a class="btn btn-primary" href="#v-dash"><svg class="i sm"><use href="#i-plus"/></svg>New request</a>
+              <span class="user"><span class="avatar">EN</span>Elena Navarro<svg class="i sm"><use href="#i-chev-down"/></svg></span>
+            </div>
+            <div class="content">
+              <div class="page-head">
+                <div>
+                  <div class="title">Good morning, Elena</div>
+                  <p class="sub">Alfa Madrid · Engineer · 14 requests wait for a decision, 1 for more than a week</p>
+                </div>
+                <div class="actions"><div class="seg" aria-label="Period"><span>4 weeks</span><span class="on">12 weeks</span><span>26 weeks</span></div></div>
+              </div>
+
+              <div class="kpis">
+                <a class="card kpi" href="#v-dash">
+                  <span class="label"><svg class="i sm"><use href="#i-inbox"/></svg>Waiting for review</span>
+                  <span class="row"><span class="value">14</span><svg class="spark" data-spark="9,11,10,12,11,13,14" viewBox="0 0 84 28" aria-hidden="true"></svg></span>
+                  <span class="delta up-bad"><svg class="i sm"><use href="#i-up"/></svg>3 more than last week</span>
+                </a>
+                <a class="card kpi" href="#v-dash">
+                  <span class="label"><svg class="i sm"><use href="#i-check"/></svg>Approved this week</span>
+                  <span class="row"><span class="value">27</span><svg class="spark" data-spark="21,24,20,27,23,26,22,27" viewBox="0 0 84 28" aria-hidden="true"></svg></span>
+                  <span class="delta up-good"><svg class="i sm"><use href="#i-up"/></svg>5 more than last week</span>
+                </a>
+                <a class="card kpi" href="#v-dash">
+                  <span class="label"><svg class="i sm"><use href="#i-alert"/></svg>Overdue orders</span>
+                  <span class="row"><span class="value">4</span><span class="chip warn"><svg class="i"><use href="#i-clock"/></svg>oldest 6 days</span></span>
+                  <span class="delta down-good"><svg class="i sm"><use href="#i-chev-down"/></svg>2 fewer than last week</span>
+                </a>
+                <a class="card kpi" href="#v-dash">
+                  <span class="label"><svg class="i sm"><use href="#i-swap"/></svg>Awaiting handover</span>
+                  <span class="row"><span class="value">9</span><svg class="spark" data-spark="6,7,9,8,10,8,9" viewBox="0 0 84 28" aria-hidden="true"></svg></span>
+                  <span class="delta">requests with goods in the warehouse</span>
+                </a>
+              </div>
+
+              <div class="charts">
+                <section class="card">
+                  <div class="card-head"><h3>Decisions per week</h3><span class="hint">lines approved and rejected</span><a class="more" href="#v-dash">Inbox</a></div>
+                  <div class="card-body">
+                    <div class="chart-box"><canvas id="c-decisions" role="img" aria-label="Decisions per week: about 23 approved and 2 rejected each week; 27 approved last week, the highest in 12 weeks."></canvas></div>
+                    <details class="data-toggle"><summary>Show the data</summary><table id="t-decisions"></table></details>
+                  </div>
+                </section>
+                <section class="card">
+                  <div class="card-head"><h3>Inbox by age</h3><span class="hint">14 requests</span></div>
+                  <div class="card-body">
+                    <div class="chart-box"><canvas id="c-age" role="img" aria-label="Inbox by age: 6 requests under 1 day, 4 from 1 to 3 days, 3 from 3 to 7 days, 1 over 7 days."></canvas></div>
+                    <details class="data-toggle"><summary>Show the data</summary><table id="t-age"></table></details>
+                  </div>
+                </section>
+                <section class="card">
+                  <div class="card-head"><h3>Orders issued and receipts posted</h3><span class="hint">per week</span><a class="more" href="#v-dash">Orders</a></div>
+                  <div class="card-body">
+                    <div class="chart-box"><canvas id="c-flow" role="img" aria-label="Orders issued and receipts posted per week: receipts caught up with orders over 12 weeks, 13 orders and 15 receipts last week."></canvas></div>
+                    <details class="data-toggle"><summary>Show the data</summary><table id="t-flow"></table></details>
+                  </div>
+                </section>
+                <section class="card">
+                  <div class="card-head"><h3>Awaiting handover</h3><span class="hint">requests by project</span></div>
+                  <div class="card-body">
+                    <div class="chart-box"><canvas id="c-handover" role="img" aria-label="Requests awaiting handover by project: Hospital X 4, Colegio San Isidro 3, Oficinas Castellana 2."></canvas></div>
+                    <details class="data-toggle"><summary>Show the data</summary><table id="t-handover"></table></details>
+                  </div>
+                </section>
+              </div>
+
+              <section class="card">
+                <div class="card-head"><h3>Waiting for you</h3><span class="hint">assigned to you, oldest first</span><a class="more" href="#v-dash">All 5 in the inbox</a></div>
+                <div class="card-body rows">
+                  <div class="row-item"><span class="chip danger"><svg class="i"><use href="#i-alert"/></svg>Urgent</span><span><span class="t mono">SOL-A-MAD-2026-00138</span> <span class="s">· Hospital X · Mateo Soler · 7 lines</span></span><span class="age">8 days</span><svg class="i sm" style="color:var(--soft)"><use href="#i-right"/></svg></div>
+                  <div class="row-item"><span class="chip warn"><svg class="i"><use href="#i-up"/></svg>High</span><span><span class="t mono">SOL-A-MAD-2026-00142</span> <span class="s">· Colegio San Isidro · Sara Gil · 4 lines</span></span><span class="age">2 days</span><svg class="i sm" style="color:var(--soft)"><use href="#i-right"/></svg></div>
+                  <div class="row-item"><span class="chip neutral">Normal</span><span><span class="t mono">SOL-A-MAD-2026-00147</span> <span class="s">· Hospital X · Tomás Herrero · 12 lines</span></span><span class="age">5 hours</span><svg class="i sm" style="color:var(--soft)"><use href="#i-right"/></svg></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ol class="notes">
+      <li><span class="k">1</span><span><b>The menu is a set of category dropdowns.</b> Click a category to fold or unfold it; the one holding the current page is always open. A category appears only when the person holds one of its entries. No counts in the menu, so a page costs no extra query.</span></li>
+      <li><span class="k">2</span><span><b>The menu can be hidden</b> with the button at the top left; the content then takes the full width. Try it here. The app remembers both choices in a small cookie, so the next page opens the same way.</span></li>
+      <li><span class="k">3</span><span><b>Four tiles, then the charts.</b> Each tile links to the list it counts, already filtered. The change against last week says whether it is good or bad in words and with an arrow, so colour never carries it alone.</span></li>
+      <li><span class="k">4</span><span><b>Counts and durations only.</b> No chart shows a price. Hover a chart for exact values; "Show the data" opens the same numbers as a table, which is also what a browser without JavaScript gets.</span></li>
+      <li><span class="k">5</span><span><b>Period in the URL</b> (<span class="mono">?weeks=4|12|26</span>), like page size and sort on the lists.</span></li>
+    </ol>
+  </section>
+
+  <!-- ===================== VIEW 2-4: phones ===================== -->
+  <section class="view" id="v-phones">
+    <div class="view-head">
+      <h2>On a phone</h2>
+      <span class="who">360&nbsp;px, designed first</span>
+      <span class="tags"><span class="tag">M8b.2</span><span class="tag">M8b.3</span><span class="tag">M8b.4</span></span>
+    </div>
+    <div class="phones">
+
+      <!-- phone A: technician home -->
+      <div class="phone-col">
+        <h3>Home of a technician</h3>
+        <div class="phone">
+          <div class="status-bar"><span>9:41</span><span>5G</span></div>
+          <div class="p-top"><span class="wordmark" style="padding:0"><span class="mark">g</span>gmat-m8</span><span class="spacer"></span><span class="avatar">MS</span></div>
+          <div class="p-content">
+            <div class="p-greet"><h2>Good morning, Mateo</h2><p>Alfa Madrid · Technician</p></div>
+            <a class="btn btn-primary btn-block" href="#v-phones"><svg class="i"><use href="#i-plus"/></svg>New request</a>
+            <div class="snap">
+              <a class="card kpi" href="#v-phones"><span class="label">Approved</span><span class="value">3</span><span class="delta">open, being bought</span></a>
+              <a class="card kpi" href="#v-phones"><span class="label">Submitted</span><span class="value">2</span><span class="delta">waiting for review</span></a>
+              <a class="card kpi" href="#v-phones"><span class="label">Drafts</span><span class="value">1</span><span class="delta">not sent yet</span></a>
+              <a class="card kpi" href="#v-phones"><span class="label">Closed</span><span class="value">8</span><span class="delta">last 30 days</span></a>
+            </div>
+            <div class="sec-title"><h3>My recent requests</h3><a href="#v-phones">See all</a></div>
+            <a class="card req" href="#v-phones" style="text-decoration:none;color:inherit">
+              <span class="top"><span class="project">Hospital X</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Approved</span></span>
+              <span class="mono" style="color:var(--soft);font-size:12px">SOL-A-MAD-2026-00131</span>
+              <meter class="partial" min="0" max="9" value="6" aria-label="6 of 9 lines delivered"></meter>
+              <span class="meta"><span>6 of 9 lines delivered</span><span>needed by 13 Nov</span></span>
+            </a>
+            <a class="card req" href="#v-phones" style="text-decoration:none;color:inherit">
+              <span class="top"><span class="project">Hospital X</span><span class="chip info"><svg class="i"><use href="#i-clock"/></svg>Submitted</span></span>
+              <span class="mono" style="color:var(--soft);font-size:12px">SOL-A-MAD-2026-00138</span>
+              <span class="meta"><span>7 lines · sent 8 days ago</span><span>to Elena Navarro</span></span>
+            </a>
+            <a class="card req" href="#v-phones" style="text-decoration:none;color:inherit">
+              <span class="top"><span class="project">Colegio San Isidro</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Approved</span></span>
+              <span class="mono" style="color:var(--soft);font-size:12px">SOL-A-MAD-2026-00119</span>
+              <meter min="0" max="4" value="4" aria-label="4 of 4 lines delivered"></meter>
+              <span class="meta"><span>4 of 4 lines delivered</span><span>closes when handed over</span></span>
+            </a>
+          </div>
+          <nav class="p-nav" aria-label="Main navigation">
+            <a href="#v-phones" aria-current="page"><svg class="i"><use href="#i-home"/></svg>Home</a>
+            <a href="#v-phones"><svg class="i"><use href="#i-clip"/></svg>Requests</a>
+            <a href="#v-phones"><svg class="i"><use href="#i-book"/></svg>Catalog</a>
+            <a href="#v-phones"><svg class="i"><use href="#i-menu"/></svg>More</a>
+          </nav>
+        </div>
+        <ol class="notes">
+          <li><span class="k">1</span><span><b>The main action first,</b> full width and 48&nbsp;px tall.</span></li>
+          <li><span class="k">2</span><span><b>Tiles scroll sideways inside their row</b> (snap), never the page. The fourth tile peeking out shows there is more.</span></li>
+          <li><span class="k">3</span><span><b>Progress without a chart library:</b> a native <span class="mono">&lt;meter&gt;</span> with its text, so the security policy stays as it is.</span></li>
+          <li><span class="k">4</span><span><b>Bottom bar of four.</b> The first entries this person can reach, then "More" opens the rest as a sheet.</span></li>
+        </ol>
+      </div>
+
+      <!-- phone B: review page with bottom sheet -->
+      <div class="phone-col">
+        <h3>Reduce a line, in a bottom sheet</h3>
+        <div class="phone">
+          <div class="status-bar"><span>9:41</span><span>5G</span></div>
+          <div class="p-top"><svg class="i"><use href="#i-left"/></svg><span class="t">Inbox</span><span class="spacer"></span><svg class="i"><use href="#i-dots"/></svg></div>
+          <div class="p-content">
+            <div style="display:grid;gap:6px">
+              <span class="mono" style="font-size:16px;font-weight:500">SOL-A-MAD-2026-00142</span>
+              <span style="display:flex;gap:6px"><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Approved</span><span class="chip warn"><svg class="i"><use href="#i-up"/></svg>High</span></span>
+            </div>
+            <dl class="facts-p">
+              <div><dt>Project</dt><dd>Colegio San Isidro</dd></div>
+              <div><dt>Requested by</dt><dd>Sara Gil</dd></div>
+              <div><dt>Needed by</dt><dd>20 Nov 2026</dd></div>
+              <div><dt>Reviewer</dt><dd>Elena Navarro</dd></div>
+            </dl>
+            <div class="card line-card">
+              <span class="name">Cable RZ1-K 0,6/1 kV 3G2,5 mm²</span>
+              <span class="ref mono">CAB-RZ1K-3G25</span>
+              <dl class="qty-grid"><div><dt>Approved</dt><dd>500 m</dd></div><div><dt>On order</dt><dd>120 m</dd></div><div><dt>Delivered</dt><dd>0 m</dd></div></dl>
+            </div>
+          </div>
+          <div class="p-dim"></div>
+          <div class="p-sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title">
+            <div class="grab"></div>
+            <div class="sh-head"><h4 id="sh-title">Reduce the approved quantity</h4><span class="x"><svg class="i"><use href="#i-x"/></svg></span></div>
+            <div class="sh-body">
+              <div class="alert-box" role="alert"><svg class="i"><use href="#i-alert"/></svg><span>Fix one field to continue.</span></div>
+              <div class="field">
+                <label for="m-qty">Approved quantity</label>
+                <div class="input invalid" id="m-qty"><span class="num">80</span><span class="unit">m</span></div>
+                <span class="err"><svg class="i sm"><use href="#i-alert"/></svg>At least 120 m: that much is already on order.</span>
+              </div>
+              <div class="field">
+                <label for="m-reason">Reason</label>
+                <div class="input area" id="m-reason">Phase 1 only needs the ground floor; the rest goes in a new request.</div>
+                <span class="help">Sara Gil sees this reason on her request.</span>
+              </div>
+            </div>
+            <div class="sh-foot"><span class="btn btn-secondary">Cancel</span><span class="btn btn-primary">Reduce</span></div>
+          </div>
+        </div>
+        <ol class="notes">
+          <li><span class="k">1</span><span><b>A native dialog shown as a bottom sheet,</b> with its buttons in thumb reach. From 640&nbsp;px up the same dialog opens in the middle of the screen.</span></li>
+          <li><span class="k">2</span><span><b>Invalid input keeps the sheet open.</b> The server answers 422 with the form and its errors, and focus moves to the summary. Before, the page reloaded and the form was lost in a fold-out section.</span></li>
+          <li><span class="k">3</span><span><b>The floor is explained in words</b> taken from the ledger rule (approved ≥ on order + delivered), and the unit sits in the field.</span></li>
+          <li><span class="k">4</span><span><b>Inputs use 16&nbsp;px text,</b> so phones do not zoom in when the field gets focus.</span></li>
+        </ol>
+      </div>
+
+      <!-- phone C: receive form -->
+      <div class="phone-col">
+        <h3>Receive goods at the worksite</h3>
+        <div class="phone">
+          <div class="status-bar"><span>9:41</span><span>5G</span></div>
+          <div class="p-top"><svg class="i"><use href="#i-left"/></svg><span class="t">Receive</span><span class="mono" style="color:var(--soft);font-size:12px;margin-left:auto">PED-A-2026-00091</span></div>
+          <div class="p-content" style="gap:12px">
+            <div class="where"><svg class="i"><use href="#i-pin"/></svg>Hospital X · worksite</div>
+            <div class="field">
+              <label for="m-note">Delivery note number</label>
+              <div class="input" id="m-note"><span class="mono">AL-24518</span></div>
+            </div>
+            <div class="card recv-line">
+              <div class="head"><span class="name" style="font-weight:600">Cable RZ1-K 3G2,5 mm²</span><span class="out">120 m due</span></div>
+              <div class="input"><span class="num">120</span><span class="unit">m</span></div>
+              <span class="split"><svg class="i sm"><use href="#i-clip"/></svg>All to SOL-…-00142 · <a class="issue" href="#v-phones">change</a></span>
+            </div>
+            <div class="card recv-line">
+              <div class="head"><span class="name" style="font-weight:600">Tubo corrugado M25</span><span class="out">200 m due</span></div>
+              <div class="input"><span class="num">200</span><span class="unit">m</span></div>
+              <span class="split"><svg class="i sm"><use href="#i-clip"/></svg>Split over 2 requests · <a class="issue" href="#v-phones">change</a></span>
+            </div>
+            <div class="card recv-line">
+              <div class="head"><span class="name" style="font-weight:600">Caja de registro 100×100</span><span class="out">40 u due</span></div>
+              <div class="input"><span class="num">36</span><span class="unit">u</span></div>
+              <a class="issue" href="#v-phones"><svg class="i sm"><use href="#i-alert"/></svg>Report damaged or wrong items</a>
+            </div>
+          </div>
+          <div class="sticky-act">
+            <span class="sum"><span>3 lines · 4 units short</span><span>No prices shown</span></span>
+            <span class="btn btn-primary btn-block"><svg class="i"><use href="#i-check"/></svg>Post the receipt</span>
+          </div>
+        </div>
+        <ol class="notes">
+          <li><span class="k">1</span><span><b>Quantities come prefilled</b> with what is due; the person only corrects what differs. Number keyboards open with <span class="mono">inputmode="decimal"</span>.</span></li>
+          <li><span class="k">2</span><span><b>The split across requests</b> follows the default attribution and opens in a dialog only when someone wants to change it.</span></li>
+          <li><span class="k">3</span><span><b>The one main action stays at the bottom</b> with a summary of what will be posted. A double tap still posts once.</span></li>
+          <li><span class="k">4</span><span><b>Who may see what does not change.</b> Prices and other projects' quantities stay out, exactly as today.</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== VIEW 5: order page + confirmation ===================== -->
+  <section class="view" id="v-order">
+    <div class="view-head">
+      <h2>Purchase order with a confirmation dialog</h2>
+      <span class="who">Elena Navarro · desktop</span>
+      <span class="tags"><span class="tag">M8b.3</span><span class="tag">M8b.4</span></span>
+    </div>
+    <div class="scroll-x">
+      <div class="browser">
+        <div class="browser-bar"><span class="url">gmat.example.com/purchasing/orders/0193f2c4…/</span></div>
+        <div class="app-desk" data-side="hidden" style="min-height:640px">
+          <aside class="side" id="side-order" aria-label="Main navigation">
+            <div class="wordmark"><span class="mark">g</span>gmat-m8</div>
+            <nav class="nav-cats">
+              <details class="nav-group">
+                <summary>Work<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-home"/></svg>Home</a>
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-clip"/></svg>Requests</a>
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-inbox"/></svg>Inbox</a>
+                </div>
+              </details>
+              <details class="nav-group" open>
+                <summary>Purchasing<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-cart"/></svg>To purchase</a>
+                  <a class="nav-link" aria-current="page" href="#v-order"><svg class="i"><use href="#i-file"/></svg>Orders</a>
+                </div>
+              </details>
+              <details class="nav-group">
+                <summary>Site &amp; warehouse<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-box"/></svg>Receiving</a>
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-cal"/></svg>Expected deliveries</a>
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-swap"/></svg>Handovers</a>
+                </div>
+              </details>
+              <details class="nav-group">
+                <summary>Organization<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-folder"/></svg>Projects</a>
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-book"/></svg>Catalog</a>
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-build"/></svg>Suppliers</a>
+                </div>
+              </details>
+              <details class="nav-group">
+                <summary>Insights<svg class="i sm chev"><use href="#i-chev-down"/></svg></summary>
+                <div class="nav-items">
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-shield"/></svg>Audit</a>
+                  <a class="nav-link" href="#v-order"><svg class="i"><use href="#i-down"/></svg>Exports</a>
+                </div>
+              </details>
+            </nav>
+          </aside>
+          <div class="main">
+            <div class="topbar">
+              <button type="button" class="btn btn-ghost icon-only side-toggle" data-side-toggle aria-controls="side-order" aria-expanded="false" aria-label="Show the menu"><svg class="i"><use href="#i-panel"/></svg></button>
+              <div class="crumbs"><a href="#v-order">Orders</a><svg class="i sm"><use href="#i-right"/></svg><b class="mono">PED-A-2026-00087</b></div>
+              <span class="spacer"></span>
+              <span class="user"><span class="avatar">EN</span>Elena Navarro<svg class="i sm"><use href="#i-chev-down"/></svg></span>
+            </div>
+            <div class="content">
+              <div class="page-head">
+                <div>
+                  <div style="display:flex;align-items:center;gap:10px"><span class="title mono" style="font-weight:500">PED-A-2026-00087</span><span class="chip info"><svg class="i"><use href="#i-mail"/></svg>Issued</span></div>
+                  <p class="sub">Suministros Eléctricos Levante SL · for Hospital X and Colegio San Isidro</p>
+                </div>
+                <div class="actions">
+                  <span class="btn btn-ghost"><svg class="i sm"><use href="#i-printer"/></svg>Print</span>
+                  <span class="btn btn-secondary"><svg class="i sm"><use href="#i-pencil"/></svg>Amend</span>
+                  <span class="btn btn-secondary icon-only" aria-label="More actions"><svg class="i"><use href="#i-dots"/></svg></span>
+                </div>
+              </div>
+              <dl class="card facts">
+                <div><dt>Buyer</dt><dd>Instalaciones Alfa SA</dd></div>
+                <div><dt>Ship to</dt><dd>Almacén Madrid</dd></div>
+                <div><dt>Expected</dt><dd>12 Nov 2026</dd></div>
+                <div><dt>Issued</dt><dd>3 Nov 2026</dd></div>
+                <div><dt>Revision</dt><dd class="num">1</dd></div>
+              </dl>
+              <section class="card" style="overflow:hidden">
+                <table class="lines">
+                  <thead><tr><th>Material</th><th class="r">Ordered</th><th>Received</th><th class="r">Unit price</th><th>For</th></tr></thead>
+                  <tbody>
+                    <tr><td><b>Cable RZ1-K 3G2,5 mm²</b><br><span class="mono" style="color:var(--soft);font-size:12px">CAB-RZ1K-3G25</span></td><td class="r">500 m</td><td><div class="recv"><meter class="partial" min="0" max="500" value="380"></meter><span class="num">380 of 500 m</span></div></td><td class="r">1,8400 €</td><td>2 requests</td></tr>
+                    <tr><td><b>Tubo corrugado M25</b><br><span class="mono" style="color:var(--soft);font-size:12px">TUB-CORR-M25</span></td><td class="r">200 m</td><td><div class="recv"><meter class="partial" min="0" max="200" value="0"></meter><span class="num">0 of 200 m</span></div></td><td class="r">0,3150 €</td><td>2 requests</td></tr>
+                    <tr><td><b>Caja de registro 100×100</b><br><span class="mono" style="color:var(--soft);font-size:12px">CAJ-REG-100</span></td><td class="r">40 u</td><td><div class="recv"><meter min="0" max="40" value="40"></meter><span class="num">40 of 40 u</span></div></td><td class="r">2,9000 €</td><td>1 request</td></tr>
+                  </tbody>
+                </table>
+              </section>
+            </div>
+          </div>
+        </div>
+        <div class="backdrop">
+          <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+            <div class="dialog-head">
+              <span class="badge"><svg class="i"><use href="#i-alert"/></svg></span>
+              <div><h4 id="dlg-title">Close the cable line short?</h4><p>Cable RZ1-K 3G2,5 mm² on PED-A-2026-00087: 380 of 500 m received.</p></div>
+              <span class="x"><svg class="i"><use href="#i-x"/></svg></span>
+            </div>
+            <div class="dialog-body">
+              <ul class="consequences">
+                <li><svg class="i sm"><use href="#i-undo"/></svg><span>The <b class="num">120 m</b> still due are no longer expected from this supplier; their 2 requests show them as still to purchase.</span></li>
+                <li><svg class="i sm"><use href="#i-check"/></svg><span>The <b class="num">380 m</b> already received stay with their requests.</span></li>
+                <li><svg class="i sm"><use href="#i-clip"/></svg><span>The reason is kept in the order's history.</span></li>
+              </ul>
+              <div class="field">
+                <label for="dlg-reason">Reason</label>
+                <div class="input area" id="dlg-reason" style="font-size:14px">Reference discontinued by the supplier; the rest is ordered elsewhere.</div>
+              </div>
+            </div>
+            <div class="dialog-foot"><span class="btn btn-secondary focused">Keep the line open</span><span class="btn btn-danger">Close short</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ol class="notes">
+      <li><span class="k">1</span><span><b>Menu hidden.</b> This page shows the other state: the button at the top left brings the menu back.</span></li>
+      <li><span class="k">2</span><span><b>Every document page follows one pattern:</b> number and status, one line of context, actions on the right (secondary ones in a menu), the facts, then the lines with their progress.</span></li>
+      <li><span class="k">3</span><span><b>A destructive action asks in a dialog that names the consequences,</b> drawn from what the service will do. "Keep the line open" has the focus, so pressing Enter by reflex does no harm.</span></li>
+      <li><span class="k">4</span><span><b>The unit price column</b> appears only for someone with <span class="mono">price.view</span>, as today. A warehouse operator sees the same page without it.</span></li>
+      <li><span class="k">5</span><span><b>Quantities and prices use tabular figures,</b> so the digits line up in columns.</span></li>
+    </ol>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  var css = function (n) { return getComputedStyle(root).getPropertyValue(n).trim(); };
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var weeks = ["17 Aug", "24 Aug", "31 Aug", "7 Sep", "14 Sep", "21 Sep", "28 Sep", "5 Oct", "12 Oct", "19 Oct", "26 Oct", "2 Nov"];
+  var data = {
+    approved: [18, 22, 19, 25, 21, 24, 20, 27, 23, 26, 22, 27],
+    rejected: [2, 3, 1, 4, 2, 2, 3, 1, 2, 3, 2, 2],
+    orders: [9, 11, 8, 12, 10, 14, 11, 13, 12, 15, 11, 13],
+    receipts: [7, 9, 10, 9, 12, 11, 13, 12, 14, 13, 14, 15],
+    ageLabels: ["Under 1 day", "1–3 days", "3–7 days", "Over 7 days"],
+    age: [6, 4, 3, 1],
+    projects: ["Hospital X", "Colegio San Isidro", "Oficinas Castellana"],
+    handover: [4, 3, 2]
+  };
+
+  function table(id, head, rows) {
+    var t = document.getElementById(id);
+    if (!t) return;
+    var h = "<thead><tr>" + head.map(function (x) { return "<th>" + x + "</th>"; }).join("") + "</tr></thead><tbody>";
+    rows.forEach(function (r) { h += "<tr>" + r.map(function (x) { return "<td>" + x + "</td>"; }).join("") + "</tr>"; });
+    t.innerHTML = h + "</tbody>";
+  }
+  table("t-decisions", ["Week of", "Approved", "Rejected"], weeks.map(function (w, i) { return [w, data.approved[i], data.rejected[i]]; }));
+  table("t-age", ["Age", "Requests"], data.ageLabels.map(function (a, i) { return [a, data.age[i]]; }));
+  table("t-flow", ["Week of", "Orders issued", "Receipts posted"], weeks.map(function (w, i) { return [w, data.orders[i], data.receipts[i]]; }));
+  table("t-handover", ["Project", "Requests"], data.projects.map(function (p, i) { return [p, data.handover[i]]; }));
+
+  function sparks() {
+    document.querySelectorAll("svg[data-spark]").forEach(function (svg) {
+      var v = svg.getAttribute("data-spark").split(",").map(Number);
+      var min = Math.min.apply(null, v), max = Math.max.apply(null, v);
+      var W = 84, H = 28, pad = 3;
+      var pts = v.map(function (y, i) {
+        var x = pad + i * (W - 2 * pad) / (v.length - 1);
+        var yy = H - pad - (y - min) / ((max - min) || 1) * (H - 2 * pad);
+        return [x.toFixed(1), yy.toFixed(1)];
+      });
+      var line = pts.map(function (p) { return p.join(","); }).join(" ");
+      var last = pts[pts.length - 1];
+      svg.innerHTML = '<polygon class="area" points="' + pts[0][0] + ',' + H + ' ' + line + ' ' + last[0] + ',' + H + '"></polygon>' +
+        '<polyline points="' + line + '"></polyline><circle r="3" cx="' + last[0] + '" cy="' + last[1] + '"></circle>';
+    });
+  }
+  sparks();
+
+  var charts = [];
+  function build() {
+    if (!window.Chart) return;
+    charts.forEach(function (c) { c.destroy(); });
+    charts = [];
+    var c = { ink: css("--ink"), soft: css("--soft"), line: css("--line"), raised: css("--raised"), s1: css("--series-1"), s2: css("--series-2") };
+    Chart.defaults.font.family = css("--font-sans");
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = c.soft;
+    var tooltip = { backgroundColor: c.ink, titleColor: c.raised, bodyColor: c.raised, padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true };
+    var legend = { display: true, position: "top", align: "end", labels: { usePointStyle: true, pointStyle: "rectRounded", boxWidth: 10, boxHeight: 10, color: c.soft, padding: 12 } };
+    var base = function (extra) {
+      return Object.assign({ responsive: true, maintainAspectRatio: false, animation: reduce ? false : { duration: 500 } }, extra);
+    };
+    var yAxis = { beginAtZero: true, border: { display: false }, grid: { color: c.line }, ticks: { precision: 0, padding: 6 } };
+    var xAxis = { grid: { display: false }, border: { color: c.line }, ticks: { maxRotation: 0, autoSkipPadding: 12 } };
+
+    charts.push(new Chart(document.getElementById("c-decisions"), {
+      type: "bar",
+      data: { labels: weeks, datasets: [
+        { label: "Approved", data: data.approved, backgroundColor: c.s1, borderRadius: 0, maxBarThickness: 26, stack: "d" },
+        { label: "Rejected", data: data.rejected, backgroundColor: c.s2, maxBarThickness: 26, stack: "d",
+          borderColor: c.raised, borderWidth: { top: 0, bottom: 2, left: 0, right: 0 }, borderSkipped: false,
+          borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } }
+      ] },
+      options: base({ interaction: { mode: "index", intersect: false }, plugins: { legend: legend, tooltip: tooltip },
+        scales: { x: Object.assign({ stacked: true }, xAxis), y: Object.assign({ stacked: true }, yAxis) } })
+    }));
+
+    charts.push(new Chart(document.getElementById("c-age"), {
+      type: "bar",
+      data: { labels: data.ageLabels, datasets: [{ label: "Requests", data: data.age, backgroundColor: c.s1, borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: false, maxBarThickness: 40 }] },
+      options: base({ plugins: { legend: { display: false }, tooltip: tooltip }, scales: { x: xAxis, y: yAxis } })
+    }));
+
+    var lastIdx = data.orders.length - 1;
+    var radii = data.orders.map(function (_, i) { return i === lastIdx ? 4 : 0; });
+    charts.push(new Chart(document.getElementById("c-flow"), {
+      type: "line",
+      data: { labels: weeks, datasets: [
+        { label: "Orders issued", data: data.orders, borderColor: c.s1, backgroundColor: c.s1, borderWidth: 2, tension: 0.3, pointRadius: radii, pointHoverRadius: 5, pointBorderColor: c.raised, pointBorderWidth: 2 },
+        { label: "Receipts posted", data: data.receipts, borderColor: c.s2, backgroundColor: c.s2, borderWidth: 2, tension: 0.3, pointRadius: radii, pointHoverRadius: 5, pointBorderColor: c.raised, pointBorderWidth: 2 }
+      ] },
+      options: base({ interaction: { mode: "index", intersect: false }, plugins: { legend: legend, tooltip: tooltip }, scales: { x: xAxis, y: yAxis } })
+    }));
+
+    charts.push(new Chart(document.getElementById("c-handover"), {
+      type: "bar",
+      data: { labels: data.projects, datasets: [{ label: "Requests", data: data.handover, backgroundColor: c.s1, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false, maxBarThickness: 26 }] },
+      options: base({ indexAxis: "y", plugins: { legend: { display: false }, tooltip: tooltip },
+        scales: { x: Object.assign({}, yAxis, { grid: { color: c.line } }), y: { grid: { display: false }, border: { color: c.line } } } })
+    }));
+  }
+
+  document.querySelectorAll("[data-side-toggle]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var app = b.closest(".app-desk");
+      var show = app.dataset.side === "hidden";
+      app.dataset.side = show ? "shown" : "hidden";
+      b.setAttribute("aria-expanded", String(show));
+      b.setAttribute("aria-label", show ? "Hide the menu" : "Show the menu");
+    });
+  });
+
+  function setTheme(t) {
+    if (t === "system") { delete root.dataset.theme; } else { root.dataset.theme = t; }
+    document.querySelectorAll(".themes button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.th === t)); });
+    build();
+  }
+  document.querySelectorAll(".themes button").forEach(function (b) {
+    b.addEventListener("click", function () { setTheme(b.dataset.th); });
+  });
+  var initial = root.dataset.theme;
+  if (initial === "light" || initial === "dark") {
+    document.querySelectorAll(".themes button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.th === initial)); });
+  }
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", build);
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(build); } else { build(); }
+})();
+</script>
