@@ -160,9 +160,40 @@ jobs:
           exit-code: "1"
           format: table
 
-  test:
-    name: test
+  # Layers A and B (plan §8.1); `live` and `e2e` run in their own workflows. Four jobs at once
+  # (issue #42), each on its own runner and database, each leaving its coverage data for
+  # `test`. Together they run every test once: `access-integration` and `unit` split the tests
+  # that are not `serial` (`unit` ignores exactly what the other runs) and spread them over the
+  # runner's cores with pytest-xdist, each worker on its own test database; the `serial` tests
+  # depend on wall-clock time and run alone, the volume list test in a job of its own.
+  # `--dist load`, never `worksteal`: pytest-django runs the transactional tests last, as their
+  # flush empties every table, the rows the migrations seeded included (units of measure).
+  # `load` hands each worker its tests in that order; `worksteal` gives the last worker the
+  # transactional tail first and then other tests, which find the seeded rows gone.
+  test-shard:
+    name: test-shard (${{ matrix.shard }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: access-integration
+            pytest: >-
+              -n auto --dist load -m "not live and not e2e and not serial"
+              tests/access tests/integration tests/unit/docker
+          - shard: unit
+            pytest: >-
+              -n auto --dist load -m "not live and not e2e and not serial"
+              tests --ignore=tests/access --ignore=tests/integration --ignore=tests/unit/docker
+          - shard: serial
+            pytest: >-
+              -m "serial and not live and not e2e"
+              tests --ignore=tests/integration/test_list_volume.py
+            migrations: true
+          - shard: volume
+            pytest: >-
+              -m "serial and not live and not e2e"
+              tests/integration/test_list_volume.py
     services:
       postgres:
         image: postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
@@ -220,29 +251,78 @@ jobs:
           uv run python manage.py compilemessages --verbosity 0
 
       - name: No missing migrations
+        if: matrix.migrations
         run: uv run python manage.py makemigrations --check --dry-run
 
-      # Layers A and B (plan §8.1). `live` and `e2e` run in their own workflows. Two passes over
-      # one coverage data file (issue #42): every test but `serial` across the runner's cores
-      # (each worker on its own test database), then the `serial` ones alone, as they depend on
-      # wall-clock time. The floor and the reports apply to both passes together.
-      - name: Tests in parallel (all but serial)
-        run: >-
-          uv run pytest -n auto --dist worksteal
-          -m "not live and not e2e and not serial"
-          --cov --cov-report= --cov-fail-under=0
+      - name: Migrations apply, reverse to zero and apply again
+        if: matrix.migrations
+        run: uv run python scripts/check_migrations_reversible.py
 
-      - name: Serial tests, coverage of both passes (project floor 90 %, branch coverage)
-        run: >-
-          uv run pytest -m "serial and not live and not e2e"
-          --cov --cov-append --cov-report=term-missing --cov-report=json:coverage.json
-          --cov-report=xml:coverage.xml
+      # The floor applies in `test`, to the four shards together.
+      - name: Tests (${{ matrix.shard }})
+        run: uv run pytest ${{ matrix.pytest }} --cov --cov-report= --cov-fail-under=0
+
+      - name: Name the coverage data after the shard
+        run: mkdir coverage-data && mv .coverage "coverage-data/${{ matrix.shard }}.coverage"
+
+      - name: Upload the coverage data
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-data-${{ matrix.shard }}
+          path: coverage-data/${{ matrix.shard }}.coverage
+          retention-days: 1
+          if-no-files-found: error
+
+  # The required check. It runs whenever the shards ran, and fails unless all four passed:
+  # a required check that is skipped counts as passed, so it never depends on `needs` alone.
+  test:
+    name: test
+    needs: test-shard
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.test-shard.result }}
+        run: |
+          if [ "$SHARDS" != "success" ]; then
+            echo "::error::a test shard did not pass (${SHARDS})"
+            exit 1
+          fi
+
+      # Coverage names each file from the repository's root; the report reads the sources.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-data-*
+          merge-multiple: true
+          path: coverage-data
+
+      - name: Four shards of coverage data
+        run: test "$(find coverage-data -name '*.coverage' | wc -l)" = 4
+
+      - name: Coverage of the four shards (project floor 90 %, branch coverage)
+        run: |
+          uv run coverage combine coverage-data/*.coverage
+          uv run coverage json -o coverage.json
+          uv run coverage xml -o coverage.xml
+          uv run coverage report
 
       - name: Coverage gate (100 % for apps/access, services, selectors)
         run: uv run python scripts/check_coverage_gates.py coverage.json
-
-      - name: Migrations apply, reverse to zero and apply again
-        run: uv run python scripts/check_migrations_reversible.py
 
       - name: Upload coverage report
         if: always()
