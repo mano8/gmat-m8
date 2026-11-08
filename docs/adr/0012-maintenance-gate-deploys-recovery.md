@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `docker_compose/gmat_m8/deploy.sh`, `docker_compose/gmat_m8/recover.sh`, `docker_compose/gmat_m8/restore-drill.sh`, `docker_compose/gmat_m8/ops/`, `docker/backup/`, `docker_compose/offsite/`
 
 ## Context
 

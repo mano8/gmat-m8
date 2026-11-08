@@ -3,6 +3,7 @@
 - **Status:** Accepted (the maintainer's answer to M8.1's open question; recorded in PR #33)
 - **Date:** 2026-11-08 (recorded); decided with M8, merged 2026-11-07
 - **Complements:** ADR-0005
+- **Governs:** `apps/receiving/services.py`
 
 ## Context
 

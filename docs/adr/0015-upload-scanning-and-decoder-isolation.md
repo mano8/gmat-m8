@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (the maintainer's decisions of 2026-11-05 on exceptions X7 and X11)
 - **Date:** 2026-11-05
+- **Governs:** `apps/attachments/scanner.py`, `apps/attachments/decoder.py`, `apps/attachments/decoder_service.py`, `apps/attachments/decoder_client.py`, `apps/attachments/processing.py`, `apps/attachments/uploads.py`, `docker_compose/gmat_m8/clamav/`
 
 ## Context
 

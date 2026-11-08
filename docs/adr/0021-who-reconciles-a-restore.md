@@ -3,6 +3,7 @@
 - **Status:** Accepted (the maintainer's decisions of 2026-11-06, M8.4; implemented in PR #33)
 - **Date:** 2026-11-08 (recorded)
 - **Complements:** ADR-0012, ADR-0016
+- **Governs:** `apps/recovery/`, `docker_compose/gmat_m8/ops/failed-state.sql`
 
 ## Context
 

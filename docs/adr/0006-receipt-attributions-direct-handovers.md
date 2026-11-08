@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/receiving/attribution.py`, `apps/receiving/services.py`, `apps/handovers/direct.py`
 
 ## Context
 

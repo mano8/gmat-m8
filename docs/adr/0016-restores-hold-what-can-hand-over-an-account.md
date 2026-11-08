@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (the maintainer's decisions of 2026-11-06 on the phase's R3 review)
 - **Date:** 2026-11-06
+- **Governs:** `apps/recovery/`
 
 ## Context
 

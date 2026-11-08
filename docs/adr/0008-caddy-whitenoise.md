@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `docker_compose/gmat_m8/caddy/`, `docker/app/Dockerfile`
 
 ## Context
 

@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/material_requests/ledger.py`, `apps/material_requests/commitments.py`, `apps/purchasing/waterfall.py`, `apps/purchasing/components.py`, `apps/purchasing/ledger.py`
 
 ## Context
 

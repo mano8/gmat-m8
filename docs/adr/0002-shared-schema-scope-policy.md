@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/access/scopes.py`, `apps/access/context.py`, `apps/access/roles.py`
 
 ## Context
 

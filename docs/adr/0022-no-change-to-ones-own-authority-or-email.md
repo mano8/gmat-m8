@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (the maintainer's decision of 2026-11-07; implemented in PR #38)
 - **Date:** 2026-11-08 (recorded); merged 2026-11-07
+- **Governs:** `apps/accounts/services/common.py`, `apps/accounts/services/grants.py`, `apps/accounts/services/email_changes.py`
 
 ## Context
 

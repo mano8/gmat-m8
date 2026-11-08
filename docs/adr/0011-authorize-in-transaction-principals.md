@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `apps/access/authorization.py`, `apps/access/principals.py`, `apps/core/locking.py`, `apps/core/idempotency.py`
 
 ## Context
 

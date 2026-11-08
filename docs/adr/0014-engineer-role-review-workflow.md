@@ -3,6 +3,7 @@
 - **Status:** Accepted (M7b.1; accepted by the maintainer with the M7b pull request, #28). §3 is amended by ADR-0019
 - **Date:** 2026-11-02
 - **Amends:** ADR-0010 (Q4), plan §3.4 (capability matrix, self-approval note) and §4.4 (editing rules of a material request)
+- **Governs:** `apps/access/roles.py`, `apps/material_requests/reviewers.py`, `apps/material_requests/services/assignment.py`, `apps/material_requests/services/editing.py`, `apps/material_requests/services/review.py`
 
 ## Context
 

@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
+- **Governs:** `pyproject.toml`, `uv.lock`, `scripts/check_security_floors.py`
 
 ## Context
 
