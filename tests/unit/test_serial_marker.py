@@ -95,7 +95,9 @@ def test_every_timing_test_is_serial() -> None:
         if not OUTSIDE & set(path.relative_to(TESTS).parts)
         for item in unmarked(path)
     ]
-    assert found == [], "mark these `serial` (pytest.mark.serial): " + ", ".join(found)
+    assert found == [], (
+        "mark these `serial` (pytest.mark.serial; ADR-0025, tests/CLAUDE.md): " + ", ".join(found)
+    )
 
 
 def test_the_guard_notices_what_is_not_marked(tmp_path: Path) -> None:
