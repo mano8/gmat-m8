@@ -7,7 +7,7 @@ The preference cookie is read back through its effects (the page that follows), 
 import re
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e import pages
 from tests.e2e.conftest import Browsing
@@ -25,8 +25,15 @@ def page_background(page: Page) -> str:
     return str(page.evaluate("getComputedStyle(document.body).backgroundColor"))
 
 
+def remembered(page: Page, click: Locator) -> None:
+    """Click something that is remembered and wait for the server to have the answer, so the next
+    page load (or reload) cannot overtake the request that stores the choice."""
+    with page.expect_response(lambda r: r.url.endswith("/ui/preferences/")):
+        click.click()
+
+
 def toggle(page: Page, label: str) -> None:
-    page.get_by_role("button", name=label).click()
+    remembered(page, page.get_by_role("button", name=label))
 
 
 def tab_reaches_the_menu(page: Page, presses: int = 40) -> bool:
@@ -70,9 +77,8 @@ def test_a_folded_category_stays_folded_and_the_current_one_stays_open(
     purchasing = page.locator(f"{MENU} [data-nav-group=purchasing]")
     site = page.locator(f"{MENU} [data-nav-group=site]")
     expect(purchasing).to_have_attribute("open", "")  # all open by default
-    purchasing.locator("summary").click()
+    remembered(page, purchasing.locator("summary"))
     expect(purchasing).not_to_have_attribute("open", "")
-    page.wait_for_load_state("networkidle")
     page.reload()
     expect(purchasing).not_to_have_attribute("open", "")
     expect(site).to_have_attribute("open", "")
@@ -81,7 +87,7 @@ def test_a_folded_category_stays_folded_and_the_current_one_stays_open(
     expect(purchasing).to_have_attribute("open", "")
     # Put it back for the other tests of this person (the cookie is per context, but be tidy).
     page.goto("/receiving/")
-    purchasing.locator("summary").click()
+    remembered(page, purchasing.locator("summary"))
     expect(purchasing).to_have_attribute("open", "")
 
 
@@ -99,7 +105,6 @@ def test_theme_system_dark_and_back_with_a_right_first_paint(
     assert theme_of(page) == "dark"  # painted at once, no reload
     dark = page_background(page)
     assert dark != light
-    page.wait_for_load_state("networkidle")
     page.reload()
     assert theme_of(page) == "dark"
     assert page_background(page) == dark  # the first paint after a reload is already dark
@@ -121,7 +126,6 @@ def test_the_login_page_has_the_theme_switch_for_a_signed_out_visitor(browsing: 
     page.goto("/accounts/login/")
     toggle(page, "Dark")
     assert theme_of(page) == "dark"
-    page.wait_for_load_state("networkidle")
     page.reload()
     assert theme_of(page) == "dark"
     toggle(page, "System")
