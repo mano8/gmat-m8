@@ -8,47 +8,47 @@
     <div class="page-head-main">
       {% url 'requests:list' as crumb_url %}
       {% include "components/crumbs.html" with parent_label=_("My requests") parent_url=crumb_url current=request_obj.number|default:_("Draft request") %}
-      <h1>{% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %}</h1>
+      <h1 class="doc-no">{% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %}</h1>
       <p class="mt-1 flex flex-wrap gap-2">{% include "material_requests/status.html" with obj=request_obj %}</p>
     </div>
   </header>
-  <section class="card mb-4" aria-label="{% translate 'Request details' %}">
-    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+  <section class="@container card mb-4" aria-label="{% translate 'Request details' %}">
+    <dl class="facts">
       <div>
-        <dt class="text-sm text-soft">{% translate "Project" %}</dt>
+        <dt>{% translate "Project" %}</dt>
         <dd>
           {{ request_obj.project.code }} · {{ request_obj.project.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Priority" %}</dt>
+        <dt>{% translate "Priority" %}</dt>
         <dd>
           {{ request_obj.get_priority_display }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Needed by" %}</dt>
+        <dt>{% translate "Needed by" %}</dt>
         <dd>
           {{ request_obj.needed_by|date:"SHORT_DATE_FORMAT"|default:"—" }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Requested by" %}</dt>
+        <dt>{% translate "Requested by" %}</dt>
         <dd>
           {{ request_obj.requested_by.full_name|default:request_obj.requested_by.email }}
         </dd>
       </div>
       {% if assignee %}
         <div>
-          <dt class="text-sm text-soft">{% translate "Sent to" %}</dt>
+          <dt>{% translate "Sent to" %}</dt>
           <dd data-testid="detail-assignee">
             {{ assignee.full_name|default:assignee.email }}
           </dd>
         </div>
       {% endif %}
       {% if request_obj.notes %}
-        <div class="sm:col-span-2">
-          <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
+        <div class="col-span-full">
+          <dt>{% translate "Notes" %}</dt>
           <dd class="whitespace-pre-line">
             {{ request_obj.notes }}
           </dd>

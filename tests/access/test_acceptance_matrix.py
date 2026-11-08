@@ -854,6 +854,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             app_action(**_each(REDIRECT, CATALOG_MANAGERS)),
             path=_object_url("catalog:deactivate", "material"),
         ),
+        Route(
+            app_action(**_each(NO_CONTENT, CATALOG_MANAGERS)),
+            position="htmx",
+            path=_object_url("catalog:deactivate", "material"),
+            headers=HTMX,
+            note="deactivated again from the dialog (no change): the page navigates",
+        ),
     ),
     "catalog:reactivate": (
         Route(
@@ -1317,6 +1324,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         Route(
             app_action(**_each(REDIRECT, SUPPLIER_MANAGERS)),
             path=_supplier_url("suppliers:deactivate"),
+        ),
+        Route(
+            app_action(**_each(NO_CONTENT, SUPPLIER_MANAGERS)),
+            position="htmx",
+            path=_supplier_url("suppliers:deactivate"),
+            headers=HTMX,
+            note="deactivated again from the dialog (no change): the page navigates",
         ),
     ),
     "suppliers:reactivate": (

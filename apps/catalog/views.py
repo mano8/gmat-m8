@@ -11,8 +11,10 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
@@ -28,11 +30,12 @@ from apps.catalog.forms import (
     MaterialForm,
 )
 from apps.catalog.models import Material, MaterialCategory
-from apps.core.forms import add_service_errors, error_text
+from apps.core.dialogs import ActionDialog
+from apps.core.forms import add_service_errors
 from apps.core.idempotency import IdempotencyError
 from apps.core.listing import paginate, render_list
 from apps.core.locking import RetryExhausted
-from apps.core.responses import conflict, idempotency_failure
+from apps.core.responses import conflict, idempotency_failure, perform
 
 VIEW, MANAGE = Capability.CATALOG_VIEW, Capability.CATALOG_MANAGE
 
@@ -87,7 +90,12 @@ def material_search(request: HttpRequest) -> HttpResponse:
 def material_detail(request: HttpRequest, material_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     material = selectors.material(ctx, material_id)
-    context = {"material": material, "manageable": selectors.manageable(ctx, material)}
+    manageable = selectors.manageable(ctx, material)
+    context = {
+        "material": material,
+        "manageable": manageable,
+        "deactivate_dialog": deactivate_dialog(material, Form()) if manageable else None,
+    }
     return render(request, "catalog/detail.html", context)
 
 
@@ -149,24 +157,42 @@ def material_update(request: HttpRequest, material_id: UUID) -> HttpResponse:
     return render(request, "catalog/form.html", {"form": form, "material": material})
 
 
+def deactivate_dialog(material: Material, form: Form) -> ActionDialog:
+    """Deactivating a material, as a confirmation dialog of its page (M8b.4)."""
+    return ActionDialog(
+        id="deactivate-dialog",
+        title=_("Deactivate the material"),
+        description=f"{material.reference} · {material.name}",
+        icon="ban",
+        tone="danger",
+        action=reverse("catalog:deactivate", args=[material.pk]),
+        submit=_("Deactivate"),
+        form=form,
+        consequences=(
+            _("The material is hidden from searches and new documents."),
+            _("Existing documents keep it. It can be reactivated."),
+        ),
+        cancel=_("Keep it active"),
+        testid="deactivate-form",
+        submit_testid="deactivate-submit",
+    )
+
+
 def _set_active(request: HttpRequest, material_id: UUID, *, active: bool) -> HttpResponse:
     ctx = access_for(request)
     material = _manageable(request, material_id)
     action = services.reactivate_material if active else services.deactivate_material
-    try:
-        action(ctx.principal, material.pk)
-    except ValidationError as exc:
-        messages.error(request, error_text(exc))
-    except RetryExhausted:
-        return conflict(request)
-    else:
-        messages.success(
-            request,
-            _("Material %(reference)s reactivated.") % {"reference": material.reference}
-            if active
-            else _("Material %(reference)s deactivated.") % {"reference": material.reference},
-        )
-    return redirect("catalog:detail", material_id=material.pk)
+    form = Form(request.POST)
+    form.is_valid()  # no fields: a service refusal can then be shown on it
+    return perform(
+        request,
+        lambda: action(ctx.principal, material.pk),
+        _("Material %(reference)s reactivated.") % {"reference": material.reference}
+        if active
+        else _("Material %(reference)s deactivated.") % {"reference": material.reference},
+        reverse("catalog:detail", args=[material.pk]),
+        dialog=deactivate_dialog(material, form).dialog(),
+    )
 
 
 @mutating(MANAGE)

@@ -10,7 +10,7 @@
       {% include "components/crumbs.html" with parent_label=_("Receive goods") parent_url=crumb_url current=order.number %}
       <h1>{% translate "Receive goods" %}</h1>
       <p class="page-head-sub">
-        <span data-field="order">{{ order.number }}</span>
+        <span class="font-mono" data-field="order">{{ order.number }}</span>
         · <span data-field="supplier">{{ order.supplier_snapshot.name }}</span>
         {% if order.expected_date %}
           · {% translate "Expected" %} {{ order.expected_date|date:"SHORT_DATE_FORMAT" }}
@@ -40,8 +40,9 @@
         <button type="submit" class="btn">{% translate "Change" %}</button>
       </form>
     {% else %}
-      <p class="mb-4 text-soft" data-testid="place-name">
-        {% translate "Arriving at" %}: <strong>{{ place.name }}</strong>
+      <p class="card mb-4 flex items-center gap-2" data-testid="place-name">
+        {% icon "map-pin" classes="size-5 text-soft" %}
+        <span>{% translate "Arriving at" %}: <strong>{{ place.name }}</strong></span>
       </p>
     {% endif %}
     {% if not rows %}
@@ -54,8 +55,8 @@
         {% csrf_token %}
         {{ form.idempotency_key }}
         {{ form.location }}
-        {% if form.non_field_errors %}<div role="alert" class="errorlist">{{ form.non_field_errors }}</div>{% endif %}
-        {{ form.location.errors }}
+        {# What is wrong with the form, in one place on top (the same summary the dialogs use). #}
+        {% include "components/error_summary.html" with form=form %}
         <section class="card mb-4" aria-label="{% translate 'Delivery' %}">
           {{ form.delivery_note_ref.as_field_group }}
         </section>
@@ -80,6 +81,7 @@
                   </p>
                 </div>
                 <div class="max-w-48">{{ entry.qty.as_field_group }}</div>
+                {# These disclosures hold fields of this one form (a dialog would nest a form in a form): they stay <details>. #}
                 <details class="mt-1"{% if entry.incident_open %} open{% endif %}>
                   <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Rejected goods or an incident" %}</summary>
                   <div class="max-w-48">{{ entry.rejected.as_field_group }}</div>
@@ -112,7 +114,12 @@
         <section class="card mb-4" aria-label="{% translate 'Notes' %}">
           {{ form.notes.as_field_group }}
         </section>
-        {% include "components/button.html" with type="submit" label=_("Post the receipt") variant="primary" block=True %}
+        <div class="action-bar" data-testid="receipt-bar">
+          <p class="action-bar-sum">
+            <span>{% blocktranslate count counter=entries|length %}{{ counter }} line{% plural %}{{ counter }} lines{% endblocktranslate %}</span>
+          </p>
+          {% include "components/button.html" with type="submit" label=_("Post the receipt") icon="package-check" variant="primary" block=True %}
+        </div>
       </form>
     {% endif %}
   {% endif %}
