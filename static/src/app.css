@@ -1548,6 +1548,40 @@
   }
 }
 
+/* --- action bar: the page's one main action (M8b.4) ---------------------------------------------
+   On a phone it sticks above the bottom bar, in thumb reach, with a line saying what it will do; from
+   48rem it is a plain card at the end of the facts. */
+@utility action-bar {
+  position: sticky;
+  bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: grid;
+  gap: 0.375rem;
+  margin: 0 -1rem 1rem;
+  border-block: 1px solid var(--line);
+  background-color: var(--surface-raised);
+  padding: 0.625rem 1rem;
+  & .action-bar-sum {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 0.75rem;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+  }
+  @media (min-width: 48rem) {
+    position: static;
+    margin-inline: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-1);
+    padding: 0.75rem 1rem;
+  }
+  @media print {
+    display: none;
+  }
+}
+
 /* --- avatar: initials ------------------------------------------------------------------------------ */
 @utility avatar {
   display: inline-grid;

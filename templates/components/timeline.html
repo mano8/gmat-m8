@@ -1,17 +1,21 @@
 {% load ui_tags %}
 {% comment %}
   History and audit entries, newest first as given. Parameter: entries, a list of dicts: title,
-  detail (optional), when (a datetime), tone ("ok", "warn", "danger", "brand" or empty), icon
-  (a Lucide name, default "circle"). The text carries the meaning; the dot only echoes it.
+  detail (optional), actor (optional, before the detail), action (optional, kept as data-action),
+  when (a datetime), tone ("ok", "warn", "danger", "brand" or empty), icon (a Lucide name,
+  default "circle"). The text carries the meaning; the dot only echoes it. testid names the list
+  (default "timeline").
 {% endcomment %}
-<ol class="timeline" data-testid="timeline">
+<ol class="timeline" data-testid="{{ testid|default:'timeline' }}">
   {% for entry in entries %}
-    <li>
+    <li{% if entry.action %} data-action="{{ entry.action }}"{% endif %}>
       <span class="timeline-dot"
             data-tone="{{ entry.tone }}">{% icon entry.icon|default:"circle" classes="size-3.5" %}</span>
       <div>
         <p class="font-medium">{{ entry.title }}</p>
-        {% if entry.detail %}<p class="text-soft">{{ entry.detail }}</p>{% endif %}
+        {% if entry.actor or entry.detail %}
+          <p class="text-soft">{{ entry.actor }}{% if entry.actor and entry.detail %} · {% endif %}{{ entry.detail }}</p>
+        {% endif %}
         {% if entry.when %}
           <time class="timeline-when"
                 datetime="{{ entry.when|date:'c' }}">{{ entry.when|date:"SHORT_DATETIME_FORMAT" }}</time>

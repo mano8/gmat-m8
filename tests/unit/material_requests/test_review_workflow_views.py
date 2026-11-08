@@ -500,7 +500,7 @@ class TestEditTools:
         first.refresh_from_db()
         assert (first.requested_qty, first.approved_qty) == (Decimal("14"), Decimal("14"))
 
-        remove = changed.context["rows"][1].remove.initial
+        remove = changed.context["rows"][1].remove.form.initial
         removed = client.post(
             url("remove_reviewed_line", second),
             {
@@ -527,7 +527,7 @@ class TestEditTools:
         found, client = submitted(make_request, people), client_for(people.engineer)
         line = found.lines.get(line_no=2)
         response = client.get(url("examine", found))
-        remove = response.context["rows"][1].remove.initial
+        remove = response.context["rows"][1].remove.form.initial
         removed = client.post(
             url("remove_reviewed_line", line),
             {
@@ -597,7 +597,7 @@ class TestRequesterSeesTheEdits:
             requested_qty="12",
             reason="Measured on site",
         )
-        remove = engineer.get(url("examine", found)).context["rows"][1].remove.initial
+        remove = engineer.get(url("examine", found)).context["rows"][1].remove.form.initial
         engineer.post(
             url("remove_reviewed_line", second),
             {

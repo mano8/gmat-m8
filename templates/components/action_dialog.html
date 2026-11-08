@@ -1,0 +1,6 @@
+{% comment %}
+  An action dialog drawn in its page (M8b.4): a native <dialog> holding the form of an
+  apps.core.dialogs.ActionDialog. Parameter: d. Opened by components/dialog_button.html (or a
+  menu item) with no script. Only on bounded pages (a document and its lines, Q43).
+{% endcomment %}
+{% include "components/dialog.html" with id=d.id title=d.title description=d.description tone=d.tone size=d.size content="components/dialog_form.html" testid=d.dialog_testid %}

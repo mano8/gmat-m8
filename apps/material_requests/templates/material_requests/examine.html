@@ -8,55 +8,77 @@
     <div class="page-head-main">
       {% url 'requests:inbox' as crumb_url %}
       {% include "components/crumbs.html" with parent_label=_("Approval inbox") parent_url=crumb_url current=request_obj.number|default:_("Request") %}
-      <h1 data-testid="examine-number">{{ request_obj.number|default:_("Request") }}</h1>
+      <h1 class="doc-no" data-testid="examine-number">{{ request_obj.number|default:_("Request") }}</h1>
       <p class="mt-1 flex flex-wrap gap-2">{% include "material_requests/status.html" with obj=request_obj %}</p>
     </div>
     <div class="page-head-actions">
       {% if request_obj.status == "APPROVED" %}
         {% can "handover.post" request_obj %}
           {% url 'handovers:new' as handover_url %}
-          <a class="btn" href="{{ handover_url }}?request={{ request_obj.pk }}">{% translate "Hand material over" %}</a>
+          <a class="btn btn-secondary"
+             href="{{ handover_url }}?request={{ request_obj.pk }}">{% translate "Hand material over" %}</a>
         {% endcan %}
+      {% endif %}
+      {% if menu_items %}
+        {% include "components/menu.html" with id="request-menu" label=_("More actions") items=menu_items %}
       {% endif %}
     </div>
   </header>
-  <section class="card mb-4" aria-label="{% translate 'Request details' %}">
-    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Request details' %}">
+    <dl class="facts">
       <div>
-        <dt class="text-sm text-soft">{% translate "Project" %}</dt>
+        <dt>{% translate "Project" %}</dt>
         <dd>
           {{ request_obj.project.code }} · {{ request_obj.project.name }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Requested by" %}</dt>
+        <dt>{% translate "Requested by" %}</dt>
         <dd>
           {{ request_obj.requested_by.full_name|default:request_obj.requested_by.email }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Priority" %}</dt>
+        <dt>{% translate "Priority" %}</dt>
         <dd data-testid="examine-priority">
           {{ request_obj.get_priority_display }}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-soft">{% translate "Needed by" %}</dt>
+        <dt>{% translate "Needed by" %}</dt>
         <dd data-testid="examine-needed-by">
           {{ request_obj.needed_by|date:"SHORT_DATE_FORMAT"|default:"—" }}
         </dd>
       </div>
+      {% if request_obj.status == "SUBMITTED" or request_obj.status == "APPROVED" %}
+        <div data-testid="assignment">
+          <dt>{% translate "Assigned reviewer" %}</dt>
+          <dd data-testid="assignee">
+            {% if assignee %}
+              {{ assignee.full_name|default:assignee.email }}
+            {% else %}
+              <span class="font-normal text-soft">{% translate "Nobody in particular: any reviewer of the branch can decide." %}</span>
+            {% endif %}
+          </dd>
+          {% if assign_form %}
+            <p class="mt-1">
+              {% include "components/dialog_button.html" with dialog="assign-dialog" label=_("Send to another reviewer") variant="link" testid="assign-open" %}
+            </p>
+          {% endif %}
+        </div>
+      {% endif %}
       {% if request_obj.notes %}
-        <div class="sm:col-span-2">
-          <dt class="text-sm text-soft">{% translate "Notes" %}</dt>
-          <dd class="whitespace-pre-line">
+        <div class="col-span-full">
+          <dt>{% translate "Notes" %}</dt>
+          <dd class="whitespace-pre-line font-normal">
             {{ request_obj.notes }}
           </dd>
         </div>
       {% endif %}
       {% if request_obj.status == "CLOSED" %}
-        <div class="sm:col-span-2" data-testid="request-closure">
-          <dt class="text-sm text-soft">{% translate "Closed" %}</dt>
+        <div class="col-span-full" data-testid="request-closure">
+          <dt>{% translate "Closed" %}</dt>
           <dd>
             {{ request_obj.get_close_mode_display }} · {{ request_obj.closed_at|date:"SHORT_DATETIME_FORMAT" }}
             {% if request_obj.close_reason %}· {{ request_obj.close_reason }}{% endif %}
@@ -65,87 +87,40 @@
       {% endif %}
     </dl>
   </section>
-  {% if request_obj.status == "SUBMITTED" or request_obj.status == "APPROVED" %}
-    <section class="card mb-4"
-             aria-label="{% translate 'Assigned reviewer' %}"
-             data-testid="assignment">
-      <p data-testid="assignee">
-        <span class="text-sm text-soft">{% translate "Assigned reviewer" %}:</span>
-        {% if assignee %}
-          {{ assignee.full_name|default:assignee.email }}
-        {% else %}
-          {% translate "Nobody in particular: any reviewer of the branch can decide." %}
-        {% endif %}
-      </p>
-      {% if assign_form %}
-        <details class="mt-2">
-          <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Send to another reviewer" %}</summary>
-          <form method="post"
-                action="{% url 'requests:assign_reviewer' request_id=request_obj.pk %}"
-                data-testid="assign-form">
-            {% csrf_token %}
-            {{ assign_form.reviewer.as_field_group }}
-            {{ assign_form.note.as_field_group }}
-            <button type="submit" class="btn">{% translate "Send" %}</button>
-          </form>
-        </details>
-      {% endif %}
-    </section>
-  {% endif %}
   {% if request_obj.status == "SUBMITTED" %}
     {% if own_request and not can_decide %}
       <p class="card mb-4 text-soft" data-testid="self-approval-notice">
         {% translate "This is your own request: another reviewer must decide it." %}
       </p>
-    {% elif can_decide %}
-      {% if own_request %}
-        <p class="card mb-4 text-soft" data-testid="self-decision-notice">
-          {% translate "This is your own request: your decisions are recorded as self-decisions." %}
-        </p>
-      {% endif %}
-      <section class="card mb-4" aria-label="{% translate 'Decide the request' %}">
-        <form method="post"
-              action="{% url 'requests:approve_all' request_id=request_obj.pk %}"
-              class="mb-3">
-          {% csrf_token %}
-          {{ approve_all_form.seen_version }}
-          <button type="submit"
-                  class="btn btn-primary btn-block"
-                  data-testid="approve-all">{% translate "Approve all pending lines" %}</button>
-        </form>
-        <details>
-          <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Return for changes" %}</summary>
-          <form method="post"
-                action="{% url 'requests:return_to_draft' request_id=request_obj.pk %}"
-                data-testid="return-form">
-            {% csrf_token %}
-            {{ return_form.note.as_field_group }}
-            <button type="submit" class="btn btn-danger btn-block">{% translate "Return to the requester" %}</button>
-          </form>
-        </details>
-      </section>
+    {% elif can_decide and own_request %}
+      <p class="card mb-4 text-soft" data-testid="self-decision-notice">
+        {% translate "This is your own request: your decisions are recorded as self-decisions." %}
+      </p>
     {% endif %}
   {% endif %}
   <section class="mb-4" aria-label="{% translate 'Lines' %}">
-    <h2 class="mb-2">{% translate "Lines" %}</h2>
-    {% if can_edit_lines %}
-      <p class="mb-3">
-        <a class="btn"
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2>{% translate "Lines" %}</h2>
+      {% if can_edit_lines %}
+        <a class="btn btn-secondary"
            href="{% url 'requests:new_line' request_id=request_obj.pk %}"
-           data-testid="add-line">{% translate "Add a line" %}</a>
-      </p>
-    {% endif %}
+           data-testid="add-line">
+          {% icon "plus" classes="size-5" %}
+          {% translate "Add a line" %}
+        </a>
+      {% endif %}
+    </div>
     <div data-testid="review-lines">
       {% for row in rows %}
         {% with entry=row.entry line=row.entry.line %}
-          <article class="card mb-3"
+          <article class="@container card mb-3"
                    data-line="{{ line.line_no }}"
                    data-testid="review-line">
             <div class="flex flex-wrap items-start justify-between gap-2">
-              <div>
+              <div class="min-w-0">
                 <span class="font-semibold">{{ line.line_no }}. {{ line.description }}</span>
                 {% if line.material_id %}
-                  <span class="block text-sm text-soft">{{ line.material.reference }}</span>
+                  <span class="block font-mono text-sm text-soft">{{ line.material.reference }}</span>
                 {% else %}
                   <span class="block text-sm text-soft">{% translate "Not in the catalog" %}</span>
                 {% endif %}
@@ -165,22 +140,22 @@
                 {% endif %}
               </span>
             </div>
-            <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+            <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm @sm:grid-cols-4">
               <div>
                 <dt class="text-soft">{% translate "Requested" %}</dt>
-                <dd data-field="requested">
+                <dd class="tabular-nums" data-field="requested">
                   {{ line.requested_qty|quantity }} {{ line.unit.code }}
                 </dd>
               </div>
               <div>
                 <dt class="text-soft">{% translate "Approved" %}</dt>
-                <dd data-field="approved">
+                <dd class="tabular-nums" data-field="approved">
                   {% if line.approved_qty is not None %}{{ line.approved_qty|quantity }} {{ line.unit.code }}{% else %}—{% endif %}
                 </dd>
               </div>
               <div>
                 <dt class="text-soft">{% translate "Delivered" %}</dt>
-                <dd data-field="delivered">
+                <dd class="tabular-nums" data-field="delivered">
                   {% if line.decision == "APPROVED" %}{{ entry.flows.delivered|quantity }} {{ line.unit.code }}{% else %}—{% endif %}
                 </dd>
               </div>
@@ -191,6 +166,11 @@
                 </dd>
               </div>
             </dl>
+            {% if line.decision == "APPROVED" and line.approved_qty %}
+              <div class="mt-3">
+                {% include "components/progress.html" with value=entry.flows.delivered maximum=line.approved_qty label=_("Delivered") unit=line.unit.code %}
+              </div>
+            {% endif %}
             {% if line.decision != "PENDING" %}
               <p class="mt-2 text-sm text-soft" data-testid="line-decision">
                 {% if line.decided_by %}
@@ -212,7 +192,7 @@
             {% if row.decide %}
               <form method="post"
                     action="{% url 'requests:decide_line' line_id=line.pk %}"
-                    class="mt-3"
+                    class="mt-3 border-t border-line pt-3"
                     data-testid="decide-form">
                 {% csrf_token %}
                 {{ row.decide.seen_version }}
@@ -235,7 +215,7 @@
             {% if row.sourcing %}
               <form method="post"
                     action="{% url 'requests:set_sourcing' line_id=line.pk %}"
-                    class="mt-3"
+                    class="mt-3 border-t border-line pt-3"
                     data-testid="sourcing-form">
                 {% csrf_token %}
                 {{ row.sourcing.sourcing.as_field_group }}
@@ -249,78 +229,38 @@
                 </p>
               {% endif %}
             {% endif %}
+            {% if row.edit or row.menu_items %}
+              <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                {% if row.edit %}
+                  {# A lazy dialog (M8b.3): htmx loads the change page's fragment into it; without JavaScript the link opens the page. #}
+                  {% url 'requests:edit_line' line_id=line.pk as edit_url %}
+                  <a class="btn btn-secondary"
+                     href="{{ edit_url }}"
+                     hx-get="{{ edit_url }}"
+                     hx-target="#line-dialog-content"
+                     data-dialog-open="line-dialog"
+                     data-testid="edit-line">
+                    {% icon "pencil" classes="size-5" %}
+                    {% translate "Change the line" %}
+                  </a>
+                {% endif %}
+                {% if row.menu_items %}
+                  {% include "components/menu.html" with id=row.menu_id label=_("More actions") items=row.menu_items %}
+                {% endif %}
+              </div>
+            {% endif %}
+            {# The line's inline dialogs (M8b.4): a bounded page, so one per action is fine. #}
             {% if row.reduce %}
-              <details class="mt-3">
-                <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Reduce the approved quantity" %}</summary>
-                <p class="text-sm text-soft">
-                  {% blocktranslate with floor=entry.floor|quantity %}At least {{ floor }} (delivered, received or on order).{% endblocktranslate %}
-                </p>
-                <form method="post"
-                      action="{% url 'requests:reduce_line' line_id=line.pk %}"
-                      data-testid="reduce-form">
-                  {% csrf_token %}
-                  {{ row.reduce.approved_qty.as_field_group }}
-                  {{ row.reduce.reason.as_field_group }}
-                  <button type="submit" class="btn">{% translate "Reduce" %}</button>
-                </form>
-              </details>
+              {% include "components/action_dialog.html" with d=row.reduce %}
             {% endif %}
             {% if row.close %}
-              <details class="mt-3">
-                <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Close the line short" %}</summary>
-                <form method="post"
-                      action="{% url 'requests:close_line' line_id=line.pk %}"
-                      data-testid="close-line-form">
-                  {% csrf_token %}
-                  {{ row.close.reason.as_field_group }}
-                  <button type="submit" class="btn btn-danger">{% translate "Close short" %}</button>
-                </form>
-              </details>
-            {% endif %}
-            {% if row.edit %}
-              <p class="mt-3">
-                {# A lazy dialog (M8b.3): htmx loads the change page's fragment into it; without JavaScript the link opens the page. #}
-                {% url 'requests:edit_line' line_id=line.pk as edit_url %}
-                <a class="btn"
-                   href="{{ edit_url }}"
-                   hx-get="{{ edit_url }}"
-                   hx-target="#line-dialog-content"
-                   data-dialog-open="line-dialog"
-                   data-testid="edit-line">{% translate "Change the line" %}</a>
-              </p>
+              {% include "components/action_dialog.html" with d=row.close %}
             {% endif %}
             {% if row.remove %}
-              <details class="mt-3">
-                <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Remove the line" %}</summary>
-                <p class="text-sm text-soft">
-                  {% if request_obj.status == "SUBMITTED" %}
-                    {% translate "The line stays on the request, rejected, with your reason." %}
-                  {% else %}
-                    {% translate "The line stays on the request, closed short, with your reason." %}
-                  {% endif %}
-                </p>
-                <form method="post"
-                      action="{% url 'requests:remove_reviewed_line' line_id=line.pk %}"
-                      data-testid="remove-line-form">
-                  {% csrf_token %}
-                  {{ row.remove.idempotency_key }}
-                  {{ row.remove.seen_version }}
-                  {{ row.remove.reason.as_field_group }}
-                  <button type="submit" class="btn btn-danger">{% translate "Remove" %}</button>
-                </form>
-              </details>
+              {% include "components/action_dialog.html" with d=row.remove %}
             {% endif %}
             {% if row.reopen %}
-              <details class="mt-3">
-                <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Reopen the line" %}</summary>
-                <form method="post"
-                      action="{% url 'requests:reopen_line' line_id=line.pk %}"
-                      data-testid="reopen-line-form">
-                  {% csrf_token %}
-                  {{ row.reopen.reason.as_field_group }}
-                  <button type="submit" class="btn">{% translate "Reopen" %}</button>
-                </form>
-              </details>
+              {% include "components/action_dialog.html" with d=row.reopen %}
             {% endif %}
           </article>
         {% endwith %}
@@ -341,70 +281,39 @@
       </form>
     </section>
   {% endif %}
-  {% if can_source and request_obj.status == "APPROVED" %}
-    <details class="card mb-4">
-      <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Close the request" %}</summary>
-      <p class="mb-2 text-sm text-soft">{% translate "Every line still open is closed short. Reopening restores them." %}</p>
-      {% if worksite_warning %}
-        <p class="mb-2 rounded-lg border border-warn bg-warn-soft p-3 text-sm"
-           role="note"
-           data-testid="worksite-warning">
-          {% translate "An order still on its way ships to this request's own worksite: goods may still arrive on site after the close, and will be recorded as site surplus." %}
-        </p>
-      {% endif %}
-      <form method="post"
-            action="{% url 'requests:close' request_id=request_obj.pk %}"
-            data-testid="close-form">
-        {% csrf_token %}
-        {{ reason_form.reason.as_field_group }}
-        <button type="submit" class="btn btn-danger">{% translate "Close request" %}</button>
-      </form>
-    </details>
-  {% endif %}
-  {% if can_source and request_obj.status == "CLOSED" %}
-    <details class="card mb-4">
-      <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Reopen the request" %}</summary>
-      <form method="post"
-            action="{% url 'requests:reopen' request_id=request_obj.pk %}"
-            data-testid="reopen-form">
-        {% csrf_token %}
-        {{ reason_form.reason.as_field_group }}
-        <button type="submit" class="btn">{% translate "Reopen request" %}</button>
-      </form>
-    </details>
-  {% endif %}
-  {% if can_cancel_any %}
-    <details class="card mb-4">
-      <summary class="min-h-11 cursor-pointer py-2 font-medium text-brand">{% translate "Cancel the request" %}</summary>
-      <p class="mb-2 text-sm text-soft">{% translate "Only possible while nothing has been ordered or delivered." %}</p>
-      <form method="post"
-            action="{% url 'requests:cancel_any' request_id=request_obj.pk %}"
-            data-testid="cancel-form">
-        {% csrf_token %}
-        {{ cancel_form.reason.as_field_group }}
-        <button type="submit" class="btn btn-danger">{% translate "Cancel request" %}</button>
-      </form>
-    </details>
-  {% endif %}
   {% include "attachments/panel.html" with panel=attachments %}
   {% if history %}
     <section class="mb-4" aria-label="{% translate 'History' %}">
       <h2 class="mb-2">{% translate "History" %}</h2>
-      <ol class="grid gap-2" data-testid="history">
-        {% for entry in history %}
-          <li class="card" data-action="{{ entry.action }}">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="font-medium">{{ entry.label }}{% if entry.line_no %} · {% blocktranslate with line=entry.line_no %}line {{ line }}{% endblocktranslate %}{% endif %}</span>
-              <span class="text-sm text-soft">{{ entry.occurred_at|date:"SHORT_DATETIME_FORMAT" }}</span>
-            </div>
-            <p class="text-sm text-soft">{{ entry.actor }}{% if entry.detail %} · {{ entry.detail }}{% endif %}</p>
-          </li>
-        {% endfor %}
-      </ol>
+      <div class="card">{% include "components/timeline.html" with entries=history testid="history" %}</div>
     </section>
+  {% endif %}
+  {% if request_obj.status == "SUBMITTED" and can_decide %}
+    <div class="action-bar" data-testid="decide-bar">
+      <p class="action-bar-sum">
+        <span>
+          {% blocktranslate count counter=pending_count %}{{ counter }} line waits for a decision{% plural %}{{ counter }} lines wait for a decision{% endblocktranslate %}
+        </span>
+      </p>
+      <form method="post"
+            action="{% url 'requests:approve_all' request_id=request_obj.pk %}">
+        {% csrf_token %}
+        {{ approve_all_form.seen_version }}
+        <button type="submit"
+                class="btn btn-primary btn-block"
+                data-testid="approve-all">
+          {% icon "check" classes="size-5" %}
+          {% translate "Approve all pending lines" %}
+        </button>
+      </form>
+    </div>
   {% endif %}
   {% url 'requests:inbox' as inbox_url %}
   <p class="mt-4">{% include "components/button.html" with href=inbox_url label=_("Approval inbox") variant="link" %}</p>
+  {# The request's own dialogs, opened from the menu above (each draws once, whatever the lines). #}
+  {% for d in dialogs %}
+    {% include "components/action_dialog.html" with d=d %}
+  {% endfor %}
   {% if can_edit_lines %}
     {# One dialog for every line: each "Change the line" loads that line's form into it. #}
     {% include "components/dialog.html" with id="line-dialog" title=_("Change a line") size="lg" testid="line-dialog" %}

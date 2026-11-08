@@ -49,6 +49,7 @@ from apps.material_requests.views.common import (
     _on_request,
     _perform,
 )
+from apps.material_requests.views.review_dialogs import line_form_ids, remove_line_dialog
 
 EDIT = Capability.REQUEST_EDIT
 Status = MaterialRequest.Status
@@ -284,9 +285,10 @@ def line_remove_reviewed(request: HttpRequest, line_id: UUID) -> HttpResponse:
     stays on the request, with the reason."""
     ctx = access_for(request)
     line = _on_line(request, line_id, EDIT)
-    form = LineRemoveForm(request.POST)
+    form = LineRemoveForm(request.POST, auto_id=line_form_ids(line, "remove"))
+    dialog = remove_line_dialog(line, form, line.request.status).dialog()
     if not form.is_valid():
-        return _invalid(request, form, _examine_url(line))
+        return _invalid(request, form, _examine_url(line), dialog=dialog)
     data = form.cleaned_data
     return _perform(
         request,
@@ -299,4 +301,5 @@ def line_remove_reviewed(request: HttpRequest, line_id: UUID) -> HttpResponse:
         ),
         _("Line %(line)s removed.") % {"line": line.line_no},
         _examine_url(line),
+        dialog=dialog,
     )

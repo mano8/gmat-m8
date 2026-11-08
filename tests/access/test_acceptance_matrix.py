@@ -982,6 +982,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=request_url("requests:return_to_draft", "review_request"),
             note="an empty note: back to the page",
         ),
+        Route(
+            review_action(UNPROCESSABLE),
+            position="a submitted request, htmx",
+            path=request_url("requests:return_to_draft", "review_request"),
+            headers=HTMX,
+            note="an empty note from the dialog: the form again with its errors",
+        ),
     ),
     "requests:decide_line": (
         Route(
@@ -997,6 +1004,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a line of an approved request",
             path=line_of("requests:reduce_line", "approved_request_line"),
             note="an empty form: back to the page",
+        ),
+        Route(
+            review_action(UNPROCESSABLE),
+            position="a line of an approved request, htmx",
+            path=line_of("requests:reduce_line", "approved_request_line"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
         ),
     ),
     "requests:set_sourcing": (
@@ -1029,6 +1043,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=line_of("requests:close_line", "approved_request_line"),
             note="no reason: back to the page",
         ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a line of an approved request, htmx",
+            path=line_of("requests:close_line", "approved_request_line"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
     ),
     "requests:reopen_line": (
         Route(
@@ -1036,6 +1057,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a line of an approved request",
             path=line_of("requests:reopen_line", "approved_request_line"),
             note="no reason: back to the page",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a line of an approved request, htmx",
+            path=line_of("requests:reopen_line", "approved_request_line"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
         ),
     ),
     "requests:schedule": (
@@ -1053,6 +1081,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=request_url("requests:close", "approved_request"),
             note="no reason: back to the page",
         ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="an approved request, htmx",
+            path=request_url("requests:close", "approved_request"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
+        ),
     ),
     "requests:reopen": (
         Route(
@@ -1060,6 +1095,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="an approved request",
             path=request_url("requests:reopen", "approved_request"),
             note="no reason: back to the page",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="an approved request, htmx",
+            path=request_url("requests:reopen", "approved_request"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
         ),
     ),
     "requests:cancel_any": (
@@ -1079,6 +1121,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a submitted request",
             path=request_url("requests:assign_reviewer", "review_request"),
             note="an empty form: back to the page",
+        ),
+        Route(
+            review_action(UNPROCESSABLE),
+            position="a submitted request, htmx",
+            path=request_url("requests:assign_reviewer", "review_request"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
         ),
     ),
     "requests:edit_line": (
@@ -1132,6 +1181,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="a live line of an approved request",
             path=line_of("requests:remove_reviewed_line", "approved_request_line"),
             note="no reason: back to the page",
+        ),
+        Route(
+            source_action(UNPROCESSABLE),
+            position="a live line of an approved request, htmx",
+            path=line_of("requests:remove_reviewed_line", "approved_request_line"),
+            headers=HTMX,
+            note="no reason from the dialog: the form again with its errors",
         ),
     ),
     "requests:withdraw": (

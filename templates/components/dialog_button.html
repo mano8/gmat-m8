@@ -1,0 +1,16 @@
+{% load ui_tags %}
+{% comment %}
+  The button that opens an inline dialog (M8b.4): an invoker command, no script (app.js covers
+  browsers without it). Parameters: dialog (the dialog's id), label, variant (as button.html),
+  icon, size ("sm"), testid.
+{% endcomment %}
+<button type="button"
+        class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'secondary' %} btn-secondary{% elif variant == 'ghost' %} btn-ghost{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if size == 'sm' %} btn-sm{% endif %}"
+        commandfor="{{ dialog }}"
+        command="show-modal"
+        {% if testid %}data-testid="{{ testid }}"{% endif %}>
+  {% if icon %}
+    {% icon icon classes="size-5" %}
+  {% endif %}
+  {{ label }}
+</button>
