@@ -204,17 +204,33 @@ def receive_at_worksite(
     return post_receipt(page, quantities)
 
 
+def open_line_dialog(page: Page, reference: str) -> Locator:
+    """``Change the line`` opens the review page's dialog and loads the line's form into it."""
+    review_line(page, reference).get_by_test_id("edit-line").click()
+    dialog = page.get_by_test_id("line-dialog")
+    expect(dialog).to_be_visible()
+    expect(dialog.get_by_test_id("line-form")).to_be_visible()
+    return dialog
+
+
+def send_dialog(page: Page, dialog: Locator, button: str) -> None:
+    """Send a dialog's form that will be accepted: the whole page navigates (``HX-Redirect``)."""
+    with page.expect_navigation():
+        dialog.get_by_test_id(button).click()
+    expect(dialog).to_be_hidden()
+
+
 def change_line(
     page: Page, reference: str, quantity: str, reason: str, *, approve: bool = False
 ) -> None:
-    """A reviewer's edit of a line (``Change the line``), saved, or saved and approved."""
-    review_line(page, reference).get_by_test_id("edit-line").click()
-    page.wait_for_url("**/edit/")
-    form = page.get_by_test_id("line-form")
+    """A reviewer's edit of a line (``Change the line``, a dialog), saved, or saved and
+    approved; the review page reloads with the edit."""
+    dialog = open_line_dialog(page, reference)
+    form = dialog.get_by_test_id("line-form")
     form.locator("input[name=requested_qty]").fill(quantity)
     form.locator("[name=reason]").fill(reason)
-    form.get_by_test_id("save-and-approve" if approve else "save-edit").click()
-    page.wait_for_url("**/examine/")
+    send_dialog(page, dialog, "save-and-approve" if approve else "save-edit")
+    expect(page).to_have_url(re.compile(r"/examine/$"))
 
 
 def invite(
