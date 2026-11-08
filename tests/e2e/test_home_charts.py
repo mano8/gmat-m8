@@ -24,7 +24,7 @@ def settled(page: Page) -> None:
 
 def drawn_charts(page: Page) -> int:
     cards = page.locator(".chart-card:has(canvas[data-chart])")
-    count = cards.count()
+    count: int = cards.count()
     for index in range(count):
         card = cards.nth(index)
         canvas = card.locator("canvas[data-chart]")

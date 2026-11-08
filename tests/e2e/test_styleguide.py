@@ -4,6 +4,7 @@ file, so it only runs where the CSS has been built (``static/dist/app.css``)."""
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from django.conf import settings
@@ -36,8 +37,10 @@ def page_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
 
 
 @pytest.mark.parametrize("scheme", ["light", "dark"])
-def test_the_style_guide_fits_a_phone(browser: Browser, page_url: str, scheme: str) -> None:
-    context = browser.new_context(**PHONE, color_scheme=scheme)  # type: ignore[arg-type]
+def test_the_style_guide_fits_a_phone(
+    browser: Browser, page_url: str, scheme: Literal["light", "dark"]
+) -> None:
+    context = browser.new_context(**PHONE, color_scheme=scheme)
     page = context.new_page()
     problems: list[str] = []
     page.on(
