@@ -181,3 +181,9 @@ def sparkline(values: Sequence[float | Decimal]) -> SafeString:
         last_x,
         last_y,
     )
+
+
+@register.simple_tag
+def steps(*labels: str) -> list[str]:
+    """The labels of a short flow's steps, for ``components/stepper.html``."""
+    return list(labels)

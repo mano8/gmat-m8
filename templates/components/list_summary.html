@@ -1,10 +1,12 @@
-{% load i18n list_tags %}
+{% load i18n list_tags ui_tags %}
 {% comment %}
   The head of a list's results partial: how many rows match and, when filters are in force, how
   many and a way to clear them. Parameters: form (the filter form), listing (the ListPage or CursorPage: the latter has no total).
-  `data-list-count` is read by app.js into the toolbar's live region after a refresh.
+  `data-list-count` is read by app.js into the toolbar's live region after a refresh. The filters
+  in force are also drawn as chips, each removing only itself (M8b.4).
 {% endcomment %}
 {% active_filter_count form as filter_count %}
+{% active_filter_chips form listing as filter_chips %}
 <p class="mb-2 flex flex-wrap items-center gap-x-3 text-sm text-soft">
   <span data-list-count>
     {% if listing.counted %}
@@ -32,3 +34,18 @@
        class="-my-3 inline-flex min-h-11 items-center underline">{% translate "Clear filters" %}</a>
   {% endif %}
 </p>
+{% if filter_chips %}
+  {# Each filter in force as a chip that removes only it; the links are plain, so they work without JavaScript. #}
+  <ul class="mb-3 flex flex-wrap gap-2" data-testid="active-filters">
+    {% for chip in filter_chips %}
+      <li>
+        <a class="filter-chip"
+           href="{{ chip.url }}"
+           aria-label="{% blocktranslate with label=chip.label value=chip.value trimmed %}Remove the filter {{ label }}: {{ value }}{% endblocktranslate %}">
+          <span>{{ chip.label }}: <strong>{{ chip.value }}</strong></span>
+          {% icon "x" classes="size-4" %}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}

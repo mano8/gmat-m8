@@ -20,7 +20,12 @@ from apps.catalog.models import Material, UnitOfMeasure
 from apps.core import listing
 from apps.core.http import is_htmx
 from apps.core.listing import PAGE_SIZES, ListPage, ListScope, paginate, render_list
-from apps.core.templatetags.list_tags import active_filter_count, clear_filters_url, page_url
+from apps.core.templatetags.list_tags import (
+    active_filter_chips,
+    active_filter_count,
+    clear_filters_url,
+    page_url,
+)
 from tests.org import Org, People, client_for
 
 SORTS = {"code": ("code",), "name": ("name",)}
@@ -195,6 +200,45 @@ class TestTags:
     def test_clearing_everything_is_the_bare_path(self) -> None:
         request = get("q=a&page=2")
         assert clear_filters_url({"request": request}, Filters(request.GET)) == "/list/"
+
+
+class Choices(forms.Form):
+    status = forms.ChoiceField(
+        label="Status", required=False, choices=[("", "All"), ("OPEN", "Open"), ("DONE", "Done")]
+    )
+    q = forms.CharField(label="Search", required=False)
+
+
+class TestFilterChips:
+    def chips(self, query: str) -> list[Any]:
+        request = get(query)
+        form = Choices(request.GET)
+        form.is_valid()
+        return active_filter_chips({"request": request}, form)
+
+    def test_one_chip_per_filter_in_force_with_the_choice_read_as_a_person_does(self) -> None:
+        chips = self.chips("status=OPEN&q=cable")
+        assert [(c.label, c.value) for c in chips] == [("Status", "Open"), ("Search", "cable")]
+
+    def test_a_chip_removes_only_its_filter_and_starts_the_page_again(self) -> None:
+        chips = self.chips("status=OPEN&q=cable&page=3&per_page=50&sort=-name")
+        assert chips[0].url == "/list/?q=cable&per_page=50&sort=-name"
+        assert chips[1].url == "/list/?status=OPEN&per_page=50&sort=-name"
+
+    def test_no_filter_no_chip(self) -> None:
+        assert self.chips("page=2") == []
+        assert active_filter_chips({"request": get("")}, None) == []
+
+    def test_an_unknown_choice_shows_what_was_sent_never_markup(self) -> None:
+        chips = self.chips("status=<b>x</b>")
+        assert chips[0].value == "<b>x</b>"
+        html = render(
+            "components/list_summary.html",
+            get("status=<b>x</b>"),
+            form=Choices(get("status=<b>x</b>").GET),
+            listing=paginate(get(), [1], default_per_page=10),
+        )
+        assert "<b>x</b>" not in html and "&lt;b&gt;x&lt;/b&gt;" in html
 
 
 def render(name: str, request: Any, **context: Any) -> str:

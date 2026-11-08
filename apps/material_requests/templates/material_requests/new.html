@@ -12,6 +12,7 @@
       <p class="page-head-sub">{% translate "Which project is the material for?" %}</p>
     </div>
   </header>
+  {% include "components/request_steps.html" with current=1 %}
   {% url 'requests:new' as new_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#project-results" action=new_url sort_always=True grid="sm:grid-cols-[1fr_auto]" %}
   {% partialdef results inline %}

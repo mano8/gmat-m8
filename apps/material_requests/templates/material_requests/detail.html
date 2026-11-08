@@ -12,7 +12,8 @@
       <p class="mt-1 flex flex-wrap gap-2">{% include "material_requests/status.html" with obj=request_obj %}</p>
     </div>
   </header>
-  <section class="@container card mb-4" aria-label="{% translate 'Request details' %}">
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Request details' %}">
     <dl class="facts">
       <div>
         <dt>{% translate "Project" %}</dt>
@@ -57,6 +58,7 @@
     </dl>
   </section>
   {% if editable %}
+    {% include "components/request_steps.html" with current=2 %}
     <section class="card mb-4" aria-label="{% translate 'Add materials' %}">
       <h2 class="card-title">{% translate "Add materials" %}</h2>
       <form method="get"
@@ -73,12 +75,10 @@
     </section>
     {% include "material_requests/draft_lines.html" %}
     {% include "attachments/panel.html" with panel=attachments %}
-    <form method="post"
-          action="{% url 'requests:cancel' request_id=request_obj.pk %}"
-          class="mt-4">
-      {% csrf_token %}
-      {% include "components/button.html" with label=_("Discard draft") type="submit" variant="danger" block=True %}
-    </form>
+    <p class="mt-4">
+      {% include "components/dialog_button.html" with dialog=discard_dialog.id label=_("Discard draft") variant="danger" icon="trash" testid="discard-draft-open" %}
+    </p>
+    {% include "components/action_dialog.html" with d=discard_dialog %}
   {% else %}
     <section class="mb-4">
       <h2 class="mb-2">{% translate "Lines" %}</h2>

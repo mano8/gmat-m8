@@ -199,3 +199,23 @@ def free_line_dialog(found: MaterialRequest, form: Form) -> ActionDialog:
         testid="free-line-form",
         submit_testid="free-line-submit",
     )
+
+
+def discard_draft_dialog(found: MaterialRequest, form: Form) -> ActionDialog:
+    """Discarding the requester's own draft, as a confirmation dialog of its page."""
+    return ActionDialog(
+        id="discard-draft-dialog",
+        title=_("Discard draft"),
+        icon="trash",
+        tone="danger",
+        action=reverse("requests:cancel", args=[found.pk]),
+        submit=_("Discard draft"),
+        form=form,
+        consequences=(
+            _("The draft and its lines are thrown away."),
+            _("Nothing has been sent to a reviewer yet."),
+        ),
+        cancel=_("Keep the draft"),
+        testid="discard-draft-form",
+        submit_testid="discard-draft-submit",
+    )

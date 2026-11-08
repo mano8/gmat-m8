@@ -1,5 +1,6 @@
 """Template helpers of the list toolkit (``apps.core.listing``)."""
 
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 
@@ -15,6 +16,53 @@ register = template.Library()
 def active_filter_count(form: forms.Form | None) -> int:
     """How many of the filter form's fields carry a value in the request."""
     return len(listing.active_filters(form)) if form is not None else 0
+
+
+@dataclass(frozen=True)
+class FilterChip:
+    """One filter in force: what it is, what it is set to, and the list without it."""
+
+    label: str
+    value: str
+    url: str
+
+
+def _shown(form: forms.Form, name: str) -> str:
+    """The value of a filter as a person reads it: a choice's label, an object's name, a date."""
+    field = form.fields[name]
+    cleaned = getattr(form, "cleaned_data", {}).get(name)
+    if cleaned not in (None, "", False):
+        if isinstance(field, forms.ChoiceField) and not isinstance(field, forms.ModelChoiceField):
+            return str(dict(field.choices).get(cleaned, cleaned))  # type: ignore[arg-type]
+        return str(cleaned)
+    raw = form.data.get(form.add_prefix(name), "")
+    if isinstance(field, forms.ChoiceField) and not isinstance(field, forms.ModelChoiceField):
+        return str(dict(field.choices).get(raw, raw))  # type: ignore[arg-type]
+    return str(raw)
+
+
+@register.simple_tag(takes_context=True)
+def active_filter_chips(
+    context: dict[str, Any], form: forms.Form | None, page: ListPage | CursorPage | None = None
+) -> list[FilterChip]:
+    """The filters in force as chips, each with the URL of the list without that filter.
+
+    Everything else in the query stays (the other filters, the page size, the sort, the other
+    sections of a page); the page starts again. The values come from the form already cleaned
+    for the list, so a chip costs no query.
+    """
+    if form is None:
+        return []
+    request = context["request"]
+    chips = []
+    for name in listing.active_filters(form):
+        drop = {form.add_prefix(name), *(page.reset_params if page is not None else ("page",))}
+        kept = [(key, value) for key, value in request.GET.items() if key not in drop]
+        url = f"{request.path}?{urlencode(kept)}" if kept else request.path
+        if page is not None and page.anchor:
+            url = f"{url}#{page.anchor}"
+        chips.append(FilterChip(str(form.fields[name].label or name), _shown(form, name), url))
+    return chips
 
 
 @register.simple_tag(takes_context=True)

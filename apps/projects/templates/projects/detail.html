@@ -34,7 +34,8 @@
       </div>
     </div>
   </header>
-  <section class="@container card mb-4" aria-label="{% translate 'Project details' %}">
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Project details' %}">
     <dl class="facts">
       <div>
         <dt>{% translate "Client" %}</dt>
@@ -128,7 +129,9 @@
         {% endif %}
       </div>
       {% if share_dialog %}
-        <p>{% include "components/dialog_button.html" with dialog="share-dialog" label=_("Share the project") variant="primary" icon="users" testid="share-open" %}</p>
+        <p>
+          {% include "components/dialog_button.html" with dialog="share-dialog" label=_("Share the project") variant="primary" icon="users" testid="share-open" %}
+        </p>
       {% endif %}
     </section>
   {% endif %}

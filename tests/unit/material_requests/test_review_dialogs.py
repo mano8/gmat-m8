@@ -231,3 +231,31 @@ class TestSentFromTheDialog:
         )
         assert response.status_code == 422
         assert 'data-testid="assign-form"' in html(response)
+
+
+class TestTheRequestersDraft:
+    def test_the_draft_page_confirms_a_discard_in_a_dialog_and_shows_the_steps(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        draft = make_request()
+        page = html(client_for(people.tech_mad).get(url("detail", draft)))
+        assert 'id="discard-draft-dialog"' in page and 'data-testid="stepper"' in page
+        assert "Nothing has been sent to a reviewer yet." in page
+        assert 'aria-current="step"' in page
+
+    def test_discarding_from_the_dialog_navigates_to_the_list(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        draft = make_request()
+        response = post(client_for(people.tech_mad), url("cancel", draft), headers=HTMX)
+        assert response.status_code == 204
+        assert response["HX-Redirect"].endswith("/requests/")
+        draft.refresh_from_db()
+        assert draft.status == Status.CANCELLED
+
+    def test_a_plain_post_still_flashes_and_redirects(
+        self, make_request: MakeRequest, people: People
+    ) -> None:
+        draft = make_request()
+        response = post(client_for(people.tech_mad), url("cancel", draft), follow=True)
+        assert any("discarded" in message for message in messages_of(response))

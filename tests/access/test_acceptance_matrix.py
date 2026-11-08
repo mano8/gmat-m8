@@ -1006,6 +1006,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="the partner's draft",
             path=request_url("requests:cancel", "partner_request"),
         ),
+        Route(
+            request_own_action(TECH_REQUEST_VIEWERS, "tech_mad", DENIED),
+            position="own draft, htmx",
+            path=request_url("requests:cancel", "materialrequest"),
+            headers=HTMX,
+            note="already discarded by the plain row: the owner may no longer act on it",
+        ),
     ),
     # The reviewer (M4.4): inbox and review page, then one POST per action. An empty form is
     # invalid and changes nothing (back to the page), except approve-all and cancel, which

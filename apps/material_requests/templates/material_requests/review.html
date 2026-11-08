@@ -12,6 +12,7 @@
       <p class="page-head-sub">{{ request_obj.project.code }} · {{ request_obj.project.name }}</p>
     </div>
   </header>
+  {% include "components/request_steps.html" with current=3 %}
   <section class="card mb-4" aria-label="{% translate 'Lines' %}">
     <h2 class="card-title">{% translate "Lines" %}</h2>
     <ul class="divide-y divide-line">
@@ -31,6 +32,8 @@
         class="card">
     {% csrf_token %}
     {{ form }}
-    {% include "components/button.html" with label=_("Submit request") type="submit" variant="primary" block=True %}
+    <div class="action-bar" data-testid="submit-bar">
+      {% include "components/button.html" with label=_("Submit request") type="submit" icon="send" variant="primary" block=True %}
+    </div>
   </form>
 {% endblock content %}

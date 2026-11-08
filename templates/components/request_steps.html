@@ -1,0 +1,7 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The new-request flow's steps (M8b.4): project, materials, review and submit.
+  Parameter: current (1 to 3).
+{% endcomment %}
+{% steps _("Project") _("Materials") _("Review and submit") as flow %}
+{% include "components/stepper.html" with steps=flow current=current label=_("New request") %}
