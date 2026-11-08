@@ -41,7 +41,7 @@ from apps.receiving.models import GoodsReceipt
 from tests.org import Org, People, build_org, build_people, client_for
 from tests.volume import Volume, build_volume
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db]
 
 BUDGET_SECONDS = 0.3
 RUNS = 5

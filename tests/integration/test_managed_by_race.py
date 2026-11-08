@@ -22,7 +22,7 @@ from apps.organizations.services import update_branch
 from tests.integration.conftest import run_concurrently
 from tests.support import grant, principal_for
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 
 @pytest.fixture

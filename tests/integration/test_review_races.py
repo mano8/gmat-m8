@@ -26,7 +26,7 @@ from tests.integration.conftest import run_concurrently
 from tests.org import Org, People
 from tests.support import principal_for
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 Status = MaterialRequest.Status
 HOLD = 0.4  # seconds the first operation keeps its locks

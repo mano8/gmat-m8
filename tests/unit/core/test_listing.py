@@ -618,7 +618,9 @@ class TestSeekAfter:
         after = listing.seek_after(narrowed, self.rows(), ("code", "pk"), str(first.pk))
         assert list(after) == rest
 
-    @pytest.mark.parametrize("cursor", ["", "nope", str(uuid7())])
+    @pytest.mark.parametrize(
+        "cursor", ["", "nope", str(uuid7())], ids=["empty", "garbage", "unknown-id"]
+    )
     def test_a_cursor_that_names_nothing_reads_from_the_start(self, cursor: str) -> None:
         after = listing.seek_after(self.rows(), self.rows(), ("code", "pk"), cursor)
         assert list(after) == list(self.rows().order_by("code", "pk"))

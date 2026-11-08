@@ -34,7 +34,7 @@ from tests.org import build_org
 from tests.outbox import SECRET_BODY, FakeOrders, no_dispatch_source, start_worker
 from tests.smtp import Behaviour, fake_smtp
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 
 def security_mails(user: User, count: int) -> list[EmailOutbox]:

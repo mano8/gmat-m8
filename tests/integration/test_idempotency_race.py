@@ -18,7 +18,7 @@ from apps.core.idempotency import IdempotentResult, idempotent, issue_key
 from apps.core.models import DocumentSequence, IdempotencyRecord
 from tests.integration.conftest import run_concurrently
 
-pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
+pytestmark = [pytest.mark.integration, pytest.mark.serial, pytest.mark.django_db(transaction=True)]
 
 OPERATION = "test.create"
 
