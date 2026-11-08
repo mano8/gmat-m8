@@ -14,6 +14,20 @@
     }
   });
 
+  // A menu or sheet (a popover) is not modal: when the keyboard moves the focus past its end, it
+  // closes instead of staying open over the page the focus has gone to.
+  document.addEventListener("focusin", function (event) {
+    document.querySelectorAll("[popover]:popover-open").forEach(function (popover) {
+      if (popover.getAttribute("popover") === "manual" || popover.contains(event.target)) {
+        return;
+      }
+      var invoker = popover.id ? document.querySelector('[popovertarget="' + popover.id + '"]') : null;
+      if (!invoker || !invoker.contains(event.target)) {
+        popover.hidePopover();
+      }
+    });
+  });
+
   // Success messages fade after a few seconds.
   window.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-autohide]").forEach(function (node) {

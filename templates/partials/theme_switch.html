@@ -9,12 +9,10 @@
       method="post"
       hx-post="{% url 'core:ui_preferences' %}"
       hx-swap="none"
-      data-theme-switch
-      role="group"
-      aria-label="{% translate 'Theme' %}">
+      data-theme-switch>
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ language_next|default:'/' }}">
-  <div class="seg">
+  <div class="seg" role="group" aria-label="{% translate 'Theme' %}">
     <button type="submit"
             name="theme"
             value="system"

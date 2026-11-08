@@ -23,6 +23,7 @@
            rel="prev">{% icon "chevron-left" classes="size-4" %}{% translate "Previous" %}</a>
       {% else %}
         <span class="btn hidden pointer-events-none opacity-50 sm:inline-flex"
+              role="link"
               aria-disabled="true"
               aria-label="{% translate 'First page' %}">{% icon "chevrons-left" classes="size-4" %}</span>
         <span class="btn pointer-events-none opacity-50"
@@ -38,6 +39,7 @@
               <span aria-hidden="true" class="px-2 text-soft">…</span>
             {% elif item == listing.number %}
               <span class="btn btn-primary min-w-11 tabular-nums"
+                    role="link"
                     aria-current="page"
                     aria-label="{% blocktranslate with number=item %}Page {{ number }}{% endblocktranslate %}">{{ item }}</span>
             {% else %}
@@ -59,6 +61,7 @@
         <span class="btn pointer-events-none opacity-50"
               aria-disabled="true">{% translate "Next" %}{% icon "chevron-right" classes="size-4" %}</span>
         <span class="btn hidden pointer-events-none opacity-50 sm:inline-flex"
+              role="link"
               aria-disabled="true"
               aria-label="{% translate 'Last page' %}">{% icon "chevrons-right" classes="size-4" %}</span>
       {% endif %}

@@ -60,12 +60,12 @@
             {% else %}
               <span class="font-normal text-soft">{% translate "Nobody in particular: any reviewer of the branch can decide." %}</span>
             {% endif %}
+            {% if assign_form %}
+              <p class="mt-1 font-normal">
+                {% include "components/dialog_button.html" with dialog="assign-dialog" label=_("Send to another reviewer") variant="link" testid="assign-open" %}
+              </p>
+            {% endif %}
           </dd>
-          {% if assign_form %}
-            <p class="mt-1">
-              {% include "components/dialog_button.html" with dialog="assign-dialog" label=_("Send to another reviewer") variant="link" testid="assign-open" %}
-            </p>
-          {% endif %}
         </div>
       {% endif %}
       {% if request_obj.notes %}
