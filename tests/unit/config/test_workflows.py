@@ -116,25 +116,76 @@ def test_the_report_names_files_from_the_repository_root() -> None:
     assert run["source_pkgs"] == ["apps", "config"]
     assert "source" not in run
     steps = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["test"]["steps"]
-    tests = next(step for step in steps if "--cov-report=xml:coverage.xml" in step.get("run", ""))
-    assert str(tests["name"]).startswith("Serial tests, coverage of both passes")
+    combined = next(step for step in steps if "coverage combine" in step.get("run", ""))
+    assert "coverage xml -o coverage.xml" in combined["run"]
     report = next(step for step in steps if step.get("name") == "Upload coverage report")
     assert "coverage.xml" in report["with"]["path"]
 
 
-def test_the_tests_run_in_parallel_then_the_serial_ones_alone() -> None:
-    """Issue #42: one coverage data file over two passes; the floor applies to both together."""
-    steps = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["test"]["steps"]
-    runs = [" ".join(step["run"].split()) for step in steps if "pytest" in step.get("run", "")]
-    assert len(runs) == 2
-    parallel, serial = runs
-    assert "-n auto" in parallel
-    assert '-m "not live and not e2e and not serial"' in parallel
-    assert "--cov-fail-under=0" in parallel
-    assert "-n " not in serial
-    assert '-m "serial and not live and not e2e"' in serial
-    assert "--cov-append" in serial
-    assert "--cov-fail-under" not in serial
+def _ci_jobs() -> dict[str, Any]:
+    return dict(_load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"])
+
+
+def _shards() -> dict[str, list[str]]:
+    """Each shard's pytest arguments, split as the shell splits them (no quoted spaces here)."""
+    include = _ci_jobs()["test-shard"]["strategy"]["matrix"]["include"]
+    return {entry["shard"]: entry["pytest"].replace('"', "").split() for entry in include}
+
+
+def _paths(args: list[str]) -> set[str]:
+    return {arg for arg in args if arg.startswith("tests")}
+
+
+def _ignored(args: list[str]) -> set[str]:
+    return {arg.removeprefix("--ignore=") for arg in args if arg.startswith("--ignore=")}
+
+
+def test_the_parallel_shards_split_what_is_not_serial() -> None:
+    """Issue #42: `unit` ignores exactly what `access-integration` runs, so each test runs once."""
+    shards = _shards()
+    assert shards.keys() == {"access-integration", "unit", "serial", "volume"}
+    selected, rest = shards["access-integration"], shards["unit"]
+    for args in (selected, rest):
+        assert args[:3] == ["-n", "auto", "--dist"]
+        assert " ".join(args[4:13]) == "-m not live and not e2e and not serial"
+    assert _paths(rest) == {"tests"}
+    assert _ignored(rest) == _paths(selected)
+
+
+def test_the_serial_tests_run_alone_in_two_shards() -> None:
+    shards = _shards()
+    serial, volume = shards["serial"], shards["volume"]
+    for args in (serial, volume):
+        assert "-n" not in args
+        assert " ".join(args[:8]) == "-m serial and not live and not e2e"
+    assert _paths(serial) == {"tests"}
+    assert _ignored(serial) == _paths(volume) == {"tests/integration/test_list_volume.py"}
+
+
+def test_each_shard_leaves_its_coverage_data_without_the_floor() -> None:
+    steps = _ci_jobs()["test-shard"]["steps"]
+    tests = next(step for step in steps if "uv run pytest" in step.get("run", ""))
+    assert tests["run"].endswith("--cov --cov-report= --cov-fail-under=0")
+    upload = next(step for step in steps if _uses(step, "actions/upload-artifact"))
+    assert upload["with"]["name"] == "coverage-data-${{ matrix.shard }}"
+    assert upload["with"]["if-no-files-found"] == "error"
+
+
+def test_the_required_test_job_fails_unless_every_shard_passed() -> None:
+    """A skipped required check counts as passed: `test` runs whatever the shards did."""
+    jobs = _ci_jobs()
+    job = jobs["test"]
+    assert job["needs"] == "test-shard"
+    assert job["if"] == "${{ !cancelled() }}"
+    assert job["steps"][0]["env"]["SHARDS"] == "${{ needs.test-shard.result }}"
+    assert '[ "$SHARDS" != "success" ]' in job["steps"][0]["run"]
+    assert "services" not in job  # it runs no test, only reads the shards' data
+    count = next(
+        step for step in job["steps"] if step.get("name") == "Four shards of coverage data"
+    )
+    assert count["run"].endswith(f"= {len(_shards())}")
+    gate = next(step for step in job["steps"] if "check_coverage_gates.py" in step.get("run", ""))
+    assert gate["run"].endswith("coverage.json")
 
 
 def test_ci_defines_the_required_checks() -> None:
@@ -568,5 +619,8 @@ def test_the_test_job_proves_every_migration_reverses() -> None:
     """To zero and back passes through any earlier head, which ``recover.sh migrate-back`` needs
     (plan §9, M8.4)."""
     workflow = _load(ROOT / ".github" / "workflows" / "ci.yaml")
-    runs = [step.get("run", "") for step in workflow["jobs"]["test"]["steps"]]
-    assert any("scripts/check_migrations_reversible.py" in run for run in runs)
+    steps = workflow["jobs"]["test-shard"]["steps"]
+    check = next(s for s in steps if "check_migrations_reversible.py" in s.get("run", ""))
+    assert check["if"] == "matrix.migrations"
+    include = workflow["jobs"]["test-shard"]["strategy"]["matrix"]["include"]
+    assert [entry["shard"] for entry in include if entry.get("migrations")] == ["serial"]
