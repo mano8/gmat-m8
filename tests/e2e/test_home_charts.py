@@ -23,11 +23,11 @@ def settled(page: Page) -> None:
 
 
 def drawn_charts(page: Page) -> int:
-    canvases = page.locator("canvas[data-chart]")
-    count = canvases.count()
+    cards = page.locator(".chart-card:has(canvas[data-chart])")
+    count = cards.count()
     for index in range(count):
-        canvas = canvases.nth(index)
-        card = page.locator(".chart-card").filter(has=canvas)
+        card = cards.nth(index)
+        canvas = card.locator("canvas[data-chart]")
         expect(canvas).to_be_visible()
         expect(canvas).to_have_attribute("role", "img")
         expect(card.locator("details[data-chart-table]")).not_to_have_attribute("open", "")
