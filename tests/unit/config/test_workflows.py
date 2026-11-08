@@ -116,10 +116,25 @@ def test_the_report_names_files_from_the_repository_root() -> None:
     assert run["source_pkgs"] == ["apps", "config"]
     assert "source" not in run
     steps = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["test"]["steps"]
-    tests = next(step for step in steps if str(step.get("name")).startswith("Tests with coverage"))
-    assert "--cov-report=xml:coverage.xml" in tests["run"]
+    tests = next(step for step in steps if "--cov-report=xml:coverage.xml" in step.get("run", ""))
+    assert str(tests["name"]).startswith("Serial tests, coverage of both passes")
     report = next(step for step in steps if step.get("name") == "Upload coverage report")
     assert "coverage.xml" in report["with"]["path"]
+
+
+def test_the_tests_run_in_parallel_then_the_serial_ones_alone() -> None:
+    """Issue #42: one coverage data file over two passes; the floor applies to both together."""
+    steps = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["test"]["steps"]
+    runs = [" ".join(step["run"].split()) for step in steps if "pytest" in step.get("run", "")]
+    assert len(runs) == 2
+    parallel, serial = runs
+    assert "-n auto" in parallel
+    assert '-m "not live and not e2e and not serial"' in parallel
+    assert "--cov-fail-under=0" in parallel
+    assert "-n " not in serial
+    assert '-m "serial and not live and not e2e"' in serial
+    assert "--cov-append" in serial
+    assert "--cov-fail-under" not in serial
 
 
 def test_ci_defines_the_required_checks() -> None:
@@ -149,31 +164,33 @@ def test_dependabot_covers_the_ecosystems_in_use() -> None:
     assert all(update["schedule"]["interval"] == "monthly" for update in config["updates"])
 
 
-def test_trivy_image_job_builds_and_gates_both_images() -> None:
-    job = _load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["trivy-image"]
-    steps = job["steps"]
-    built = {
-        step["with"]["file"]: step["with"]
-        for step in steps
-        if str(step.get("uses", "")).startswith("docker/build-push-action@")
-    }
+def _trivy(steps: list[dict[str, Any]], option: str, value: str) -> list[dict[str, Any]]:
+    """The Trivy steps whose ``with`` sets ``option`` to ``value``."""
+    trivy = [step for step in steps if _uses(step, "aquasecurity/trivy-action")]
+    return [step for step in trivy if step["with"].get(option) == value]
+
+
+def _trivy_image_steps() -> list[dict[str, Any]]:
+    return list(_load(ROOT / ".github" / "workflows" / "ci.yaml")["jobs"]["trivy-image"]["steps"])
+
+
+def test_trivy_image_job_builds_both_images() -> None:
+    steps = _trivy_image_steps()
+    builds = [step["with"] for step in steps if _uses(step, "docker/build-push-action")]
+    built = {with_["file"]: with_ for with_ in builds}
     assert built.keys() == {"docker/app/Dockerfile", "docker/backup/Dockerfile"}
     assert all(with_["load"] is True and with_["push"] is False for with_ in built.values())
-    gates = [
-        step["with"]
-        for step in steps
-        if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
-        and step["with"].get("exit-code") == "1"
-    ]
+
+
+def test_trivy_image_job_gates_both_images() -> None:
+    gates = [step["with"] for step in _trivy(_trivy_image_steps(), "exit-code", "1")]
     assert {gate["image-ref"] for gate in gates} == {"gmat-m8:ci-scan", "gmat-m8-backup:ci-scan"}
     assert all(gate["severity"] == "CRITICAL,HIGH" for gate in gates)
-    # The all-severity reports ignore the exception file so they stay complete.
-    reports = [
-        step
-        for step in steps
-        if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
-        and step["with"].get("format") == "json"
-    ]
+
+
+def test_trivy_image_reports_ignore_the_exception_file() -> None:
+    """The all-severity reports ignore the exception file so they stay complete."""
+    reports = _trivy(_trivy_image_steps(), "format", "json")
     assert len(reports) == 2
     assert all(report["env"]["TRIVY_IGNOREFILE"] == "" for report in reports)
 
@@ -310,7 +327,7 @@ def test_publish_verification_checks_main_and_the_required_runs() -> None:
     assert "release_tools.py notes" in commands  # no notes, no release, and it fails early
 
 
-def test_scan_builds_and_gates_both_images_for_both_architectures() -> None:
+def test_scan_covers_both_images_for_both_architectures() -> None:
     job = _load(PUBLISH)["jobs"]["scan"]
     assert job["permissions"] == {"contents": "read"}  # nothing to push, sign or release here
     legs = {(entry["key"], entry["arch"]): entry for entry in job["strategy"]["matrix"]["include"]}
@@ -324,22 +341,25 @@ def test_scan_builds_and_gates_both_images_for_both_architectures() -> None:
         "docker/app/Dockerfile",
         "docker/backup/Dockerfile",
     }
-    steps = job["steps"]
 
+
+def test_scan_builds_each_leg_without_pushing() -> None:
+    steps = _load(PUBLISH)["jobs"]["scan"]["steps"]
     builds = [step["with"] for step in steps if _uses(step, "docker/build-push-action")]
     assert len(builds) == 1
     assert builds[0]["platforms"] == "linux/${{ matrix.arch }}"
     assert builds[0]["push"] is False
     assert builds[0]["load"] is True
 
-    trivy = [step for step in steps if _uses(step, "aquasecurity/trivy-action")]
-    gates = [step["with"] for step in trivy if step["with"].get("exit-code") == "1"]
+
+def test_scan_gates_and_reports_each_leg() -> None:
+    steps = _load(PUBLISH)["jobs"]["scan"]["steps"]
+    gates = [step["with"] for step in _trivy(steps, "exit-code", "1")]
     assert len(gates) == 1
     assert gates[0]["severity"] == "CRITICAL,HIGH"
-    reports = [step for step in trivy if step["with"].get("format") == "json"]
+    reports = _trivy(steps, "format", "json")
     assert len(reports) == 1
     assert reports[0]["env"]["TRIVY_IGNOREFILE"] == ""  # the report keeps accepted findings
-
     sboms = [step["with"] for step in steps if _uses(step, "anchore/sbom-action")]
     assert [sbom["format"] for sbom in sboms] == ["spdx-json"]
 

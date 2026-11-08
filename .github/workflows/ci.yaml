@@ -173,7 +173,9 @@ jobs:
           POSTGRES_PASSWORD: gmat_test_pw
         ports:
           - 5432:5432
+        # The data lives in memory: a throwaway database of this job only (issue #42).
         options: >-
+          --tmpfs /var/lib/postgresql
           --health-cmd "pg_isready -U gmat -d gmat"
           --health-interval 5s
           --health-timeout 5s
@@ -185,6 +187,16 @@ jobs:
       DB_HOST: localhost
       DB_PORT: "5432"
     steps:
+      # Nothing here needs to survive a crash: no flush to disk, no full-page images.
+      - name: Test database without fsync or synchronous commit
+        run: >-
+          docker exec ${{ job.services.postgres.id }}
+          psql -U gmat -d gmat -v ON_ERROR_STOP=1
+          -c "ALTER SYSTEM SET fsync = off"
+          -c "ALTER SYSTEM SET synchronous_commit = off"
+          -c "ALTER SYSTEM SET full_page_writes = off"
+          -c "SELECT pg_reload_conf()"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -200,17 +212,30 @@ jobs:
         run: uv sync --locked
 
       # msgfmt compiles the message catalogs for the i18n tests (the .mo files are not committed).
-      - name: Install gettext
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext
+      # Compiled once here, the tests' own compilemessages finds them up to date, so parallel
+      # workers never write the same .mo file.
+      - name: Install gettext and compile the catalogs
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext
+          uv run python manage.py compilemessages --verbosity 0
 
       - name: No missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
 
-      # Layers A and B (plan §8.1). `live` and `e2e` run in their own workflows.
-      - name: Tests with coverage (project floor 90 %, branch coverage)
+      # Layers A and B (plan §8.1). `live` and `e2e` run in their own workflows. Two passes over
+      # one coverage data file (issue #42): every test but `serial` across the runner's cores
+      # (each worker on its own test database), then the `serial` ones alone, as they depend on
+      # wall-clock time. The floor and the reports apply to both passes together.
+      - name: Tests in parallel (all but serial)
         run: >-
-          uv run pytest -m "not live and not e2e"
-          --cov --cov-report=term-missing --cov-report=json:coverage.json
+          uv run pytest -n auto --dist worksteal
+          -m "not live and not e2e and not serial"
+          --cov --cov-report= --cov-fail-under=0
+
+      - name: Serial tests, coverage of both passes (project floor 90 %, branch coverage)
+        run: >-
+          uv run pytest -m "serial and not live and not e2e"
+          --cov --cov-append --cov-report=term-missing --cov-report=json:coverage.json
           --cov-report=xml:coverage.xml
 
       - name: Coverage gate (100 % for apps/access, services, selectors)
