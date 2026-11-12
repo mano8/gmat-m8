@@ -3,8 +3,9 @@
 One flow, made once per run through the screens (as the other journeys do): a request that is
 still waiting for its review, a second one approved and sourced for purchase, the order bought for
 it and the receiving form of that order; and, as the technician who reaches the worksite only
-through the project (M9.3), that project's expected deliveries, the form at its worksite and a
-receipt of 1 posted there. The materials are used by no other journey, so the ledgers never meet.
+through the project (M9.3), that project's page, its expected deliveries, the form at its
+worksite and a receipt of 1 posted there. The materials are used by no other journey, so the
+ledgers never meet.
 """
 
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ class Documents:
     order: str  # the issued order (the material manager)
     order_number: str
     receive: str  # the receiving form of that order (the warehouse operator)
+    site_project: str  # COL-MAD's page, with "Receive materials" (the technician)
     site_expected: str  # COL-MAD's expected deliveries (the technician)
     site_receive: str  # the receiving form at COL-MAD's worksite (the technician)
     site_receipt: str  # a receipt of 1 posted there by the technician
@@ -57,9 +59,11 @@ def build(browsing: Browsing) -> Documents:
     )
     order = manager.url
 
-    technician.goto("/receiving/expected/")
-    project = technician.get_by_test_id("expected-project").filter(has_text="COL-MAD")
-    project.get_by_role("link").click()
+    technician.goto("/projects/")
+    technician.get_by_role("link", name="COL-MAD", exact=True).click()
+    technician.wait_for_url("**/projects/*/")
+    site_project = technician.url
+    technician.get_by_role("link", name="Receive materials").click()
     technician.wait_for_url("**/receiving/expected/*/")
     site_expected = technician.url
     delivery = technician.get_by_test_id("expected-order").filter(has_text=order_number)
@@ -79,6 +83,7 @@ def build(browsing: Browsing) -> Documents:
         order=order,
         order_number=order_number,
         receive=warehouse.url,
+        site_project=site_project,
         site_expected=site_expected,
         site_receive=site_receive,
         site_receipt=site_receipt,
