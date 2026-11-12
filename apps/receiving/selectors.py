@@ -1,8 +1,9 @@
 """Reads of receiving (plan §3.4, §4.5): every row through ``visible_to``.
 
 ``expected_deliveries`` is what is still coming to one project, for whoever may receive it
-there (``receipt.view``): the project's site manager first of all (○ site, Q9), and the
-warehouse operators and material managers of the branch that buys for it. Per allocation of
+there (``receipt.view``): since Q44 (ADR-0028) every business role whose membership's scope
+holds the project, its site manager, technicians and partners (○ site) as much as the branch
+that buys for it or executes it. Per allocation of
 that project on an issued order whose line can still receive, it shows only the fields of
 §3.4: order number, supplier display name and expected date, material reference and name,
 unit, and the quantity still expected **for that project**. Never a price, the supplier's
@@ -15,17 +16,18 @@ line's receipt capacity A - R and outstanding A - D (§4.5).
 The screens (M6.3) read the rest from here:
 
 - **Receipts** (``receipts``, ``receipt``, ``receipt_lines``, ``direct_handover``): through
-  ``receipt.view``, which reaches a worksite receipt through its project (○ site). Lines
+  ``receipt.view``, which reaches a worksite receipt through its project (○ site, and every
+  branch grant for the projects of its scope, ``SITE_CAPABILITIES``). Lines
   show what arrived and its attribution, never the order's ordered quantity or price.
 - **Finding an order to receive** (``receivable_orders``, ``receipt_order``,
-  ``receipt_locations``): through ``receipt.post``. The order of a site manager is found
-  through the live allocations of the requests they see (their projects), the same objects
-  ``post_receipt`` authorizes at a worksite.
+  ``receipt_locations``): through ``receipt.post``. The order of a project receiver is found
+  through the live allocations of the requests of the projects they receive at, the same
+  objects ``post_receipt`` authorizes at a worksite, whoever requested them.
 - **The receipt form** (``receipt_rows``): per order line that can still receive, the
   suggested quantity and the allocations that may take it, computed with the same pure
   functions as the service (``attribution``) but without locks: it is a suggestion, the
   service decides. The order line's outstanding quantity is shown only to whoever sees the
-  whole order (``po.view``); a site manager gets what their project can take (§3.4).
+  whole order (``po.view``); a project receiver gets what their project can take (§3.4).
 """
 
 from collections.abc import Collection, Sequence

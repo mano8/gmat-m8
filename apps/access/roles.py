@@ -6,7 +6,17 @@ plan's table, one row per capability and one column per role:
 - ``Reach.SCOPE`` (●): every object within the membership's scope;
 - ``Reach.ASSIGNED`` (○): only the objects of the projects assigned to the user; used by the
   assignment-scoped roles (site managers, partners), whose scope is those projects;
-- ``Reach.OWN`` (○ own): only the objects the user created, within the membership's scope.
+- ``Reach.OWN`` (○ own): only the objects the user created, within the membership's scope;
+- ``Reach.SITE`` (○ site, Q44, ADR-0028): only the documents at the worksite of a project in
+  the membership's project scope (S3, S4; active projects only for technicians and
+  partners), never a document by its branch and never a warehouse's.
+
+Project receiving (Q44, ADR-0028): every business role receives at the worksite of a
+project in its scope. Site managers, technicians and partners hold ``receipt.view`` and
+``receipt.post`` ○ site; the branch roles keep ● and, for the ``SITE_CAPABILITIES``, also
+reach the worksite documents of every project in their scope, so a branch receives for a
+project it executes but does not buy for. ``receipt.void`` and warehouse receiving keep
+their policy.
 
 ``ENGINEER`` (Q30, ADR-0014) ranks below the group administrator and above every other
 role: it holds every capability of a material manager in its branch scope. ``request.edit``
@@ -65,6 +75,7 @@ class Reach(StrEnum):
     SCOPE = "scope"
     ASSIGNED = "assigned"
     OWN = "own"
+    SITE = "site"
 
 
 class ScopeBasis(Enum):
@@ -132,8 +143,13 @@ INSTALLATION_CAPABILITIES = frozenset(
     }
 )
 
-# Matrix cells: ● scope, ○ assigned, ○ own, — none.
-_SC, _AS, _OW, _NO = Reach.SCOPE, Reach.ASSIGNED, Reach.OWN, None
+# Capabilities whose every grant also reaches the documents at the worksite of each project
+# in its project scope (Q44, ADR-0028: project receiving). A ``Reach.SITE`` grant reaches
+# only those; a ``Reach.SCOPE`` grant reaches them on top of its branches' documents.
+SITE_CAPABILITIES = frozenset({Capability.RECEIPT_VIEW, Capability.RECEIPT_POST})
+
+# Matrix cells: ● scope, ○ assigned, ○ own, ○ site, — none.
+_SC, _AS, _OW, _SI, _NO = Reach.SCOPE, Reach.ASSIGNED, Reach.OWN, Reach.SITE, None
 
 MATRIX_ROLES = (
     Role.GROUP_ADMIN,
@@ -165,8 +181,8 @@ _MATRIX: dict[Capability, tuple[Reach | None, ...]] = {
     Capability.PO_VIEW:             (_SC, _SC, _SC, _NO, _NO, _NO, _SC),
     Capability.PO_MANAGE:           (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
     Capability.PRICE_VIEW:          (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
-    Capability.RECEIPT_VIEW:        (_SC, _SC, _SC, _AS, _NO, _NO, _SC),
-    Capability.RECEIPT_POST:        (_SC, _SC, _SC, _AS, _NO, _NO, _SC),
+    Capability.RECEIPT_VIEW:        (_SC, _SC, _SC, _SI, _SI, _SI, _SC),
+    Capability.RECEIPT_POST:        (_SC, _SC, _SC, _SI, _SI, _SI, _SC),
     Capability.RECEIPT_VOID:        (_SC, _SC, _NO, _NO, _NO, _NO, _SC),
     Capability.HANDOVER_VIEW:       (_SC, _SC, _SC, _AS, _NO, _NO, _SC),
     Capability.HANDOVER_POST:       (_SC, _SC, _SC, _NO, _NO, _NO, _SC),

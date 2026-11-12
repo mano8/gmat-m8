@@ -252,7 +252,10 @@ class TestUpload:
         self, people: People, receipt: GoodsReceipt
     ) -> None:
         assert send(client_for(people.mm_sev), receipt).status_code == 404
-        assert send(client_for(people.tech_mad, mfa=False), receipt).status_code == 403
+        # A warehouse receipt: a technician receives at worksites only (Q44), so it is
+        # out of their reach, not merely beyond their rights.
+        assert send(client_for(people.tech_mad, mfa=False), receipt).status_code == 404
+        assert send(client_for(people.nobody, mfa=False), receipt).status_code == 403
         assert states() == []
 
     def test_an_unknown_kind_is_not_found(self, technician: Client) -> None:

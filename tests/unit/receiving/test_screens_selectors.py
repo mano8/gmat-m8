@@ -70,7 +70,8 @@ class TestReceipts:
         assert selectors.can_post(ctx(people.wo_mad)) and selectors.can_post(
             ctx(people.site_manager)
         )
-        assert not selectors.can_post(ctx(people.tech_mad))
+        assert selectors.can_post(ctx(people.tech_mad)) and selectors.can_post(ctx(people.partner))
+        assert not selectors.can_post(ctx(people.nobody))
         assert selectors.can_void(ctx(people.mm_mad), there)
         assert not selectors.can_void(ctx(people.wo_mad), there)
         voided = services.void_receipt(mm, there.pk, reason="Wrong delivery")
@@ -159,9 +160,20 @@ class TestFindingTheOrder:
         order = buy((make_line("3"), "3"))
         for user in (people.wo_mad, people.mm_mad, people.site_manager):
             assert selectors.receipt_order(ctx(user), order.pk) == order
+        # Q44: who receives at the hospital's worksite finds an order that buys for it.
+        for user in (people.tech_mad, people.partner, people.engineer):
+            assert selectors.receipt_order(ctx(user), order.pk) == order
 
     @pytest.mark.parametrize(
-        "actor", ["mm_sev", "tech_mad", "partner", "revoked_assignment", "nobody"]
+        "actor",
+        [
+            "mm_sev",
+            "expired",
+            "inactive_partner",
+            "inactive_branch",
+            "revoked_assignment",
+            "nobody",
+        ],
     )
     def test_anyone_else_gets_404(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy, actor: str
@@ -319,7 +331,13 @@ class TestTheExpectedIndex:
             org.hospital.pk
         ]
         assert org.hospital.pk in {p.pk for p in selectors.expected_projects(ctx(people.wo_mad))}
-        assert list(selectors.expected_projects(ctx(people.tech_mad))) == []
+        technician = {p.pk for p in selectors.expected_projects(ctx(people.tech_mad))}
+        assert org.hospital.pk in technician and org.mad_hold.pk not in technician  # active only
+        assert [p.pk for p in selectors.expected_projects(ctx(people.partner))] == [org.hospital.pk]
+        assert list(selectors.expected_projects(ctx(people.mm_sev))) != []
+        assert org.hospital.pk not in {
+            p.pk for p in selectors.expected_projects(ctx(people.mm_sev))
+        }
         Project.objects.filter(pk=org.hospital.pk).update(status=Project.Status.CLOSED)
         assert list(selectors.expected_projects(ctx(people.site_manager))) == []
 
@@ -332,6 +350,9 @@ class TestTheExpectedIndex:
         assert selectors.worksite(ctx(people.site_manager), org.hospital.pk) == org.worksite(
             org.hospital
         )
-        assert selectors.worksite(ctx(people.tech_mad), org.hospital.pk) is None
+        assert selectors.worksite(ctx(people.tech_mad), org.hospital.pk) == org.worksite(
+            org.hospital
+        )
+        assert selectors.worksite(ctx(people.mm_sev), org.hospital.pk) is None
         Location.objects.filter(pk=org.worksite(org.hospital).pk).update(is_active=False)
         assert selectors.worksite(ctx(people.site_manager), org.hospital.pk) is None

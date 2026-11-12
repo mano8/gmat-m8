@@ -19,13 +19,23 @@ wrapper, in the order of CLAUDE.md "Writes":
 7. audit and events: ``receipt.posted``, ``receipt.voided``, ``handover.posted``,
    ``handover.voided`` (§4.10).
 
-**Who posts** (plan §3.4, Q9): a receipt is a document of its order's branch (S5); one at a
-worksite also belongs to that project, which its site manager reaches (○ site). At a
-warehouse the authorization object is the order. At a worksite it is the requests of that
-project that the order serves: their procurement branch is the order's (C5) and their
-project the worksite's, so each membership covers them exactly when it covers the receipt
-(S6). A site manager therefore receives only at their project's worksite, from any order
-that buys for it, and the goods go to that project's allocations only.
+**Who posts** (plan §3.4, Q9 as extended by Q44, ADR-0028): a receipt is a document of its
+order's branch (S5); one at a worksite also belongs to that project. At a warehouse the
+authorization object is the order, so warehouse receiving stays with the order's branch
+(group administrators, material managers, engineers, warehouse operators). At a worksite it
+is the requests of that project that the order serves. ``receipt.post`` reaches them through
+their procurement branch, which is the order's (C5), or through their project, which is the
+worksite's (``SITE_CAPABILITIES``): every business role whose membership's scope holds the
+project receives there, whoever requested the goods, technicians and partners included
+(○ site, active projects only for them). Every request served shares the project and the
+procurement branch, so one membership covers them all or none (S6).
+
+**What a worksite receipt takes**: the goods go to that project's allocations only, even
+when the order buys for several projects. Who does not see the whole order (``po.view`` on
+it: the project receivers, Q44) receives only the lines that carry a live allocation of the
+project; a line of another project is refused like a line of another order, so the refusal
+tells nothing about it. Who sees the order may still record a line that serves no
+allocation of the project as surplus there: goods delivered to the wrong site (E12).
 
 **Attribution** (``attribution``): at a warehouse in attribution order, at a worksite to the
 project's allocations, each capped by its ceiling remaining and its request line's A - R
@@ -48,6 +58,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
+from apps.access.context import AccessContext
 from apps.access.principals import Principal
 from apps.access.roles import Capability
 from apps.accounts.models import User
@@ -136,7 +147,11 @@ class _Facts:
 def _authorize_post(
     principal: Principal, order: PurchaseOrder, location: Location, locks: LockOrder
 ) -> User:
-    """``receipt.post`` on what the receipt will belong to (see the module docstring)."""
+    """``receipt.post`` on what the receipt will belong to (see the module docstring).
+
+    Runs in full on every call, an idempotent replay included: memberships, assignments,
+    the project's, branch's and company's state and the session are read again under the
+    transaction's locks (S8, S9, S10)."""
     objects: list[Any] = [order]
     if location.project_id is not None:
         served = MaterialRequest.objects.filter(
@@ -252,8 +267,27 @@ def _candidates(facts: _Facts, po_line_id: UUID, project_id: UUID | None) -> lis
     ]
 
 
+def _serves(facts: _Facts, po_line_id: UUID, project_id: UUID) -> bool:
+    """The order line carries a live allocation (positive ceiling) of the project."""
+    return any(
+        allocation.po_line_id == po_line_id
+        and allocation.qty > 0
+        and facts.projects[allocation.request_line_id] == project_id
+        for allocation in facts.allocations.values()
+    )
+
+
+def _unknown_line() -> ValidationError:
+    return ValidationError(_("A line is not on this order."), code="unknown")
+
+
 def _plan_line(
-    order: PurchaseOrder, location: Location, facts: _Facts, item: ReceiptLineInput
+    order: PurchaseOrder,
+    location: Location,
+    facts: _Facts,
+    item: ReceiptLineInput,
+    *,
+    whole_order: bool,
 ) -> _LinePlan:
     po_line = (
         PurchaseOrderLine.objects.select_related("unit")
@@ -261,7 +295,12 @@ def _plan_line(
         .first()
     )
     if po_line is None:
-        raise ValidationError(_("A line is not on this order."), code="unknown")
+        raise _unknown_line()
+    # Before anything about the line itself (its unit's precision): for a project receiver,
+    # a line that serves only other projects is answered like one of another order.
+    project_id = location.project_id
+    if project_id is not None and not whole_order and not _serves(facts, po_line.pk, project_id):
+        raise _unknown_line()
     _check_line_input(item, po_line)
     candidates = _candidates(facts, po_line.pk, location.project_id)
     if item.split is None:
@@ -413,7 +452,9 @@ def post_receipt(
         _check_order(locked)
         _check_location(locked, here)
         facts = _facts(component, here)
-        plans = [_plan_line(locked, here, facts, item) for item in lines]
+        # Read at the transaction's clock, after authorize_in_txn: a projection, not a right.
+        whole_order = AccessContext.for_user(actor).can(Capability.PO_VIEW, locked)
+        plans = [_plan_line(locked, here, facts, item, whole_order=whole_order) for item in lines]
         # Capacity last, once every line and split is valid: otherwise which refusal comes
         # back would tell a site manager whether a quantity fits the whole order line.
         for plan in plans:
