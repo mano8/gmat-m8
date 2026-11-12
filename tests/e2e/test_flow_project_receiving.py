@@ -13,7 +13,7 @@ the metre is expected again.
 """
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 from apps.core.demo import SUPPLIERS
 from tests.e2e import pages
@@ -34,15 +34,24 @@ CASES = {
 NAMES = {"partner": "Pablo Cienfuegos", "tech-mad": "Tomás Herrero"}  # the demo people
 RECEIVERS = ("admin", "mm-mad", "eng-mad", "wo-mad", "site-manager", "tech-mad", "partner")
 SITE_ONLY = ("site-manager", "tech-mad", "partner")
+# The site manager reads the handovers of their project (handover.view ○); the others none.
+READS_HANDOVERS = ("site-manager",)
 
 
-def shows_nothing_of_the_order(page: Page, *also: str) -> None:
-    """No price, supplier contact, order page or handover; nor ``also`` (a requester)."""
+def shows_nothing_of_the_order(page: Page, person: str, *also: str) -> None:
+    """No price, supplier contact or order page, no handover for who may not read one; nor
+    ``also`` (a requester's name)."""
     main = page.locator("main")
     text = str(main.inner_text())
     assert not [hidden for hidden in (*HIDDEN, *also) if hidden in text], page.url
     expect(main.locator("a[href*='/purchasing/']")).to_have_count(0)
-    expect(main.locator("a[href*='/handovers/']")).to_have_count(0)
+    if person not in READS_HANDOVERS:
+        expect(main.locator("a[href*='/handovers/']")).to_have_count(0)
+
+
+def back_to_project(page: Page) -> Locator:
+    """The receipt's way back to its project's expected deliveries (the menu has its own)."""
+    return page.get_by_test_id("page-header").get_by_role("link", name="Expected deliveries")
 
 
 def fits(page: Page, viewport: str) -> None:
@@ -74,17 +83,19 @@ def test_every_role_receives_at_the_project(browsing: Browsing, viewport: str) -
         page = browsing.as_(person, viewport)
         receipts[person] = pages.receive_from_project(page, PROJECT, PLACE, order, {material: "1"})
         expect(page.get_by_test_id("receipt-line")).to_contain_text(material)
-        expect(page.get_by_role("link", name="Expected deliveries")).to_be_visible()
+        expect(back_to_project(page)).to_be_visible()
         fits(page, viewport)
-        if person in SITE_ONLY:
-            requester_name = (NAMES[requester],) if person == other else ()
-            shows_nothing_of_the_order(page, *requester_name)
-            expect(page.get_by_test_id("void-open")).to_have_count(0)
-            pages.back(page)  # the form they posted
-            shows_nothing_of_the_order(page, *requester_name)
-            fits(page, viewport)
         if person == other:
             receipt_url = page.url
+        if person in SITE_ONLY:
+            requester_name = (NAMES[requester],) if person == other else ()
+            shows_nothing_of_the_order(page, person, *requester_name)
+            expect(page.get_by_test_id("void-open")).to_have_count(0)
+            if person in READS_HANDOVERS:  # the direct handover their receipt made
+                expect(page.locator("main a[href*='/handovers/']")).to_have_count(1)
+            pages.back(page)  # the form they posted
+            shows_nothing_of_the_order(page, person, *requester_name)
+            fits(page, viewport)
     assert len(set(receipts.values())) == len(RECEIVERS)
 
     # Everything arrived and went straight to the site: the request is delivered and closed.
@@ -95,7 +106,7 @@ def test_every_role_receives_at_the_project(browsing: Browsing, viewport: str) -
     receiver = browsing.as_(other, viewport)
     receiver.goto("/receiving/")
     expect(receiver.get_by_test_id("receipt-row").filter(has_text=receipts[other])).to_be_visible()
-    shows_nothing_of_the_order(receiver, NAMES[requester])
+    shows_nothing_of_the_order(receiver, other, NAMES[requester])
     fits(receiver, viewport)
     # Receiving someone else's goods opens nothing of their request.
     response = receiver.goto(request_page)
@@ -110,10 +121,10 @@ def test_every_role_receives_at_the_project(browsing: Browsing, viewport: str) -
     expect(manager.get_by_test_id("void-reason")).to_contain_text("Counted twice")
     receiver.goto(receipt_url)
     expect(receiver.get_by_test_id("void-reason")).to_contain_text("Counted twice")
-    receiver.get_by_role("link", name="Expected deliveries").click()
+    back_to_project(receiver).click()
     expected = receiver.get_by_test_id("expected-order").filter(has_text=order)
     expect(expected.get_by_test_id("expected-line").filter(has_text=material)).to_be_visible()
-    shows_nothing_of_the_order(receiver)
+    shows_nothing_of_the_order(receiver, other)
     fits(receiver, viewport)
     asking.goto(request_page)
     expect(asking.get_by_test_id("page-header")).to_contain_text("Approved")
