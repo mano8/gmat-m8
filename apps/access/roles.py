@@ -128,7 +128,9 @@ ROLE_ASSIGNMENT_KIND: MappingProxyType[Role, str] = MappingProxyType(
 )
 
 # Technicians see the active projects of their branches (Q6); partners only active
-# assigned projects (S4). Applies to project rows, not to the documents of a project.
+# assigned projects (S4). Applies to project rows, and to the documents a ``Reach.SITE``
+# grant reaches through its project (their worksite receipts, ADR-0028); not to the
+# documents they reach otherwise (their own requests).
 ACTIVE_PROJECTS_ONLY = frozenset({Role.TECHNICIAN, Role.PARTNER_REQUESTER})
 ACTIVE_PROJECT_STATUS = "ACTIVE"
 

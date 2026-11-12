@@ -101,7 +101,10 @@ def order_search(request: HttpRequest) -> HttpResponse:
     ctx = access_for(request)
     filters = OrderSearchForm(request.GET or None)
     data = filters.cleaned_data if filters.is_valid() else {}
+    by_order = selectors.receives_by_order(ctx)
     rows = selectors.receivable_orders(ctx, q=data.get("q", ""))
+    if not by_order:  # nothing to search: the projects lead to the forms (Q44)
+        rows = rows.none()
     listing = paginate(
         request,
         rows,
@@ -114,15 +117,17 @@ def order_search(request: HttpRequest) -> HttpResponse:
         "filters": filters,
         "listing": listing,
         "entries": [(found, progress.get(found.pk)) for found in listing.rows],
-        "by_order": selectors.receives_by_order(ctx),
+        "by_order": by_order,
     }
     return render_list(request, "receiving/orders.html", context)
 
 
-def back_link(ctx: AccessContext, place: Location | None) -> tuple[str, str]:
-    """Where the receipt form's breadcrumb leads: who receives only at the worksites of
-    projects goes back to the project's expected deliveries, the rest to the order search."""
-    if selectors.receives_by_order(ctx):
+def back_link(ctx: AccessContext, order: PurchaseOrder, place: Location | None) -> tuple[str, str]:
+    """Where the receipt form's breadcrumb leads: to the order search when it lists the
+    order, otherwise (who reaches the order only through a project: the site reach, or a
+    branch that executes the project but does not buy for it) to the project's expected
+    deliveries."""
+    if selectors.in_order_search(ctx, order):
         return _("Receive goods"), reverse("receiving:orders")
     if place is not None and place.project_id is not None:
         return _("Expected deliveries"), reverse("receiving:expected", args=[place.project_id])
@@ -144,7 +149,7 @@ def receive_page(
         form = ReceiptForm(
             rows=rows, places=places, actor_id=ctx.user_id, initial={"location": str(place.pk)}
         )
-    back_label, back_url = back_link(ctx, place)
+    back_label, back_url = back_link(ctx, order, place)
     context = {
         "back_label": back_label,
         "back_url": back_url,

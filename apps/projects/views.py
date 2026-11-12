@@ -41,6 +41,7 @@ from apps.projects.row_dialogs import (
     project_url,
     share_dialog,
 )
+from apps.receiving import selectors as receiving_selectors
 
 VIEW, MANAGE = Capability.PROJECT_VIEW, Capability.PROJECT_MANAGE
 ASSIGNMENTS_SCOPE = ListScope(prefix="assignments_", anchor="assignments")
@@ -93,6 +94,8 @@ def _detail(
     )
     context = {
         "project": project,
+        # "Receive materials" where the expected deliveries lead to a form (Q44, ADR-0028).
+        "receives_here": receiving_selectors.worksite(ctx, project.pk) is not None,
         "manageable": manageable,
         "assignment_filters": filters,
         "assignments": listing,

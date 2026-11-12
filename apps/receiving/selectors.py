@@ -276,10 +276,16 @@ def worksite(ctx: AccessContext, project_id: UUID, capability: str = POST) -> Lo
         project_id=project_id, kind=Location.Kind.WORKSITE, is_active=True
     )
     if capability == POST:
-        rows = rows.filter(branch__is_active=True, branch__company__is_active=True).exclude(
-            project__status=Project.Status.CLOSED
-        )
+        rows = rows.filter(_open_places())
     return rows.first()
+
+
+def _open_places() -> Q:
+    """Places goods may still arrive at (C7, S9): active, of an active branch and company,
+    and not the worksite of a closed project (its goods arrive at a warehouse). The form's
+    places and the way to it share it; the service checks the same under its locks."""
+    active = Q(is_active=True, branch__is_active=True, branch__company__is_active=True)
+    return active & ~Q(project__status=Project.Status.CLOSED)
 
 
 def receives_by_order(ctx: AccessContext) -> bool:
@@ -465,6 +471,12 @@ def receivable_orders(ctx: AccessContext, *, q: str = "") -> QuerySet[PurchaseOr
     return rows.select_related("branch__company", "ship_to").order_by("-issued_at", "-id")
 
 
+def in_order_search(ctx: AccessContext, of: PurchaseOrder) -> bool:
+    """Whether ``receivable_orders`` lists the order: a branch that executes a project but
+    does not buy for it reaches the order's form through the project, not the search."""
+    return receivable_orders(ctx).filter(pk=of.pk).exists()
+
+
 def receipt_progress(orders: Collection[PurchaseOrder]) -> dict[UUID, Progress]:
     """How much of each (already visible) order has arrived."""
     ids = [found.pk for found in orders]
@@ -507,19 +519,20 @@ def receipt_locations(ctx: AccessContext, of: PurchaseOrder) -> list[Location]:
 
     The order's warehouses (its branch's, or those of the branches it manages) and the
     worksite of each active project with live allocations on it; active places of active
-    branches. The service checks again under its locks.
+    branches. A warehouse only for who receives on the order itself, which is what the
+    service authorizes there: a branch that reaches the order only through a project it
+    runs receives at that project's worksite, never at its own warehouse (ADR-0028 §3).
+    The service checks again under its locks.
     """
-    places = Location.objects.visible_to(ctx, POST).filter(
-        is_active=True, branch__is_active=True, branch__company__is_active=True
-    )
+    places = Location.objects.visible_to(ctx, POST).filter(_open_places())
     warehouses = Q(kind=Location.Kind.WAREHOUSE) & (
         Q(branch_id=of.branch_id) | Q(branch__managed_by_id=of.branch_id)
     )
+    if not PurchaseOrder.objects.visible_to(ctx, POST).filter(pk=of.pk).exists():
+        warehouses = Q(pk__in=[])
     served = PurchaseAllocation.objects.filter(po_line__po=of, qty__gt=0)
-    worksites = (
-        Q(kind=Location.Kind.WORKSITE)
-        & Q(project__in=served.values("request_line__project_id"))
-        & ~Q(project__status=Project.Status.CLOSED)
+    worksites = Q(kind=Location.Kind.WORKSITE) & Q(
+        project__in=served.values("request_line__project_id")
     )
     return list(
         places.filter(warehouses | worksites)

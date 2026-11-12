@@ -30,7 +30,9 @@
   {% endif %}
   {% partialdef results inline %}
     <div id="order-results" data-testid="receivable-orders">
-      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if by_order %}
+        {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% endif %}
       {% if not by_order %}
         {% url 'receiving:projects' as projects_url %}
         {% include "components/empty_state.html" with title=_("Receive from a project") text=_("Choose a project to see what is still coming to its worksite and receive it there.") href=projects_url label=_("Receive materials") icon="package-check" %}

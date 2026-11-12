@@ -19,15 +19,11 @@
         {% endcan %}
         {% can "receipt.view" project %}
           {% url 'receiving:expected' project_id=project.pk as expected_url %}
-          {% can "receipt.post" project %}
-            {% if project.status != "CLOSED" %}
-              {% include "components/button.html" with href=expected_url label=_("Receive materials") icon="package-check" variant="primary" %}
-            {% else %}
-              {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}
-            {% endif %}
+          {% if receives_here %}
+            {% include "components/button.html" with href=expected_url label=_("Receive materials") icon="package-check" variant="primary" %}
           {% else %}
             {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}
-          {% endcan %}
+          {% endif %}
         {% endcan %}
         {% if project.status == "ACTIVE" %}
           {% can "handover.post" project %}

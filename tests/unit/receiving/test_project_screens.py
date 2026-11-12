@@ -15,11 +15,13 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
+from apps.access.roles import Role
 from apps.organizations.models import Branch
 from apps.projects.models import Project
 from apps.receiving.models import GoodsReceipt
-from tests.org import Org, People, Sentinel, build_sentinel_order
+from tests.org import Org, People, Sentinel, build_sentinel_order, member
 from tests.org import client_for as signed_in
+from tests.support import enroll_totp
 from tests.unit.purchasing.conftest import Buy, MakeLine
 from tests.unit.receiving.conftest import Receive
 from tests.unit.receiving.test_views import page, receipt_payload
@@ -130,6 +132,9 @@ class TestEveryRoleReceivesAtAProject:
         html = response.content.decode()
         assert str(order.number) in html
         assert "Receive these goods" not in html
+        # The project's page agrees: its expected deliveries, no "Receive materials".
+        project = get(client, reverse("projects:detail", args=[org.hospital.pk]))
+        assert "Receive materials" not in project and "Expected deliveries" in project
 
     def test_a_project_outside_the_scope_is_not_there(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy
@@ -156,6 +161,7 @@ class TestTheEntryPoints:
         assert "Receive from a project" in html
         assert 'data-testid="receivable-order"' not in html and str(order.number) not in html
         assert 'name="q"' not in html  # no search of orders they cannot reach
+        assert "0 results" not in html  # and no count of a search they do not have
 
     @pytest.mark.parametrize("actor", ["tech_mad", "partner"])
     def test_the_form_leads_back_to_the_project(
@@ -175,6 +181,26 @@ class TestTheEntryPoints:
         listing = page(client, "list")
         assert reverse("receiving:orders") in listing and "Receive goods" in listing
         assert reverse("receiving:orders") in page(client, "receive", order.pk)
+
+    @pytest.mark.parametrize("role", [Role.WAREHOUSE_OPERATOR, Role.MATERIAL_MANAGER])
+    def test_the_branch_that_runs_the_project_goes_back_to_it(
+        self, org: Org, make_line: MakeLine, buy: Buy, role: Role
+    ) -> None:
+        """B-MAD runs the hospital, A-MAD buys for it: B-MAD's staff reach A-MAD's order
+        through the project (Q44), and their order search does not list it, so the form leads
+        back to the project's expected deliveries (M9.3)."""
+        order = buy((make_line("4"), "4"))
+        user = member(role, email="bmad@example.org", branch=org.b_mad)
+        enroll_totp(user)  # both roles are privileged: the session passed MFA
+        client = client_for(user)
+        assert str(order.number) not in page(client, "orders")
+        html = page(client, "receive", order.pk)
+        assert reverse("receiving:expected", args=[org.hospital.pk]) in html
+        assert f'href="{reverse("receiving:orders")}"' not in html
+        # Its only place is the hospital's worksite: not B-MAD's warehouse, which the order's
+        # branch manages but where the service lets only that branch receive (ADR-0028 §3).
+        assert 'data-testid="place-name"' in html
+        assert org.warehouses["B Madrid"].name not in html
 
     def test_a_mixed_user_keeps_the_order_search_of_their_branch_role(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy
