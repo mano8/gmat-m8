@@ -9,21 +9,32 @@
       {% url 'receiving:list' as crumb_url %}
       {% include "components/crumbs.html" with parent_label=_("Receipts") parent_url=crumb_url current=_("Receive goods") %}
       <h1>{% translate "Receive goods" %}</h1>
-      <p class="page-head-sub">{% translate "Find the purchase order the goods belong to." %}</p>
+      <p class="page-head-sub">
+        {% if by_order %}
+          {% translate "Find the purchase order the goods belong to." %}
+        {% else %}
+          {% translate "Goods for your projects are received from the project's expected deliveries." %}
+        {% endif %}
+      </p>
     </div>
     <div class="page-head-actions">
       <div class="flex flex-wrap gap-3">
         {% url 'receiving:projects' as projects_url %}
-        {% include "components/button.html" with href=projects_url label=_("Expected on site") %}
+        {% include "components/button.html" with href=projects_url label=_("Expected on site") variant="primary" %}
       </div>
     </div>
   </header>
-  {% url 'receiving:orders' as orders_url %}
-  {% include "components/list_toolbar.html" with form=filters listing=listing target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_auto]" %}
+  {% if by_order %}
+    {% url 'receiving:orders' as orders_url %}
+    {% include "components/list_toolbar.html" with form=filters listing=listing target="#order-results" action=orders_url grid="sm:grid-cols-[1fr_auto]" %}
+  {% endif %}
   {% partialdef results inline %}
     <div id="order-results" data-testid="receivable-orders">
       {% include "components/list_summary.html" with form=filters listing=listing %}
-      {% if entries %}
+      {% if not by_order %}
+        {% url 'receiving:projects' as projects_url %}
+        {% include "components/empty_state.html" with title=_("Receive from a project") text=_("Choose a project to see what is still coming to its worksite and receive it there.") href=projects_url label=_("Receive materials") icon="package-check" %}
+      {% elif entries %}
         <table class="table-responsive">
           <thead>
             <tr>
@@ -59,7 +70,7 @@
         </table>
         {% include "components/pagination.html" with listing=listing %}
       {% else %}
-        {% include "components/empty_state.html" with title=_("No orders to receive") text=_("No issued order matches the search. A site manager receives from the expected deliveries of a project.") %}
+        {% include "components/empty_state.html" with title=_("No orders to receive") text=_("No issued order matches the search. Goods for a project's worksite are received from its expected deliveries.") %}
       {% endif %}
     </div>
   {% endpartialdef %}

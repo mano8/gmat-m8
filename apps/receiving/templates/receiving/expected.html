@@ -11,6 +11,11 @@
       <h1>{% translate "Expected deliveries" %}</h1>
       <p class="page-head-sub" data-testid="expected-project-name">{{ project.code }} · {{ project.name }}</p>
     </div>
+    {% if receipts_url %}
+      <div class="page-head-actions">
+        {% include "components/button.html" with href=receipts_url label=_("Receipts at this worksite") icon="package-check" %}
+      </div>
+    {% endif %}
   </header>
   {% url 'receiving:expected' project_id=project.pk as expected_url %}
   {% include "components/list_toolbar.html" with form=filters listing=listing target="#expected-results" action=expected_url grid="sm:grid-cols-[1fr_10rem_auto]" %}

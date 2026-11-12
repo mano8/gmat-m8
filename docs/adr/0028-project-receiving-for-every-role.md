@@ -51,6 +51,12 @@ The ledger rules do not change: order state (C10), the over-receipt check (I4), 
 
 Reads go through `receipt.view` and its site reach: the expected deliveries of a project (§3.4's projection: order number, supplier display name, expected date, material, unit, what that project still expects), the receipt form at the worksite (the order line's outstanding quantity only for `po.view`), and the worksite receipts of their projects. Technicians and partners still never see a price, a supplier's contact details, another project's quantity, the whole purchase order, a handover document, or another person's request beyond the request number an allocation names. The screens (M9.2) make that reachable and hide the rest.
 
+### 7. The screens (M9.2)
+
+- **Discovery.** The page of a project offers "Receive materials" to whoever holds `receipt.post` on it (the project not closed); it leads to the project's expected deliveries, from which the receipt form is reached. A reader without `receipt.post` keeps "Expected deliveries". The project's expected-deliveries page links to its worksite receipts (the receipts list narrowed to the worksite).
+- **Order search is for branch grants.** `selectors.receives_by_order` is true when some `receipt.post` grant is not `Reach.SITE`. Whoever has only the site reach (site managers, technicians, partners) is never offered the order search: the receipts list and the project list lead to the projects, the order search page says so (it lists nothing for them and shows no search), and the receipt form's breadcrumb returns to the project's expected deliveries.
+- **Nothing new is exposed.** The screens read through the selectors above; the receipt page shows the handover and the purchase order only to `handover.view` / `po.view`, and a receipt's files follow the receipt (X8).
+
 ## What this changes
 
 - **ADR-0010 Q9:** "material manager or warehouse operator, or the project's site manager through the expected-deliveries view" becomes: every business role at the worksite of a project in its membership's scope (§5 above), and the order's branch at its warehouses.

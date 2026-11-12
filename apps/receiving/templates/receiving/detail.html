@@ -12,6 +12,10 @@
       <p class="mt-1 flex flex-wrap gap-2">{% include "receiving/status.html" with obj=receipt %}</p>
     </div>
     <div class="page-head-actions">
+      {% if project %}
+        {% url 'receiving:expected' project_id=project.pk as expected_url %}
+        {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}
+      {% endif %}
       {% can "po.view" receipt.po %}
         {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
         {% include "components/button.html" with href=order_url label=_("Purchase order") %}

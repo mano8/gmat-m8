@@ -13,9 +13,11 @@ from uuid import UUID
 
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
+from apps.access.context import AccessContext
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
 from apps.attachments import selectors as attachment_selectors
@@ -62,7 +64,12 @@ def receipt_list(request: HttpRequest) -> HttpResponse:
         sorts=selectors.RECEIPT_SORTS,
         sort_labels=selectors.RECEIPT_SORT_LABELS,
     )
-    context = {"filters": filters, "listing": listing, "can_post": selectors.can_post(ctx)}
+    context = {
+        "filters": filters,
+        "listing": listing,
+        "can_post": selectors.can_post(ctx),
+        "by_order": selectors.receives_by_order(ctx),
+    }
     return render_list(request, "receiving/list.html", context)
 
 
@@ -76,6 +83,7 @@ def receipt_detail(request: HttpRequest, receipt_id: UUID) -> HttpResponse:
         "receipt": found,
         "lines": selectors.receipt_lines(ctx, found),
         "handover": selectors.direct_handover(ctx, found),
+        "project": selectors.receipt_project(ctx, found),
         "can_void": can_void,
         "void_form": RequiredReasonForm(auto_id=VOID_FIELD_IDS) if can_void else None,
         "attachments": attachment_selectors.panel(ctx, found),
@@ -106,8 +114,19 @@ def order_search(request: HttpRequest) -> HttpResponse:
         "filters": filters,
         "listing": listing,
         "entries": [(found, progress.get(found.pk)) for found in listing.rows],
+        "by_order": selectors.receives_by_order(ctx),
     }
     return render_list(request, "receiving/orders.html", context)
+
+
+def back_link(ctx: AccessContext, place: Location | None) -> tuple[str, str]:
+    """Where the receipt form's breadcrumb leads: who receives only at the worksites of
+    projects goes back to the project's expected deliveries, the rest to the order search."""
+    if selectors.receives_by_order(ctx):
+        return _("Receive goods"), reverse("receiving:orders")
+    if place is not None and place.project_id is not None:
+        return _("Expected deliveries"), reverse("receiving:expected", args=[place.project_id])
+    return _("Expected on site"), reverse("receiving:projects")
 
 
 def receive_page(
@@ -125,7 +144,10 @@ def receive_page(
         form = ReceiptForm(
             rows=rows, places=places, actor_id=ctx.user_id, initial={"location": str(place.pk)}
         )
+    back_label, back_url = back_link(ctx, place)
     context = {
+        "back_label": back_label,
+        "back_url": back_url,
         "order": order,
         "places": places,
         "place": place,
@@ -164,7 +186,8 @@ def project_list(request: HttpRequest) -> HttpResponse:
         sorts=selectors.PROJECT_SORTS,
         sort_labels=selectors.PROJECT_SORT_LABELS,
     )
-    return render_list(request, "receiving/projects.html", {"filters": filters, "listing": listing})
+    context = {"filters": filters, "listing": listing, "can_post": selectors.can_post(ctx)}
+    return render_list(request, "receiving/projects.html", context)
 
 
 @require_safe
@@ -183,8 +206,10 @@ def expected(request: HttpRequest, project_id: UUID) -> HttpResponse:
         request, orders.seek, orders.window, default_per_page=selectors.EXPECTED_PER_PAGE
     )
     place = selectors.worksite(ctx, project.pk)
+    reads = selectors.worksite(ctx, project.pk, VIEW)
     context = {
         "project": project,
+        "receipts_url": f"{reverse('receiving:list')}?place={reads.pk}" if reads else "",
         "filters": filters,
         "listing": listing,
         "orders": [

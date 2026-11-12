@@ -42,7 +42,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
-from apps.access.roles import Capability
+from apps.access.roles import Capability, Reach
 from apps.core.listing import seek_after
 from apps.core.stats import weekly, weekly_by
 from apps.handovers.models import Handover
@@ -267,13 +267,21 @@ def expected_project(ctx: AccessContext, project_id: UUID) -> Project:
     return found
 
 
-def worksite(ctx: AccessContext, project_id: UUID) -> Location | None:
-    """The project's worksite, if the user may post receipts there."""
+def worksite(ctx: AccessContext, project_id: UUID, capability: str = POST) -> Location | None:
+    """The project's worksite, if the user holds ``capability`` there (``receipt.post`` to
+    receive, ``receipt.view`` to read its receipts)."""
     return (
-        Location.objects.visible_to(ctx, POST)
+        Location.objects.visible_to(ctx, capability)
         .filter(project_id=project_id, kind=Location.Kind.WORKSITE, is_active=True)
         .first()
     )
+
+
+def receives_by_order(ctx: AccessContext) -> bool:
+    """Whether some grant of ``receipt.post`` reaches orders (a branch's), not only the
+    worksites of projects (○ site). Whoever has only the latter receives from the expected
+    deliveries of a project and never finds an order (Q44, ADR-0028)."""
+    return any(grant.reach is not Reach.SITE for grant in ctx.scope_for(POST).grants)
 
 
 # --- receipts -------------------------------
@@ -342,6 +350,13 @@ def receipt(ctx: AccessContext, receipt_id: UUID) -> GoodsReceipt:
     if found is None:
         raise NotInScope(VIEW)
     return found
+
+
+def receipt_project(ctx: AccessContext, of: GoodsReceipt) -> Project | None:
+    """The project whose worksite the receipt was posted at, if the user reads it."""
+    if of.location.project_id is None:
+        return None
+    return Project.objects.visible_to(ctx, VIEW).filter(pk=of.location.project_id).first()
 
 
 def can_post(ctx: AccessContext) -> bool:

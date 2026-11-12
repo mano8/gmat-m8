@@ -6572,3 +6572,34 @@ msgstr "Mis borradores"
 
 msgid "in the last 30 days"
 msgstr "en los últimos 30 días"
+
+#: apps/projects/templates/projects/detail.html:24
+#: apps/receiving/templates/receiving/list.html:19
+#: apps/receiving/templates/receiving/orders.html:36
+#: apps/receiving/templates/receiving/projects.html:27
+msgid "Receive materials"
+msgstr "Recibir materiales"
+
+#: apps/receiving/templates/receiving/expected.html:16
+msgid "Receipts at this worksite"
+msgstr "Recepciones en esta obra"
+
+#: apps/receiving/templates/receiving/orders.html:16
+msgid "Goods for your projects are received from the project's expected deliveries."
+msgstr "Los materiales de sus proyectos se reciben desde las entregas esperadas del proyecto."
+
+#: apps/receiving/templates/receiving/orders.html:36
+msgid "Receive from a project"
+msgstr "Recibir desde un proyecto"
+
+#: apps/receiving/templates/receiving/orders.html:36
+msgid "Choose a project to see what is still coming to its worksite and receive it there."
+msgstr "Elija un proyecto para ver lo que aún llega a su obra y recíbalo allí."
+
+#: apps/receiving/templates/receiving/orders.html:73
+msgid "No issued order matches the search. Goods for a project's worksite are received from its expected deliveries."
+msgstr "Ningún pedido emitido coincide con la búsqueda. Los materiales de la obra de un proyecto se reciben desde sus entregas esperadas."
+
+#: apps/receiving/templates/receiving/projects.html:34
+msgid "No project with a worksite is within your access."
+msgstr "Ningún proyecto con obra está dentro de su acceso."
