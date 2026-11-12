@@ -133,6 +133,10 @@ DOCUMENT_SCREENS: dict[str, tuple[str, Callable[[Documents], str], Prepare]] = {
     "request status": ("tech-mad", lambda d: d.request_status, nothing),
     "order": ("mm-mad", lambda d: d.order, nothing),
     "receive form": ("wo-mad", lambda d: d.receive, nothing),
+    # M9.3: what a project receiver works with (the technician, through the project only).
+    "expected deliveries of a project": ("tech-mad", lambda d: d.site_expected, nothing),
+    "receive form at a worksite": ("tech-mad", lambda d: d.site_receive, nothing),
+    "worksite receipt": ("tech-mad", lambda d: d.site_receipt, nothing),
 }
 
 

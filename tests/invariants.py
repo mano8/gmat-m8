@@ -379,12 +379,23 @@ def _i8_receipt(rows: Rows, receipt: Row, handed: set[UUID]) -> Iterator[Violati
         yield Violation("I8", f"receipt {receipt['number']}: an attribution not handed over")
 
 
+def _i8_receiver(rows: Rows, receipt: Row) -> Iterator[Violation]:
+    """Q44 (ADR-0028): whoever receives at the worksite, a project receiver or a branch role,
+    hands the goods over to themselves: the direct handover names the receipt's receiver."""
+    receiver = receipt["received_by_id"]
+    for handover in _direct_handover(rows, receipt["id"]):
+        if (handover["handed_by_id"], handover["received_by_id"]) != (receiver, receiver):
+            yield Violation("I8", f"receipt {receipt['number']}: its handover names another")
+
+
 def _i8_receipts(rows: Rows) -> Iterator[Violation]:
-    """A site receipt with attributions has one direct handover, voided with it; a
-    warehouse receipt has none; each site attribution is handed over once."""
+    """A site receipt with attributions has one direct handover, voided with it, made by
+    and to the person who posted the receipt; a warehouse receipt has none; each site
+    attribution is handed over once."""
     handed = {line["receipt_attribution_id"] for line in rows.handover_lines.values()}
     for receipt in rows.receipts.values():
         yield from _i8_receipt(rows, receipt, handed)
+        yield from _i8_receiver(rows, receipt)
 
 
 def _i8_lines(rows: Rows) -> Iterator[Violation]:

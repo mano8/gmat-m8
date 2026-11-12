@@ -126,7 +126,12 @@ def source_by_purchase(page: Page, number: str, references: list[str]) -> None:
 
 
 def order_from_worklist(
-    page: Page, number: str, references: list[str], supplier: str, ship_to: str
+    page: Page,
+    number: str,
+    references: list[str],
+    supplier: str,
+    ship_to: str,
+    unit_price: str = "1.25",
 ) -> str:
     """Tick the request's lines on the worklist, make the draft order, price it and issue it."""
     page.goto("/purchasing/")
@@ -142,7 +147,7 @@ def order_from_worklist(
     page.get_by_test_id("new-order-form").get_by_role("button", name="Create the draft").click()
     page.wait_for_url(re.compile(r"/purchasing/orders/[0-9a-f-]{36}/$"))
     expect(page.locator("h1")).to_have_text("Draft order")
-    issue_order(page)
+    issue_order(page, unit_price)
     return str(page.locator("h1").inner_text()).strip()
 
 
@@ -217,6 +222,28 @@ def receive_at_worksite(
     order.get_by_role("link", name="Receive these goods").click()
     page.wait_for_url("**/receive/**")
     expect(page.get_by_test_id("place-name")).to_contain_text(place)
+    return post_receipt(page, quantities)
+
+
+def receive_from_project(
+    page: Page, project: str, place: str, order_number: str, quantities: dict[str, str]
+) -> str:
+    """Any role (Q44): the project's page, "Receive materials", the order among the project's
+    expected deliveries, the receipt form at its worksite; returns the receipt's number."""
+    page.goto("/projects/")
+    page.get_by_role("link", name=project, exact=True).click()
+    page.wait_for_url(re.compile(r"/projects/[0-9a-f-]{36}/$"))
+    page.get_by_role("link", name="Receive materials").click()
+    page.wait_for_url(re.compile(r"/receiving/expected/[0-9a-f-]{36}/"))
+    expect(page.get_by_test_id("expected-project-name")).to_contain_text(project)
+    order = page.get_by_test_id("expected-order").filter(has_text=order_number)
+    order.get_by_role("link", name="Receive these goods").click()
+    page.wait_for_url("**/receive/**")
+    chosen = page.locator("#id_place option:checked")  # who may receive elsewhere too
+    if chosen.count():
+        expect(chosen).to_contain_text(project)
+    else:
+        expect(page.get_by_test_id("place-name")).to_contain_text(place)
     return post_receipt(page, quantities)
 
 
