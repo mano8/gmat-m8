@@ -5078,6 +5078,10 @@ msgstr ""
 msgid "Line %(line)s: more than remains to be received on this order."
 msgstr ""
 
+#: apps/receiving/services.py:270
+msgid "These goods are more than remains to be received on this order."
+msgstr ""
+
 #: apps/receiving/services.py:259
 msgid "A line is not on this order."
 msgstr ""

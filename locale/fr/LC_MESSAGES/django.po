@@ -5268,6 +5268,10 @@ msgstr "La ligne %(line)s n'a plus rien à réceptionner."
 msgid "Line %(line)s: more than remains to be received on this order."
 msgstr "Ligne %(line)s : plus que ce qui reste à réceptionner sur cette commande."
 
+#: apps/receiving/services.py:270
+msgid "These goods are more than remains to be received on this order."
+msgstr "Ces marchandises dépassent ce qui reste à réceptionner sur cette commande."
+
 #: apps/receiving/services.py:259
 msgid "A line is not on this order."
 msgstr "Une ligne n'appartient pas à cette commande."

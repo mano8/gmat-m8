@@ -5234,6 +5234,10 @@ msgstr "La línea %(line)s no tiene nada pendiente de recibir."
 msgid "Line %(line)s: more than remains to be received on this order."
 msgstr "Línea %(line)s: más de lo que queda por recibir en este pedido."
 
+#: apps/receiving/services.py:270
+msgid "These goods are more than remains to be received on this order."
+msgstr "Estos materiales superan lo que queda por recibir en este pedido."
+
 #: apps/receiving/services.py:259
 msgid "A line is not on this order."
 msgstr "Una línea no pertenece a este pedido."

@@ -255,6 +255,23 @@ def _check_capacity(item: ReceiptLineInput, po_line: PurchaseOrderLine, book: Bo
         )
 
 
+def _check_capacities(plans: Sequence[_LinePlan], book: Book, *, whole_order: bool) -> None:
+    """``_check_capacity`` for every line. Who does not see the whole order gets one refusal
+    for the receipt that names no line: which of two lines failed would tell whether a
+    quantity fits an order line other projects share, and repeated posts that write nothing
+    would find its outstanding quantity (§3.4, M9.3)."""
+    try:
+        for plan in plans:
+            _check_capacity(plan.item, plan.po_line, book)
+    except ValidationError:
+        if whole_order:
+            raise
+        raise ValidationError(
+            _("These goods are more than remains to be received on this order."),
+            code="over_receipt",
+        ) from None
+
+
 def _candidates(facts: _Facts, po_line_id: UUID, project_id: UUID | None) -> list[Candidate]:
     """The allocations that may take goods of this line, in attribution order (§4.5)."""
     book = facts.book
@@ -457,8 +474,7 @@ def post_receipt(
         plans = [_plan_line(locked, here, facts, item, whole_order=whole_order) for item in lines]
         # Capacity last, once every line and split is valid: otherwise which refusal comes
         # back would tell a site manager whether a quantity fits the whole order line.
-        for plan in plans:
-            _check_capacity(plan.item, plan.po_line, facts.book)
+        _check_capacities(plans, facts.book, whole_order=whole_order)
         receipt = GoodsReceipt(
             po=locked,
             branch=locked.branch,

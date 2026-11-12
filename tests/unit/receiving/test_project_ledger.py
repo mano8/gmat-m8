@@ -11,9 +11,11 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.utils import translation
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import AccessDenied, NotInScope
+from apps.catalog.models import Material
 from apps.core.idempotency import IdempotencyConflict, IdempotencyKeyInvalid, issue_key
 from apps.handovers import services as handovers
 from apps.handovers.models import Handover
@@ -59,6 +61,56 @@ class TestQuantityCaps:
         )
         assert error_codes(caught.value) == {"over_receipt"}
         assert broken_rules(people) == []
+
+    @pytest.mark.parametrize("actor", ["tech_mad", "partner", "site_manager"])
+    def test_a_refusal_never_says_which_line_did_not_fit(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, breaker: Material, actor: str
+    ) -> None:
+        """Both lines serve the hospital; the cable line is shared with SEV-2. A probe on it
+        beside a quantity the breaker line cannot take is refused the same way whether the
+        probe fits or not, so repeated posts that write nothing do not find what remains on
+        the shared line (§3.4)."""
+        cable = make_line("10")
+        breakers = make_line("4", material=breaker)
+        order = buy(
+            (cable, "10"), (make_line("10", project=org.sev_for_mad), "10"), (breakers, "4")
+        )
+        cable_line, breaker_line = order.lines.order_by("line_no")
+        principal, site = principal_for(getattr(people, actor)), org.worksite(org.hospital)
+        answers = set()
+        for probe in ("5", "15"):  # fits the shared line (20), or not
+            caught = refused_without_writes(
+                ValidationError,
+                principal,
+                order,
+                site,
+                ReceiptLineInput(cable_line.pk, D(probe)),
+                ReceiptLineInput(breaker_line.pk, D(9)),
+            )
+            assert isinstance(caught.value, ValidationError)
+            with translation.override("en"):
+                messages = tuple(str(text) for text in caught.value.messages)
+            answers.add((messages, frozenset(error_codes(caught.value))))
+        assert len(answers) == 1
+        (messages, codes), *_ = answers
+        assert codes == {"over_receipt"} and not any("Line" in text for text in messages)
+
+    def test_who_sees_the_order_is_told_which_line(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, breaker: Material
+    ) -> None:
+        order = buy((make_line("10"), "10"), (make_line("4", material=breaker), "4"))
+        _cable_line, breaker_line = order.lines.order_by("line_no")
+        caught = refused_without_writes(
+            ValidationError,
+            principal_for(people.wo_mad),
+            order,
+            org.worksite(org.hospital),
+            ReceiptLineInput(breaker_line.pk, D(9)),
+        )
+        assert error_codes(caught.value) == {"over_receipt"}
+        assert isinstance(caught.value, ValidationError)
+        with translation.override("en"):
+            assert any("Line 2" in str(text) for text in caught.value.messages)
 
     def test_two_receivers_use_the_order_up_and_a_third_receipt_is_refused(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy
