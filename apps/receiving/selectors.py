@@ -269,12 +269,17 @@ def expected_project(ctx: AccessContext, project_id: UUID) -> Project:
 
 def worksite(ctx: AccessContext, project_id: UUID, capability: str = POST) -> Location | None:
     """The project's worksite, if the user holds ``capability`` there (``receipt.post`` to
-    receive, ``receipt.view`` to read its receipts)."""
-    return (
-        Location.objects.visible_to(ctx, capability)
-        .filter(project_id=project_id, kind=Location.Kind.WORKSITE, is_active=True)
-        .first()
+    receive, ``receipt.view`` to read its receipts). To receive, only where
+    ``receipt_locations`` would offer it: not at a closed project (its goods arrive at a
+    warehouse, S9) and not at an inactive branch's or company's worksite."""
+    rows = Location.objects.visible_to(ctx, capability).filter(
+        project_id=project_id, kind=Location.Kind.WORKSITE, is_active=True
     )
+    if capability == POST:
+        rows = rows.filter(branch__is_active=True, branch__company__is_active=True).exclude(
+            project__status=Project.Status.CLOSED
+        )
+    return rows.first()
 
 
 def receives_by_order(ctx: AccessContext) -> bool:

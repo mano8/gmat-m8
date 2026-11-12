@@ -15,6 +15,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
+from apps.organizations.models import Branch
 from apps.projects.models import Project
 from apps.receiving.models import GoodsReceipt
 from tests.org import Org, People, Sentinel, build_sentinel_order
@@ -105,6 +106,30 @@ class TestEveryRoleReceivesAtAProject:
         )
         if response.status_code == 200:
             assert "Receive materials" not in response.content.decode()
+
+    @pytest.mark.parametrize("actor", ["mm_mad", "wo_mad", "site_manager"])
+    @pytest.mark.parametrize("closed_by", ["project closed", "branch inactive"])
+    def test_the_expected_deliveries_offer_no_form_where_nothing_can_arrive(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, actor: str, closed_by: str
+    ) -> None:
+        """M9.3: the goods of a closed project arrive at a warehouse, and an inactive branch's
+        worksite takes none (S9); the page still lists what is coming, without the way to
+        a form that would refuse the place."""
+        order = buy((make_line("10"), "10"))
+        client = client_for(getattr(people, actor))
+        assert "Receive these goods" in page(client, "expected", org.hospital.pk)
+        if closed_by == "project closed":
+            Project.objects.filter(pk=org.hospital.pk).update(status=Project.Status.CLOSED)
+        else:  # B-MAD runs the hospital; A-MAD still reaches it as its buyer
+            Branch.objects.filter(pk=org.b_mad.pk).update(is_active=False)
+        response = client.get(reverse("receiving:expected", args=[org.hospital.pk]))
+        if (actor, closed_by) == ("site_manager", "branch inactive"):
+            # An assignment needs its project's branch active: no grant left at all (S7: 403).
+            assert response.status_code == 403
+            return
+        html = response.content.decode()
+        assert str(order.number) in html
+        assert "Receive these goods" not in html
 
     def test_a_project_outside_the_scope_is_not_there(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy
