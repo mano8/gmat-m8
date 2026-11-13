@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n access ui_tags %}
 {% block head_title %}
   {{ receipt.number }} · gmat-m8
@@ -12,6 +13,10 @@
       <p class="mt-1 flex flex-wrap gap-2">{% include "receiving/status.html" with obj=receipt %}</p>
     </div>
     <div class="page-head-actions">
+      {% if project %}
+        {% url 'receiving:expected' project_id=project.pk as expected_url %}
+        {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}
+      {% endif %}
       {% can "po.view" receipt.po %}
         {% url 'purchasing:detail' po_id=receipt.po_id as order_url %}
         {% include "components/button.html" with href=order_url label=_("Purchase order") %}
@@ -52,7 +57,7 @@
       <div>
         <dt>{% translate "Received" %}</dt>
         <dd>
-          {{ receipt.received_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.received_by.full_name|default:receipt.received_by.email }}
+          {{ receipt.received_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.received_by|person }}
         </dd>
       </div>
       {% if receipt.delivery_note_ref %}
@@ -83,7 +88,7 @@
         <div class="col-span-full" data-testid="void-reason">
           <dt>{% translate "Voided" %}</dt>
           <dd>
-            {{ receipt.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.voided_by.full_name|default:receipt.voided_by.email }}
+            {{ receipt.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.voided_by|person }}
             <span class="block whitespace-pre-line">{{ receipt.void_reason }}</span>
           </dd>
         </div>

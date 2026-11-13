@@ -9,6 +9,9 @@ branches, projects and reach. ``Scope`` turns them into ``Q`` objects:
 - ``project_q``: projects of the grants' branches (S3) or assigned to the user (S4);
 - ``document_q``: documents by their branch (S5) or project, own documents only for a
   ``Reach.OWN`` grant. Document models (M4 onwards) declare their fields through it.
+  A ``Reach.SITE`` grant reaches a document only through its project, by the grant's
+  project scope (S3, S4); for a ``SITE_CAPABILITIES`` capability every other grant reaches
+  those documents too, on top of its own (Q44, ADR-0028: project receiving).
 
 This module imports no model, so model modules can build their querysets on it.
 """
@@ -20,7 +23,13 @@ from uuid import UUID
 
 from django.db.models import Model, Q, QuerySet
 
-from apps.access.roles import ACTIVE_PROJECT_STATUS, PRIVILEGED_ROLES, Reach, Role
+from apps.access.roles import (
+    ACTIVE_PROJECT_STATUS,
+    PRIVILEGED_ROLES,
+    SITE_CAPABILITIES,
+    Reach,
+    Role,
+)
 
 ALWAYS = Q(pk__isnull=False)
 NEVER = Q(pk__in=[])
@@ -78,23 +87,44 @@ class Grant:
             condition &= Q(**{f"{prefix}status": ACTIVE_PROJECT_STATUS})
         return condition
 
+    def site_q(self, project: str | None) -> Q:
+        """Documents whose project (through ``project``) is in this grant's project scope:
+        its branches' projects (S3) or its assigned ones (S4), active only where the role
+        sees only active projects. A document without a project path is never one."""
+        return NEVER if project is None else self.project_q(f"{project}__")
+
+    def _document_parts(
+        self, branches: tuple[str, ...], project: str | None, *, site: bool
+    ) -> list[Q]:
+        """By the document's branch (S5), its assigned project (S4) and, with ``site``, the
+        projects of the grant's scope."""
+        parts: list[Q] = []
+        if self.branch_ids:
+            ids = sorted(self.branch_ids)
+            parts.extend(Q(**{f"{name}__in": ids}) for name in branches)
+        if self.project_ids and project is not None:
+            parts.append(Q(**{f"{project}__in": sorted(self.project_ids)}))
+        if site:
+            parts.append(self.site_q(project))
+        return parts
+
     def document_q(
         self,
         branches: tuple[str, ...],
         project: str | None,
         owner: str | None,
         user_id: UUID | None,
+        *,
+        site: bool = False,
     ) -> Q:
+        """``site``: the capability also reaches the documents of the grant's projects
+        (``SITE_CAPABILITIES``); a ``Reach.SITE`` grant reaches only those."""
         if self.everything:
             condition = ALWAYS
+        elif self.reach is Reach.SITE:
+            condition = self.site_q(project)
         else:
-            parts: list[Q] = []
-            if self.branch_ids:
-                ids = sorted(self.branch_ids)
-                parts.extend(Q(**{f"{name}__in": ids}) for name in branches)
-            if self.project_ids and project is not None:
-                parts.append(Q(**{f"{project}__in": sorted(self.project_ids)}))
-            condition = any_of(parts)
+            condition = any_of(self._document_parts(branches, project, site=site))
         if self.reach is Reach.OWN:
             if owner is None or user_id is None:
                 return NEVER  # nothing is "own" without an owner
@@ -134,13 +164,15 @@ class Scope:
         return Scope(self.capability, grants, self.user_id)
 
     def branch_q(self, field_name: str = "pk") -> Q:
-        """Branch rows in scope (S1, S2), through ``field_name`` (``pk`` for ``Branch``)."""
+        """Branch rows in scope (S1, S2), through ``field_name`` (``pk`` for ``Branch``).
+
+        A ``Reach.SITE`` grant reaches no branch row: only its projects' worksites."""
         if self.everything:
             return ALWAYS
         return any_of(
             Q(**{f"{field_name}__in": sorted(grant.branch_ids)})
             for grant in self.grants
-            if grant.branch_ids
+            if grant.branch_ids and grant.reach is not Reach.SITE
         )
 
     def project_q(self, prefix: str = "") -> Q:
@@ -157,11 +189,14 @@ class Scope:
         """Documents in scope (S5): by branch, or by project for assigned projects.
 
         ``Reach.OWN`` grants add ``owner = user``; a model without ``owner`` gets none of
-        their rows. Installation-wide grants reach no document.
+        their rows. Installation-wide grants reach no document. For a ``SITE_CAPABILITIES``
+        capability, every grant also reaches the documents of its projects through
+        ``project`` (Q44); a ``Reach.SITE`` grant only those.
         """
         branches = (branch,) if isinstance(branch, str) else branch
+        site = self.capability in SITE_CAPABILITIES
         return any_of(
-            grant.document_q(branches, project, owner, self.user_id)
+            grant.document_q(branches, project, owner, self.user_id, site=site)
             for grant in self.grants
             if grant.everything or not grant.installation
         )

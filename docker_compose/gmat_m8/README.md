@@ -49,7 +49,7 @@ docker compose up -d --build --wait           # https://localhost:8443 (accept o
 The first administrator is invited from a shell, while no active group administrator exists (a second run is refused once one does):
 
 ```bash
-docker compose run --rm web manage bootstrap_admin --email you@example.com --company-code A [--company-name "Company A"] [--superuser]
+docker compose run --rm web manage bootstrap_admin --email you@example.com --full-name "Your Name" --company-code A [--company-name "Company A"] [--superuser]
 ```
 
 It creates the company and its head office if they are missing and prints a one-time setup link (valid 72 hours, shown only in this terminal). Open it at `https://localhost:8443` to set the password; the first sign-in then enrolls MFA. Running it again before the link is used replaces the link. `createsuperuser` is disabled: `--superuser` also makes the account a platform operator. Everyone else is invited from the app (People → Invite someone).
@@ -79,7 +79,7 @@ None of the env files is committed; only the `*.example` templates are.
 Seed data for development (the dev overlay only; the command refuses any settings but `config.settings.dev` and `config.settings.test`):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage bootstrap_admin --email you@example.com --company-code A   # once: prints the setup link
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage bootstrap_admin --email you@example.com --full-name "Your Name" --company-code A   # once: prints the setup link
 docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web manage seed_demo --operator you@example.com [--password …]
 ```
 

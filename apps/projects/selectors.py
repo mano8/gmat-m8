@@ -103,7 +103,7 @@ def assignment_candidates(ctx: AccessContext, kind: str | None = None) -> QueryS
     user_ids = Membership.objects.filter(valid_now(), condition).values("user_id")
     return User.objects.filter(
         pk__in=user_ids, is_active=True, offboarded_at__isnull=True
-    ).order_by("email")
+    ).order_by("full_name", "email")  # listed by name (ADR-0029), the address breaks ties
 
 
 def manageable(ctx: AccessContext, of: Project) -> bool:

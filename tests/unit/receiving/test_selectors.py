@@ -6,7 +6,7 @@ import pytest
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
-from apps.access.roles import Role
+from apps.access.roles import Capability, Role
 from apps.accounts.models import User
 from apps.catalog.models import Material
 from apps.purchasing.models import PurchaseOrder
@@ -94,7 +94,10 @@ class TestExpectedDeliveries:
             assert not value.found_in(text)
         assert not Sentinel.SUPPLIER_PHONE.found_in(text)
 
-    @pytest.mark.parametrize("actor", ["group_admin", "mm_mad", "wo_mad", "site_manager"])
+    @pytest.mark.parametrize(
+        "actor",
+        ["group_admin", "mm_mad", "wo_mad", "site_manager", "engineer", "tech_mad", "partner"],
+    )
     def test_who_may_receive_sees_them(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy, actor: str
     ) -> None:
@@ -102,7 +105,16 @@ class TestExpectedDeliveries:
         assert len(selectors.expected_deliveries(ctx(getattr(people, actor)), org.hospital.pk)) == 1
 
     @pytest.mark.parametrize(
-        "actor", ["mm_sev", "tech_mad", "partner", "revoked_assignment", "nobody", "operator"]
+        "actor",
+        [
+            "mm_sev",
+            "expired",
+            "inactive_partner",
+            "inactive_branch",
+            "revoked_assignment",
+            "nobody",
+            "operator",
+        ],
     )
     def test_anyone_else_gets_404(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy, actor: str
@@ -111,10 +123,14 @@ class TestExpectedDeliveries:
         with pytest.raises(NotInScope):
             selectors.expected_deliveries(ctx(getattr(people, actor)), org.hospital.pk)
 
-    def test_a_branch_that_does_not_buy_for_the_project_sees_none_of_its_orders(
+    def test_the_branch_that_executes_the_project_sees_what_it_expects(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy
     ) -> None:
-        """B-MAD's own warehouse operator sees the hospital, not A-MAD's orders (S5)."""
-        buy((make_line("10"), "10"))
+        """B-MAD executes the hospital and A-MAD buys for it: B-MAD's own warehouse operator
+        receives on its site (Q44), so it sees what the hospital still expects, though not
+        A-MAD's orders themselves (S5)."""
+        order = buy((make_line("10"), "10"))
         operator = member(Role.WAREHOUSE_OPERATOR, email="wo-bmad@example.org", branch=org.b_mad)
-        assert selectors.expected_deliveries(ctx(operator), org.hospital.pk) == []
+        rows = selectors.expected_deliveries(ctx(operator), org.hospital.pk)
+        assert [(row.po_id, row.expected) for row in rows] == [(order.pk, D(10))]
+        assert not PurchaseOrder.objects.visible_to(ctx(operator), Capability.PO_VIEW).exists()

@@ -103,11 +103,24 @@ class TestCreate:
             invite()
         assert error_codes(exc) == {"pending"}
 
+    def test_a_name_is_required(
+        self, invite: Callable[..., Invitation], admin_principal: SessionPrincipal, branch: Branch
+    ) -> None:
+        """ADR-0029: everyone the application shows is shown by name."""
+        for blank in ("", "   "):
+            with pytest.raises(ValidationError) as exc:
+                invite(full_name=blank)
+            assert error_codes(exc) == {"required"}
+        assert not Invitation.objects.exists()
+        assert invite(full_name=" Ana Ruiz ").full_name == "Ana Ruiz"
+
     def test_grants_are_validated(
         self, invite: Callable[..., Invitation], admin_principal: SessionPrincipal, branch: Branch
     ) -> None:
         with pytest.raises(ValidationError) as exc:
-            services.create_invitation(admin_principal, email="x@example.org", memberships=[])
+            services.create_invitation(
+                admin_principal, email="x@example.org", full_name="X", memberships=[]
+            )
         assert error_codes(exc) == {"no_grant"}
         with pytest.raises(ValidationError):
             invite(role=Role.TECHNICIAN, branch_id=None)  # a branch role without its branch
@@ -124,6 +137,7 @@ class TestCreate:
             services.create_invitation(
                 admin_principal,
                 email="p@example.org",
+                full_name="Pat Partner",
                 employer_company_id=other.pk,
                 memberships=[MembershipGrant(role=Role.PARTNER_REQUESTER, company_id=company.pk)],
             )
@@ -326,6 +340,24 @@ class TestAcceptExistingAccount:
         assert accept(raw, session_user=user, password=None) == user
         user.refresh_from_db()
         assert (user.password, user.session_epoch) == (password_hash, epoch)
+
+    @pytest.mark.parametrize(("own", "named"), [("", "Ana Ruiz"), ("Old Name", "Old Name")])
+    def test_an_active_account_takes_the_invitations_name_only_without_one(
+        self,
+        invite: Callable[..., Invitation],
+        make_user: Callable[..., User],
+        own: str,
+        named: str,
+    ) -> None:
+        """ADR-0029: an account from before names were required is named by the invitation
+        it accepts; a named account keeps its own."""
+        user = make_user("old@example.org", full_name=own)
+        invite("old@example.org", role=Role.WAREHOUSE_OPERATOR, full_name="Ana Ruiz")
+        accept(last_token("old@example.org"), session_user=user, password=None)
+        user.refresh_from_db()
+        assert user.full_name == named
+        named_now = AuditEvent.objects.get(action="invitation.accepted").data["named"]
+        assert named_now is (own == "")
         assert Membership.objects.get(user=user).role == Role.WAREHOUSE_OPERATOR
 
     def test_never_changes_an_active_accounts_password(
@@ -355,6 +387,25 @@ class TestAcceptExistingAccount:
         assert not Authenticator.objects.filter(user=user).exists()
         assert Membership.objects.filter(user=user, revoked_at__isnull=True).count() == 1
         assert AuditEvent.objects.get(action="invitation.accepted").data["reactivated"] is True
+
+    @pytest.mark.parametrize(("invited_as", "named"), [("Ana Ruiz", "Ana Ruiz"), ("", "Old Name")])
+    def test_a_rehire_takes_the_invitations_name_or_keeps_its_own(
+        self,
+        invite: Callable[..., Invitation],
+        admin_principal: SessionPrincipal,
+        member: Callable[..., User],
+        branch: Branch,
+        invited_as: str,
+        named: str,
+    ) -> None:
+        """An invitation made before names were required (ADR-0029) has none: the returning
+        account keeps the name it had."""
+        user = member(Role.TECHNICIAN, email="old@example.org", branch=branch)
+        User.objects.filter(pk=user.pk).update(full_name="Old Name")
+        services.offboard_user(admin_principal, user.pk)
+        invitation = invite("old@example.org", full_name="Ana Ruiz")
+        Invitation.objects.filter(pk=invitation.pk).update(full_name=invited_as)
+        assert accept(last_token("old@example.org")).full_name == named
 
     def test_an_invitation_older_than_the_offboarding_cannot_reactivate(
         self, invite: Callable[..., Invitation], member: Callable[..., User], branch: Branch

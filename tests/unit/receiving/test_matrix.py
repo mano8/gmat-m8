@@ -4,13 +4,15 @@ Every operation, called directly as every actor of the shared fixture, on an iss
 of A-MAD that buys for the hospital:
 
 - ``post_at_warehouse`` (A-MAD's warehouse): ``receipt.post`` on the order: group
-  administrators, A-MAD's material manager and warehouse operator. The hospital's site
-  manager does not see the order: 404.
-- ``post_at_site`` (the hospital's worksite): the same, plus the hospital's site manager
-  (○ site, Q9), through the hospital requests the order serves.
+  administrators, A-MAD's material manager, engineer and warehouse operator. Who receives
+  only at worksites (○ site) does not see the order: 404.
+- ``post_at_site`` (the hospital's worksite): the same, plus everyone whose membership's
+  scope holds the hospital (Q44, ADR-0028): its site manager and partner, A-MAD's
+  technician (B-MAD, the hospital's branch, is managed by A-MAD), the mixed user through
+  their technician membership; whoever requested the goods.
 - ``void`` (a receipt at the hospital's worksite): ``receipt.void`` belongs to group
-  administrators and material managers. Who sees the receipt without it gets 403: the
-  warehouse operator and the site manager.
+  administrators, material managers and engineers. Who sees the receipt without it gets
+  403: the warehouse operator, the site manager, the technician, the partner.
 
 A deactivated account is refused before any scope (403); everyone else gets 404. M6.3 adds
 the URL rows to ``tests/access/test_acceptance_matrix.py``.
@@ -95,22 +97,25 @@ OPERATIONS: dict[str, Operation] = {
     "void": lambda p, s, org: services.void_receipt(p, s.receipt.pk, reason="Wrong order"),
 }
 
+BRANCH = {"group_admin", "mm_mad", "engineer", "wo_mad"}
+SITE = {"site_manager", "tech_mad", "partner", "mixed"}
 ALLOWED = {
-    "post_at_warehouse": {"group_admin", "mm_mad", "wo_mad"},
-    "post_at_site": {"group_admin", "mm_mad", "wo_mad", "site_manager"},
-    "void": {"group_admin", "mm_mad"},
+    "post_at_warehouse": BRANCH,
+    "post_at_site": BRANCH | SITE,
+    "void": {"group_admin", "mm_mad", "engineer"},
 }
 # Refused before any scope (deactivated), or sees the receipt without receipt.void: 403.
 DENIED = {
     "post_at_warehouse": {"deactivated"},
     "post_at_site": {"deactivated"},
-    "void": {"deactivated", "wo_mad", "site_manager"},
+    "void": {"deactivated", "wo_mad"} | SITE,
 }
 ACTORS = [
     "group_admin",
     "operator",
     "mm_mad",
     "mm_sev",
+    "engineer",
     "wo_mad",
     "tech_mad",
     "site_manager",
@@ -165,7 +170,7 @@ def test_privileged_roles_need_session_mfa(
     org: Org, people: People, make_line: MakeLine, operation: str
 ) -> None:
     state = build(org, people, make_line, sevilla=False)
-    for user in (people.group_admin, people.mm_mad):
+    for user in (people.group_admin, people.mm_mad, people.engineer):
         with pytest.raises(MFARequired):
             OPERATIONS[operation](principal_for(user, mfa_at=None), state, org)
 
@@ -178,9 +183,21 @@ def test_ordinary_roles_need_no_mfa(
     OPERATIONS[operation](principal_for(people.wo_mad, mfa_at=None), state, org)
 
 
-def test_the_site_manager_posts_without_mfa(org: Org, people: People, make_line: MakeLine) -> None:
+@pytest.mark.parametrize("actor", ["site_manager", "tech_mad", "partner"])
+def test_site_receivers_post_without_mfa(
+    org: Org, people: People, make_line: MakeLine, actor: str
+) -> None:
     state = build(org, people, make_line, sevilla=False)
-    OPERATIONS["post_at_site"](principal_for(people.site_manager, mfa_at=None), state, org)
+    OPERATIONS["post_at_site"](principal_for(getattr(people, actor), mfa_at=None), state, org)
+
+
+# What the mixed user's technician membership in A-MAD gives on A-MAD's order (S6): the
+# material manager's membership of A-SEV covers none of it.
+MIXED_IN_MADRID: dict[str, type[Exception] | None] = {
+    "post_at_warehouse": NotInScope,
+    "post_at_site": None,  # ○ site: the hospital is a project of the technician's scope
+    "void": AccessDenied,  # they see the site receipt, but void nothing in A-MAD
+}
 
 
 @pytest.mark.parametrize("operation", sorted(OPERATIONS))
@@ -190,5 +207,12 @@ def test_capabilities_never_mix_across_memberships(
     """The mixed user manages A-SEV's materials and is a technician in A-MAD (S6)."""
     call = OPERATIONS[operation]
     call(principal_for(people.mixed), build(org, people, make_line, sevilla=True), org)
-    with pytest.raises(NotInScope):
-        call(principal_for(people.mixed), build(org, people, make_line, sevilla=False), org)
+    madrid = build(org, people, make_line, sevilla=False)
+    error = MIXED_IN_MADRID[operation]
+    if error is None:
+        # The technician's grant covers it alone: no session MFA, which only the material
+        # manager's privileged grant would ask for.
+        call(principal_for(people.mixed, mfa_at=None), madrid, org)
+        return
+    with pytest.raises(error):
+        call(principal_for(people.mixed), madrid, org)

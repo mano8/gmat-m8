@@ -22,7 +22,7 @@ It fits a single company with one office as well as a group of companies with se
 1. **Request.** Choose materials from the catalog for a project, or describe one that is not in it. Set the priority and the date you need them by, then submit.
 2. **Review.** A reviewer approves or rejects each line, corrects it, or sends the request back for changes. The original stays on record, so the requester sees what was changed.
 3. **Purchase.** A worklist shows what is left to buy, grouped by material. Build purchase orders per supplier, then issue, print and, if you turn it on, email them. An issued order changes only through a recorded amendment.
-4. **Receive.** Record a delivery from a phone, at a warehouse or on the worksite: what was accepted, what was rejected, any incident or surplus, and a photo of the delivery note.
+4. **Receive.** Record a delivery from a phone, at a warehouse or on the worksite (anyone who works on the project can receive there): what was accepted, what was rejected, any incident or surplus, and a photo of the delivery note.
 5. **Hand over.** Hand materials from the warehouse to the people on the project. Goods received on site are handed over in the same step.
 6. **Follow up.** For every line, see how much was approved, ordered, received and delivered. Dashboards, CSV exports and a full audit trail cover the rest.
 
@@ -35,8 +35,8 @@ It fits a single company with one office as well as a group of companies with se
 | Engineer | The same as a material manager, and ranks above one | The same |
 | Warehouse operator | Receives goods and hands them over | Orders and suppliers, without prices |
 | Site manager | Requests and reviews materials for their projects, receives goods on site | Only their assigned projects: what is expected, no prices or supplier contacts |
-| Technician | Requests materials and follows their own requests | Their own requests, the catalog and their branch's projects |
-| Partner requester | Requests materials for projects shared with them | Their own requests; never prices, suppliers or anyone else's requests |
+| Technician | Requests materials, follows their own requests and receives goods on site | Their own requests, the catalog and their branch's projects: what is expected on site and the receipts posted there, no prices or supplier contacts |
+| Partner requester | Requests materials for projects shared with them and receives goods on their sites | Their own requests, and what is expected and received on those sites; never prices, supplier contacts or anyone else's requests |
 
 A person can hold several roles, each limited to its own branch or projects. Group administrators, material managers and engineers must sign in with a second factor.
 
@@ -59,7 +59,7 @@ bash init.sh                          # writes .env and app.env with generated s
 docker compose up -d --build --wait   # https://localhost:8443 (accept or trust Caddy's local CA)
 
 # the first administrator: prints a one-time setup link
-docker compose run --rm web manage bootstrap_admin --email you@example.com --company-code A
+docker compose run --rm web manage bootstrap_admin --email you@example.com --full-name "Your Name" --company-code A
 ```
 
 Open the link, set a password and enroll a second factor. Email stays on your machine, in Mailpit, and never reaches a real inbox.

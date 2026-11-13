@@ -100,8 +100,8 @@ def create_invitation(
     *,
     email: str,
     memberships: Sequence[MembershipGrant],
+    full_name: str,
     assignments: Sequence[AssignmentGrant] = (),
-    full_name: str = "",
     employer_company_id: UUID | None = None,
     idempotency_key: str | None = None,
 ) -> Invitation:
@@ -115,6 +115,7 @@ def create_invitation(
     email = _normalize_email(email)
     target_id = User.objects.filter(email=email).values_list("pk", flat=True).first()
     actor = _lock_and_authorize(principal, target_id)
+    _require_name(full_name)
     payload = {
         "email": email,
         "grants": _grants_json(memberships, assignments),
@@ -281,6 +282,11 @@ def _accepting_account(
     if target is not None and target.is_active:
         if password is not None:
             raise ValueError("Accepting for an active account never changes its password")
+        if not target.full_name.strip() and invitation.full_name:
+            # An account from before names were required takes the one it was invited
+            # with; a named account keeps its own (ADR-0029).
+            target.full_name = invitation.full_name
+            target.save(update_fields=["full_name"])
         return target, False
     return _returning_account(invitation, target, password), True
 
@@ -302,6 +308,7 @@ def accept_invitation(principal: TokenPrincipal, *, password: str | None = None)
     target = authorize_in_txn(principal, tokens.ACCEPT_INVITATION, locks=LockOrder())
     invitation = Invitation.objects.get(pk=_token_row(principal))
     memberships, assignments = parse_grants(invitation.grants)
+    name_before = target.full_name if target is not None else None
     user, reactivated = _accepting_account(invitation, target, password)
     _verified_email(user)
     identity = AuditIdentity(label=user.email, user_id=user.pk, via=principal.via, ip=principal.ip)
@@ -316,7 +323,13 @@ def accept_invitation(principal: TokenPrincipal, *, password: str | None = None)
         identity,
         "invitation.accepted",
         obj=invitation,
-        data={"kind": invitation.kind, "user_id": user.pk, "reactivated": reactivated},
+        data={
+            "kind": invitation.kind,
+            "user_id": user.pk,
+            "reactivated": reactivated,
+            # An existing account named by the invitation (ADR-0029).
+            "named": name_before is not None and user.full_name != name_before,
+        },
     )
     events.publish("invitation.accepted", invitation_id=invitation.pk, user_id=user.pk)
     return user
@@ -332,23 +345,33 @@ class Bootstrap:
     company_created: bool
 
 
+def _require_name(full_name: str) -> None:
+    """Everyone the application shows is shown by name, never by address (ADR-0029)."""
+    if not full_name.strip():
+        raise ValidationError(
+            {"full_name": ValidationError(_("Give the person's full name."), code="required")}
+        )
+
+
 @transactional
 def bootstrap_admin(
     principal: TokenPrincipal,
     *,
     company_code: str,
+    full_name: str,
     company_name: str = "",
     platform_operator: bool = False,
 ) -> Bootstrap:
     """Invite the first ``GROUP_ADMIN`` (F76): only while no active one exists.
 
     Creates the company and its head office if they are missing. Running it again before
-    the link is used replaces the previous link.
+    the link is used replaces the previous link. The administrator is named (ADR-0029).
     """
     locks = LockOrder()
     # Serializes bootstraps with each other and with every organization change.
     lock_access_state(locks, mode=LockMode.UPDATE)
     authorize_in_txn(principal, tokens.BOOTSTRAP_ADMIN, locks=locks)
+    _require_name(full_name)
     email = _normalize_email(principal.target_email)
     if User.objects.filter(email=email).exists():
         raise ValidationError(
@@ -384,6 +407,7 @@ def bootstrap_admin(
         email=email,
         kind=Invitation.Kind.NEW_ACCOUNT,
         bootstrap=True,
+        full_name=full_name.strip(),
         platform_operator=platform_operator,
         employer_company=company,
         grants=_grants_json([MembershipGrant(role=Role.GROUP_ADMIN)], []),

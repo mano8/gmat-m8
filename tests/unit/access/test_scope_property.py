@@ -25,6 +25,7 @@ from apps.access.roles import (
     INSTALLATION_CAPABILITIES,
     ROLE_CAPABILITIES,
     Capability,
+    Reach,
     Role,
 )
 from apps.accounts.models import User
@@ -58,6 +59,7 @@ CAPABILITIES = (
     Capability.REQUEST_VIEW,
     Capability.REQUEST_REVIEW,
     Capability.PO_VIEW,
+    Capability.RECEIPT_VIEW,
     Capability.RECEIPT_POST,
 )
 TECHNICIAN_LIKE = {Role.TECHNICIAN}
@@ -395,7 +397,8 @@ def reference(
             continue  # catalog and suppliers: no branch or project rows
         elif role in BRANCH_SCOPED:
             scope, reached = _branch_reach(graph, role, membership.target)
-            branches |= scope
+            if ROLE_CAPABILITIES[role][capability] is not Reach.SITE:
+                branches |= scope  # a site grant (Q44) reaches projects and worksites only
             projects |= reached
         else:
             projects |= _assigned_reach(graph, user, role)

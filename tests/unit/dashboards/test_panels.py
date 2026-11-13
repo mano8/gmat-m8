@@ -42,9 +42,14 @@ class TestRegistry:
         assert len({panel.key for panel in panels.PANELS}) == len(panels.PANELS)
         assert set(panels.BY_KEY) == {panel.key for panel in panels.PANELS}
 
-    def test_requesters_get_their_requests_only(self, people: People) -> None:
+    def test_requesters_get_their_requests_and_their_sites_surplus(self, people: People) -> None:
+        """Q44 (M9.1): they read the receipts of their projects' worksites."""
         for user in (people.tech_mad, people.partner):
-            assert keys(AccessContext.for_user(user)) == {"my-requests", "request-progress"}
+            assert keys(AccessContext.for_user(user)) == {
+                "my-requests",
+                "request-progress",
+                "site-surplus",
+            }
 
     def test_a_site_manager_follows_requests_receipts_and_reviews(self, people: People) -> None:
         assert keys(AccessContext.for_user(people.site_manager)) == {

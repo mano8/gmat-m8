@@ -51,7 +51,7 @@ from apps.projects.models import ProjectAssignment
 from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
 from tests.access.matrix import World, build_world
 from tests.orders import allocate, line, order
-from tests.org import Sentinel, build_sentinel_order
+from tests.org import Sentinel, build_sentinel_order, make_user
 from tests.outbox import make_dispatch
 
 
@@ -187,6 +187,14 @@ def _admin_rows(world: World) -> None:
     reviewable("cancel_request", Status.SUBMITTED, 4)
     reviewable("approved_request", Status.APPROVED, 5, approved=True)
     world.objects["submitted_request_line"] = submitted.lines.get()
+    # Who submitted shows on the review page's history: by name, never by address (ADR-0029).
+    for key in ("review_request", "approved_request"):
+        record(
+            AuditIdentity(label=people.tech_mad.email, user_id=people.tech_mad.pk),
+            "request.submitted",
+            obj=world.objects[key],
+            branch_id=org.a_mad.pk,
+        )
     _edited(world, "submitted_request")
     _edited(world, "review_request")
     _edited(world, "approved_request")
@@ -294,6 +302,7 @@ def _admin_rows(world: World) -> None:
         request_line=world.objects["approved_request_line"],
         qty=Decimal("1.000"),
     )
+    _sev_2_receipt(world)
     _attachments(world)
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
@@ -316,6 +325,74 @@ def _admin_rows(world: World) -> None:
     )
     _security_mail(world)
     assert AuditEvent.objects.exists()
+
+
+def _sev_2_receipt(world: World) -> None:
+    """A receipt of 1 at SEV-2's worksite (Q44, M9.3): a project A-SEV runs and A-MAD buys for,
+    on goods somebody outside the actors requested, with its direct handover. A document of
+    A-MAD (S5) that A-SEV's grants reach through the project (``SITE_CAPABILITIES``)."""
+    people, org = world.people, world.org
+    now, one = timezone.now(), Decimal("1.000")
+    material = world.objects["material"]
+    request = MaterialRequest.objects.create(
+        project=org.sev_for_mad,
+        procurement_branch=org.a_mad,
+        requested_by=make_user("sev-requester@example.org"),
+        status=MaterialRequest.Status.APPROVED,
+        number="SOL-A-MAD-2026-00090",
+        submitted_at=now,
+        decided_at=now,
+    )
+    request_line = MaterialRequestLine.objects.create(
+        request=request,
+        project=org.sev_for_mad,
+        line_no=1,
+        material=material,
+        unit=material.unit,
+        requested_qty=one,
+        approved_qty=one,
+        decision=MaterialRequestLine.Decision.APPROVED,
+        decided_by=people.mm_mad,
+        decided_at=now,
+    )
+    site = org.worksite(org.sev_for_mad)
+    bought = order(org, status="ISSUED", issued_by=people.mm_mad, ship_to=site)
+    po_line = line(bought, material, one)
+    world.objects["sevreceipt"] = receipt = GoodsReceipt.objects.create(
+        number="REC-A-MAD-2026-00003",
+        po=bought,
+        branch=org.a_mad,
+        location=site,
+        received_at=now,
+        received_by=people.tech_mad,
+    )
+    receipt_line = GoodsReceiptLine.objects.create(
+        receipt=receipt, po=bought, po_line=po_line, qty_received=one
+    )
+    attribution = ReceiptAttribution.objects.create(
+        receipt_line=receipt_line,
+        allocation=allocate(po_line, request_line, one),
+        po_line=po_line,
+        qty=one,
+    )
+    handover = Handover.objects.create(
+        number="ENT-A-MAD-2026-00003",
+        kind=Handover.Kind.DIRECT_RECEIPT,
+        branch=org.a_mad,
+        source_location=site,
+        project=org.sev_for_mad,
+        handed_by=people.tech_mad,
+        received_by=people.tech_mad,
+        handed_at=now,
+        goods_receipt=receipt,
+    )
+    HandoverLine.objects.create(
+        handover=handover,
+        project=org.sev_for_mad,
+        request_line=request_line,
+        qty=one,
+        receipt_attribution=attribution,
+    )
 
 
 def _security_mail(world: World) -> None:
@@ -353,13 +430,15 @@ def _security_mail(world: World) -> None:
 
 
 def _attachments(world: World) -> None:
-    """One stored file on the technician's draft, the worksite and warehouse receipts and the
-    warehouse handover (M6.4), and a row of each attachment model for the admin."""
+    """One stored file on the technician's draft, the worksite and warehouse receipts, SEV-2's
+    worksite receipt (M9.3) and the warehouse handover (M6.4), and a row of each attachment
+    model for the admin."""
     people = world.people
     parents = {
         "requestattachment": ("request", world.objects["materialrequest"], people.tech_mad),
         "attachment": ("receipt", world.objects["goodsreceipt"], people.wo_mad),
         "warehouseattachment": ("receipt", world.objects["warehousereceipt"], people.wo_mad),
+        "sevattachment": ("receipt", world.objects["sevreceipt"], people.tech_mad),
         "handoverattachment": ("handover", world.objects["warehousehandover"], people.wo_mad),
     }
     files.ensure_dirs()

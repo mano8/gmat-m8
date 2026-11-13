@@ -473,11 +473,32 @@ PO_SENTINELS = SUPPLIER_SENTINELS | {Sentinel.OTHER_PROJECT_QUANTITY}
 # handovers are read by the A-MAD staff and its site manager; receipt.void and handover.void are
 # the managers' and the engineer's (the first three of ``WHOLE_ORDER``); handover.post excludes
 # site managers.
-RECEIPT_HOLDERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "wo_mad", "site_manager", "mixed")
+HANDOVER_VIEWERS = (
+    "group_admin",
+    "mm_mad",
+    "engineer",
+    "mm_sev",
+    "wo_mad",
+    "site_manager",
+    "mixed",
+)
+# Q44 (M9.1, ADR-0028): every business role receives at its projects' worksites.
+RECEIPT_HOLDERS = (*HANDOVER_VIEWERS, "tech_mad", "partner")
 RECEIPT_VOIDERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "mixed")
 HANDOVER_POSTERS = ("group_admin", "mm_mad", "engineer", "mm_sev", "wo_mad", "mixed")
 WHOLE_ORDER = ("group_admin", "mm_mad", "engineer", "wo_mad")
-HOSPITAL_RECEIVERS = ("group_admin", "mm_mad", "engineer", "wo_mad", "site_manager")
+HOSPITAL_HANDOVER_VIEWERS = ("group_admin", "mm_mad", "engineer", "wo_mad", "site_manager")
+# The mixed user through their technician membership of A-MAD (the hospital is B-MAD's).
+HOSPITAL_RECEIVERS = (*HOSPITAL_HANDOVER_VIEWERS, "tech_mad", "partner", "mixed")
+# The sentinel order also buys for SEV-2 (executed by A-SEV, bought by A-MAD): who receives
+# at its worksite, where the form opens when the hospital's is not theirs or comes later.
+SEV_2_RECEIVERS = ("tech_mad", "mm_sev", "mixed")
+SENTINEL_ORDER_RECEIVERS = (*HOSPITAL_RECEIVERS, "mm_sev")
+# SEV-2's worksite (M9.3): a project A-SEV runs and A-MAD buys for. Its receipts are A-MAD's
+# documents (S5), read by A-MAD's staff and technician and, through the project
+# (``SITE_CAPABILITIES``), by A-SEV's material manager and the mixed user; never by the
+# hospital's site manager or partner. Voiding stays with the order's branch.
+SEV_2_SITE = (*WHOLE_ORDER, *SEV_2_RECEIVERS)
 SUPPLIER_NAME = frozenset({Sentinel.SUPPLIER_NAME})
 OTHER_QUANTITY = frozenset({Sentinel.OTHER_PROJECT_QUANTITY})
 
@@ -510,7 +531,7 @@ CHART_HOLDERS: dict[str, tuple[str, ...]] = {
     "orders-receipts": PO_VIEWERS,
     "on-time": PO_VIEWERS,
     "overdue-suppliers": PO_VIEWERS,
-    "receipts-handovers": RECEIPT_HOLDERS,
+    "receipts-handovers": HANDOVER_VIEWERS,
     "handover-projects": HANDOVER_POSTERS,
     "branch-requests": ("group_admin",),
     "branch-people": ("group_admin",),
@@ -672,6 +693,16 @@ def order_action(ok: Outcome = REDIRECT) -> dict[str, Expect]:
 
 def purchase_url(name: str, key: str) -> Callable[[World], str]:
     return _object_url(name, key)
+
+
+def _at_site(name: str, key: str, project: str) -> Callable[[World], str]:
+    """The receipt form of an order with ``?location=`` the worksite of ``project``."""
+
+    def path(world: World) -> str:
+        site = world.org.worksite(getattr(world.org, project))
+        return f"{reverse(name, args=[world.objects[key].pk])}?location={site.pk}"
+
+    return path
 
 
 # Attachments (M6.4): every operation is checked against the parent (plan §5). View with the
@@ -1589,6 +1620,8 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # Receiving (M6.3): receipt.view reads receipts at a warehouse (branch scope) or at a
     # worksite (its project: the site manager too); receipt.post receives; receipt.void is the
     # manager's. The site manager's pages hold the supplier's name and nothing else of the order.
+    # M9.1 (Q44): technicians and partners receive at their projects' worksites too, and a
+    # branch at the worksites of the projects it executes; M9.3 adds the positions it opens.
     "receiving:list": (Route(app_page(**_each(OK, RECEIPT_HOLDERS))),),
     "receiving:orders": (Route(app_page(**_each(OK, RECEIPT_HOLDERS)), allowed=SUPPLIER_NAME),),
     "receiving:projects": (Route(app_page(**_each(OK, RECEIPT_HOLDERS))),),
@@ -1606,16 +1639,50 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="foreign scope",
             path=_project_url("receiving:expected", "sev_works"),
         ),
+        Route(
+            project_page(RECEIPT_HOLDERS, SEV_2_SITE, SEV_2_SITE),
+            position="run by A-SEV, bought by A-MAD",
+            path=_project_url("receiving:expected", "sev_for_mad"),
+            allowed=SUPPLIER_NAME,
+            allowed_for=dict.fromkeys(SEV_2_SITE, OTHER_QUANTITY),
+            note="SEV-2's own share of the sentinel order is the other project's quantity of "
+            "the hospital's pages: shown to who receives at SEV-2 only",
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, ON_HOLD_VIEWERS, ON_HOLD_VIEWERS),
+            position="on hold",
+            path=_project_url("receiving:expected", "mad_hold"),
+            note="technicians and partners reach active projects only (ADR-0028)",
+        ),
     ),
     "receiving:receive": (
         Route(
-            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            project_page(RECEIPT_HOLDERS, SENTINEL_ORDER_RECEIVERS, SENTINEL_ORDER_RECEIVERS),
             position="issued",
             path=purchase_url("receiving:receive", "purchaseorder"),
             allowed=SUPPLIER_NAME,
-            allowed_for=dict.fromkeys(WHOLE_ORDER, OTHER_QUANTITY),
-            note="the site manager gets their project's share only: not the order's outstanding "
-            "quantity nor the other project's allocation",
+            allowed_for=dict.fromkeys(WHOLE_ORDER + SEV_2_RECEIVERS, OTHER_QUANTITY),
+            note="the site manager and the partner get the hospital's share only: not the "
+            "order's outstanding quantity nor the other project's allocation; who receives at "
+            "SEV-2 too (Q44) gets the form at its worksite, with SEV-2's own share",
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, SENTINEL_ORDER_RECEIVERS, SENTINEL_ORDER_RECEIVERS),
+            position="issued, at the hospital",
+            path=_at_site("receiving:receive", "purchaseorder", "hospital"),
+            allowed=SUPPLIER_NAME,
+            allowed_for=dict.fromkeys((*WHOLE_ORDER, "mm_sev"), OTHER_QUANTITY),
+            note="a place the user may not use falls back to one they may (A-SEV's manager: "
+            "SEV-2, with its own share)",
+        ),
+        Route(
+            project_page(RECEIPT_HOLDERS, SENTINEL_ORDER_RECEIVERS, SENTINEL_ORDER_RECEIVERS),
+            position="issued, at SEV-2",
+            path=_at_site("receiving:receive", "purchaseorder", "sev_for_mad"),
+            allowed=SUPPLIER_NAME,
+            allowed_for=dict.fromkeys(SEV_2_SITE, OTHER_QUANTITY),
+            note="the hospital's site manager and partner asking for SEV-2's site get the "
+            "hospital's form: never SEV-2's share",
         ),
         Route(
             project_page(RECEIPT_HOLDERS, WHOLE_ORDER, WHOLE_ORDER),
@@ -1632,7 +1699,9 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     ),
     "receiving:post": (
         Route(
-            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS, REDIRECT),
+            project_action(
+                RECEIPT_HOLDERS, SENTINEL_ORDER_RECEIVERS, SENTINEL_ORDER_RECEIVERS, REDIRECT
+            ),
             path=purchase_url("receiving:post", "purchaseorder"),
             note="no place chosen: back to the form",
         ),
@@ -1658,6 +1727,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             note="a site manager has no warehouse receipt",
         ),
         Route(
+            project_page(RECEIPT_HOLDERS, SEV_2_SITE, SEV_2_SITE),
+            position="worksite run by A-SEV, bought by A-MAD",
+            path=_object_url("receiving:detail", "sevreceipt"),
+            allowed=SUPPLIER_NAME,
+            note="read by the buying branch and, through the project, by the running one",
+        ),
+        Route(
             app_page(**_each(NOT_FOUND, RECEIPT_HOLDERS)),
             position="unknown",
             path=_unknown_url("receiving:detail"),
@@ -1667,7 +1743,7 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         Route(
             project_action(
                 RECEIPT_VOIDERS,
-                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer", "mixed"),
                 ("group_admin", "mm_mad", "engineer"),
                 REDIRECT,
             ),
@@ -1685,11 +1761,23 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="warehouse",
             path=_object_url("receiving:void", "warehousereceipt"),
         ),
+        Route(
+            project_action(
+                RECEIPT_VOIDERS,
+                ("group_admin", "mm_mad", "engineer", "mm_sev", "mixed"),
+                ("group_admin", "mm_mad", "engineer"),
+                REDIRECT,
+            ),
+            position="worksite run by A-SEV, bought by A-MAD",
+            path=_object_url("receiving:void", "sevreceipt"),
+            note="A-SEV's manager reads it through the project but voids only its own "
+            "branch's documents: 403",
+        ),
         # M8b.3's inline dialog pilot: the void form posted with htmx.
         Route(
             project_action(
                 RECEIPT_VOIDERS,
-                ("group_admin", "mm_mad", "engineer"),
+                ("group_admin", "mm_mad", "engineer", "mixed"),
                 ("group_admin", "mm_mad", "engineer"),
                 UNPROCESSABLE,
             ),
@@ -1712,7 +1800,7 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     ),
     # Handovers (M6.3): handover.view also reaches an assigned project (the site manager reads,
     # never posts); handover.post and handover.void are the branch's.
-    "handovers:list": (Route(app_page(**_each(OK, RECEIPT_HOLDERS))),),
+    "handovers:list": (Route(app_page(**_each(OK, HANDOVER_VIEWERS))),),
     "handovers:new": (
         Route(app_page(**_each(OK, HANDOVER_POSTERS)), position="no project"),
         Route(
@@ -1743,17 +1831,17 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     ),
     "handovers:detail": (
         Route(
-            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            project_page(HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS),
             position="from a warehouse",
             path=_object_url("handovers:detail", "warehousehandover"),
         ),
         Route(
-            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            project_page(HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS),
             position="received on site",
             path=_object_url("handovers:detail", "handover"),
         ),
         Route(
-            app_page(**_each(NOT_FOUND, RECEIPT_HOLDERS)),
+            app_page(**_each(NOT_FOUND, HANDOVER_VIEWERS)),
             position="unknown",
             path=_unknown_url("handovers:detail"),
         ),
@@ -1820,6 +1908,13 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             data=_upload_body,
             headers=UPLOAD_ORIGIN,
         ),
+        Route(
+            project_action(RECEIPT_HOLDERS, SEV_2_SITE, SEV_2_SITE, REDIRECT),
+            position="worksite run by A-SEV, bought by A-MAD",
+            path=_upload("attachments:upload_receipt", "sevreceipt"),
+            data=_upload_body,
+            headers=UPLOAD_ORIGIN,
+        ),
     ),
     "attachments:upload_handover": (
         Route(
@@ -1848,7 +1943,12 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             path=_attachment_url("attachments:download", "warehouseattachment"),
         ),
         Route(
-            project_page(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, HOSPITAL_RECEIVERS),
+            project_page(RECEIPT_HOLDERS, SEV_2_SITE, SEV_2_SITE),
+            position="SEV-2 worksite receipt",
+            path=_attachment_url("attachments:download", "sevattachment"),
+        ),
+        Route(
+            project_page(HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS),
             position="handover",
             path=_attachment_url("attachments:download", "handoverattachment"),
         ),
@@ -1868,17 +1968,26 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             position="worksite receipt",
             path=_attachment_url("attachments:remove", "attachment"),
         ),
+        Route(
+            project_action(RECEIPT_HOLDERS, SEV_2_SITE, FILE_MANAGERS, REDIRECT),
+            position="SEV-2 worksite receipt",
+            path=_attachment_url("attachments:remove", "sevattachment"),
+            note="its uploader, the technician, removes nothing from a posted receipt; A-SEV's "
+            "manager moderates only its own branch's",
+        ),
         # M8b.4: the remove dialog posts with htmx. A moderator must give a reason, so an empty
         # form comes back on the dialog (before the plain row removes the file).
         Route(
-            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, UNPROCESSABLE),
+            project_action(
+                HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS, FILE_MANAGERS, UNPROCESSABLE
+            ),
             position="handover, htmx",
             path=_attachment_url("attachments:remove", "handoverattachment"),
             headers=HTMX,
             note="no reason from the dialog: the form again, nothing removed",
         ),
         Route(
-            project_action(RECEIPT_HOLDERS, HOSPITAL_RECEIVERS, FILE_MANAGERS, REDIRECT),
+            project_action(HANDOVER_VIEWERS, HOSPITAL_HANDOVER_VIEWERS, FILE_MANAGERS, REDIRECT),
             position="handover",
             path=_attachment_url("attachments:remove", "handoverattachment"),
         ),
@@ -2152,6 +2261,26 @@ def _with_query(key: str, route: Route, query: str) -> Route:
 
 for _key, _query in PAGED_SECTIONS.items():
     ROUTES[_key] = (*ROUTES[_key], *(_with_query(_key, route, _query) for route in ROUTES[_key]))
+
+
+# M9.3: the receiving screens asked for with htmx (a list's fragment, a page's partial) answer
+# every actor as the full page does, and show no more sentinels.
+RECEIVING_PAGES = (
+    "receiving:list",
+    "receiving:orders",
+    "receiving:projects",
+    "receiving:expected",
+    "receiving:receive",
+    "receiving:detail",
+)
+
+
+def _htmx(route: Route) -> Route:
+    return replace(route, position=f"{route.position}, htmx".lstrip(", "), headers=HTMX)
+
+
+for _key in RECEIVING_PAGES:
+    ROUTES[_key] = (*ROUTES[_key], *(_htmx(route) for route in ROUTES[_key] if not route.headers))
 
 
 # --- the matrix --------------------------------------------------------------------------

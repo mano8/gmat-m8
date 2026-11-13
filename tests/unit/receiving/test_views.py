@@ -194,7 +194,17 @@ class TestTheForm:
         Location.objects.filter(kind=Location.Kind.WORKSITE).update(is_active=False)
         assert "Nowhere to receive" in page(client_for(people.wo_mad), "receive", order.pk)
 
-    @pytest.mark.parametrize("actor", ["mm_sev", "tech_mad", "partner", "nobody"])
+    @pytest.mark.parametrize("actor", ["tech_mad", "partner"])
+    def test_a_project_receiver_gets_the_worksite_form(
+        self, org: Org, people: People, make_line: MakeLine, buy: Buy, actor: str
+    ) -> None:
+        """Q44: the form of an order that buys for their project, at its worksite only."""
+        order = buy((make_line("4"), "4"))
+        html = page(client_for(getattr(people, actor)), "receive", order.pk)
+        assert org.worksite(org.hospital).name in html
+        assert org.warehouses["A Madrid"].name not in html
+
+    @pytest.mark.parametrize("actor", ["mm_sev", "expired", "inactive_partner", "nobody"])
     def test_anyone_else_gets_404_or_403(
         self, org: Org, people: People, make_line: MakeLine, buy: Buy, actor: str
     ) -> None:

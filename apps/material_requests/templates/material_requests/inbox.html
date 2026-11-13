@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n %}
 {% block head_title %}
   {% translate "Approval inbox" %} · gmat-m8
@@ -38,7 +39,7 @@
             </div>
             <p class="text-sm text-soft">{{ item.project.code }} · {{ item.project.name }}</p>
             <p class="text-sm text-soft">
-              {{ item.requested_by.full_name|default:item.requested_by.email }}
+              {{ item.requested_by|person }}
               · {% blocktranslate count counter=item.line_count %}{{ counter }} line{% plural %}{{ counter }} lines{% endblocktranslate %}
               {% if item.needed_by %}· {% translate "Needed by" %} {{ item.needed_by|date:"SHORT_DATE_FORMAT" }}{% endif %}
             </p>

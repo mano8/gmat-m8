@@ -20,7 +20,8 @@ from apps.access.roles import (
 )
 from apps.projects.models import ProjectAssignment
 
-# Copied from plan §3.4 as amended by ADR-0014 (columns: GA, MM, WO, SM, TECH, PARTNER, ENG).
+# Copied from plan §3.4 as amended by ADR-0014 and ADR-0028 (columns: GA, MM, WO, SM, TECH,
+# PARTNER, ENG).
 PLAN_TABLE = """
 org.manage          | ● | — | — | — | — | — | —
 project.view        | ● | ● | ● | ○ | ● | ○ | ●
@@ -39,8 +40,8 @@ request.cancel_any  | ● | ● | — | — | — | — | ●
 po.view             | ● | ● | ● | — | — | — | ●
 po.manage           | ● | ● | — | — | — | — | ●
 price.view          | ● | ● | — | — | — | — | ●
-receipt.view        | ● | ● | ● | ○ site | — | — | ●
-receipt.post        | ● | ● | ● | ○ site (Q9) | — | — | ●
+receipt.view        | ● | ● | ● | ○ site | ○ site | ○ site | ●
+receipt.post        | ● | ● | ● | ○ site | ○ site | ○ site | ●
 receipt.void        | ● | ● | — | — | — | — | ●
 handover.view       | ● | ● | ● | ○ | — | — | ●
 handover.post       | ● | ● | ● | — | — | — | ●
@@ -59,6 +60,8 @@ def plan_reach(capability: str, cell: str) -> Reach | None:
         return Reach.SCOPE
     if cell == "○ own" or capability in OWN_DRAFTS:
         return Reach.OWN
+    if cell == "○ site":
+        return Reach.SITE
     return Reach.ASSIGNED
 
 

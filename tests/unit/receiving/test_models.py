@@ -1,4 +1,4 @@
-"""Scope of receipts and handovers (S5, receipt.view ○ site) and their state tables."""
+"""Scope of receipts and handovers (S5, receipt.view ○ site, Q44) and their state tables."""
 
 from typing import Any
 
@@ -6,13 +6,14 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.access.context import AccessContext
-from apps.access.roles import Capability
+from apps.access.roles import Capability, Role
 from apps.accounts.models import User
 from apps.handovers import transitions as handover_transitions
 from apps.handovers.models import Handover, HandoverLine
+from apps.projects.models import Project
 from apps.receiving import transitions as receipt_transitions
 from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
-from tests.org import Org, People
+from tests.org import Org, People, member
 from tests.support import error_codes
 from tests.unit.purchasing.conftest import Buy, MakeLine
 from tests.unit.receiving.conftest import Receive
@@ -59,7 +60,44 @@ def test_the_site_manager_sees_the_site_receipt_only(
 ) -> None:
     assert visible(people.site_manager, model, capability) == 1
     assert visible(people.revoked_assignment, model, capability) == 0
+
+
+@pytest.mark.parametrize(("model", "capability"), MODELS)
+def test_technicians_and_partners_see_the_site_receipt_only(
+    people: People, received: dict[str, GoodsReceipt], model: type, capability: str
+) -> None:
+    """○ site (Q44): the receipt at a worksite of their project, never a handover, never a
+    warehouse's receipt; nothing through an expired membership or an inactive company."""
+    expected = 1 if capability == RECEIPTS else 0
+    assert visible(people.tech_mad, model, capability) == expected
+    assert visible(people.partner, model, capability) == expected
+    for nobody in (people.expired, people.inactive_partner, people.inactive_branch):
+        assert visible(nobody, model, capability) == 0
+
+
+@pytest.mark.parametrize(("model", "capability"), MODELS[:3])
+def test_a_project_that_is_not_active_leaves_technicians_and_partners_only(
+    org: Org, people: People, received: dict[str, GoodsReceipt], model: type, capability: str
+) -> None:
+    """Technicians and partners reach active projects only; the site manager keeps it."""
+    Project.objects.filter(pk=org.hospital.pk).update(status=Project.Status.ON_HOLD)
     assert visible(people.tech_mad, model, capability) == 0
+    assert visible(people.partner, model, capability) == 0
+    assert visible(people.site_manager, model, capability) == 1
+
+
+@pytest.mark.parametrize(("model", "capability"), MODELS[:3])
+def test_the_projects_own_branch_sees_its_site_receipts(
+    org: Org, received: dict[str, GoodsReceipt], model: type, capability: str
+) -> None:
+    """The hospital is executed by B-MAD and bought by A-MAD: B-MAD's warehouse operator
+    and material manager read the receipt at the hospital's worksite (Q44), not A-MAD's
+    warehouse receipt; voiding stays with the order's branch."""
+    operator = member(Role.WAREHOUSE_OPERATOR, email="wo-bmad@example.org", branch=org.b_mad)
+    manager = member(Role.MATERIAL_MANAGER, email="mm-bmad@example.org", branch=org.b_mad)
+    assert visible(operator, model, capability) == 1
+    assert visible(manager, model, capability) == 1
+    assert visible(manager, model, Capability.RECEIPT_VOID) == 0
 
 
 def test_names(received: dict[str, GoodsReceipt]) -> None:

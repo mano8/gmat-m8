@@ -191,7 +191,7 @@ class InvitationForm(IdempotentForm, RoleTargetMixin):
     operation = "invitation.create"
 
     email = forms.EmailField(label=_("Email"), max_length=254)
-    full_name = forms.CharField(label=_("Full name"), max_length=150, required=False)
+    full_name = forms.CharField(label=_("Full name"), max_length=150)
     employer_company = CompanyChoiceField(
         label=_("Employer"),
         queryset=None,

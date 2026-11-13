@@ -45,6 +45,11 @@ SCREENS: dict[str, tuple[str, Callable[[Documents], str], Open]] = {
     "review-dialog": ("eng-mad", lambda d: d.pending_request, line_dialog),
     "order": ("mm-mad", lambda d: d.order, nothing),
     "receive-form": ("wo-mad", lambda d: d.receive, nothing),
+    # M9.3: a project receiver's screens (the technician, through the project only).
+    "site-project": ("tech-mad", lambda d: d.site_project, nothing),
+    "site-expected": ("tech-mad", lambda d: d.site_expected, nothing),
+    "site-receive-form": ("tech-mad", lambda d: d.site_receive, nothing),
+    "site-receipt": ("tech-mad", lambda d: d.site_receipt, nothing),
     "people": ("admin", lambda d: "/org/people/", nothing),
 }
 

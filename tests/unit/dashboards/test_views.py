@@ -37,7 +37,7 @@ class TestHome:
         response = client_for(people.tech_mad, mfa=False).get(reverse("core:home"))
         html = response.content.decode()
         assert response.status_code == 200
-        assert placeholders(html) == {"my-requests", "request-progress"}
+        assert placeholders(html) == {"my-requests", "request-progress", "site-surplus"}
         assert f'hx-get="{panel_url("my-requests")}"' in html
         assert 'hx-trigger="load"' in html
 

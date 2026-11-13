@@ -5268,6 +5268,10 @@ msgstr "La ligne %(line)s n'a plus rien à réceptionner."
 msgid "Line %(line)s: more than remains to be received on this order."
 msgstr "Ligne %(line)s : plus que ce qui reste à réceptionner sur cette commande."
 
+#: apps/receiving/services.py:270
+msgid "These goods are more than remains to be received on this order."
+msgstr "Ces marchandises dépassent ce qui reste à réceptionner sur cette commande."
+
 #: apps/receiving/services.py:259
 msgid "A line is not on this order."
 msgstr "Une ligne n'appartient pas à cette commande."
@@ -6610,3 +6614,38 @@ msgstr "Mes brouillons"
 
 msgid "in the last 30 days"
 msgstr "ces 30 derniers jours"
+
+#: apps/projects/templates/projects/detail.html:24
+#: apps/receiving/templates/receiving/list.html:19
+#: apps/receiving/templates/receiving/orders.html:36
+#: apps/receiving/templates/receiving/projects.html:27
+msgid "Receive materials"
+msgstr "Réceptionner des matériaux"
+
+#: apps/receiving/templates/receiving/expected.html:16
+msgid "Receipts at this worksite"
+msgstr "Réceptions sur ce chantier"
+
+#: apps/receiving/templates/receiving/orders.html:16
+msgid "Goods for your projects are received from the project's expected deliveries."
+msgstr "Les matériaux de vos projets se réceptionnent depuis les livraisons attendues du projet."
+
+#: apps/receiving/templates/receiving/orders.html:36
+msgid "Receive from a project"
+msgstr "Réceptionner depuis un projet"
+
+#: apps/receiving/templates/receiving/orders.html:36
+msgid "Choose a project to see what is still coming to its worksite and receive it there."
+msgstr "Choisissez un projet pour voir ce qui doit encore arriver sur son chantier et le réceptionner."
+
+#: apps/receiving/templates/receiving/orders.html:73
+msgid "No issued order matches the search. Goods for a project's worksite are received from its expected deliveries."
+msgstr "Aucune commande émise ne correspond à la recherche. Les matériaux du chantier d'un projet se réceptionnent depuis ses livraisons attendues."
+
+#: apps/receiving/templates/receiving/projects.html:34
+msgid "No project with a worksite is within your access."
+msgstr "Aucun projet avec chantier n'est dans votre périmètre d'accès."
+
+#: apps/accounts/services/invitations.py:341
+msgid "Give the person's full name."
+msgstr "Indiquez le nom complet de la personne."

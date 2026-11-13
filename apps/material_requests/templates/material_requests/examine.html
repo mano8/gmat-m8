@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n access ui_tags %}
 {% block head_title %}
   {{ request_obj.number|default:_("Request") }} · gmat-m8
@@ -36,7 +37,11 @@
       <div>
         <dt>{% translate "Requested by" %}</dt>
         <dd>
-          {{ request_obj.requested_by.full_name|default:request_obj.requested_by.email }}
+          {% if requester_contact %}
+            {{ request_obj.requested_by|person_contact }}
+          {% else %}
+            {{ request_obj.requested_by|person }}
+          {% endif %}
         </dd>
       </div>
       <div>
@@ -56,7 +61,7 @@
           <dt>{% translate "Assigned reviewer" %}</dt>
           <dd data-testid="assignee">
             {% if assignee %}
-              {{ assignee.full_name|default:assignee.email }}
+              {{ assignee|person }}
             {% else %}
               <span class="font-normal text-soft">{% translate "Nobody in particular: any reviewer of the branch can decide." %}</span>
             {% endif %}
@@ -174,7 +179,7 @@
             {% if line.decision != "PENDING" %}
               <p class="mt-2 text-sm text-soft" data-testid="line-decision">
                 {% if line.decided_by %}
-                  {% blocktranslate with who=line.decided_by.full_name|default:line.decided_by.email %}Decided by {{ who }}{% endblocktranslate %}
+                  {% blocktranslate with who=line.decided_by|person %}Decided by {{ who }}{% endblocktranslate %}
                 {% endif %}
                 {% if line.decision_note %}· {{ line.decision_note }}{% endif %}
               </p>
@@ -182,7 +187,7 @@
             {% if line.closed_short_at %}
               <p class="mt-2 text-sm text-soft" data-testid="line-closure">
                 {{ line.get_closed_short_source_display }}
-                · {% blocktranslate with who=line.closed_short_by.full_name|default:line.closed_short_by.email when=line.closed_short_at|date:"SHORT_DATETIME_FORMAT" %}by {{ who }} on {{ when }}{% endblocktranslate %}
+                · {% blocktranslate with who=line.closed_short_by|person when=line.closed_short_at|date:"SHORT_DATETIME_FORMAT" %}by {{ who }} on {{ when }}{% endblocktranslate %}
                 · {{ line.close_reason }}
               </p>
             {% endif %}

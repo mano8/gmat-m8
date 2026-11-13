@@ -63,9 +63,14 @@ ROLES: list[tuple[str, list[str], list[str]]] = [
     ("mm_mad", ALL_GROUPS, ["/suppliers/", "/audit/", "/exports/", "/purchasing/"]),
     ("engineer", ALL_GROUPS, ["/suppliers/", "/audit/", "/exports/", "/purchasing/"]),
     ("wo_mad", ["work", "purchasing", "site", "organization"], ["/suppliers/"]),
-    ("tech_mad", ["work", "organization"], ["/requests/", "/projects/", "/catalog/"]),
+    # Q44 (M9.1): technicians and partners receive at their projects' worksites.
+    (
+        "tech_mad",
+        ["work", "site", "organization"],
+        ["/requests/", "/projects/", "/catalog/", "/receiving/expected/"],
+    ),
     ("site_manager", ["work", "site", "organization"], ["/receiving/expected/"]),
-    ("partner", ["work", "organization"], ["/requests/"]),
+    ("partner", ["work", "site", "organization"], ["/requests/", "/receiving/expected/"]),
     ("nobody", ["work"], ["/"]),
     ("operator", ["work"], ["/"]),
 ]
@@ -115,10 +120,17 @@ def test_the_bar_holds_four_entries_and_the_sheet_the_rest(org: Org, people: Peo
 
 
 def test_a_user_with_four_entries_or_fewer_has_no_more_button(org: Org, people: People) -> None:
-    _sidebar, bar, sheet = parts(page(client_for(people.tech_mad)))
-    assert links_of(bar) == ["/", "/requests/", "/projects/", "/catalog/"]
+    _sidebar, bar, sheet = parts(page(client_for(people.nobody)))
+    assert links_of(bar) == ["/"]
     assert "more-menu" not in bar
     assert sheet == ""
+
+
+def test_a_technicians_bar_leads_to_receiving(org: Org, people: People) -> None:
+    """Q44 (M9.1): receiving ranks before projects and the catalog; the rest is in More."""
+    _sidebar, bar, sheet = parts(page(client_for(people.tech_mad)))
+    assert links_of(bar)[:3] == ["/", "/requests/", "/receiving/"]
+    assert "/catalog/" in links_of(sheet)
 
 
 def test_the_phone_bar_order_follows_the_work_of_the_role(org: Org, people: People) -> None:

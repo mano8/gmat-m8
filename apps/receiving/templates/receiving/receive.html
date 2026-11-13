@@ -6,8 +6,7 @@
 {% block content %}
   <header class="page-head" data-testid="page-header">
     <div class="page-head-main">
-      {% url 'receiving:orders' as crumb_url %}
-      {% include "components/crumbs.html" with parent_label=_("Receive goods") parent_url=crumb_url current=order.number %}
+      {% include "components/crumbs.html" with parent_label=back_label parent_url=back_url current=order.number %}
       <h1>{% translate "Receive goods" %}</h1>
       <p class="page-head-sub">
         <span class="font-mono" data-field="order">{{ order.number }}</span>

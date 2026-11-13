@@ -35,6 +35,7 @@ def invite(admin_principal: SessionPrincipal, branch: Branch) -> Callable[..., I
             grant_kwargs["branch_id"] = kwargs.pop("branch_id", branch.pk)
         if role is Role.PARTNER_REQUESTER:
             grant_kwargs["company_id"] = kwargs["employer_company_id"]
+        kwargs.setdefault("full_name", "New Person")  # required (ADR-0029)
         return services.create_invitation(
             principal or admin_principal,
             email=email,

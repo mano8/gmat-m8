@@ -7,12 +7,13 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import F, Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
+from apps.accounts.people import recorded_name
 from apps.audit.models import AuditEvent
 from apps.material_requests import selectors as request_selectors
 from apps.material_requests.models import MaterialRequest
@@ -218,14 +219,18 @@ def history(ctx: AccessContext, of: PurchaseOrder) -> list[HistoryEntry]:
     """The order's audit events and its allocations' trims, oldest first (else nothing)."""
     if not can_see_history(ctx, of):
         return []
-    events = AuditEvent.objects.filter(
-        Q(object_type=PurchaseOrder._meta.label_lower, object_id=of.pk)
-        | Q(action="purchase_allocation.trimmed", data__order_id=str(of.pk))
-    ).order_by("occurred_at", "id")
+    events = (
+        AuditEvent.objects.filter(
+            Q(object_type=PurchaseOrder._meta.label_lower, object_id=of.pk)
+            | Q(action="purchase_allocation.trimmed", data__order_id=str(of.pk))
+        )
+        .annotate(actor_name=F("actor__full_name"))
+        .order_by("occurred_at", "id")
+    )
     return [
         HistoryEntry(
             occurred_at=event.occurred_at,
-            actor=event.actor_label,
+            actor=recorded_name(event),  # ADR-0029
             label=ACTION_LABELS.get(event.action, event.action),
             detail=_detail(event.action, event.data),
         )
@@ -257,9 +262,11 @@ def request_trims(ctx: AccessContext, of: MaterialRequest) -> dict[int, list[Req
     """
     if not request_selectors.can_see_history(ctx, of):
         return {}
-    events = AuditEvent.objects.filter(
-        action="purchase_allocation.trimmed", data__request_id=str(of.pk)
-    ).order_by("occurred_at", "id")
+    events = (
+        AuditEvent.objects.filter(action="purchase_allocation.trimmed", data__request_id=str(of.pk))
+        .annotate(actor_name=F("actor__full_name"))
+        .order_by("occurred_at", "id")
+    )
     grouped: dict[int, list[RequestTrim]] = {}
     for event in events:
         data = event.data
@@ -267,7 +274,7 @@ def request_trims(ctx: AccessContext, of: MaterialRequest) -> dict[int, list[Req
         grouped.setdefault(int(data["request_line"]), []).append(
             RequestTrim(
                 occurred_at=event.occurred_at,
-                actor=event.actor_label,
+                actor=recorded_name(event),  # ADR-0029
                 line_no=int(data["request_line"]),
                 before=Decimal(str(data["from"])),
                 after=Decimal(str(data["to"])),

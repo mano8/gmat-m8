@@ -97,6 +97,48 @@ class TestScope:
         }
 
 
+class TestTheSiteReach:
+    """Q44, ADR-0028: a site grant reaches documents only through their project."""
+
+    def test_a_site_grant_reaches_no_document_without_a_project_and_no_branch(
+        self, org: Org
+    ) -> None:
+        site = branch_grant(org.a_mad, reach=Reach.SITE)
+        assert site.document_q(("branch",), None, None, USER) is NEVER
+        scope = Scope("receipt.view", (site,), USER)
+        assert scope.document_q(branch="branch") is NEVER
+        assert not Branch.objects.in_scope(scope).exists()
+
+    def test_a_site_grant_reaches_documents_of_its_projects_only(self, org: Org) -> None:
+        from apps.locations.models import Location
+
+        scope = Scope("receipt.view", (branch_grant(org.a_sev, reach=Reach.SITE),), USER)
+        condition = scope.document_q(branch="branch", project="project")
+        places = set(Location.objects.filter(condition).values_list("name", flat=True))
+        assert places == {"site SEV-1", "site SEV-2"}  # no warehouse of A-SEV
+
+    def test_branch_grants_reach_their_projects_documents_for_receiving_only(
+        self, org: Org
+    ) -> None:
+        """A-MAD buys for the hospital (B-MAD's) and SEV-2 (A-SEV's): a grant on A-MAD alone
+        reaches their worksites for the receiving capabilities, never for another."""
+        from apps.locations.models import Location
+
+        grant = branch_grant(org.a_mad, role=Role.MATERIAL_MANAGER)
+        own = {"wh A Madrid", "site MAD-1"}
+        for capability, expected in (
+            ("receipt.view", own | {"site HOSP-X", "site SEV-2"}),
+            ("receipt.post", own | {"site HOSP-X", "site SEV-2"}),
+            ("receipt.void", own),
+            ("handover.view", own),
+        ):
+            condition = Scope(capability, (grant,), USER).document_q(
+                branch="branch", project="project"
+            )
+            found = set(Location.objects.filter(condition).values_list("name", flat=True))
+            assert found == expected, capability
+
+
 class TestScopedQuerySet:
     def test_an_empty_scope_is_an_empty_queryset(self, org: Org) -> None:
         assert not Branch.objects.in_scope(Scope("x")).exists()

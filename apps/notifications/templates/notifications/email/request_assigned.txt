@@ -1,4 +1,4 @@
-{% load i18n %}{% autoescape off %}{% blocktranslate with number=request_obj.number project=request_obj.project.name name=assigned_by.full_name|default:assigned_by.email count lines=lines %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} line).{% plural %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} lines).{% endblocktranslate %}
+{% load i18n people %}{% autoescape off %}{% blocktranslate with number=request_obj.number project=request_obj.project.name name=assigned_by|person count lines=lines %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} line).{% plural %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} lines).{% endblocktranslate %}
 {% if note %}
 {% translate "Note" %}: {{ note }}{% endif %}{% if request_obj.needed_by %}
 {% translate "Needed by" %}: {{ request_obj.needed_by|date:"SHORT_DATE_FORMAT" }}{% endif %}

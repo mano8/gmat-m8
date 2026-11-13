@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n access ui_tags %}
 {% block head_title %}
   {{ handover.number }} · gmat-m8
@@ -37,12 +38,12 @@
       </div>
       <div>
         <dt>{% translate "Received by" %}</dt>
-        <dd data-field="received-by">{% if handover.received_by %}{{ handover.received_by.full_name|default:handover.received_by.email }}{% else %}{{ handover.received_by_name }}{% endif %}</dd>
+        <dd data-field="received-by">{% if handover.received_by %}{{ handover.received_by|person }}{% else %}{{ handover.received_by_name }}{% endif %}</dd>
       </div>
       <div>
         <dt>{% translate "Handed over" %}</dt>
         <dd>
-          {{ handover.handed_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.handed_by.full_name|default:handover.handed_by.email }}
+          {{ handover.handed_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.handed_by|person }}
         </dd>
       </div>
       {% if handover.goods_receipt %}
@@ -61,7 +62,7 @@
         <div class="col-span-full" data-testid="void-reason">
           <dt>{% translate "Voided" %}</dt>
           <dd>
-            {{ handover.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.voided_by.full_name|default:handover.voided_by.email }}
+            {{ handover.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ handover.voided_by|person }}
             <span class="block whitespace-pre-line">{{ handover.void_reason }}</span>
           </dd>
         </div>

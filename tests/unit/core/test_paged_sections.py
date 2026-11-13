@@ -38,7 +38,8 @@ def get(client: Any, name: str, *args: Any, **query: Any) -> str:
 class TestProjectAssignments:
     def shared(self, org: Org, count: int = SIZE + 1) -> None:
         for number in range(count):
-            assign(make_user(f"share{number}@example.org"), org.hospital, "MANAGER")
+            user = make_user(f"share{number}@example.org", full_name=f"Shared {number}")
+            assign(user, org.hospital, "MANAGER")
 
     def test_a_page_never_shows_more_than_its_size(self, org: Org, people: People) -> None:
         self.shared(org)
@@ -53,14 +54,17 @@ class TestProjectAssignments:
     def test_the_filters_narrow_and_the_pager_keeps_them(self, org: Org, people: People) -> None:
         self.shared(org, 3)
         revoked = assign(
-            make_user("left@example.org"), org.hospital, "PARTNER", revoked_at=timezone.now()
+            make_user("left@example.org", full_name="Left Behind"),
+            org.hospital,
+            "PARTNER",
+            revoked_at=timezone.now(),
         )
         client = client_for(people.mm_mad)
         html = get(client, "projects:detail", org.hospital.pk, **{"assignments-state": "revoked"})
-        assert "left@example.org" in html and "share0@example.org" not in html
+        assert "Left Behind" in html and "Shared 0" not in html  # by name (ADR-0029)
         assert "1 filter active" in html
         kind = get(client, "projects:detail", org.hospital.pk, **{"assignments-kind": "MANAGER"})
-        assert "share0@example.org" in kind and "left@example.org" not in kind
+        assert "Shared 0" in kind and "Left Behind" not in kind
         none = get(client, "projects:detail", org.mad_hold.pk, **{"assignments-kind": "MANAGER"})
         assert "No assignment matches the filters." in none
         assert ProjectAssignment.objects.filter(pk=revoked.pk).exists()
@@ -68,7 +72,7 @@ class TestProjectAssignments:
     def test_a_reader_who_does_not_manage_sees_no_section(self, org: Org, people: People) -> None:
         self.shared(org, 2)
         html = get(client_for(people.site_manager), "projects:detail", org.hospital.pk)
-        assert "share0@example.org" not in html and 'id="assignments"' not in html
+        assert "Shared 0" not in html and 'id="assignments"' not in html
 
     def test_bad_parameters_fall_back(self, org: Org, people: People) -> None:
         client = client_for(people.mm_mad)

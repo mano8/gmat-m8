@@ -16,6 +16,7 @@ from django.core.management import CommandError, call_command
 from django.core.management.base import BaseCommand
 from django.test import Client
 from django.urls import reverse
+from django.utils import translation
 
 from apps.access.principals import OperatorPrincipal
 from apps.access.roles import Capability, Role
@@ -41,8 +42,10 @@ class CountCompanies(OperatorCommand):
 
 
 def bootstrap(*args: str) -> str:
+    """``manage bootstrap_admin`` with ``args``; a name unless they bring one (ADR-0029)."""
     out = StringIO()
-    call_command("bootstrap_admin", *args, stdout=out)
+    named = args if "--full-name" in args else (*args, "--full-name", "Ada Admin")
+    call_command("bootstrap_admin", *named, stdout=out)
     return out.getvalue()
 
 
@@ -180,3 +183,29 @@ def test_refusals(setup: str) -> None:
     with pytest.raises(CommandError):
         bootstrap("--email", "boss@example.org", "--company-code", "A")
     assert not Invitation.objects.exists()
+
+
+def test_the_first_administrator_is_named() -> None:
+    """ADR-0029: no account without a name; the accepted account carries it."""
+    with pytest.raises(CommandError, match="full-name"):
+        call_command("bootstrap_admin", "--email", "boss@example.org", "--company-code", "A")
+    with translation.override("en"), pytest.raises(CommandError, match="full name"):
+        bootstrap("--email", "boss@example.org", "--company-code", "A", "--full-name", "  ")
+    assert not Invitation.objects.exists()
+    link = setup_link(
+        bootstrap("--email", "boss@example.org", "--company-code", "A", "--full-name", " Ada Lin ")
+    )
+    assert Invitation.objects.get().full_name == "Ada Lin"
+    client = Client()
+    client.get(link)
+    client.post(reverse("invitations:submit"), {"password1": PASSWORD, "password2": PASSWORD})
+    assert User.objects.get(email="boss@example.org").full_name == "Ada Lin"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_command_runs_in_its_own_transaction() -> None:
+    """Outside a test's transaction, as on the server: the service opens its own (a
+    ``LockOutsideTransaction`` otherwise)."""
+    output = bootstrap("--email", "boss@example.org", "--company-code", "A")
+    assert setup_link(output)
+    assert Invitation.objects.get().full_name == "Ada Admin"

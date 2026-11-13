@@ -19,6 +19,7 @@ import pytest
 from django.db import transaction
 from django.utils import timezone
 
+from apps.access.principals import SessionPrincipal
 from apps.catalog.models import UnitOfMeasure
 from apps.handovers import services as handovers
 from apps.handovers.models import Handover
@@ -33,6 +34,7 @@ from apps.receiving.services import ReceiptLineInput
 from tests.invariants import RULES, Derived, Facts, Rows, Watch, derive, history, violations
 from tests.ledger_world import LedgerWorld, build_ledger_world
 from tests.org import build_org, build_people
+from tests.support import principal_for
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -45,7 +47,7 @@ class Documents:
     issued: PurchaseOrder  # X 10, Y 8, Z 6; 24 ordered
     draft: PurchaseOrder  # W 7
     at_warehouse: GoodsReceipt  # 10 at A-MAD: Y 8 (HIGH), X 2
-    at_site: GoodsReceipt  # 4 at MAD-2's site: Z 4, handed over at once
+    at_site: GoodsReceipt  # 4 at MAD-2's site by A-MAD's technician (Q44): Z 4, handed over
     voided: GoodsReceipt  # 1 at A-MAD, voided
     handover: Handover  # X 2 from A-MAD's warehouse
 
@@ -78,10 +80,10 @@ def _build(world: LedgerWorld) -> Documents:
         requested = [RequestItem(lines[name].pk, D(qty)) for name, qty in items]
         return purchasing.add_request_lines(buyer, po.pk, requested)
 
-    def receive(at: UUID, qty: str) -> GoodsReceipt:
+    def receive(at: UUID, qty: str, by: SessionPrincipal = buyer) -> GoodsReceipt:
         line = issued.lines.get().pk
         return receiving.post_receipt(
-            buyer, issued.pk, location_id=at, lines=[ReceiptLineInput(line, D(qty))]
+            by, issued.pk, location_id=at, lines=[ReceiptLineInput(line, D(qty))]
         )
 
     issued = purchasing.issue(buyer, order(("X", "10"), ("Y", "8"), ("Z", "6")).pk)
@@ -92,7 +94,9 @@ def _build(world: LedgerWorld) -> Documents:
         issued=issued,
         draft=order(("W", "7")),
         at_warehouse=receive(madrid, "10"),
-        at_site=receive(world.worksite(world.projects[1].pk).pk, "4"),
+        at_site=receive(
+            world.worksite(world.projects[1].pk).pk, "4", principal_for(world.people.tech_mad)
+        ),
         voided=GoodsReceipt.objects.get(pk=voided.pk),
         handover=handovers.create_handover(
             buyer,
@@ -184,6 +188,11 @@ def _i8_not_handed_over(rows: Rows, docs: Documents) -> None:
     _set(rows.handover_lines, _handover_line(rows, docs.direct), receipt_attribution_id=None)
 
 
+def _i8_receiver(rows: Rows, docs: Documents) -> None:
+    buyer = docs.world.people.mm_mad.pk  # the technician posted it
+    _set(rows.handovers, docs.direct.pk, handed_by_id=buyer, received_by_id=buyer)
+
+
 def _i9(rows: Rows, docs: Documents) -> None:
     madrid = docs.world.warehouses["A Madrid"].pk
     _set(rows.receipts, docs.at_site.pk, location_id=madrid)  # a site receipt counted as stock
@@ -262,6 +271,7 @@ BREAKS: dict[str, tuple[str, Break]] = {
     "direct-handover-status": ("I8", _i8_status),
     "direct-line-quantity": ("I8", _i8_quantity),
     "site-attribution-not-handed-over": ("I8", _i8_not_handed_over),
+    "direct-handover-by-another-receiver": ("I8", _i8_receiver),
     "site-receipt-as-stock": ("I9", _i9),
     "negative-quantity": ("I10", _i10),
     "received-above-approved": ("I13", _i13),

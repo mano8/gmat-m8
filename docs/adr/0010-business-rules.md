@@ -28,7 +28,7 @@ The plan lists open business questions (Q1-Q29). The maintainer answered the blo
 | Q3 | Warehouses per branch | 0..n `WAREHOUSE` locations per branch, one default |
 | Q7 | Send purchase orders from the app | No in the MVP: a printable purchase-order page. The email dispatch of step M5.3 exists behind `PO_DISPATCH` (off by default; maintainer's choice, 2026-11-01) and sends no PDF; switching it on is the decision this row still awaits |
 | Q8 | Photos and attachments | Recommended; optional step M6.4 |
-| Q9 | Who confirms a direct-to-site receipt | Material manager or warehouse operator, or the project's site manager through the expected-deliveries view |
+| Q9 | Who confirms a direct-to-site receipt | Material manager or warehouse operator, or the project's site manager through the expected-deliveries view. **Amended by [ADR-0028](0028-project-receiving-for-every-role.md) (Q44):** every business role receives at the worksite of a project in its membership's scope, whoever requested the goods |
 | Q10 | Prices and discounts | Optional unit price and discount, visible only with `price.view` |
 | Q11 | UI languages | Spanish by default, English source strings, French available |
 | Q12 | Session length | 14 days for technicians and partners; 12 h plus MFA for privileged roles |

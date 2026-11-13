@@ -4,11 +4,11 @@ Random sequences of the operations that feed the ledger, each through its servic
 A-MAD's material manager on the world of ``tests/ledger_world.py``: draft allocations and
 increases, unallocations and ordered quantities, issues, amendments (quantities,
 allocations, new lines), cancellations, order lines closed short, receipts at warehouses
-and worksites (partial, surplus, manual splits) and their voids, warehouse handovers and
-their voids, request lines and requests closed and reopened, priority and needed-by
-changes, approved quantities reduced, sourcing changes and reviewer edits (quantity and
-material, so lines are replaced). Buying a line again after its order gave up is the
-replacement purchase.
+and worksites (partial, surplus, manual splits; also by a technician or a partner, Q44)
+and their voids, warehouse handovers and their voids, request lines and requests closed
+and reopened, priority and needed-by changes, approved quantities reduced, sourcing
+changes and reviewer edits (quantity and material, so lines are replaced). Buying a line
+again after its order gave up is the replacement purchase.
 
 After every step ``tests.invariants.Watch`` checks I1-I13, C4-C10, the automatic
 transitions of §4.9 and the derivation itself against an independent reference; a refused
@@ -31,8 +31,9 @@ effort of a local, random run.
 
 ``test_a_tour`` drives the same checked operations through fixed sequences: every operation
 once, and the shapes a cap or a reopening exists for (E8, E12 with stock handed over first,
-E13, a warehouse handover closing its request), which random walks seldom build. Breaking
-any of those rules in the services fails a tour.
+E13, a warehouse handover closing its request, a partner and a technician receiving at their
+projects), which random walks seldom build. Breaking any of those rules in the services
+fails a tour.
 """
 
 import os
@@ -49,6 +50,7 @@ from hypothesis import HealthCheck, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, initialize, rule, run_state_machine_as_test
 
+from apps.access.exceptions import AccessDenied, NotInScope
 from apps.handovers import services as handovers
 from apps.handovers.services import HandoverLineInput, Receiver
 from apps.material_requests import services as requests
@@ -72,6 +74,7 @@ from tests.invariants import (
 )
 from tests.ledger_world import LedgerWorld, build_ledger_world
 from tests.org import Org, People
+from tests.support import principal_for
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -93,6 +96,7 @@ WAREHOUSE = st.sampled_from(["A Madrid", "B Madrid", "A Sevilla"])
 PRIORITY = st.sampled_from(["LOW", "NORMAL", "HIGH", "URGENT"])
 NEEDED_BY = st.none() | st.integers(min_value=0, max_value=20)
 SPLIT = st.none() | st.tuples(INDEX, QTY)
+RECEIVER = st.sampled_from(["technician", "partner"])
 START = date(2026, 12, 1)
 
 type Keep = Callable[[Row], bool]
@@ -151,12 +155,20 @@ class LedgerMachine(RuleBasedStateMachine):
 
     # --- one service call, checked ----------------------------------------------------
 
-    def attempt(self, operation: Callable[[], object], name: str) -> bool:
-        """Run one service call; check every rule; return whether it was accepted."""
+    def attempt(
+        self,
+        operation: Callable[[], object],
+        name: str,
+        refusals: tuple[type[Exception], ...] = (ValidationError,),
+    ) -> bool:
+        """Run one service call; check every rule; return whether it was accepted.
+
+        A refusal of ``refusals`` (the validation errors; for a project receiver also the
+        access errors) must have written nothing."""
         try:
             with transaction.atomic():
                 operation()
-        except ValidationError:
+        except refusals:
             accepted = False
         else:
             accepted = True
@@ -295,6 +307,31 @@ class LedgerMachine(RuleBasedStateMachine):
         )
         if expected is not None:
             assert accepted == expected, f"a receipt of {qty} at A Madrid: expected {expected}"
+        return accepted
+
+    def receiver_projects(self, who: str) -> set[UUID]:
+        """The worksites a project receiver reaches (Q44): A-MAD's technician the three
+        projects A-MAD buys for or runs, the partner the hospital they are assigned to."""
+        projects = self.world.projects
+        return {p.pk for p in (projects if who == "technician" else projects[:1])}
+
+    def receive_as(self, who: str, po_line_id: UUID, project_id: UUID, qty: int) -> bool:
+        """A technician or partner posts a receipt at ``project_id``'s worksite, whoever
+        requested the goods. Outside their projects it is refused, whatever the order."""
+        people = self.world.people
+        principal = principal_for(people.tech_mad if who == "technician" else people.partner)
+        site = self.location("site", project_id)
+        item = ReceiptLineInput(po_line_id, D(qty))
+        refusals = (ValidationError, AccessDenied, NotInScope)
+        accepted = self.attempt(
+            lambda: receiving.post_receipt(
+                principal, self.order_of(po_line_id)["id"], location_id=site, lines=[item]
+            ),
+            f"receive as the {who}",
+            refusals,
+        )
+        if project_id not in self.receiver_projects(who):
+            assert not accepted, f"the {who} received at a worksite outside their projects"
         return accepted
 
     def void_receipt(self, receipt_id: UUID) -> bool:
@@ -505,6 +542,18 @@ class LedgerMachine(RuleBasedStateMachine):
         ) or [p.pk for p in self.world.projects]
         site = self.location("site", served[project % len(served)])
         self.receive(po_line, site, qty, None)
+
+    @rule(order_line=INDEX, qty=QTY, project=INDEX, who=RECEIVER)
+    def rule_receive_as_a_project_receiver(
+        self, order_line: int, qty: int, project: int, who: str
+    ) -> None:
+        """A technician or a partner receives at a worksite (Q44): no authorship of the
+        request, a refusal outside their projects, the same ledger rules as anyone's."""
+        po_line = self.choose("order_lines", order_line, self.on(ISSUED))
+        if po_line is None:
+            return
+        projects = self.world.projects
+        self.receive_as(who, po_line, projects[project % len(projects)].pk, qty)
 
     @rule(line=INDEX, qty=QTY, source=WAREHOUSE)
     def rule_hand_over(self, line: int, qty: int, source: str) -> None:
@@ -736,7 +785,30 @@ def warehouse_handover_closes_and_reopens(m: LedgerMachine) -> None:
     assert m.rows.requests[request["Y"]]["status"] == "APPROVED"
 
 
+def project_receivers(m: LedgerMachine) -> None:
+    """Q44: the goods of the hospital's X and Y (requested by the technician) arrive at its
+    worksite and the partner receives them: Y is served first (HIGH) and its request
+    closes with the direct handover, 2 are site surplus. The partner is refused at MAD-2's
+    worksite, the technician is not; the material manager voids and Y's request reopens."""
+    line, request = names(m)
+    hospital, mad_2 = m.world.projects[0].pk, m.world.projects[1].pk
+    assert m.buy(line["Y"], 8, "A Madrid")
+    po = newest(m, "orders")
+    assert m.add_lines(po, line["Z"], 6)
+    assert m.issue(po)
+    po_line = newest(m, "order_lines")
+    assert m.receive_as("partner", po_line, hospital, 10)  # Y 8, 2 surplus on site
+    assert m.rows.requests[request["Y"]]["status"] == "CLOSED"
+    on_site = newest(m, "receipts")
+    assert not m.receive_as("partner", po_line, mad_2, 2)  # not their project
+    assert m.receive_as("technician", po_line, mad_2, 4)  # Z, requested by themselves too
+    assert not m.void_handover(newest(m, "handovers"))  # a direct one goes with its receipt
+    assert m.void_receipt(on_site)
+    assert m.rows.requests[request["Y"]]["status"] == "APPROVED"
+
+
 TOURS: dict[str, Callable[[LedgerMachine], None]] = {
+    "project-receivers": project_receivers,
     "every-operation": every_operation,
     "receipt-capacity-across-orders": receipt_capacity_across_orders,
     "site-receipt-after-stock": site_receipt_after_stock,

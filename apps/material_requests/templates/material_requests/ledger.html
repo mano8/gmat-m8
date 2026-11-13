@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n ui_tags %}
 {% block head_title %}
   {% translate "Ledger" %} · {{ request_obj.number|default:_("Request") }} · gmat-m8
@@ -99,7 +100,7 @@
               {% translate "Closed short" %}
             {% endif %}
             · {{ line.closed_short_at|date:"SHORT_DATETIME_FORMAT" }}
-            · {{ line.closed_short_by.full_name|default:line.closed_short_by.email }}
+            · {{ line.closed_short_by|person }}
             {% if line.close_reason %}· {{ line.close_reason }}{% endif %}
           </p>
         {% endif %}

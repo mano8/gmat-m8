@@ -69,6 +69,8 @@ def bootstrap_link(stack: Stack) -> str:
         "bootstrap_admin",
         "--email",
         ADMIN_EMAIL,
+        "--full-name",
+        "Adela Arias",
         "--company-code",
         "A",
         "--company-name",

@@ -11,10 +11,14 @@
     <div class="page-head-actions">
       <div class="flex flex-wrap gap-3">
         {% url 'receiving:projects' as projects_url %}
-        {% include "components/button.html" with href=projects_url label=_("Expected on site") %}
-        {% if can_post %}
+        {% if can_post and by_order %}
+          {% include "components/button.html" with href=projects_url label=_("Expected on site") %}
           {% url 'receiving:orders' as orders_url %}
           {% include "components/button.html" with href=orders_url label=_("Receive goods") variant="primary" %}
+        {% elif can_post %}
+          {% include "components/button.html" with href=projects_url label=_("Receive materials") icon="package-check" variant="primary" %}
+        {% else %}
+          {% include "components/button.html" with href=projects_url label=_("Expected on site") %}
         {% endif %}
       </div>
     </div>

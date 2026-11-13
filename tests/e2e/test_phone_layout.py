@@ -36,11 +36,20 @@ SCREENS = {
         "/requests/new/",
         "/catalog/",
         "/projects/",
+        "/receiving/",
+        "/receiving/expected/",
         "/account/sessions/",
     ],
     "wo-mad": ["/", "/receiving/orders/", "/receiving/", "/handovers/", "/handovers/new/"],
-    "site-manager": ["/", "/receiving/expected/", "/handovers/"],
-    "partner": ["/", "/requests/", "/requests/new/"],
+    "site-manager": ["/", "/projects/", "/receiving/expected/", "/receiving/", "/handovers/"],
+    "partner": [
+        "/",
+        "/requests/",
+        "/requests/new/",
+        "/projects/",
+        "/receiving/expected/",
+        "/receiving/",
+    ],
 }
 
 

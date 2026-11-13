@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n access list_tags %}
 {% block head_title %}
   {{ project.code }} · gmat-m8
@@ -19,7 +20,11 @@
         {% endcan %}
         {% can "receipt.view" project %}
           {% url 'receiving:expected' project_id=project.pk as expected_url %}
-          {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}
+          {% if receives_here %}
+            {% include "components/button.html" with href=expected_url label=_("Receive materials") icon="package-check" variant="primary" %}
+          {% else %}
+            {% include "components/button.html" with href=expected_url label=_("Expected deliveries") %}
+          {% endif %}
         {% endcan %}
         {% if project.status == "ACTIVE" %}
           {% can "handover.post" project %}
@@ -85,7 +90,7 @@
               <li class="py-3" data-testid="project-assignment">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p class="font-medium">{{ assignment.user.full_name|default:assignment.user.email }}</p>
+                    <p class="font-medium">{{ assignment.user|person }}</p>
                     <p class="text-sm text-soft">
                       {{ assignment.get_kind_display }} ·
                       {{ assignment.valid_from|date:"SHORT_DATETIME_FORMAT" }} – {{ assignment.valid_until|date:"SHORT_DATETIME_FORMAT"|default:"…" }}
