@@ -4,14 +4,15 @@ import pytest
 
 from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
+from apps.access.roles import Role
 from apps.accounts import selectors as accounts
-from apps.accounts.models import Invitation
+from apps.accounts.models import Invitation, User
 from apps.accounts.tokens import hash_token, new_token
 from apps.organizations import selectors as organizations
 from apps.organizations.models import Membership
 from apps.projects import selectors as projects
 from apps.projects.models import ProjectAssignment
-from tests.org import Org, People
+from tests.org import Org, People, member
 
 pytestmark = pytest.mark.django_db
 
@@ -95,6 +96,14 @@ class TestProjects:
         assert people.partner in set(projects.assignment_candidates(manager, "PARTNER"))
         # Partners of an inactive company are no candidates.
         assert people.inactive_partner not in set(projects.assignment_candidates(manager))
+
+    def test_candidates_are_listed_by_name(self, org: Org, people: People) -> None:
+        """The picker labels people by name (ADR-0029), so it lists them in that order."""
+        User.objects.filter(pk=people.site_manager.pk).update(full_name="Zoe Adams")
+        named = member(Role.SITE_MANAGER, email="zz@example.org", branch=org.a_mad)
+        User.objects.filter(pk=named.pk).update(full_name="Ana Ruiz")
+        listed = list(projects.assignment_candidates(ctx(people.mm_mad), "MANAGER"))
+        assert listed.index(named) < listed.index(people.site_manager)
         assert not projects.assignment_candidates(ctx(people.tech_mad)).exists()
         # Site managers outside the manager's branches are not offered.
         assert people.site_manager not in set(projects.assignment_candidates(ctx(people.mm_sev)))

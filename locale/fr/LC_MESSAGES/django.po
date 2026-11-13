@@ -6645,3 +6645,7 @@ msgstr "Aucune commande émise ne correspond à la recherche. Les matériaux du 
 #: apps/receiving/templates/receiving/projects.html:34
 msgid "No project with a worksite is within your access."
 msgstr "Aucun projet avec chantier n'est dans votre périmètre d'accès."
+
+#: apps/accounts/services/invitations.py:341
+msgid "Give the person's full name."
+msgstr "Indiquez le nom complet de la personne."

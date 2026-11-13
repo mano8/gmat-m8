@@ -191,6 +191,13 @@ def can_review(ctx: AccessContext, of: MaterialRequest) -> bool:
     return ctx.can(REVIEW, of)
 
 
+def shows_requester_address(ctx: AccessContext, of: MaterialRequest) -> bool:
+    """The requester's address on the review page, only to who reviews the request through a
+    managing role (group administrator, material manager, engineer): a site manager reviews
+    by name (ADR-0029)."""
+    return object_in_scope(of, ctx.scope_for(REVIEW).only(privileged=True))
+
+
 def can_decide(ctx: AccessContext, of: MaterialRequest) -> bool:
     """Deciding, returning and reducing, of one's own request only where the procurement
     branch allows it or a self-deciding role's grant covers the request (Q33; the services

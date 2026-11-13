@@ -65,8 +65,11 @@ class TestListAndDetail:
         assert codes(empty) == set()
 
     def test_managers_see_the_assignments(self, org: Org, people: People) -> None:
+        User.objects.filter(pk=people.site_manager.pk).update(full_name="Sara Gil")
         response = client_for(people.mm_mad).get(reverse("projects:detail", args=[org.hospital.pk]))
-        assert people.site_manager.email.encode() in response.content
+        # By name, never by address (ADR-0029).
+        assert b"Sara Gil" in response.content
+        assert people.site_manager.email.encode() not in response.content
         assert reverse("projects:assign", args=[org.hospital.pk]).encode() in response.content
 
 

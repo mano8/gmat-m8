@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n access ui_tags %}
 {% block head_title %}
   {{ receipt.number }} · gmat-m8
@@ -56,7 +57,7 @@
       <div>
         <dt>{% translate "Received" %}</dt>
         <dd>
-          {{ receipt.received_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.received_by.full_name|default:receipt.received_by.email }}
+          {{ receipt.received_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.received_by|person }}
         </dd>
       </div>
       {% if receipt.delivery_note_ref %}
@@ -87,7 +88,7 @@
         <div class="col-span-full" data-testid="void-reason">
           <dt>{% translate "Voided" %}</dt>
           <dd>
-            {{ receipt.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.voided_by.full_name|default:receipt.voided_by.email }}
+            {{ receipt.voided_at|date:"SHORT_DATETIME_FORMAT" }} · {{ receipt.voided_by|person }}
             <span class="block whitespace-pre-line">{{ receipt.void_reason }}</span>
           </dd>
         </div>

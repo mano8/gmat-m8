@@ -16,6 +16,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 
 from apps.accounts.models import User
+from apps.accounts.people import name_of
 from apps.core.forms import IdempotentForm
 from apps.handovers.models import Handover
 from apps.handovers.selectors import OpenLine
@@ -90,10 +91,6 @@ class Choices:
     request_id: UUID | None = None
 
 
-def person_label(user: User) -> str:
-    return user.full_name or user.email
-
-
 class HandoverForm(IdempotentForm):
     """Material of a warehouse handed over to a project: where from, to whom, how much."""
 
@@ -119,7 +116,7 @@ class HandoverForm(IdempotentForm):
         ]
         self.fields["receiver_user"].choices = [  # type: ignore[attr-defined]
             ("", "—"),
-            *((str(user.pk), person_label(user)) for user in choices.receivers),
+            *((str(user.pk), name_of(user)) for user in choices.receivers),
         ]
         self.initial["project"] = str(choices.project.pk)
         self.initial["request"] = str(choices.request_id) if choices.request_id else ""

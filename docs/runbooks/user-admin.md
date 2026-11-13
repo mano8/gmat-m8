@@ -17,7 +17,7 @@ Every `--operator EMAIL` below is an existing, active account that holds the cap
 Done once, after the first deploy. No account exists yet, so the command prints a one-time setup link in your terminal (valid 72 hours, shown only there):
 
 ```bash
-dc run --rm web manage bootstrap_admin --email you@example.org --company-code A --company-name "Company A" --superuser
+dc run --rm web manage bootstrap_admin --email you@example.org --full-name "Your Name" --company-code A --company-name "Company A" --superuser
 ```
 
 - `--superuser` also makes the account a **platform operator**. The recovery tooling (`recover.sh`, `post-restore-reconcile`) needs one, because it reconciles as a platform operator. Create at least one and keep it. The command refuses once an active administrator (or, with `--superuser`, an active platform operator) exists.
@@ -29,7 +29,7 @@ Everyone else is invited from the app.
 
 ## Inviting a person
 
-People → **Invite someone** (`/org/invitations/new/`). Choose the email, the role and where it applies. Rules the screen enforces:
+People → **Invite someone** (`/org/invitations/new/`). Choose the email, the person's full name (required: the application shows people by name, never by address), the role and where it applies. Rules the screen enforces:
 
 - An invitation lives **72 hours**. The person opens the link, sets a password, and for a privileged role (`GROUP_ADMIN`, `MATERIAL_MANAGER`, `ENGINEER`) enrolls MFA at the first sign-in. The link works once.
 - A group administrator cannot invite or change a staff or superuser account.

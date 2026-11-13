@@ -77,6 +77,7 @@ from apps.material_requests.selectors.reviewer import (
     inbox_projects,
     link_candidates,
     ships_to_own_worksite,
+    shows_requester_address,
     sourcing_to_decide,
 )
 from apps.material_requests.selectors.trends import (
@@ -161,6 +162,7 @@ __all__ = [
     "recent_progress",
     "request",
     "ships_to_own_worksite",
+    "shows_requester_address",
     "sourcing_to_decide",
     "submitted_by_branch",
     "version",

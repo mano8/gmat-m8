@@ -4,6 +4,7 @@
   item (a selectors.LineHistory). Only what the line itself shows: material, description, unit,
   quantities and decision, and who changed it, when and why.
 {% endcomment %}
+{% load people %}
 <div class="mt-3 rounded-lg border border-line p-3 text-sm"
      data-testid="line-edits">
   <p data-field="submitted">
@@ -20,7 +21,7 @@
     {% for edit in item.revisions %}
       <li data-kind="{{ edit.kind }}" data-testid="line-edit">
         <span class="font-medium">{{ edit.get_kind_display }}</span>
-        · {{ edit.editor.full_name|default:edit.editor.email }}
+        · {{ edit.editor|person }}
         · <span class="text-soft">{{ edit.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
         <span class="block text-soft" data-field="reason">{{ edit.reason }}</span>
         <span class="block" data-field="change">

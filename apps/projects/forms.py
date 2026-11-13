@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
+from apps.accounts.people import name_of
 from apps.core.forms import IdempotentForm, datetime_field
 from apps.core.listing import REVOCATION_CHOICES
 from apps.organizations import selectors as org_selectors
@@ -144,7 +145,7 @@ class ProjectCreateForm(IdempotentForm, ProjectForm):
 
 class UserChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]
     def label_from_instance(self, obj: Any) -> str:
-        return f"{obj.full_name} <{obj.email}>" if obj.full_name else obj.email
+        return name_of(obj)  # by name: an address only on the people screens (ADR-0029)
 
 
 class AssignmentForm(IdempotentForm):

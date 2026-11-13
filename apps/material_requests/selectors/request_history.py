@@ -6,9 +6,11 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from django.db.models import F
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
+from apps.accounts.people import recorded_name
 from apps.audit.models import AuditEvent
 from apps.material_requests import revisions
 from apps.material_requests.models import (
@@ -139,13 +141,15 @@ def history(ctx: AccessContext, of: MaterialRequest) -> list[HistoryEntry]:
     """The request's audit events, oldest first, for who may see them (else nothing)."""
     if not can_see_history(ctx, of):
         return []
-    events = AuditEvent.objects.filter(
-        object_type=MaterialRequest._meta.label_lower, object_id=of.pk
-    ).order_by("occurred_at", "id")
+    events = (
+        AuditEvent.objects.filter(object_type=MaterialRequest._meta.label_lower, object_id=of.pk)
+        .annotate(actor_name=F("actor__full_name"))
+        .order_by("occurred_at", "id")
+    )
     return [
         HistoryEntry(
             occurred_at=event.occurred_at,
-            actor=event.actor_label,
+            actor=recorded_name(event),  # ADR-0029
             action=event.action,
             label=ACTION_LABELS.get(event.action, event.action),
             line_no=event.data.get("line_no"),

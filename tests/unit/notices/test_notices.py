@@ -120,6 +120,7 @@ class TestAssigned:
         self, people: People, make_request: MakeRequest
     ) -> None:
         draft = make_request(MaterialRequest.Status.DRAFT)
+        User.objects.filter(pk=people.tech_mad.pk).update(full_name="Tomás Herrero")
         request_services.submit(
             principal_for(people.tech_mad), draft.pk, reviewer_id=people.engineer.pk
         )
@@ -132,7 +133,8 @@ class TestAssigned:
         assert assigned.eligibility_object_id == draft.pk
         number = MaterialRequest.objects.get(pk=draft.pk).number or "-"
         assert number in assigned.subject
-        assert people.tech_mad.email in assigned.body  # who sent it (no full name here)
+        # Who sent it, by name, never by address (ADR-0029).
+        assert "Tomás Herrero" in assigned.body and people.tech_mad.email not in assigned.body
         assert "/requests/" in assigned.body
         assert "<html" in assigned.html_body
 
@@ -140,6 +142,7 @@ class TestAssigned:
         self, people: People, submitted: MaterialRequest
     ) -> None:
         EmailOutbox.objects.all().delete()
+        User.objects.filter(pk=people.mm_mad.pk).update(full_name="Marta Molina")
         request_services.assign_reviewer(
             principal_for(people.mm_mad),
             submitted.pk,
@@ -151,7 +154,7 @@ class TestAssigned:
         assert message.eligibility_rule == Capability.REQUEST_REVIEW
         assert "Needs an engineer's eye" in message.body
         assert "Needs an engineer&#x27;s eye" in message.html_body
-        assert people.mm_mad.email in message.body
+        assert "Marta Molina" in message.body and people.mm_mad.email not in message.body
 
     def test_assigning_oneself_mails_nobody(
         self, people: People, submitted: MaterialRequest

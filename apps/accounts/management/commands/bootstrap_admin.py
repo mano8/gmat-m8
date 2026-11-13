@@ -1,4 +1,5 @@
-"""``manage bootstrap_admin --email … --company-code … [--superuser]`` (plan §5, F76, Q29).
+"""``manage bootstrap_admin --email … --full-name … --company-code … [--superuser]``
+(plan §5, F76, Q29; the name since ADR-0029).
 
 Invites the first group administrator from a shell on the server, only while no active
 ``GROUP_ADMIN`` exists (and, with ``--superuser``, no active superuser). In one audited
@@ -24,6 +25,9 @@ class Command(BaseCommand):
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument("--email", required=True, help="Address of the first administrator")
         parser.add_argument(
+            "--full-name", required=True, help="Full name of the first administrator"
+        )
+        parser.add_argument(
             "--company-code", required=True, help="Code of the first company (created if missing)"
         )
         parser.add_argument("--company-name", default="", help="Legal name of a new company")
@@ -40,6 +44,7 @@ class Command(BaseCommand):
             result = services.bootstrap_admin(
                 principal,
                 company_code=str(options["company_code"]).strip().upper(),
+                full_name=str(options["full_name"]),
                 company_name=str(options["company_name"]).strip(),
                 platform_operator=options["superuser"],
             )

@@ -32,3 +32,4 @@ Each ADR names the files it governs (`- **Governs:**`). A pull request that touc
 - [ADR-0026](0026-adrs-stay-aligned.md): Every change answers the ADRs that govern what it touches
 - [ADR-0027](0027-ui-design-system.md): The UI follows one design system: tokens, a component library, vendored assets
 - [ADR-0028](0028-project-receiving-for-every-role.md): Every business role receives at the worksites of its projects
+- [ADR-0029](0029-people-by-name-addresses-to-managers.md): People are shown by name; an address only where managing them needs it

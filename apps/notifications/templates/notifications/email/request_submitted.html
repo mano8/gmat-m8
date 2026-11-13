@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n people %}
 {% get_current_language as language %}<!DOCTYPE html>
 <html lang="{{ language }}">
   <head>
@@ -8,7 +8,7 @@
   <body>
     <h1>{% blocktranslate with number=request_obj.number %}Request {{ number }} to review{% endblocktranslate %}</h1>
     <p>
-      {% blocktranslate with project=request_obj.project.name name=request_obj.requested_by.full_name|default:request_obj.requested_by.email count lines=lines %}From {{ name }} for {{ project }}: {{ lines }} line.{% plural %}From {{ name }} for {{ project }}: {{ lines }} lines.{% endblocktranslate %}
+      {% blocktranslate with project=request_obj.project.name name=request_obj.requested_by|person count lines=lines %}From {{ name }} for {{ project }}: {{ lines }} line.{% plural %}From {{ name }} for {{ project }}: {{ lines }} lines.{% endblocktranslate %}
     </p>
     <p>
       {% translate "Priority" %}: {{ request_obj.get_priority_display }}

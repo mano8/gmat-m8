@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n people %}
 {% get_current_language as language %}<!DOCTYPE html>
 <html lang="{{ language }}">
   <head>
@@ -8,7 +8,7 @@
   <body>
     <h1>{% blocktranslate with number=request_obj.number %}Request {{ number }} assigned to you{% endblocktranslate %}</h1>
     <p>
-      {% blocktranslate with number=request_obj.number project=request_obj.project.name name=assigned_by.full_name|default:assigned_by.email count lines=lines %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} line).{% plural %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} lines).{% endblocktranslate %}
+      {% blocktranslate with number=request_obj.number project=request_obj.project.name name=assigned_by|person count lines=lines %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} line).{% plural %}{{ name }} sent you request {{ number }} for {{ project }} to review ({{ lines }} lines).{% endblocktranslate %}
     </p>
     {% if note %}
       <p>{% translate "Note" %}: {{ note }}</p>

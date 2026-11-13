@@ -296,6 +296,7 @@ def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
         "can_decide": selectors.can_decide(ctx, found),
         "can_source": sourcing,
         "own_request": found.requested_by_id == ctx.user_id,
+        "requester_contact": selectors.shows_requester_address(ctx, found),
         "schedule_form": ScheduleForm(initial=ScheduleForm.initial_for(found))
         if sourcing and found.status == Status.APPROVED
         else None,

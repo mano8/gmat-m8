@@ -255,6 +255,7 @@ class TestInvitations:
             reverse("org:create_invitation"),
             {
                 "email": "newbie@example.org",
+                "full_name": "New Person",
                 "role": Role.SITE_MANAGER,
                 "branch": org.a_mad.pk,
                 "project": org.hospital.pk,
@@ -288,6 +289,22 @@ class TestInvitations:
             client.post(reverse("org:revoke_invitation", args=[newer.pk]), follow=True)
         )
 
+    def test_the_form_asks_for_the_name(self, org: Org, people: People) -> None:
+        """ADR-0029: an invitation without a full name comes back with the field's error."""
+        client = client_for(people.group_admin)
+        response = client.post(
+            reverse("org:create_invitation"),
+            {
+                "email": "nameless@example.org",
+                "full_name": "  ",
+                "role": Role.TECHNICIAN,
+                "branch": org.a_mad.pk,
+                "idempotency_key": issue_key(people.group_admin.pk, "invitation.create"),
+            },
+        )
+        assert response.status_code == 200 and b"errorlist" in response.content
+        assert not Invitation.objects.exists()
+
     def test_form_and_service_errors_rerender(self, org: Org, people: People) -> None:
         client = client_for(people.group_admin)
         key = issue_key(people.group_admin.pk, "invitation.create")
@@ -295,6 +312,7 @@ class TestInvitations:
             reverse("org:create_invitation"),
             {
                 "email": "x@example.org",
+                "full_name": "New Person",
                 "role": Role.TECHNICIAN,
                 "branch": org.a_mad.pk,
                 "project": org.hospital.pk,
@@ -306,6 +324,7 @@ class TestInvitations:
             reverse("org:create_invitation"),
             {
                 "email": people.partner.email,
+                "full_name": "New Person",
                 "role": Role.PARTNER_REQUESTER,
                 "employer_company": org.a.pk,
                 "idempotency_key": key,

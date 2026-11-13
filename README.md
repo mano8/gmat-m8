@@ -59,7 +59,7 @@ bash init.sh                          # writes .env and app.env with generated s
 docker compose up -d --build --wait   # https://localhost:8443 (accept or trust Caddy's local CA)
 
 # the first administrator: prints a one-time setup link
-docker compose run --rm web manage bootstrap_admin --email you@example.com --company-code A
+docker compose run --rm web manage bootstrap_admin --email you@example.com --full-name "Your Name" --company-code A
 ```
 
 Open the link, set a password and enroll a second factor. Email stays on your machine, in Mailpit, and never reaches a real inbox.

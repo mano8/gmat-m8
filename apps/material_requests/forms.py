@@ -16,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.accounts.models import User
+from apps.accounts.people import name_of
 from apps.catalog import selectors as catalog_selectors
 from apps.catalog.forms import UnitChoiceField
 from apps.core.forms import IdempotentForm
@@ -35,10 +36,6 @@ class IdChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]
 
 
 QUANTITY = _("Quantity")
-
-
-def user_label(user: User) -> str:
-    return user.full_name or user.email
 
 
 def seen_version_field() -> forms.IntegerField:
@@ -213,7 +210,7 @@ class SubmitForm(IdempotentForm):
         if not reviewers:
             del self.fields["reviewer"]
             return
-        choices: list[tuple[str, Any]] = [(str(user.pk), user_label(user)) for user in reviewers]
+        choices: list[tuple[str, Any]] = [(str(user.pk), name_of(user)) for user in reviewers]
         if current not in {user.pk for user in reviewers}:
             choices.insert(0, ("", _("No one in particular")))
         self.fields["reviewer"].choices = choices  # type: ignore[attr-defined]
@@ -398,7 +395,7 @@ class AssignForm(forms.Form):
     def __init__(self, *args: Any, reviewers: Sequence[User], **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.fields["reviewer"].choices = [  # type: ignore[attr-defined]
-            (str(user.pk), user_label(user)) for user in reviewers
+            (str(user.pk), name_of(user)) for user in reviewers
         ]
 
     def reviewer_id(self) -> UUID:

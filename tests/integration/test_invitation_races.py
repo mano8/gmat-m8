@@ -49,6 +49,7 @@ def test_two_concurrent_redemptions_one_succeeds(
     services.create_invitation(
         admin_principal,
         email="new@example.org",
+        full_name="New Person",
         memberships=[MembershipGrant(role=Role.TECHNICIAN, branch_id=branch.pk)],
     )
     digest = tokens.hash_token(last_token("new@example.org"))
@@ -82,6 +83,7 @@ def test_offboarding_racing_an_acceptance_leaves_the_user_out(
     services.create_invitation(
         admin_principal,
         email=user.email,
+        full_name="Old Hand",
         memberships=[MembershipGrant(role=Role.WAREHOUSE_OPERATOR, branch_id=branch.pk)],
     )
     digest = tokens.hash_token(last_token(user.email))

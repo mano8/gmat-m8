@@ -84,6 +84,8 @@ def bootstrap(world: World) -> None:
         "bootstrap_admin",
         "--email",
         ADMIN_EMAIL,
+        "--full-name",
+        "Adela Arias",
         "--company-code",
         "A",
         "--company-name",

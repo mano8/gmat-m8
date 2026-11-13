@@ -9,6 +9,7 @@ from django.forms import Form
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
+from apps.accounts.people import name_of
 from apps.core.dialogs import REVOKE_DIALOG, ActionDialog, validity_dialog
 from apps.projects.models import Project, ProjectAssignment
 
@@ -29,7 +30,7 @@ def assignment_revoke_dialog(assignment: ProjectAssignment, form: Form) -> Actio
     return ActionDialog(
         id=REVOKE_DIALOG,
         title=_("Revoke access to the project"),
-        description=str(assignment.user.full_name or assignment.user.email),
+        description=name_of(assignment.user),
         icon="ban",
         tone="danger",
         action=reverse("projects:revoke_assignment", args=[assignment.pk]),

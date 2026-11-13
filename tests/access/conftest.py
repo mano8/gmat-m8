@@ -187,6 +187,14 @@ def _admin_rows(world: World) -> None:
     reviewable("cancel_request", Status.SUBMITTED, 4)
     reviewable("approved_request", Status.APPROVED, 5, approved=True)
     world.objects["submitted_request_line"] = submitted.lines.get()
+    # Who submitted shows on the review page's history: by name, never by address (ADR-0029).
+    for key in ("review_request", "approved_request"):
+        record(
+            AuditIdentity(label=people.tech_mad.email, user_id=people.tech_mad.pk),
+            "request.submitted",
+            obj=world.objects[key],
+            branch_id=org.a_mad.pk,
+        )
     _edited(world, "submitted_request")
     _edited(world, "review_request")
     _edited(world, "approved_request")

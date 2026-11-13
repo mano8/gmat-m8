@@ -4,6 +4,7 @@
   Each row downloads through the authorised view; the upload and remove forms post to their
   own URLs and come back to this page (``?back=``).
 {% endcomment %}
+{% load people %}
 {% if panel.shown %}
   <section class="card mb-4"
            aria-label="{% translate 'Attachments' %}"
@@ -16,7 +17,7 @@
             {% if row.item.removed_at %}
               <p class="text-soft line-through">{{ row.item.file_name }}</p>
               <p class="text-sm text-soft" data-testid="attachment-removed">
-                {% blocktranslate trimmed with who=row.item.removed_by.full_name|default:row.item.removed_by.email when=row.item.removed_at|date:"SHORT_DATETIME_FORMAT" %}
+                {% blocktranslate trimmed with who=row.item.removed_by|person when=row.item.removed_at|date:"SHORT_DATETIME_FORMAT" %}
                   Removed by {{ who }} on {{ when }}
                 {% endblocktranslate %}
                 {% if row.item.removal_reason %}<span class="block whitespace-pre-line">{{ row.item.removal_reason }}</span>{% endif %}
@@ -26,7 +27,7 @@
                  href="{% url 'attachments:download' attachment_id=row.item.pk %}"
                  data-testid="attachment-link">{{ row.item.file_name }}</a>
               <p class="text-sm text-soft">
-                {{ row.item.get_content_type_display }} · {{ row.item.size_bytes|filesizeformat }} · {{ row.item.uploaded_by.full_name|default:row.item.uploaded_by.email }} · {{ row.item.uploaded_at|date:"SHORT_DATETIME_FORMAT" }}
+                {{ row.item.get_content_type_display }} · {{ row.item.size_bytes|filesizeformat }} · {{ row.item.uploaded_by|person }} · {{ row.item.uploaded_at|date:"SHORT_DATETIME_FORMAT" }}
               </p>
               {% if row.can_remove %}
                 {% attachment_remove_dialog row panel as remove %}

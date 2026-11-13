@@ -6607,3 +6607,7 @@ msgstr "Ningún pedido emitido coincide con la búsqueda. Los materiales de la o
 #: apps/receiving/templates/receiving/projects.html:34
 msgid "No project with a worksite is within your access."
 msgstr "Ningún proyecto con obra está dentro de su acceso."
+
+#: apps/accounts/services/invitations.py:341
+msgid "Give the person's full name."
+msgstr "Indique el nombre completo de la persona."

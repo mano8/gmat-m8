@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load people %}
 {% load i18n %}
 {% block head_title %}
   {% if request_obj.number %}{{ request_obj.number }}{% else %}{% translate "Draft request" %}{% endif %} · gmat-m8
@@ -36,14 +37,14 @@
       <div>
         <dt>{% translate "Requested by" %}</dt>
         <dd>
-          {{ request_obj.requested_by.full_name|default:request_obj.requested_by.email }}
+          {{ request_obj.requested_by|person }}
         </dd>
       </div>
       {% if assignee %}
         <div>
           <dt>{% translate "Sent to" %}</dt>
           <dd data-testid="detail-assignee">
-            {{ assignee.full_name|default:assignee.email }}
+            {{ assignee|person }}
           </dd>
         </div>
       {% endif %}

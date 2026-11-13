@@ -39,6 +39,7 @@ def invite(client: Any, org: Org, people: People, email: str = "newbie@example.o
         reverse("org:create_invitation"),
         {
             "email": email,
+            "full_name": "New Person",
             "role": Role.TECHNICIAN,
             "branch": org.a_mad.pk,
             "idempotency_key": issue_key(people.group_admin.pk, "invitation.create"),
@@ -123,6 +124,7 @@ class TestBadge:
             reverse("org:create_invitation"),
             {
                 "email": "newbie@example.org",
+                "full_name": "New Person",
                 "role": Role.TECHNICIAN,
                 "branch": org.a_mad.pk,
                 "idempotency_key": key.group(1),

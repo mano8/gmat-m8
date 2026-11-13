@@ -14,6 +14,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.access.context import AccessContext
+from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.catalog.models import Material
 from apps.material_requests import selectors, services
@@ -238,8 +239,11 @@ class TestAssignment:
         services.assign_reviewer(
             principal_for(people.mm_mad), found.pk, reviewer_id=people.engineer.pk, note="Yours"
         )
+        User.objects.filter(pk=people.engineer.pk).update(full_name="Elena Navarro")
         page = html(client.get(url("examine", found)))
-        assert 'data-testid="assignee"' in page and people.engineer.email in page
+        # By name, never by address: the assignee is not the requester (ADR-0029).
+        assert 'data-testid="assignee"' in page and "Elena Navarro" in page
+        assert people.engineer.email not in page
 
     def test_a_reviewer_reassigns_with_a_note(
         self, make_request: MakeRequest, people: People
