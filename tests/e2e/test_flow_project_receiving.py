@@ -19,6 +19,7 @@ from apps.core.demo import SUPPLIERS
 from tests.e2e import pages
 from tests.e2e.conftest import Browsing
 from tests.e2e.test_phone_layout import overflow
+from tests.e2e.test_styleguide import TARGETS
 
 PROJECT, PLACE = "HOSP-X", "Hospital X"
 SUPPLIER = SUPPLIERS[0]
@@ -54,9 +55,15 @@ def back_to_project(page: Page) -> Locator:
     return page.get_by_test_id("page-header").get_by_role("link", name="Expected deliveries")
 
 
+# The page's own actions (the app shell's bars are measured by the M8b tests).
+ACTIONS = "main a.btn, main button.btn"
+
+
 def fits(page: Page, viewport: str) -> None:
+    """On a phone: no sideways scroll, and every action a 44 px target (M9.2)."""
     if viewport == "phone":
         assert overflow(page) <= 0, f"{page.url} scrolls sideways"
+        assert page.evaluate(TARGETS, ACTIONS) == [], f"{page.url}: actions under 44 px"
 
 
 @pytest.mark.parametrize("viewport", ["phone", "desktop"])
@@ -107,6 +114,12 @@ def test_every_role_receives_at_the_project(browsing: Browsing, viewport: str) -
     receiver.goto("/receiving/")
     expect(receiver.get_by_test_id("receipt-row").filter(has_text=receipts[other])).to_be_visible()
     shows_nothing_of_the_order(receiver, other, NAMES[requester])
+    fits(receiver, viewport)
+    # The project's page and its "Receive materials", as the receiver finds them.
+    receiver.goto("/projects/")
+    fits(receiver, viewport)
+    receiver.get_by_role("link", name=PROJECT, exact=True).click()
+    expect(receiver.get_by_role("link", name="Receive materials")).to_be_visible()
     fits(receiver, viewport)
     # Receiving someone else's goods opens nothing of their request.
     response = receiver.goto(request_page)
