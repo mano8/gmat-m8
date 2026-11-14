@@ -1,6 +1,6 @@
 # ADR-0029: People are shown by name; an address only where managing them needs it
 
-- **Status:** Proposed (the maintainer's decision in the review of the M9 pull request, #54, 2026-11-13; accepted when that PR merges)
+- **Status:** Accepted (the maintainer's decision in the review of the M9 pull request, #54, 2026-11-13; implemented there, merged 2026-11-13; status recorded at the maintainer's review of PR #55, 2026-11-14)
 - **Date:** 2026-11-13
 - **Governs:** `apps/accounts/people.py`, `apps/accounts/templatetags/people.py`, `apps/accounts/management/commands/bootstrap_admin.py`, `apps/accounts/services/invitations.py`, `apps/organizations/forms.py`, `apps/material_requests/selectors/reviewer.py`
 

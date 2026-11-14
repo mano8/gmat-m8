@@ -1,6 +1,6 @@
 # ADR-0027: The UI follows one design system: tokens, a component library, vendored assets
 
-- **Status:** Proposed (the maintainer's request for M8b, issue #50; accepted when the phase PR merges)
+- **Status:** Accepted (the maintainer's request for M8b, issue #50; implemented in PR #51, merged 2026-11-08; status recorded at the maintainer's review of PR #55, 2026-11-14)
 - **Date:** 2026-11-08
 - **Governs:** `static/src/app.css`, `static/js/`, `static/vendor/chartjs/`, `static/vendor/fonts/`, `static/vendor/lucide/`, `templates/components/`, `templates/layouts/`, `templates/partials/`, `templates/base.html`, `templates/errors/`, `apps/core/templatetags/ui_tags.py`, `apps/core/templatetags/nav_tags.py`, `apps/core/navigation.py`, `apps/core/preferences.py`, `apps/core/context_processors.py`, `apps/core/responses.py`, `apps/core/dialogs.py`, `apps/core/stats.py`, `apps/dashboards/chart.py`, `apps/dashboards/charts.py`, `apps/dashboards/tiles.py`, `apps/core/management/commands/styleguide.py`, `apps/core/templates/styleguide/`, `docs/design/`, `scripts/check_contrast.py`, `scripts/vendor_icons.py`
 - **Amends:** [ADR-0001](0001-modular-monolith.md) (what `static/vendor/` may hold)
