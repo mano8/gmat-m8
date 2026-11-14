@@ -1,6 +1,7 @@
 """Group-administrator screens (plan §3.4, §5): ``org.manage`` only, 403 otherwise.
 
 - ``people_screens`` (M2.6): people, memberships, offboarding, email changes, invitations;
+- ``account_actions`` (M10.4): a person's full name and a lost second factor;
 - ``company_screens`` (M10.2): companies and the members of a joint venture;
 - ``branch_screens`` (M10.2): branches, their managing branch, self-approval and activity.
 
@@ -8,6 +9,7 @@ Reads go through the selectors; writes through the services, from POST-only view
 own URLs.
 """
 
+from apps.organizations.views.account_actions import rename_person, reset_mfa
 from apps.organizations.views.branch_screens import (
     branch,
     branches,
@@ -89,8 +91,10 @@ __all__ = [
     "preview_branch_manager",
     "reactivate_branch",
     "reactivate_company",
+    "rename_person",
     "request_email_change",
     "resend_invitation",
+    "reset_mfa",
     "revoke_email_change",
     "revoke_invitation",
     "revoke_membership",

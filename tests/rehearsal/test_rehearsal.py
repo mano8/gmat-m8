@@ -453,7 +453,10 @@ principal = SessionPrincipal(
 )
 tech = Membership.objects.get(user__email="tech-mad@demo.example", revoked_at=None)
 revoke_membership(principal, tech.pk)
-reset_user_mfa(principal, User.objects.get(email="eng-mad@demo.example").pk, reason="lost phone")
+reset_user_mfa(
+    principal, User.objects.get(email="eng-mad@demo.example").pk, reason="lost phone",
+    identity_checked=True,
+)
 Authenticator.objects.filter(user=mm, type="recovery_codes").delete()
 regenerated = RecoveryCodes.activate(mm).generate_codes()
 EmailOutbox.objects.filter(pk=SENT_AFTER).update(status=Status.SENT, sent_at=timezone.now())

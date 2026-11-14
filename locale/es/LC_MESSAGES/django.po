@@ -7302,3 +7302,57 @@ msgstr "Donde llega y se recibe el material del proyecto."
 
 msgid "Worksite location"
 msgstr "Lugar de la obra"
+
+msgid "Check the person's identity outside the application first."
+msgstr "Comprueba primero la identidad de la persona fuera de la aplicación."
+
+msgid "The name is too long."
+msgstr "El nombre es demasiado largo."
+
+msgid "Kept in the audit trail, e.g. a lost phone and no recovery code."
+msgstr "Queda en el registro de auditoría; p. ej., un teléfono perdido y ningún código de recuperación."
+
+msgid "I checked this person's identity outside the application."
+msgstr "He comprobado la identidad de esta persona fuera de la aplicación."
+
+msgid "Change the name"
+msgstr "Cambiar el nombre"
+
+msgid "Every page, mail and history shows the person by this name."
+msgstr "Todas las páginas, correos e historiales muestran a la persona con este nombre."
+
+msgid "Reset the second factor"
+msgstr "Restablecer el segundo factor"
+
+msgid "Reset"
+msgstr "Restablecer"
+
+msgid "Every second factor of the account is removed, recovery codes included."
+msgstr "Se eliminan todos los segundos factores de la cuenta, códigos de recuperación incluidos."
+
+msgid "Every session of the account ends at once."
+msgstr "Todas las sesiones de la cuenta terminan de inmediato."
+
+msgid "The person is told by email."
+msgstr "Se avisa a la persona por correo."
+
+msgid "If their roles need a second factor, they set up a new one at their next sign-in."
+msgstr "Si sus roles requieren un segundo factor, configurará uno nuevo en su próximo inicio de sesión."
+
+msgid "Whoever asks for this may not be the person: check who they are by a way you trust outside the application, such as a call to a number you already had."
+msgstr "Quien lo pide puede no ser la persona: comprueba quién es por un medio de confianza fuera de la aplicación, como una llamada a un número que ya tenías."
+
+msgid "Keep the factors"
+msgstr "Conservar los factores"
+
+msgid "Second factor"
+msgstr "Segundo factor"
+
+msgid "The person lost their phone or security key and has no recovery code: remove every second factor, and they set up a new one."
+msgstr "La persona perdió su teléfono o su llave de seguridad y no tiene código de recuperación: elimina todos los segundos factores y configurará uno nuevo."
+
+msgid "Name saved."
+msgstr "Nombre guardado."
+
+msgid "Second factors removed and sessions ended; a notice to the person is queued."
+msgstr "Segundos factores eliminados y sesiones terminadas; el aviso a la persona está en cola de envío."

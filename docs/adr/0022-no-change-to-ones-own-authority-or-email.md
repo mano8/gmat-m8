@@ -10,7 +10,7 @@ Group administrators manage people through `org.manage`: memberships, validity, 
 
 ## Decision
 
-On their own account an administrator changes **only their employer** (`set_employer_company`). The employer matters only for partner memberships, and `org.manage` belongs to group administrators alone. The services refuse the actor's own account with code `self`, whatever the page shows:
+On their own account an administrator changes **only their employer** (`set_employer_company`) and, since M10.4, their full name (`rename_user`, ADR-0030: a name is neither authority nor an address). The employer matters only for partner memberships, and `org.manage` belongs to group administrators alone. The services refuse the actor's own account with code `self`, whatever the page shows:
 
 - granting, revoking or changing the validity of one's own memberships (`apps/organizations/services.py`, `_not_own_roles`);
 - an email change of one's own address (`apps/accounts/services/email_changes.py`);

@@ -13,7 +13,12 @@ from django.utils.translation import gettext_lazy as _
 from apps.access.context import AccessContext
 from apps.access.roles import BRANCH_ROLES, COMPANY_ROLES, ROLE_ASSIGNMENT_KIND, Capability, Role
 from apps.accounts import selectors as account_selectors
-from apps.accounts.services import AssignmentGrant, MembershipGrant
+from apps.accounts.services import (
+    FULL_NAME_MAX_LENGTH,
+    MFA_RESET_OPERATION,
+    AssignmentGrant,
+    MembershipGrant,
+)
 from apps.core.forms import IdempotentForm, datetime_field
 from apps.core.listing import REVOCATION_CHOICES
 from apps.notifications.models import Status
@@ -190,6 +195,31 @@ class ConfirmForm(forms.Form):
 
 class ReasonForm(forms.Form):
     reason = forms.CharField(label=_("Reason"), required=False, max_length=200)
+
+
+class RenameForm(forms.Form):
+    """A person's full name (M10.4, ADR-0029): required; the service checks it again."""
+
+    full_name = forms.CharField(label=_("Full name"), max_length=FULL_NAME_MAX_LENGTH)
+
+
+class MfaResetForm(IdempotentForm):
+    """Remove a person's lost second factors (M10.4): a reason, and the administrator's word
+    that the person's identity was checked outside the application (never a detail of it)."""
+
+    operation = MFA_RESET_OPERATION
+
+    reason = forms.CharField(
+        label=_("Reason"),
+        max_length=200,
+        help_text=_("Kept in the audit trail, e.g. a lost phone and no recovery code."),
+    )
+    identity_checked = forms.BooleanField(
+        label=_("I checked this person's identity outside the application."),
+        error_messages={
+            "required": _("Check the person's identity outside the application first.")
+        },
+    )
 
 
 class InvitationForm(IdempotentForm, RoleTargetMixin):

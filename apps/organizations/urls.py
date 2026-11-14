@@ -96,6 +96,9 @@ urlpatterns = [
     path("people/<uuid:user_id>/employer/", views.set_employer, name="set_employer"),
     path("people/<uuid:user_id>/offboard/", views.offboard, name="offboard"),
     path("people/<uuid:user_id>/email/", views.request_email_change, name="request_email_change"),
+    # M10.4: inline dialogs of the person's page (inventory §3.4).
+    path("people/<uuid:user_id>/name/", views.rename_person, name="rename_person"),
+    path("people/<uuid:user_id>/mfa-reset/", views.reset_mfa, name="reset_mfa"),
     path(
         "memberships/<uuid:membership_id>/revoke/",
         views.revoke_membership,

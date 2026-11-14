@@ -7118,3 +7118,57 @@ msgstr ""
 
 msgid "Worksite location"
 msgstr ""
+
+msgid "Check the person's identity outside the application first."
+msgstr ""
+
+msgid "The name is too long."
+msgstr ""
+
+msgid "Kept in the audit trail, e.g. a lost phone and no recovery code."
+msgstr ""
+
+msgid "I checked this person's identity outside the application."
+msgstr ""
+
+msgid "Change the name"
+msgstr ""
+
+msgid "Every page, mail and history shows the person by this name."
+msgstr ""
+
+msgid "Reset the second factor"
+msgstr ""
+
+msgid "Reset"
+msgstr ""
+
+msgid "Every second factor of the account is removed, recovery codes included."
+msgstr ""
+
+msgid "Every session of the account ends at once."
+msgstr ""
+
+msgid "The person is told by email."
+msgstr ""
+
+msgid "If their roles need a second factor, they set up a new one at their next sign-in."
+msgstr ""
+
+msgid "Whoever asks for this may not be the person: check who they are by a way you trust outside the application, such as a call to a number you already had."
+msgstr ""
+
+msgid "Keep the factors"
+msgstr ""
+
+msgid "Second factor"
+msgstr ""
+
+msgid "The person lost their phone or security key and has no recovery code: remove every second factor, and they set up a new one."
+msgstr ""
+
+msgid "Name saved."
+msgstr ""
+
+msgid "Second factors removed and sessions ended; a notice to the person is queued."
+msgstr ""

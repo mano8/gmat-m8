@@ -2319,6 +2319,32 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "org:request_email_change": (
         Route(org_action(), path=_person_url("org:request_email_change")),
     ),
+    # M10.4: inline dialogs of the person's page. An empty form changes nothing: a flash
+    # without htmx, the dialog again (422) with it.
+    "org:rename_person": (
+        Route(org_action(), path=_person_url("org:rename_person"), note="no name: nothing changes"),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:rename_person"),
+            headers=HTMX,
+            note="no name from the dialog: the form again with its errors",
+        ),
+    ),
+    "org:reset_mfa": (
+        Route(
+            org_action(),
+            path=_person_url("org:reset_mfa"),
+            note="no reason, no identity tick: the factors stay",
+        ),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:reset_mfa"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
     "org:revoke_membership": (
         Route(org_action(), path=_object_url("org:revoke_membership", "membership")),
         Route(

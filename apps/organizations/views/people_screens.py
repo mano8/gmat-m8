@@ -24,7 +24,7 @@ from django.views.decorators.http import require_safe
 from apps.access.context import AccessContext
 from apps.access.middleware import access_for
 from apps.access.mixins import mutating, require_capability
-from apps.access.policy import may_manage_account
+from apps.access.policy import is_staff_account, may_manage_account
 from apps.access.roles import Capability
 from apps.accounts import selectors as account_selectors
 from apps.accounts import services as account_services
@@ -51,19 +51,24 @@ from apps.organizations.forms import (
     InvitationForm,
     MembershipFilterForm,
     MembershipForm,
+    MfaResetForm,
     PeopleFilterForm,
     PersonInvitationFilterForm,
     ReasonForm,
+    RenameForm,
     SharedProjectFilterForm,
 )
 from apps.organizations.row_dialogs import (
     grant_dialog,
     membership_revoke_dialog,
     membership_validity_dialog,
+    mfa_reset_dialog,
     offboard_dialog,
     person_url,
+    rename_dialog,
     revoke_email_change_dialog,
 )
+from apps.organizations.views.account_actions import MFA_RESET_IDS, RENAME_IDS
 
 ORG = Capability.ORG_MANAGE
 
@@ -192,6 +197,28 @@ def _email_revoke(change: EmailChangeRequest | None) -> Any:
     return revoke_email_change_dialog(change, ReasonForm(auto_id=EMAIL_REVOKE_IDS))
 
 
+def _account_dialogs(ctx: AccessContext, user: User, manageable: bool) -> dict[str, Any]:
+    """The name and second-factor dialogs (M10.4). The reset is offered only when there is a
+    factor to remove, never on one's own page or a staff account's (the service refuses them
+    too: those go to ``manage reset_mfa``)."""
+    resettable = (
+        manageable
+        and user.is_active
+        and not is_staff_account(user)
+        and account_selectors.has_second_factor(ctx, user)
+    )
+    return {
+        "rename_dialog": rename_dialog(
+            user, RenameForm(initial={"full_name": user.full_name}, auto_id=RENAME_IDS)
+        ),
+        "mfa_reset_dialog": mfa_reset_dialog(
+            user, MfaResetForm(actor_id=ctx.user_id, auto_id=MFA_RESET_IDS)
+        )
+        if resettable
+        else None,
+    }
+
+
 @require_safe
 @require_capability(ORG)
 def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
@@ -201,10 +228,11 @@ def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
         applied_at__isnull=True, cancelled_at__isnull=True, revoked_at__isnull=True
     )
     change = open_change.first()
+    manageable = may_manage_account(request.user, user) and user.pk != ctx.user_id
     context = {
         "person": user,
-        "manageable": may_manage_account(request.user, user) and user.pk != ctx.user_id,
-        # One's own employer is the one thing an administrator changes on their own page.
+        "manageable": manageable,
+        # One's own employer and name are what an administrator changes on their own page.
         "employer_editable": may_manage_account(request.user, user),
         "is_self": user.pk == ctx.user_id,
         **_person_sections(request, ctx, user),
@@ -217,6 +245,7 @@ def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
         "email_form": EmailChangeForm(),
         "offboard_dialog": offboard_dialog(user, ConfirmForm(auto_id=OFFBOARD_IDS)),
         "email_revoke_dialog": _email_revoke(change),
+        **_account_dialogs(ctx, user, manageable),
     }
     return render(request, "organizations/person.html", context)
 

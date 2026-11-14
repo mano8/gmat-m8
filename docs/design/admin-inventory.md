@@ -30,7 +30,7 @@ in backticks in the fourth.
 | `account.EmailAddress` | read-only | screen | `org:request_email_change`, `org:revoke_email_change` | allauth's address row; an address changes only by an administrator's email change (ADR-0004, ADR-0022). |
 | `accounts.EmailChangeRequest` | read-only | screen | `org:request_email_change`, `org:revoke_email_change` | On the person's page, with its delivery badge. |
 | `accounts.Invitation` | read-only | screen | `org:create_invitation`, `org:resend_invitation`, `org:revoke_invitation` | `/org/invitations/`. |
-| `accounts.User` | read-only | screen; the name **needs a screen (M10.4)** | `org:set_employer`, `org:offboard`, `org:rename_person` | `/org/people/`. The full name is editable nowhere today, though ADR-0029 promised it with M10: a new service and a dialog on the person's page (§3.4). Staff and superuser flags stay out of the app. |
+| `accounts.User` | read-only | screen; the name since M10.4 | `org:set_employer`, `org:offboard`, `org:rename_person` | `/org/people/`. The full name was editable nowhere before M10.4, though ADR-0029 promised it with M10: `rename_user` and an inline dialog on the person's page (§3.4). Staff and superuser flags stay out of the app. |
 | `attachments.Attachment` | read-only | screen | `attachments:upload_request`, `attachments:upload_receipt`, `attachments:upload_handover`, `attachments:remove` | The panel on each document. |
 | `attachments.AttachmentReservation` | read-only | internal | — | An upload's lease; the worker expires it. |
 | `attachments.MediaDeletion` | read-only | internal | — | The worker's purge queue. |
@@ -45,7 +45,7 @@ in backticks in the fourth.
 | `locations.Location` (worksite) | editable (`org.manage`): name, address, activity | screen (M10.3) | `projects:create`, `locations:update_worksite`, `locations:deactivate_worksite`, `locations:reactivate_worksite` | Created with its project; the admin is the only place to rename or deactivate one today (§3.3). |
 | `material_requests.MaterialRequest` | read-only | screen | `requests:start`, `requests:submit`, `requests:examine` and the review actions | |
 | `material_requests.MaterialRequestLine` | read-only | screen | `requests:add_line`, `requests:update_line`, `requests:apply_edit` | |
-| `mfa.Authenticator` | read-only | screen for its owner; the reset **needs a screen (M10.4)** | `org:reset_mfa` | Enrolment and removal by the owner at `/accounts/2fa/`; a lost factor today needs `manage reset_mfa` on the server. |
+| `mfa.Authenticator` | read-only | screen for its owner; the reset a screen since M10.4 | `org:reset_mfa` | Enrolment and removal by the owner at `/accounts/2fa/`; a lost factor is reset on the person's page, `manage reset_mfa` stays for a staff account (§3.4). |
 | `organizations.Branch` | editable (`org.manage`) | screen (M10.2) | `org:create_branch`, `org:update_branch`, `org:set_branch_manager`, `org:set_self_approval`, `org:deactivate_branch`, `org:reactivate_branch` | Incl. `managed_by`, `allow_self_approval`, the default warehouse, activity. |
 | `organizations.Company` | editable (`org.manage`) | screen (M10.2) | `org:create_company`, `org:update_company`, `org:deactivate_company`, `org:reactivate_company` | `create_company` also makes the head-office branch. |
 | `organizations.JointVentureMember` | editable (`org.manage`) | screen (M10.2) | `org:add_venture_member`, `org:update_venture_member` | On the joint venture's page. No removal, in the admin or the services. |
@@ -147,6 +147,8 @@ Built in M10.3 (`apps/locations/views.py`, namespace `locations`, included under
 | `worksites/<id>/reactivate/` | `locations:reactivate_worksite` | POST | Inline dialog on the project page. |
 
 ### 3.4 People (M10.4): on `/org/people/<id>/`
+
+Built in M10.4 (`apps/organizations/views/account_actions.py`; ADR-0030 points 4 and 6).
 
 | URL | Name | Method | What |
 | --- | --- | --- | --- |
