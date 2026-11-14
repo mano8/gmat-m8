@@ -59,6 +59,8 @@ def _require_resettable_here(principal: Principal, user: User) -> None:
     are reset with ``manage reset_mfa`` run by a superuser (ADR-0030)."""
     if isinstance(principal, SessionPrincipal) and is_staff_account(user):
         raise AccessDenied("A staff account's second factors are reset on the command line")
+    if user.offboarded_at is not None:
+        raise ValidationError(_("This person has left: there is nothing to reset."), code="left")
 
 
 def _log_reset(principal: Principal, user: User) -> None:

@@ -83,7 +83,8 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 		# The admin is optional (ADR-0030). Off, its prefix goes to Django like any unknown path
 		# (404). On, only the allowed networks reach it and anyone else gets a 404 here. Only the
 		# words that turn it off (or nothing) skip the gate: a spelling Django reads as on never
-		# opens it. Without an allowlist nobody gets in (the loopback of this container only).
+		# opens it. Without an allowlist nobody gets in: an empty value matches no address, and the
+		# loopback default below applies only to a variable that is absent altogether.
 		@admin {
 			path /{$ADMIN_URL_PATH:admin} /{$ADMIN_URL_PATH:admin}/*
 			not expression `"{$DJANGO_ADMIN_ENABLED}" in ["", "0", "false", "no", "off"]`

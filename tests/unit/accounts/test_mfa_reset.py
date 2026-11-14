@@ -11,7 +11,7 @@ from allauth.mfa.models import Authenticator
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.utils import translation
+from django.utils import timezone, translation
 
 from apps.access.exceptions import AccessDenied
 from apps.access.roles import Role
@@ -113,6 +113,14 @@ class TestService:
         with pytest.raises(ValidationError) as exc:
             reset(people.group_admin, target, reason=reason, identity_checked=checked)
         assert code in error_codes(exc.value)
+        assert not AuditEvent.objects.filter(action="user.mfa_reset").exists()
+        assert Authenticator.objects.filter(user=lost).count() == 2
+
+    def test_a_person_who_left_is_refused(self, people: People, lost: User) -> None:
+        User.objects.filter(pk=lost.pk).update(offboarded_at=timezone.now())
+        with pytest.raises(ValidationError) as exc:
+            reset(people.group_admin, lost)
+        assert "left" in error_codes(exc.value)
         assert not AuditEvent.objects.filter(action="user.mfa_reset").exists()
         assert Authenticator.objects.filter(user=lost).count() == 2
 

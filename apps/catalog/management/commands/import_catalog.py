@@ -125,15 +125,22 @@ class Command(ImportCommand):
     def summary(self) -> dict[str, Any]:
         return {"categories_created": self.categories_created}
 
+    def _active_codes(self) -> str:
+        return ", ".join(sorted(code for code, found in self.units.items() if found.is_active))
+
     def _unit(self, parsed: MaterialRow, existing: Material | None) -> UnitOfMeasure:
         """The row's unit: a known one, and an active one unless the material already has it
         (an inactive unit leaves the choices for new materials; existing ones keep it, Q72)."""
         unit = self.units.get(parsed.unit_code.upper())
-        active = ", ".join(sorted(code for code, found in self.units.items() if found.is_active))
         if unit is None:
-            raise RowRefused(f"unknown unit {parsed.unit_code!r} (use one of {active})", "unit")
+            raise RowRefused(
+                f"unknown unit {parsed.unit_code!r} (use one of {self._active_codes()})", "unit"
+            )
         if not unit.is_active and (existing is None or existing.unit_id != unit.pk):
-            raise RowRefused(f"unit {parsed.unit_code!r} is inactive (use one of {active})", "unit")
+            raise RowRefused(
+                f"unit {parsed.unit_code!r} is inactive (use one of {self._active_codes()})",
+                "unit",
+            )
         return unit
 
     def apply(self, principal: OperatorPrincipal, parsed: MaterialRow) -> str:

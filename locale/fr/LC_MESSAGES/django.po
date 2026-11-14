@@ -7394,3 +7394,9 @@ msgstr "Nom enregistré."
 
 msgid "Second factors removed and sessions ended; a notice to the person is queued."
 msgstr "Seconds facteurs supprimés et sessions terminées ; l'avis à la personne est en file d'envoi."
+
+msgid "This unit of measure is not active."
+msgstr "Cette unité de mesure n'est pas active."
+
+msgid "This person has left: there is nothing to reset."
+msgstr "Cette personne est partie : il n'y a rien à réinitialiser."

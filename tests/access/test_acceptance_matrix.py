@@ -21,9 +21,11 @@ allowed only to its ``price.view`` holders (``Route.allowed_for``), so a warehou
 operator reading an order is checked priceless.
 """
 
+import importlib
 import io
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import timedelta
 from typing import Any
@@ -35,10 +37,12 @@ from django.contrib import admin
 from django.contrib.auth.hashers import make_password
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.urls import reverse
+from django.test import override_settings
+from django.urls import clear_url_caches, reverse
 from django.utils import timezone
 from PIL import Image
 
+import config.urls
 from apps.access.models import AccessState
 from apps.accounts.models import User
 from apps.accounts.sessions import bump_session_epoch
@@ -2642,6 +2646,19 @@ def test_other_methods_are_refused_everywhere(world: World, key: str) -> None:
 # --- admin (plan §8.2) -------------------------------------------------------------------
 
 
+@contextmanager
+def _admin_switched_off() -> Iterator[None]:
+    """The URLconf as production builds it by default: no admin prefix at all."""
+    try:
+        with override_settings(ADMIN_ENABLED=False):
+            importlib.reload(config.urls)
+            clear_url_caches()
+            yield
+    finally:
+        importlib.reload(config.urls)
+        clear_url_caches()
+
+
 class TestAdmin:
     def test_every_admin_is_read_only(self) -> None:
         registered = {
@@ -2671,6 +2688,29 @@ class TestAdmin:
         assert Company.objects.get(pk=world.org.c.pk).is_active is True
         assert AccessState.objects.get().org_generation == generation
         assert not AuditEvent.objects.filter(action="company.updated", object_id=world.org.c.pk)
+
+    def test_switched_off_the_prefix_is_an_unknown_path_for_every_actor(self, world: World) -> None:
+        """``DJANGO_ADMIN_ENABLED`` off (production's default, ADR-0030): the admin has no URL,
+        so each actor, the operator and the admitted group administrator included, gets what an
+        unknown path gives them (their own sign-in or step-up redirect, or the 404), by every
+        method, and never an admin page or the admin's own login."""
+        paths = ("/admin/", "/admin/login/", "/admin/organizations/company/")
+        problems: list[str] = []
+        with _admin_switched_off():
+            for actor in ACTOR_NAMES:
+                for method in TABLE_METHODS:
+                    unknown = send(world.client(actor), method, "/no/such/page/")
+                    for path in paths:
+                        got = send(world.client(actor), method, path)
+                        location = got.get("Location", "")
+                        if (got.status_code, location) != (
+                            unknown.status_code,
+                            unknown.get("Location", ""),
+                        ):
+                            problems.append(f"{method} {path} as {actor}: {got.status_code}")
+                        if got.status_code == 200 or "/admin/" in location:
+                            problems.append(f"{method} {path} as {actor}: reaches the admin")
+        assert problems == []
 
     def test_a_group_admin_cannot_touch_a_staff_account(self, world: World) -> None:
         operator = world.people.operator

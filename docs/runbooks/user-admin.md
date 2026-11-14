@@ -28,6 +28,18 @@ dc run --rm web manage bootstrap_admin --email you@example.org --full-name "Your
 
 Everyone else is invited from the app.
 
+## Setting up the organization
+
+Group administrators set everything up under **Administration** in the menu; nothing needs the Django admin. Every change is audited, and none deletes anything: companies, branches, warehouses and units are deactivated, and reactivated if needed. Each screen asks for a session that passed MFA.
+
+1. **Companies** → *New company*: a code (fixed, document numbers are built from it), the legal name, the kind. Its head-office branch is made with it. A joint venture lists its member companies and their shares on its own page (*Add a member*, *Change the share*).
+2. **Branches** → *New branch* (or from the company's page): code (fixed), name, and optionally a **managing branch**: people who work for the managing branch also reach this branch, its projects and its documents (one level only). *Allow self-approval* lets requesters decide their own requests bought by the branch; group administrators, material managers and engineers already decide their own with a second factor, either way.
+3. **Warehouses** → *New warehouse* (or from the branch's page): name and address. Choose the branch's **default warehouse** on its page. A worksite comes with its project and is renamed, deactivated or reactivated from the project's page.
+4. **Units of measure** → *New unit*: code, name and decimals. Once a material, a request line or an order line uses a unit its code is fixed and its decimals can only be raised. An inactive unit is no longer offered for new materials or by `import_catalog`; what has it keeps it.
+5. Then **invite people** (below) and create projects.
+
+**Deactivating a company or a branch, or changing a branch's managing branch**, is the change with the widest reach, so its dialog first shows what it does: which branches stop granting access or leave a managing branch's scope, how many roles and project shares change what they reach, who will no longer reach any branch or project (by name, with a link to their page), and the open orders or requests that make the service refuse the deactivation until they are finished. Read it, then confirm. If somebody else changed the organization meanwhile, the confirmation is refused and the dialog asks you to reload, so the figures you read are the ones that apply. Nobody's account or role is removed: reactivating restores the access, and people can be offboarded separately.
+
 ## Inviting a person
 
 People → **Invite someone** (`/org/invitations/new/`). Choose the email, the person's full name (required: the application shows people by name, never by address), the role and where it applies. Rules the screen enforces:
@@ -168,6 +180,9 @@ If the old key may have **leaked**, moving secrets to a new key is not enough: a
 
 | Task | Where |
 | --- | --- |
+| Companies, joint ventures, branches | Administration → Companies, Branches |
+| Warehouses, a branch's default | Administration → Warehouses; the branch's page |
+| Units of measure | Administration → Units of measure |
 | Invite, resend, revoke | People → Invitations |
 | Roles and scope | People → the person |
 | Leaver | People → the person → Offboard |

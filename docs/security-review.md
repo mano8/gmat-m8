@@ -218,3 +218,39 @@ The review's questions and proposed exceptions were answered; all of it is imple
 - The sweep had scanned the application and backup images only. Caddy, the one process facing the internet, carried 7 findings (one CRITICAL), and PostgreSQL 28 (two CRITICAL). The nightly scan never reported them because it failed before scanning anything on `v0.1.0`, a prerelease without assets (fixed in `80decd3`, so only once this branch merges). Moved to the newest digests; what is left is exception X1.
 - Nothing purged expired `django_session` rows; now the hourly `sessions` task.
 - No command could retire an old MFA key; now `manage reencrypt_mfa`.
+
+## Pass 2: phase M10, administration in the app (2026-11-14)
+
+Reviewed on `m10-admin-in-app` (M10.1–M10.5 and the M10.6 changes). The surface is the screens
+for companies, joint ventures, branches, warehouses, worksites, units of measure, a person's name
+and the second-factor reset, and the admin made optional and read-only (ADR-0030).
+
+### Method
+
+- **`/code-review high`** over the whole branch (8 findings, below).
+- **`/security-review`** of the same diff: the new views and their capability checks, the services they call, the scope-change preview, the second-factor reset and rename, the admin's switch and its read-only base, the Caddy gate and the deploy checks. No finding reached the review's bar of 8/10.
+- **The access matrix** (`tests/access/test_acceptance_matrix.py`, `test_admin_inventory.py`): every new URL and method for every actor (anonymous, each role with and without session MFA, the platform operator without a membership, revoked, expired and inactive-branch or -company holders, a stale session), the objects at each position (active and inactive company and branch, managed and managing, htmx and lazy variants), and the sentinels. With the admin switched off every actor receives what an unknown path gives them.
+- **The browser layer** (`tests/e2e/test_flow_administration.py`, `test_administration_screens.py`, `test_mfa_reset.py`): the whole set-up, the deactivation's preview and the refusal that follows, the reset and the owner's re-enrolment, axe in both colour schemes, the keyboard.
+
+### Findings and what became of them
+
+| # | Severity | Finding | Resolution |
+| --- | --- | --- | --- |
+| M10-1 | Low | `create_material` and `update_material` took an inactive unit; only the form and `import_catalog` narrowed the choices | The service refuses it (`inactive`); a material that has the unit keeps it |
+| M10-2 | Low | `perform` treated a lazy translation or `reverse_lazy` as a function of the result, so an action that had already committed would have answered 500 | `callable()` decides; the outcome type admits `Promise` |
+| M10-3 | Low | `reset_user_mfa` did not refuse an offboarded person (the button was hidden, the service not): an audit entry and a mail queue for an account that left | Refused (`left`); the command shares the rule |
+| M10-4 | Info | A comment in the Caddyfile described a loopback default that an empty `ADMIN_ALLOWED_CIDRS` does not get (it matches nobody, which fails closed) | Comment corrected; behaviour unchanged |
+| M10-5 | Info | The preview's counts of roles and people can be stale: only `org_generation` is compared at confirmation | Recorded in ADR-0030 ("a reading, not a promise"); the service re-checks its own preconditions |
+| M10-6 | Info | Free-text request lines still offer an inactive unit | Recorded decision of M10.3, to confirm in the PR |
+| M10-7 | Info | Lowering a unit's decimals races with a document that starts using it in the same instant | Recorded in ADR-0030; the check is a reading under the unit's row lock |
+| M10-8 | Info | `import_catalog` rebuilt the list of active units for every row | Built only for the two error messages |
+
+The people's links in the deactivation preview were 20 px targets (axe, `target-size`): they are 44 px.
+
+### What the pass checked and found sound
+
+- Every new URL is a view behind `@require_capability`/`@mutating` with `org.manage`, out-of-scope objects 404, no other method reaches a service, and every write is its own POST-only URL with an idempotency key.
+- The reset and the rename take the user rows' locks and call `require_may_manage_account` before anything is written; a staff account is refused to every session principal, nobody resets their own factors, a revoked authority between page and submit leaves the factors in place, and the replay re-authorizes.
+- The scope preview reads through the same `AccessContext` rules as enforcement, shows names only to `org.manage` holders, and escapes them (autoescape; no `|safe`).
+- The admin: off, no URL exists (404 as an unknown path, proved for every actor); on, every `ModelAdmin` is read-only, `gmat.E024` and the `editable-admin` rule refuse one that is not, and Caddy fails closed on an empty list or an unknown spelling of the switch. `changepassword` refuses like `createsuperuser`.
+

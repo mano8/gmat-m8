@@ -7356,3 +7356,9 @@ msgstr "Nombre guardado."
 
 msgid "Second factors removed and sessions ended; a notice to the person is queued."
 msgstr "Segundos factores eliminados y sesiones terminadas; el aviso a la persona está en cola de envío."
+
+msgid "This unit of measure is not active."
+msgstr "Esta unidad de medida no está activa."
+
+msgid "This person has left: there is nothing to reset."
+msgstr "Esta persona ya no está: no hay nada que restablecer."

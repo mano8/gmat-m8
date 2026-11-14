@@ -31,6 +31,7 @@ from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render, resolve_url
 from django.utils.cache import patch_vary_headers
+from django.utils.functional import Promise
 from django.utils.translation import gettext as _
 
 from apps.core.forms import add_service_errors, error_text, form_error_text
@@ -130,13 +131,13 @@ def _refused(
     return go(request, to)
 
 
-type Outcome[T] = str | Callable[[T], str]
+type Outcome[T] = str | Promise | Callable[[T], str]
 """A flash or a place after a service call: fixed, or worked out from what it returned (the
 page of the document a create made)."""
 
 
 def _outcome[T](value: Outcome[T], result: T) -> str:
-    return value if isinstance(value, str) else value(result)
+    return value(result) if callable(value) else str(value)
 
 
 def perform[T](

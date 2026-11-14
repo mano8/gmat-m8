@@ -7172,3 +7172,9 @@ msgstr ""
 
 msgid "Second factors removed and sessions ended; a notice to the person is queued."
 msgstr ""
+
+msgid "This unit of measure is not active."
+msgstr ""
+
+msgid "This person has left: there is nothing to reset."
+msgstr ""

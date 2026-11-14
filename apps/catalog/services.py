@@ -192,6 +192,18 @@ MATERIAL_DEFAULTS: dict[str, Any] = {
 }
 
 
+def _require_active_unit(unit_id: UUID, *, keeps: UUID | None = None) -> None:
+    """A material takes only an active unit; one that has an inactive unit keeps it (Q72).
+
+    The material form and ``import_catalog`` already leave inactive units out of their choices;
+    this is the rule itself, for a stale form or any other caller.
+    """
+    if unit_id != keeps and not UnitOfMeasure.objects.filter(pk=unit_id, is_active=True).exists():
+        raise ValidationError(
+            {"unit": ValidationError(_("This unit of measure is not active."), code="inactive")}
+        )
+
+
 @transactional
 def create_material(
     principal: Principal,
@@ -218,6 +230,7 @@ def create_material(
     payload = {**values, "unit_id": unit_id, "category_id": category_id, "stock": is_stock_item}
 
     def execute() -> Material:
+        _require_active_unit(unit_id)
         material = Material(
             unit_id=unit_id, category_id=category_id, is_stock_item=is_stock_item, **values
         )
@@ -258,9 +271,11 @@ def update_material(principal: Principal, material_id: UUID, **changes: Any) -> 
     """
     material = Material.objects.select_for_update().get(pk=material_id)
     _authorize(principal, material)
+    unit_before = material.unit_id
     diff = apply_changes(material, _clean_text(changes), MATERIAL_FIELDS)
     if not diff:
         return material
+    _require_active_unit(material.unit_id, keeps=unit_before)
     material.full_clean(validate_constraints=False)
     with constraint_errors(
         MATERIAL_CONSTRAINTS,

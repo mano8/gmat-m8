@@ -73,7 +73,8 @@
       <ul class="list-disc ps-5">
         {% for pk, name in data.losing %}
           <li>
-            <a href="{% url 'org:person' user_id=pk %}">{{ name }}</a>
+            <a class="inline-flex min-h-11 items-center"
+               href="{% url 'org:person' user_id=pk %}">{{ name }}</a>
           </li>
         {% endfor %}
         {% if data.losing_more %}
@@ -95,7 +96,8 @@
       <ul class="list-disc ps-5">
         {% for pk, name in data.regaining %}
           <li>
-            <a href="{% url 'org:person' user_id=pk %}">{{ name }}</a>
+            <a class="inline-flex min-h-11 items-center"
+               href="{% url 'org:person' user_id=pk %}">{{ name }}</a>
           </li>
         {% endfor %}
         {% if data.regaining_more %}

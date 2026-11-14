@@ -12,6 +12,10 @@ SCREENS = {
         "/",
         "/org/people/",
         "/org/invitations/",
+        "/org/structure/companies/",
+        "/org/structure/branches/",
+        "/org/warehouses/",
+        "/catalog/units/",
         "/audit/",
         "/audit/?per_page=100",
         "/exports/",
@@ -71,7 +75,8 @@ def test_screens_fit_a_phone(browsing: Browsing, person: str) -> None:
     for path in SCREENS[person]:
         page.goto(path)
         expect(page.locator("main h1").first).to_be_visible()
-        expect(page.get_by_text("Loading…")).to_have_count(0)  # the dashboard's panels
+        # The dashboard's panels; a closed lazy dialog holds the same word, out of sight.
+        expect(page.get_by_text("Loading…").locator("visible=true")).to_have_count(0)
         if (extra := overflow(page)) > 0:
             wide.append(f"{path}: {extra}px too wide")
     assert not wide, "\n".join(wide)
