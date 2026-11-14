@@ -4,8 +4,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-14
+
+The first release. It opens the pilot: the 0.x releases run on the production server for one branch and a few people of each role, and each round of corrections the pilot asks for is a new 0.x release, until the exit criteria of [docs/runbooks/pilot.md](docs/runbooks/pilot.md) hold and v1.0.0 follows. Below 1.0.0, a minor version may change behaviour and the data model; every change is still recorded here.
+
 ### Added
 
+- The pilot runbook ([docs/runbooks/pilot.md](docs/runbooks/pilot.md)): how the 0.x versions are numbered, what to decide before the first release, the checklist of what to try for real (first deploy, backups and a real restore drill, mail through the real SMTP, setting up the organization, every role's work on phones and computers, access seen from the roles that should not see, upgrades, operations over time), how to report what the pilot finds and the exit criteria for v1.0.0.
 - Django 6.1 project scaffold: `config/` settings (`base`, `dev`, `test`, `prod`, `build`) with typed, fail-closed environment helpers.
 - `apps/core` with `/healthz/` (liveness) and `/readyz/` (database readiness) endpoints.
 - `apps/accounts` with a custom `User` (email login, UUIDv7 key, `offboarded_at`, `authz_generation`, `session_epoch`, `privilege_elevated_at`).

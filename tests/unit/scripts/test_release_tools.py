@@ -171,8 +171,19 @@ def test_empty_section_is_refused(tools: ModuleType) -> None:
 
 
 def test_repository_changelog_has_an_unreleased_section(tools: ModuleType) -> None:
+    # It comes first, and may be empty: a release PR moves its entries under the new version and
+    # leaves a fresh, empty one above it (docs/release.md, step 1).
     changelog = (tools.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert tools.release_notes(changelog, "Unreleased").strip()
+    names = [match["name"] for match in tools.CHANGELOG_SECTION.finditer(changelog)]
+    assert names[:1] == ["Unreleased"]
+
+
+def test_repository_changelog_versions_have_notes(tools: ModuleType) -> None:
+    changelog = (tools.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    versions = [m["name"] for m in tools.CHANGELOG_SECTION.finditer(changelog)][1:]
+    for version in versions:
+        assert tools.VERSION_PATTERN.match(version), version
+        assert tools.release_notes(changelog, version).strip()
 
 
 # ------------------------------------------------------------------------- manifest
