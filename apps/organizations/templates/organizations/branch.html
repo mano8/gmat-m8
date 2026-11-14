@@ -134,6 +134,12 @@
            aria-labelledby="warehouses-title"
            data-list-section>
     <h2 id="warehouses-title" class="card-title">{% translate "Warehouses" %}</h2>
+    <div class="mb-3 flex flex-wrap gap-2">
+      {% if branch.is_active and branch.company.is_active %}
+        {% include "organizations/lazy_button.html" with url=new_warehouse_url dialog="new-dialog" label=_("New warehouse") variant="primary" icon="plus" testid="warehouse-new-open" %}
+      {% endif %}
+      {% include "components/button.html" with href=warehouses_url label=_("Manage warehouses") icon="warehouse" %}
+    </div>
     {% if warehouses.rows %}
       <ul class="divide-y divide-line">
         {% for warehouse in warehouses.rows %}
@@ -161,6 +167,7 @@
     {% include "components/action_dialog.html" with d=manager_dialog %}
   {% endif %}
   {% include "components/action_dialog.html" with d=approval_dialog %}
+  {% include "components/dialog.html" with id="new-dialog" title=_("New warehouse") testid="warehouse-new-dialog" %}
   {% if branch.is_active %}
     {% include "components/dialog.html" with id="activity-dialog" title=_("Deactivate the branch") tone="danger" size="lg" testid="activity-dialog" %}
   {% else %}

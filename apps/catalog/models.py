@@ -96,8 +96,11 @@ class MaterialCategory(BaseModel):
 class UnitOfMeasure(BaseModel):
     """A unit (``UD``, ``M``, ``KG``…) and how many decimals its quantities may have.
 
-    Seeded by ``catalog.0002``; read-only in the admin (a unit's ``decimals`` governs the
-    quantities already entered, so it does not change under a material).
+    Seeded by ``catalog.0003``; group administrators add and change units on ``/catalog/units/``
+    (``services.create_unit`` / ``update_unit``, ADR-0030), read-only in the admin. A unit's
+    ``decimals`` governs the quantities already entered, so ``code`` and a lower ``decimals``
+    are refused while anything uses the unit. Never deleted: an inactive unit leaves the choices
+    for new materials and imports, and the materials that have it keep it.
     """
 
     code = models.CharField(_("code"), max_length=10, unique=True)
@@ -108,6 +111,7 @@ class UnitOfMeasure(BaseModel):
         validators=[MaxValueValidator(MAX_UNIT_DECIMALS)],
         help_text=_("How many decimal places a quantity in this unit may have."),
     )
+    is_active = models.BooleanField(_("active"), default=True)
 
     objects = UnitQuerySet.as_manager()
 

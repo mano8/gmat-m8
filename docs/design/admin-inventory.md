@@ -38,11 +38,11 @@ in backticks in the fourth.
 | `audit.AuditEvent` | read-only | screen | — | `/audit/` and one object's history; append-only, nothing to write. |
 | `catalog.Material` | editable (`catalog.manage`) | screen | `catalog:create`, `catalog:update`, `catalog:deactivate`, `catalog:reactivate` | `/catalog/`. |
 | `catalog.MaterialCategory` | editable (`catalog.manage`) | screen | `catalog:category_create`, `catalog:category_update` | `/catalog/categories/`. |
-| `catalog.UnitOfMeasure` | read-only (seeded) | **needs a screen (M10.3)** | `catalog:create_unit`, `catalog:update_unit`, `catalog:deactivate_unit`, `catalog:reactivate_unit` | Q72: new services, `is_active` by an expand migration. |
+| `catalog.UnitOfMeasure` | read-only (seeded) | screen (M10.3) | `catalog:create_unit`, `catalog:update_unit`, `catalog:deactivate_unit`, `catalog:reactivate_unit` | Q72: new services, `is_active` by an expand migration. |
 | `handovers.Handover` | read-only | screen | `handovers:create`, `handovers:void` | |
 | `handovers.HandoverLine` | read-only | screen | `handovers:create` | Written with its handover. |
-| `locations.Location` (warehouse) | editable (`org.manage`) | **needs a screen (M10.3)** | `locations:create_warehouse`, `locations:update_warehouse`, `locations:deactivate_warehouse`, `locations:reactivate_warehouse` | `/org/warehouses/`; the default is set on the branch (`org:update_branch`). |
-| `locations.Location` (worksite) | editable (`org.manage`): name, address, activity | **needs a screen (M10.3)** | `projects:create`, `locations:update_worksite`, `locations:deactivate_worksite`, `locations:reactivate_worksite` | Created with its project; the admin is the only place to rename or deactivate one today (§3.3). |
+| `locations.Location` (warehouse) | editable (`org.manage`) | screen (M10.3) | `locations:create_warehouse`, `locations:update_warehouse`, `locations:deactivate_warehouse`, `locations:reactivate_warehouse` | `/org/warehouses/`; the default is set on the branch (`org:update_branch`). |
+| `locations.Location` (worksite) | editable (`org.manage`): name, address, activity | screen (M10.3) | `projects:create`, `locations:update_worksite`, `locations:deactivate_worksite`, `locations:reactivate_worksite` | Created with its project; the admin is the only place to rename or deactivate one today (§3.3). |
 | `material_requests.MaterialRequest` | read-only | screen | `requests:start`, `requests:submit`, `requests:examine` and the review actions | |
 | `material_requests.MaterialRequestLine` | read-only | screen | `requests:add_line`, `requests:update_line`, `requests:apply_edit` | |
 | `mfa.Authenticator` | read-only | screen for its owner; the reset **needs a screen (M10.4)** | `org:reset_mfa` | Enrolment and removal by the owner at `/accounts/2fa/`; a lost factor today needs `manage reset_mfa` on the server. |
@@ -130,7 +130,7 @@ Built in M10.2 (`apps/organizations/views/branch_screens.py`). The managing bran
 
 ### 3.3 Warehouses and worksites (M10.3): `/org/warehouses/`, `/org/worksites/`
 
-Views in `apps/locations` (namespace `locations`), included under `org/`.
+Built in M10.3 (`apps/locations/views.py`, namespace `locations`, included under `org/`). The branch page opens *New warehouse* for its branch (`?branch=`) and links to the list filtered by it; the default warehouse is chosen in the branch's edit dialog (M10.2). The project page shows a *Worksite* section with its dialogs to `org.manage` holders only.
 
 | URL | Name | Method | What |
 | --- | --- | --- | --- |
@@ -154,6 +154,8 @@ Views in `apps/locations` (namespace `locations`), included under `org/`.
 | `people/<id>/mfa-reset/` | `org:reset_mfa` | POST | Inline danger dialog, shown only when the person has a factor, never on one's own page or a staff account's: the consequences, a required reason, a required tick "I checked this person's identity outside the application". `reset_user_mfa` gains a keyword `identity_checked: bool` (refused when false) stored in the audit payload. |
 
 ### 3.5 Units of measure (M10.3): `/catalog/units/`
+
+Built in M10.3 (`apps/catalog/unit_views.py`; ADR-0030 point 5).
 
 | URL | Name | Method | What |
 | --- | --- | --- | --- |

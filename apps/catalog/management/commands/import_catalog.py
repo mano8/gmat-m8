@@ -125,17 +125,23 @@ class Command(ImportCommand):
     def summary(self) -> dict[str, Any]:
         return {"categories_created": self.categories_created}
 
-    def apply(self, principal: OperatorPrincipal, parsed: MaterialRow) -> str:
+    def _unit(self, parsed: MaterialRow, existing: Material | None) -> UnitOfMeasure:
+        """The row's unit: a known one, and an active one unless the material already has it
+        (an inactive unit leaves the choices for new materials; existing ones keep it, Q72)."""
         unit = self.units.get(parsed.unit_code.upper())
+        active = ", ".join(sorted(code for code, found in self.units.items() if found.is_active))
         if unit is None:
-            raise RowRefused(
-                f"unknown unit {parsed.unit_code!r} (use one of {', '.join(sorted(self.units))})",
-                "unit",
-            )
+            raise RowRefused(f"unknown unit {parsed.unit_code!r} (use one of {active})", "unit")
+        if not unit.is_active and (existing is None or existing.unit_id != unit.pk):
+            raise RowRefused(f"unit {parsed.unit_code!r} is inactive (use one of {active})", "unit")
+        return unit
+
+    def apply(self, principal: OperatorPrincipal, parsed: MaterialRow) -> str:
+        existing = selectors.material_by_reference(self.ctx, parsed.reference)
+        unit = self._unit(parsed, existing)
         fields = dict(parsed.values, unit_id=unit.pk)
         if parsed.category_path is not None:
             fields["category_id"] = self._category(principal, parsed.category_path)
-        existing = selectors.material_by_reference(self.ctx, parsed.reference)
         if existing is None:
             material = services.create_material(
                 principal,

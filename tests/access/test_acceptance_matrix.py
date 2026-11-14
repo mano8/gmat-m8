@@ -482,6 +482,163 @@ def _structure_routes() -> dict[str, tuple[Route, ...]]:
     }
 
 
+# Where each M10.3 warehouse URL is tried: the active, the inactive and an inactive branch's.
+WAREHOUSE_POSITIONS = (
+    ("active", "spare_warehouse"),
+    ("inactive", "closed_warehouse"),
+    ("inactive branch", "old_branch_warehouse"),
+)
+
+
+def _warehouse_positions(
+    name: str, methods: dict[str, Any], *, htmx: Outcome | None = None, dialog: str = ""
+) -> tuple[Route, ...]:
+    """One route per position of a warehouse; with ``htmx``, the dialog's request too (a POST's
+    422, a lazy GET's 200)."""
+    routes = [
+        Route(methods, position=where, path=_object_url(name, key))
+        for where, key in WAREHOUSE_POSITIONS
+    ]
+    if htmx is not None:
+        headers = {**HTMX, "HX-Target": f"{dialog}-content"} if dialog else HTMX
+        outcome = org_page() if htmx is OK else org_action(htmx)
+        routes.append(
+            Route(
+                outcome, position="htmx", path=_object_url(name, "spare_warehouse"), headers=headers
+            )
+        )
+    return tuple(routes)
+
+
+def _place_routes() -> dict[str, tuple[Route, ...]]:
+    """Warehouses and worksites (M10.3, inventory §3.3) and units of measure (§3.5): group
+    administrators only (org.manage). A warehouse's or a worksite's activity actions have no
+    field, so they change the spare row they are sent to; every other POST is an empty form."""
+    lazy_new = {**HTMX, "HX-Target": "new-dialog-content"}
+    unit = _object_url
+    site = _object_url
+    return {
+        "locations:warehouses": (Route(org_page()),),
+        "locations:new_warehouse": (
+            Route(org_page()),
+            Route(
+                org_page(),
+                position="from a branch",
+                path=lambda world: (
+                    f"{reverse('locations:new_warehouse')}?branch={world.org.a_sev.pk}"
+                ),
+            ),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "locations:create_warehouse": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "locations:edit_warehouse": _warehouse_positions(
+            "locations:edit_warehouse", org_page(), htmx=OK, dialog="edit-dialog"
+        ),
+        "locations:update_warehouse": _warehouse_positions(
+            "locations:update_warehouse", org_action(), htmx=UNPROCESSABLE
+        ),
+        "locations:confirm_deactivate_warehouse": _warehouse_positions(
+            "locations:confirm_deactivate_warehouse", org_page(), htmx=OK, dialog="activity-dialog"
+        ),
+        "locations:deactivate_warehouse": _warehouse_positions(
+            "locations:deactivate_warehouse", org_action(), htmx=NO_CONTENT
+        ),
+        "locations:reactivate_warehouse": _warehouse_positions(
+            "locations:reactivate_warehouse", org_action(), htmx=NO_CONTENT
+        ),
+        "locations:update_worksite": (
+            Route(
+                org_action(),
+                path=site("locations:update_worksite", "spare_worksite"),
+                note="an empty form: nothing changes",
+            ),
+            Route(
+                org_action(UNPROCESSABLE),
+                position="htmx",
+                path=site("locations:update_worksite", "spare_worksite"),
+                headers=HTMX,
+            ),
+        ),
+        "locations:deactivate_worksite": (
+            Route(org_action(), path=site("locations:deactivate_worksite", "spare_worksite")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=site("locations:deactivate_worksite", "spare_worksite"),
+                headers=HTMX,
+            ),
+        ),
+        "locations:reactivate_worksite": (
+            Route(org_action(), path=site("locations:reactivate_worksite", "spare_worksite")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=site("locations:reactivate_worksite", "spare_worksite"),
+                headers=HTMX,
+            ),
+        ),
+        "catalog:units": (Route(org_page()),),
+        "catalog:new_unit": (
+            Route(org_page()),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "catalog:create_unit": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "catalog:edit_unit": (
+            Route(org_page(), position="free", path=unit("catalog:edit_unit", "spare_unit")),
+            Route(org_page(), position="in use", path=unit("catalog:edit_unit", "unitofmeasure")),
+            Route(
+                org_page(),
+                position="htmx",
+                path=unit("catalog:edit_unit", "spare_unit"),
+                headers={**HTMX, "HX-Target": "edit-dialog-content"},
+            ),
+        ),
+        "catalog:update_unit": (
+            Route(
+                org_action(),
+                position="free",
+                path=unit("catalog:update_unit", "spare_unit"),
+                note="an empty form: nothing changes",
+            ),
+            Route(
+                org_action(),
+                position="in use",
+                path=unit("catalog:update_unit", "unitofmeasure"),
+            ),
+            Route(
+                org_action(UNPROCESSABLE),
+                position="htmx",
+                path=unit("catalog:update_unit", "spare_unit"),
+                headers=HTMX,
+            ),
+        ),
+        "catalog:deactivate_unit": (
+            Route(org_action(), path=unit("catalog:deactivate_unit", "spare_unit")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=unit("catalog:deactivate_unit", "spare_unit"),
+                headers=HTMX,
+            ),
+        ),
+        "catalog:reactivate_unit": (
+            Route(org_action(), path=unit("catalog:reactivate_unit", "spare_unit")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=unit("catalog:reactivate_unit", "spare_unit"),
+                headers=HTMX,
+            ),
+        ),
+    }
+
+
 UNKNOWN_ID = "00000000-0000-7000-8000-000000000000"
 # Every account with a valid membership reads the catalog; managers change it (M3.1).
 CATALOG_VIEWERS = (*PROJECT_VIEWERS, "revoked_assignment")
@@ -2230,6 +2387,8 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     # every company and branch, active or not (S2). An empty POST changes nothing: the form is
     # invalid (a plain POST is flashed and redirected, the dialog's gets 422).
     **_structure_routes(),
+    # M10.3: warehouses, worksites and units of measure; group administrators only.
+    **_place_routes(),
     # Token pages: anonymous by design; no token in the session shows the generic page.
     "invitations:link": (
         Route(
@@ -2361,6 +2520,8 @@ PAGED_LISTS = (
     "org:invitations",
     "org:companies",
     "org:branches",
+    "locations:warehouses",
+    "catalog:units",
     "requests:list",
     "requests:new",
     "requests:inbox",

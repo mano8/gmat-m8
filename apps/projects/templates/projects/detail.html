@@ -74,6 +74,44 @@
       </div>
     </dl>
   </section>
+  {% if worksite %}
+    <section class="card mb-4"
+             aria-labelledby="worksite-title"
+             data-testid="worksite">
+      <h2 id="worksite-title" class="card-title">{% translate "Worksite location" %}</h2>
+      <p class="mb-3 text-soft">{% translate "Where the project's goods arrive and are received." %}</p>
+      <dl class="facts mb-4">
+        <div>
+          <dt>{% translate "Name" %}</dt>
+          <dd data-testid="worksite-name">
+            {{ worksite.name }}
+          </dd>
+        </div>
+        <div>
+          <dt>{% translate "Status" %}</dt>
+          <dd>
+            {% include "organizations/active_status.html" with obj=worksite place=True %}
+          </dd>
+        </div>
+        <div class="col-span-full">
+          <dt>{% translate "Address" %}</dt>
+          <dd>
+            {{ worksite.address|default:"—"|linebreaksbr }}
+          </dd>
+        </div>
+      </dl>
+      <div class="flex flex-wrap gap-3">
+        {% include "components/dialog_button.html" with dialog=worksite_dialogs.edit.id label=_("Edit the worksite") icon="pencil" testid="worksite-edit-open" %}
+        {% if worksite.is_active %}
+          {% include "components/dialog_button.html" with dialog=worksite_dialogs.activity.id label=_("Deactivate") variant="danger" icon="ban" testid="worksite-deactivate-open" %}
+        {% else %}
+          {% include "components/dialog_button.html" with dialog=worksite_dialogs.activity.id label=_("Reactivate") icon="rotate-ccw" testid="worksite-reactivate-open" %}
+        {% endif %}
+      </div>
+    </section>
+    {% include "components/action_dialog.html" with d=worksite_dialogs.edit %}
+    {% include "components/action_dialog.html" with d=worksite_dialogs.activity %}
+  {% endif %}
   {% if manageable %}
     <section class="card mb-4"
              id="assignments"

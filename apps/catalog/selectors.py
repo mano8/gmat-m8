@@ -13,7 +13,8 @@ number matches with either separator (``2,5`` or ``2.5``).
 import re
 from uuid import UUID
 
-from django.db.models import Case, F, IntegerField, Q, QuerySet, Value, When
+from django.db.models import Case, Count, F, IntegerField, Q, QuerySet, Value, When
+from django.db.models.fields.reverse_related import ManyToOneRel
 from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
 
@@ -30,6 +31,9 @@ MAX_TERMS = 6
 MAX_TERM_LENGTH = 60
 
 VIEW = Capability.CATALOG_VIEW
+ORG = Capability.ORG_MANAGE
+UNIT_SORTS = {"code": ("code",), "name": ("name",), "decimals": ("decimals", "code")}
+UNIT_SORT_LABELS = {"code": _("Code"), "name": _("Name"), "decimals": _("Decimals")}
 
 STATE_ACTIVE, STATE_INACTIVE, STATE_ALL = "active", "inactive", "all"
 STATES = (STATE_ACTIVE, STATE_INACTIVE, STATE_ALL)
@@ -61,6 +65,53 @@ def root_categories(ctx: AccessContext) -> QuerySet[MaterialCategory]:
 
 def units(ctx: AccessContext) -> QuerySet[UnitOfMeasure]:
     return UnitOfMeasure.objects.visible_to(ctx, VIEW).order_by("code")
+
+
+def active_units(ctx: AccessContext, *, keep: UUID | None = None) -> QuerySet[UnitOfMeasure]:
+    """The units a new material or an import may use: the active ones. ``keep`` adds the
+    unit an existing material has, so editing it never drops its unit from the choices (Q72)."""
+    rows = units(ctx)
+    return (
+        rows.filter(Q(is_active=True) | Q(pk=keep))
+        if keep is not None
+        else rows.filter(is_active=True)
+    )
+
+
+# --- units of measure, as group administrators manage them (M10.3, Q72) ---------------
+
+
+def unit_list(ctx: AccessContext, *, q: str = "", state: str = "") -> QuerySet[UnitOfMeasure]:
+    """Every unit, inactive ones included, filtered by text (code, name) and state, with the
+    number of materials that have it (``material_count``)."""
+    rows = UnitOfMeasure.objects.visible_to(ctx, ORG)
+    if state == STATE_ACTIVE:
+        rows = rows.filter(is_active=True)
+    elif state == STATE_INACTIVE:
+        rows = rows.filter(is_active=False)
+    if q:
+        rows = rows.filter(Q(code__icontains=q) | Q(name__icontains=q))
+    return rows.annotate(material_count=Count("materials")).order_by("code")
+
+
+def unit(ctx: AccessContext, unit_id: UUID) -> UnitOfMeasure:
+    """A unit, inactive ones included; ``NotInScope`` (404) unless ``ctx`` holds ``org.manage``."""
+    found = UnitOfMeasure.objects.visible_to(ctx, ORG).filter(pk=unit_id).first()
+    if found is None:
+        raise NotInScope(ORG)
+    return found
+
+
+def unit_in_use(of: UnitOfMeasure) -> bool:
+    """Whether anything points at the unit: a material, a request line or its as-submitted
+    copy, an order line. Worked out from the model's reverse relations, so a table that
+    later gets a unit is counted without anyone remembering to add it here."""
+    for relation in UnitOfMeasure._meta.get_fields(include_hidden=True):
+        if isinstance(relation, ManyToOneRel):
+            rows = relation.related_model._base_manager.filter(**{relation.field.name: of.pk})
+            if rows.exists():
+                return True
+    return False
 
 
 def _terms(query: str) -> list[str]:

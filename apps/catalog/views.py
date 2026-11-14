@@ -133,7 +133,9 @@ def material_create(request: HttpRequest) -> HttpResponse:
 def material_edit(request: HttpRequest, material_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     material = _manageable(request, material_id)
-    form = MaterialForm(initial=MaterialForm.initial_for(material), ctx=ctx)
+    form = MaterialForm(
+        initial=MaterialForm.initial_for(material), ctx=ctx, keep_unit=material.unit_id
+    )
     return render(request, "catalog/form.html", {"form": form, "material": material})
 
 
@@ -141,7 +143,7 @@ def material_edit(request: HttpRequest, material_id: UUID) -> HttpResponse:
 def material_update(request: HttpRequest, material_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     material = _manageable(request, material_id)
-    form = MaterialForm(request.POST, ctx=ctx)
+    form = MaterialForm(request.POST, ctx=ctx, keep_unit=material.unit_id)
     if form.is_valid():
         try:
             services.update_material(ctx.principal, material.pk, **form.values())

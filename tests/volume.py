@@ -6,7 +6,8 @@ allocations), 5k receipts (with their attributions), 2k handovers, and what the 
 list people and projects need (300 projects, 1,000 users with their memberships, 400
 invitations with a queued, sent or failed email, 500 suppliers), and for the structure screens
 (M10.2) 150 companies with two branches each, one company in ten active, so the other screens'
-branch choices stay the size of a real group. ``Scale`` sizes it.
+branch choices stay the size of a real group, a warehouse for each of those branches and (M10.3)
+120 more units of measure. ``Scale`` sizes it.
 
 Written with ``bulk_create`` (the triggers and constraints still run; the composite foreign
 keys are checked as rows go in, the others at the end by ``SET CONSTRAINTS ALL IMMEDIATE``),
@@ -65,6 +66,7 @@ class Scale:
     invitations: int = 400
     suppliers: int = 500
     companies: int = 150
+    units: int = 120
 
 
 @dataclass
@@ -249,6 +251,30 @@ class _Builder:
         ]
         _insert(Branch, branches)
         self.done("branches", branches)
+        warehouses = [
+            Location(
+                id=new_id(),
+                kind=Location.Kind.WAREHOUSE,
+                branch=branch,
+                name=f"Almacén volumen {number:04}",
+                is_active=number % 3 != 0,
+            )
+            for number, branch in enumerate(branches)
+        ]
+        _insert(Location, warehouses)
+        self.done("warehouses", warehouses)
+        units = [
+            UnitOfMeasure(
+                id=new_id(),
+                code=f"U{number:04}",
+                name=f"Unidad volumen {number:04}",
+                decimals=number % 4,
+                is_active=number % 5 != 0,
+            )
+            for number in range(self.scale.units)
+        ]
+        _insert(UnitOfMeasure, units)
+        self.done("units", units)
         return self.done("companies", companies)
 
     def projects(self) -> list[Project]:

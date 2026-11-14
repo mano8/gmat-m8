@@ -7150,3 +7150,155 @@ msgstr "Miembro añadido."
 #: apps/organizations/views/company_screens.py:277
 msgid "Share saved."
 msgstr "Participación guardada."
+
+msgid "Short and unique, such as UD, M or KG. Fixed once anything uses the unit."
+msgstr "Corto y único, como UD, M o KG. Fijo en cuanto algo usa la unidad."
+
+msgid "Decimals"
+msgstr "Decimales"
+
+msgid "The unit is in use: its code is fixed."
+msgstr "La unidad está en uso: su código es fijo."
+
+msgid "The unit is in use: its decimals can be raised, not lowered."
+msgstr "La unidad está en uso: sus decimales se pueden aumentar, no reducir."
+
+msgid "A unit with this code exists."
+msgstr "Ya existe una unidad con este código."
+
+msgid "A unit in use keeps its code. Add a new unit and deactivate this one."
+msgstr "Una unidad en uso conserva su código. Añade una unidad nueva y desactiva esta."
+
+msgid "Quantities in a unit in use keep their decimals; they can only be raised."
+msgstr "Las cantidades de una unidad en uso conservan sus decimales; solo se pueden aumentar."
+
+msgid "Units of measure"
+msgstr "Unidades de medida"
+
+msgid "A unit's decimals say how many decimal places its quantities may have. An inactive unit is no longer offered for new materials; the ones that have it keep it."
+msgstr "Los decimales de una unidad indican cuántos decimales pueden tener sus cantidades. Una unidad inactiva ya no se ofrece para materiales nuevos; los que la tienen la conservan."
+
+msgid "New unit"
+msgstr "Nueva unidad"
+
+msgid "No units"
+msgstr "Sin unidades"
+
+msgid "No unit matches the filters."
+msgstr "Ninguna unidad coincide con los filtros."
+
+msgid "New unit of measure"
+msgstr "Nueva unidad de medida"
+
+msgid "Edit the unit"
+msgstr "Editar la unidad"
+
+msgid "A unit is never deleted: it can be deactivated, and its history stays."
+msgstr "Una unidad no se borra nunca: se puede desactivar y su historial se conserva."
+
+msgid "Materials, requests and orders that use this unit keep their quantities."
+msgstr "Los materiales, solicitudes y pedidos que usan esta unidad conservan sus cantidades."
+
+#, python-format
+msgid "Unit %(code)s created."
+msgstr "Unidad %(code)s creada."
+
+#, python-format
+msgid "Unit %(code)s saved."
+msgstr "Unidad %(code)s guardada."
+
+#, python-format
+msgid "Unit %(code)s reactivated."
+msgstr "Unidad %(code)s reactivada."
+
+#, python-format
+msgid "Unit %(code)s deactivated."
+msgstr "Unidad %(code)s desactivada."
+
+msgid "New warehouse"
+msgstr "Nuevo almacén"
+
+msgid "To make it the branch's default, choose it on the branch's page."
+msgstr "Para que sea el almacén por defecto de la delegación, elígelo en la página de la delegación."
+
+msgid "Edit the warehouse"
+msgstr "Editar el almacén"
+
+msgid "Deactivate the warehouse"
+msgstr "Desactivar el almacén"
+
+msgid "Goods can no longer be received or handed over from it."
+msgstr "Ya no se podrá recibir material en él ni entregarlo desde él."
+
+msgid "Receipts and handovers already posted keep it. It can be reactivated."
+msgstr "Las recepciones y entregas ya registradas lo conservan. Se puede reactivar."
+
+msgid "It is the default warehouse of its branch: choose another default on the branch's page first."
+msgstr "Es el almacén por defecto de su delegación: elige antes otro en la página de la delegación."
+
+msgid "Edit the worksite"
+msgstr "Editar el lugar de la obra"
+
+msgid "The worksite is where the project's goods arrive."
+msgstr "Es donde llega el material del proyecto."
+
+msgid "Deactivate the worksite"
+msgstr "Desactivar el lugar de la obra"
+
+msgid "Goods can no longer be received at the project's worksite."
+msgstr "Ya no se podrá recibir material en el lugar de la obra del proyecto."
+
+msgid "Receipts already posted keep it. It can be reactivated."
+msgstr "Las recepciones ya registradas lo conservan. Se puede reactivar."
+
+msgid "Reactivate the worksite"
+msgstr "Reactivar el lugar de la obra"
+
+msgid "Goods can be received at the project's worksite again."
+msgstr "Se podrá volver a recibir material en el lugar de la obra del proyecto."
+
+msgid "Keep it inactive"
+msgstr "Mantenerlo inactivo"
+
+msgid "Where each branch receives goods and hands them over from. A worksite comes with its project and is changed on the project's page."
+msgstr "Donde cada delegación recibe el material y desde donde lo entrega. El lugar de una obra viene con su proyecto y se cambia en la página del proyecto."
+
+msgid "No warehouses"
+msgstr "Sin almacenes"
+
+msgid "No warehouse matches the filters."
+msgstr "Ningún almacén coincide con los filtros."
+
+#, python-format
+msgid "Warehouse %(name)s created."
+msgstr "Almacén %(name)s creado."
+
+#, python-format
+msgid "Warehouse %(name)s saved."
+msgstr "Almacén %(name)s guardado."
+
+#, python-format
+msgid "Warehouse %(name)s deactivated."
+msgstr "Almacén %(name)s desactivado."
+
+#, python-format
+msgid "Warehouse %(name)s reactivated."
+msgstr "Almacén %(name)s reactivado."
+
+msgid "Worksite saved."
+msgstr "Lugar de la obra guardado."
+
+msgid "Worksite reactivated."
+msgstr "Lugar de la obra reactivado."
+
+msgid "Worksite deactivated."
+msgstr "Lugar de la obra desactivado."
+
+msgid "Manage warehouses"
+msgstr "Gestionar almacenes"
+
+msgid "Where the project's goods arrive and are received."
+msgstr "Donde llega y se recibe el material del proyecto."
+
+msgid "Worksite location"
+msgstr "Lugar de la obra"

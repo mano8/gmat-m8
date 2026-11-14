@@ -14,7 +14,7 @@ from tests.org import Org, People, client_for
 pytestmark = pytest.mark.django_db
 
 ALL_GROUPS = ["work", "purchasing", "site", "organization", "insights", "administration"]
-# Every category but Administration, which only ``org.manage`` reaches (M10.2).
+# Every category but Administration, which only ``org.manage`` reaches (M10.2, M10.3).
 BUSINESS_GROUPS = ALL_GROUPS[:-1]
 SIDEBAR = re.compile(r'<nav id="app-menu".*?</nav>', re.S)
 SHEET = re.compile(r'<div id="more-menu".*?\n    </div>', re.S)
@@ -64,6 +64,8 @@ ROLES: list[tuple[str, list[str], list[str]]] = [
             "/org/people/",
             "/org/structure/companies/",
             "/org/structure/branches/",
+            "/org/warehouses/",
+            "/catalog/units/",
             "/suppliers/",
             "/audit/",
             "/exports/",
@@ -243,3 +245,21 @@ def test_the_user_menu_holds_the_account_links_the_language_the_theme_and_sign_o
 def test_the_quick_action_is_there_only_with_request_create(org: Org, people: People) -> None:
     assert 'href="/requests/new/"' in page(client_for(people.tech_mad))
     assert 'href="/requests/new/"' not in page(client_for(people.nobody))
+
+
+@pytest.mark.parametrize(
+    ("path", "current"),
+    [
+        ("/org/warehouses/", "/org/warehouses/"),
+        ("/catalog/units/", "/catalog/units/"),
+        ("/catalog/", "/catalog/"),
+        ("/catalog/categories/", "/catalog/"),
+    ],
+)
+def test_the_administration_pages_mark_their_own_entry_not_the_catalogs(
+    org: Org, people: People, path: str, current: str
+) -> None:
+    """M10.3: Units of measure is Administration's, so /catalog/units/ never lights Catalog."""
+    sidebar, _bar, _sheet = parts(page(client_for(people.group_admin), path))
+    marked = re.findall(r'href="([^"]+)"\s+class="nav-link"\s+aria-current="page"', sidebar)
+    assert marked == [current]

@@ -18,6 +18,7 @@ urlpatterns = [
     path("handovers/", include("apps.handovers.urls")),
     path("attachments/", include("apps.attachments.urls")),
     path("org/", include("apps.organizations.urls")),
+    path("org/", include("apps.locations.urls")),
     path("audit/", include("apps.audit.urls")),
     path("exports/", include("apps.exports.urls")),
     path("dashboard/", include("apps.dashboards.urls")),

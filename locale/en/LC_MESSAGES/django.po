@@ -6966,3 +6966,155 @@ msgstr ""
 #: apps/organizations/views/company_screens.py:277
 msgid "Share saved."
 msgstr ""
+
+msgid "Short and unique, such as UD, M or KG. Fixed once anything uses the unit."
+msgstr ""
+
+msgid "Decimals"
+msgstr ""
+
+msgid "The unit is in use: its code is fixed."
+msgstr ""
+
+msgid "The unit is in use: its decimals can be raised, not lowered."
+msgstr ""
+
+msgid "A unit with this code exists."
+msgstr ""
+
+msgid "A unit in use keeps its code. Add a new unit and deactivate this one."
+msgstr ""
+
+msgid "Quantities in a unit in use keep their decimals; they can only be raised."
+msgstr ""
+
+msgid "Units of measure"
+msgstr ""
+
+msgid "A unit's decimals say how many decimal places its quantities may have. An inactive unit is no longer offered for new materials; the ones that have it keep it."
+msgstr ""
+
+msgid "New unit"
+msgstr ""
+
+msgid "No units"
+msgstr ""
+
+msgid "No unit matches the filters."
+msgstr ""
+
+msgid "New unit of measure"
+msgstr ""
+
+msgid "Edit the unit"
+msgstr ""
+
+msgid "A unit is never deleted: it can be deactivated, and its history stays."
+msgstr ""
+
+msgid "Materials, requests and orders that use this unit keep their quantities."
+msgstr ""
+
+#, python-format
+msgid "Unit %(code)s created."
+msgstr ""
+
+#, python-format
+msgid "Unit %(code)s saved."
+msgstr ""
+
+#, python-format
+msgid "Unit %(code)s reactivated."
+msgstr ""
+
+#, python-format
+msgid "Unit %(code)s deactivated."
+msgstr ""
+
+msgid "New warehouse"
+msgstr ""
+
+msgid "To make it the branch's default, choose it on the branch's page."
+msgstr ""
+
+msgid "Edit the warehouse"
+msgstr ""
+
+msgid "Deactivate the warehouse"
+msgstr ""
+
+msgid "Goods can no longer be received or handed over from it."
+msgstr ""
+
+msgid "Receipts and handovers already posted keep it. It can be reactivated."
+msgstr ""
+
+msgid "It is the default warehouse of its branch: choose another default on the branch's page first."
+msgstr ""
+
+msgid "Edit the worksite"
+msgstr ""
+
+msgid "The worksite is where the project's goods arrive."
+msgstr ""
+
+msgid "Deactivate the worksite"
+msgstr ""
+
+msgid "Goods can no longer be received at the project's worksite."
+msgstr ""
+
+msgid "Receipts already posted keep it. It can be reactivated."
+msgstr ""
+
+msgid "Reactivate the worksite"
+msgstr ""
+
+msgid "Goods can be received at the project's worksite again."
+msgstr ""
+
+msgid "Keep it inactive"
+msgstr ""
+
+msgid "Where each branch receives goods and hands them over from. A worksite comes with its project and is changed on the project's page."
+msgstr ""
+
+msgid "No warehouses"
+msgstr ""
+
+msgid "No warehouse matches the filters."
+msgstr ""
+
+#, python-format
+msgid "Warehouse %(name)s created."
+msgstr ""
+
+#, python-format
+msgid "Warehouse %(name)s saved."
+msgstr ""
+
+#, python-format
+msgid "Warehouse %(name)s deactivated."
+msgstr ""
+
+#, python-format
+msgid "Warehouse %(name)s reactivated."
+msgstr ""
+
+msgid "Worksite saved."
+msgstr ""
+
+msgid "Worksite reactivated."
+msgstr ""
+
+msgid "Worksite deactivated."
+msgstr ""
+
+msgid "Manage warehouses"
+msgstr ""
+
+msgid "Where the project's goods arrive and are received."
+msgstr ""
+
+msgid "Worksite location"
+msgstr ""

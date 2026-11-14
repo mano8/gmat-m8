@@ -130,6 +130,8 @@ def branch(request: HttpRequest, branch_id: UUID) -> HttpResponse:
         "managed": managed,
         "manages_others": manages_others,
         "warehouses": warehouses,
+        "new_warehouse_url": f"{reverse('locations:new_warehouse')}?branch={found.pk}",
+        "warehouses_url": f"{reverse('locations:warehouses')}?branch={found.pk}",
         "projects": selectors.project_counts(ctx, found),
         **_page_dialogs(ctx, found, manages_others),
     }

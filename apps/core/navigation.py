@@ -50,6 +50,15 @@ BRANCH_PAGES = (
     "confirm_reactivate_branch",
 )
 STRUCTURE_PAGES = (*COMPANY_PAGES, *BRANCH_PAGES)
+#: The warehouse pages (M10.3), lazy dialogs opened as pages of their own included.
+WAREHOUSE_PAGES = (
+    "warehouses",
+    "new_warehouse",
+    "edit_warehouse",
+    "confirm_deactivate_warehouse",
+)
+#: The units of measure pages under ``/catalog/units/`` (M10.3): Administration's, not Catalog's.
+UNIT_PAGES = ("units", "new_unit", "edit_unit")
 
 
 @dataclass(frozen=True)
@@ -174,7 +183,7 @@ CATEGORIES: tuple[Category, ...] = (
                 "catalog:list",
                 "package",
                 "catalog.view",
-                _app("catalog"),
+                _app("catalog", but=UNIT_PAGES),
                 11,
             ),
             Entry(
@@ -237,6 +246,24 @@ CATEGORIES: tuple[Category, ...] = (
                 "org.manage",
                 _url(*(f"org:{name}" for name in BRANCH_PAGES)),
                 17,
+            ),
+            Entry(
+                "warehouses",
+                _("Warehouses"),
+                "locations:warehouses",
+                "warehouse",
+                "org.manage",
+                _url(*(f"locations:{name}" for name in WAREHOUSE_PAGES)),
+                18,
+            ),
+            Entry(
+                "units",
+                _("Units of measure"),
+                "catalog:units",
+                "scale",
+                "org.manage",
+                _url(*(f"catalog:{name}" for name in UNIT_PAGES)),
+                19,
             ),
         ),
     ),
