@@ -7,7 +7,7 @@
 #
 # The base moves with the `db` service's image (same digest in docker-compose.yml).
 
-ARG POSTGRES_IMAGE=postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+ARG POSTGRES_IMAGE=postgres:18-alpine@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
 FROM ${POSTGRES_IMAGE}
 
 ARG APP_VERSION=dev
