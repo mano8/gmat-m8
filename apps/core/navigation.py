@@ -15,7 +15,6 @@ from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.middleware import access_for
-from apps.core.preferences import CATEGORY_KEYS
 
 #: The bottom bar holds this many entries and a "More" button (the maintainer's four plus More).
 PHONE_BAR_SIZE = 4
@@ -269,7 +268,8 @@ CATEGORIES: tuple[Category, ...] = (
     ),
 )
 
-assert tuple(category.key for category in CATEGORIES) == CATEGORY_KEYS  # noqa: S101
+# ``tests/unit/core/test_ui_navigation.py`` keeps these keys equal to ``CATEGORY_KEYS``, the
+# cookie's allowlist.
 
 
 @dataclass(frozen=True)

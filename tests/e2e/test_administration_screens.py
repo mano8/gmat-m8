@@ -134,4 +134,5 @@ def test_the_administration_menu_is_the_group_administrators_only(browsing: Brow
     technician = browsing.as_("tech-mad", "desktop")
     technician.goto("/requests/")
     expect(technician.locator("#app-menu [data-nav-group=administration]")).to_have_count(0)
-    assert technician.goto("/org/structure/companies/").status == 403  # type: ignore[union-attr]
+    response = technician.goto("/org/structure/companies/")
+    assert response is not None and response.status == 403

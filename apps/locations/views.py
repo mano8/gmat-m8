@@ -9,6 +9,7 @@ rules (the branch's default warehouse stays active); its refusal reaches the dia
 """
 
 from contextlib import suppress
+from typing import cast
 from uuid import UUID
 
 from django.forms import Form
@@ -180,8 +181,9 @@ def reactivate_warehouse(request: HttpRequest, location_id: UUID) -> HttpRespons
 def _worksite_action(request: HttpRequest, location_id: UUID) -> tuple[Location, str]:
     """The worksite (404 unless in scope) and the project page every outcome goes back to."""
     found = selectors.worksite(access_for(request), location_id)
-    assert found.project_id is not None  # noqa: S101  a worksite always has its project
-    return found, project_url(found.project_id)
+    # A worksite always has its project (the model's check constraint; the selector reads
+    # worksites only).
+    return found, project_url(cast(UUID, found.project_id))
 
 
 @mutating(ORG)

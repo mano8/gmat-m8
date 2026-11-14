@@ -13,7 +13,7 @@ It fits a single company with one office as well as a group of companies with se
 
 ![The home page on a desktop: key figures, charts and the menu](docs/screenshots/dashboard.webp)
 
-<img src="docs/screenshots/request-on-a-phone.webp" alt="A request on a phone: its facts and its lines as a card" width="320">
+![A request on a phone: its facts and its lines as a card](docs/screenshots/request-on-a-phone.webp)
 
 > **Status:** not released yet. The features below are built and tested, and the first version is being prepared. No image has been published so far, so for now you run it from this repository.
 
