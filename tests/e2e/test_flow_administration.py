@@ -163,7 +163,7 @@ def create_material(page: Page, reference: str, unit_code: str) -> str:
     choose_containing(form.locator("[name=unit]"), f"{unit_code} ·")
     form.locator("button[type=submit]").click()
     page.wait_for_url(re.compile(r"/catalog/[0-9a-f-]{36}/$"))
-    return page.url
+    return str(page.url)  # Any where Playwright is not installed (CI's typecheck)
 
 
 def test_a_material_comes_back_with_its_unit_in_one_step(browsing: Browsing) -> None:
