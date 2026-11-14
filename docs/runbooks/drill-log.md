@@ -9,6 +9,6 @@ A drill is **due every quarter**. A `FAILED` verdict is an incident ([incident.m
 
 ## Notes
 
-No drill has run against real data yet: the first one is part of the go-live (plan H8.7), right after the first deploy and before real data is loaded. The scripts themselves were rehearsed against real containers on 2026-11-05 (37 tests, 38 drill checks passed): see [../deploy-rehearsal.md](../deploy-rehearsal.md). That rehearsal does not replace a drill, because it cannot prove the real offsite storage, the real keys or the real images.
+No drill has run against real data yet: the first one is part of the pilot's first release, v0.1.0 (plan H8.7, [pilot.md](pilot.md)), right after the first deploy and before real data is loaded. The scripts themselves were rehearsed against real containers on 2026-11-05 (37 tests, 38 drill checks passed): see [../deploy-rehearsal.md](../deploy-rehearsal.md). That rehearsal does not replace a drill, because it cannot prove the real offsite storage, the real keys or the real images.
 
 What a line means: `PASSED` is `restore-drill.sh` exiting 0, with every check reported `PASS`: the runtime role writes, the audit table refuses `UPDATE` and `DELETE`, row counts equal the manifest, attachments match their checksums, the pre-restore session, invitation, reset link, signed key and recovery codes are rejected, revocations are re-applied or privileged accounts are suspended, queued messages are `QUARANTINED` and nothing was sent, and `web` and the worker cannot reach the outside.
