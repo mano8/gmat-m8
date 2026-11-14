@@ -1,0 +1,129 @@
+{% load i18n %}
+{% comment %}
+  What a scope-defining change does to access (M10.2): the body of its dialog. Parameter: data,
+  an apps.organizations.selectors.ScopePreview. Counts and names only; the service decides.
+{% endcomment %}
+<section class="grid gap-3 rounded-lg border border-line bg-sunken p-3 text-sm"
+         data-testid="preview">
+  <h3 class="font-semibold">{% translate "What changes" %}</h3>
+  {% if not data.changes_access %}
+    <p data-testid="preview-nothing">{% translate "Nobody's access changes." %}</p>
+  {% endif %}
+  {% if data.stopping %}
+    <div>
+      <p>{% translate "These branches stop granting access:" %}</p>
+      <ul class="list-disc ps-5">
+        {% for label in data.stopping %}<li>{{ label }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  {% if data.starting %}
+    <div>
+      <p>{% translate "These branches grant access again:" %}</p>
+      <ul class="list-disc ps-5">
+        {% for label in data.starting %}<li>{{ label }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  {% if data.leaving %}
+    <div data-testid="preview-leaving">
+      <p>{% translate "Leave the scope of a managing branch:" %}</p>
+      <ul class="list-disc ps-5">
+        {% for move in data.leaving %}
+          <li>{% blocktranslate with branch=move.branch manager=move.manager %}{{ branch }}, no longer reached from {{ manager }}{% endblocktranslate %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  {% if data.joining %}
+    <div data-testid="preview-joining">
+      <p>{% translate "Join the scope of a managing branch:" %}</p>
+      <ul class="list-disc ps-5">
+        {% for move in data.joining %}
+          <li>{% blocktranslate with branch=move.branch manager=move.manager %}{{ branch }}, reached from {{ manager }}{% endblocktranslate %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  {% if data.changes_access %}
+    <dl class="grid grid-cols-2 gap-2 tabular-nums">
+      <div>
+        <dt class="text-soft">{% translate "Roles whose reach changes" %}</dt>
+        <dd class="font-semibold" data-testid="preview-memberships">
+          {{ data.memberships }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-soft">{% translate "Project shares whose reach changes" %}</dt>
+        <dd class="font-semibold" data-testid="preview-assignments">
+          {{ data.assignments }}
+        </dd>
+      </div>
+    </dl>
+  {% endif %}
+  {% if data.losing %}
+    <div data-testid="preview-losing">
+      <p>
+        {% blocktranslate count total=data.losing_total trimmed %}
+          {{ total }} person no longer reaches any branch or project:
+        {% plural %}
+          {{ total }} people no longer reach any branch or project:
+        {% endblocktranslate %}
+      </p>
+      <ul class="list-disc ps-5">
+        {% for pk, name in data.losing %}
+          <li>
+            <a href="{% url 'org:person' user_id=pk %}">{{ name }}</a>
+          </li>
+        {% endfor %}
+        {% if data.losing_more %}
+          <li>{% blocktranslate with more=data.losing_more %}and {{ more }} more{% endblocktranslate %}</li>
+        {% endif %}
+      </ul>
+      <p class="mt-1 text-soft">{% translate "Their accounts and roles stay as they are." %}</p>
+    </div>
+  {% endif %}
+  {% if data.regaining %}
+    <div data-testid="preview-regaining">
+      <p>
+        {% blocktranslate count total=data.regaining_total trimmed %}
+          {{ total }} person reaches a branch or project again:
+        {% plural %}
+          {{ total }} people reach a branch or project again:
+        {% endblocktranslate %}
+      </p>
+      <ul class="list-disc ps-5">
+        {% for pk, name in data.regaining %}
+          <li>
+            <a href="{% url 'org:person' user_id=pk %}">{{ name }}</a>
+          </li>
+        {% endfor %}
+        {% if data.regaining_more %}
+          <li>{% blocktranslate with more=data.regaining_more %}and {{ more }} more{% endblocktranslate %}</li>
+        {% endif %}
+      </ul>
+    </div>
+  {% endif %}
+  {% if data.blocking %}
+    <div class="rounded-lg border border-warn bg-warn-soft p-3"
+         role="note"
+         data-testid="preview-blocking">
+      <p class="font-semibold">{% translate "These open documents prevent the deactivation:" %}</p>
+      <ul class="list-disc ps-5">
+        {% for doc in data.blocking %}
+          <li>
+            {% if doc.kind == "purchase_order" %}
+              {% blocktranslate with number=doc.number %}Order {{ number }}{% endblocktranslate %}
+            {% else %}
+              {% blocktranslate with number=doc.number %}Request {{ number }}{% endblocktranslate %}
+            {% endif %}
+          </li>
+        {% endfor %}
+        {% if data.blocking_more %}
+          <li>{% blocktranslate with more=data.blocking_more %}and {{ more }} more{% endblocktranslate %}</li>
+        {% endif %}
+      </ul>
+      <p class="mt-1">{% translate "Close or finish them first; the deactivation is refused until then." %}</p>
+    </div>
+  {% endif %}
+</section>

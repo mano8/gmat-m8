@@ -377,6 +377,63 @@ class TestBranches:
             services.update_branch(outsider, branch.pk, is_active=False)
 
 
+class TestSeenGeneration:
+    """M10.2: a change confirmed on a preview read before another organization change is
+    refused (``edited``), and writes nothing; one that changes nothing is a no-op."""
+
+    def test_a_stale_generation_refuses_a_branch_change(
+        self, admin_principal: SessionPrincipal, company: Company, branch: Branch
+    ) -> None:
+        seen = org_generation()
+        services.update_company(admin_principal, company.pk, legal_name="Renamed")  # not scope
+        assert org_generation() == seen
+        other = services.create_branch(admin_principal, NewBranch(company.pk, "SEV", "Sevilla"))
+        assert org_generation() == seen + 1  # a branch created: scope-defining
+        with pytest.raises(ValidationError) as refused:
+            services.update_branch(
+                admin_principal, branch.pk, is_active=False, seen_generation=seen
+            )
+        assert error_codes(refused) == {"edited"}
+        assert Branch.objects.get(pk=branch.pk).is_active
+        assert not AuditEvent.objects.filter(action="branch.updated").exists()
+        changed = services.update_branch(
+            admin_principal, branch.pk, managed_by_id=other.pk, seen_generation=seen + 1
+        )
+        assert changed.managed_by_id == other.pk and org_generation() == seen + 2
+
+    def test_a_stale_generation_refuses_a_company_change(
+        self, admin_principal: SessionPrincipal, company: Company, branch: Branch
+    ) -> None:
+        seen = org_generation()
+        services.update_branch(admin_principal, branch.pk, is_active=False)
+        with pytest.raises(ValidationError) as refused:
+            services.update_company(
+                admin_principal, company.pk, is_active=False, seen_generation=seen
+            )
+        assert error_codes(refused) == {"edited"}
+        assert Company.objects.get(pk=company.pk).is_active
+        services.update_company(
+            admin_principal, company.pk, is_active=False, seen_generation=seen + 1
+        )
+        assert not Company.objects.get(pk=company.pk).is_active
+
+    def test_nothing_to_change_is_never_refused(
+        self, admin_principal: SessionPrincipal, company: Company, branch: Branch
+    ) -> None:
+        services.update_branch(admin_principal, branch.pk, is_active=False)
+        stale = org_generation() - 1
+        assert not services.update_branch(
+            admin_principal, branch.pk, is_active=False, seen_generation=stale
+        ).is_active
+        assert services.update_company(
+            admin_principal, company.pk, is_active=True, seen_generation=stale
+        ).is_active
+
+    def test_authorization_comes_first(self, outsider: SessionPrincipal, branch: Branch) -> None:
+        with pytest.raises(AccessDenied):
+            services.update_branch(outsider, branch.pk, is_active=False, seen_generation=-1)
+
+
 class TestDeactivationRegistry:
     def test_no_branches_no_documents(self, blocking_documents: list[OpenDocument]) -> None:
         blocking_documents.append(OpenDocument("x", "1", UUID(int=1)))

@@ -1,5 +1,5 @@
 """Group-administrator screens (plan §3.4, §5, M2.6): people, memberships, offboarding,
-email changes and invitations. Companies and branches stay in the admin (service-backed).
+email changes and invitations.
 
 Every screen needs ``org.manage`` (403 otherwise). Reads go through the selectors; writes
 through the services, from POST-only views on their own URLs. A staff or superuser account

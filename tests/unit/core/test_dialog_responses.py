@@ -149,6 +149,24 @@ class TestPerform:
         assert response.status_code == 204 and response["HX-Redirect"] == "/to/"
         assert flashed(request) == ["Done."]  # shown on the page htmx navigates to
 
+    def test_the_flash_and_the_place_may_follow_the_result(self) -> None:
+        """M10.2: a create goes to the page of what it made."""
+        request = make_request(htmx=True)
+        response = perform(
+            request, lambda: "e7", lambda made: f"Made {made}.", lambda made: f"/made/{made}/"
+        )
+        assert response.status_code == 204 and response["HX-Redirect"] == "/made/e7/"
+        assert flashed(request) == ["Made e7."]
+
+    def test_a_place_that_follows_the_result_needs_failed_to(self) -> None:
+        request = make_request()
+        with pytest.raises(TypeError, match="failed_to"):
+            perform(request, refuse(ValidationError("No.")), "Done.", lambda made: "/x/")
+        response = perform(
+            request, refuse(ValidationError("No.")), "Done.", lambda made: "/x/", failed_to="/f/"
+        )
+        assert response["Location"] == "/f/"
+
     def test_a_refusal_plain_is_flashed_and_goes_to_failed_to(self) -> None:
         request = make_request()
         form = ReasonForm({"reason": "x"})

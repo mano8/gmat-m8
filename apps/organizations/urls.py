@@ -1,8 +1,91 @@
-from django.urls import path
+from django.urls import include, path
 
 from apps.organizations import views
 
 app_name = "org"
+
+structure = [
+    path("companies/", views.companies, name="companies"),
+    path("companies/new/", views.new_company, name="new_company"),
+    path("companies/create/", views.create_company, name="create_company"),
+    path("companies/<uuid:company_id>/", views.company, name="company"),
+    path("companies/<uuid:company_id>/update/", views.update_company, name="update_company"),
+    path(
+        "companies/<uuid:company_id>/deactivate/confirm/",
+        views.confirm_deactivate_company,
+        name="confirm_deactivate_company",
+    ),
+    path(
+        "companies/<uuid:company_id>/deactivate/",
+        views.deactivate_company,
+        name="deactivate_company",
+    ),
+    path(
+        "companies/<uuid:company_id>/reactivate/confirm/",
+        views.confirm_reactivate_company,
+        name="confirm_reactivate_company",
+    ),
+    path(
+        "companies/<uuid:company_id>/reactivate/",
+        views.reactivate_company,
+        name="reactivate_company",
+    ),
+    path(
+        "companies/<uuid:company_id>/members/add/",
+        views.add_venture_member,
+        name="add_venture_member",
+    ),
+    path(
+        "venture-members/<uuid:member_id>/edit/",
+        views.edit_venture_member,
+        name="edit_venture_member",
+    ),
+    path(
+        "venture-members/<uuid:member_id>/update/",
+        views.update_venture_member,
+        name="update_venture_member",
+    ),
+    path("branches/", views.branches, name="branches"),
+    path("branches/new/", views.new_branch, name="new_branch"),
+    path("branches/create/", views.create_branch, name="create_branch"),
+    path("branches/<uuid:branch_id>/", views.branch, name="branch"),
+    path("branches/<uuid:branch_id>/update/", views.update_branch, name="update_branch"),
+    path(
+        "branches/<uuid:branch_id>/manager/preview/",
+        views.preview_branch_manager,
+        name="preview_branch_manager",
+    ),
+    path(
+        "branches/<uuid:branch_id>/manager/",
+        views.set_branch_manager,
+        name="set_branch_manager",
+    ),
+    path(
+        "branches/<uuid:branch_id>/self-approval/",
+        views.set_self_approval,
+        name="set_self_approval",
+    ),
+    path(
+        "branches/<uuid:branch_id>/deactivate/confirm/",
+        views.confirm_deactivate_branch,
+        name="confirm_deactivate_branch",
+    ),
+    path(
+        "branches/<uuid:branch_id>/deactivate/",
+        views.deactivate_branch,
+        name="deactivate_branch",
+    ),
+    path(
+        "branches/<uuid:branch_id>/reactivate/confirm/",
+        views.confirm_reactivate_branch,
+        name="confirm_reactivate_branch",
+    ),
+    path(
+        "branches/<uuid:branch_id>/reactivate/",
+        views.reactivate_branch,
+        name="reactivate_branch",
+    ),
+]
 
 urlpatterns = [
     path("people/", views.people, name="people"),
@@ -61,4 +144,6 @@ urlpatterns = [
         views.revoke_invitation,
         name="revoke_invitation",
     ),
+    # M10.2: companies, joint ventures and branches (inventory §3.1, §3.2).
+    path("structure/", include(structure)),
 ]

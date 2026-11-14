@@ -13,7 +13,9 @@ from tests.org import Org, People, client_for
 
 pytestmark = pytest.mark.django_db
 
-ALL_GROUPS = ["work", "purchasing", "site", "organization", "insights"]
+ALL_GROUPS = ["work", "purchasing", "site", "organization", "insights", "administration"]
+# Every category but Administration, which only ``org.manage`` reaches (M10.2).
+BUSINESS_GROUPS = ALL_GROUPS[:-1]
 SIDEBAR = re.compile(r'<nav id="app-menu".*?</nav>', re.S)
 SHEET = re.compile(r'<div id="more-menu".*?\n    </div>', re.S)
 BAR = re.compile(r'<nav class="fixed[^>]*>.*?</nav>', re.S)
@@ -58,10 +60,18 @@ ROLES: list[tuple[str, list[str], list[str]]] = [
     (
         "group_admin",
         ALL_GROUPS,
-        ["/org/people/", "/suppliers/", "/audit/", "/exports/", "/purchasing/"],
+        [
+            "/org/people/",
+            "/org/structure/companies/",
+            "/org/structure/branches/",
+            "/suppliers/",
+            "/audit/",
+            "/exports/",
+            "/purchasing/",
+        ],
     ),
-    ("mm_mad", ALL_GROUPS, ["/suppliers/", "/audit/", "/exports/", "/purchasing/"]),
-    ("engineer", ALL_GROUPS, ["/suppliers/", "/audit/", "/exports/", "/purchasing/"]),
+    ("mm_mad", BUSINESS_GROUPS, ["/suppliers/", "/audit/", "/exports/", "/purchasing/"]),
+    ("engineer", BUSINESS_GROUPS, ["/suppliers/", "/audit/", "/exports/", "/purchasing/"]),
     ("wo_mad", ["work", "purchasing", "site", "organization"], ["/suppliers/"]),
     # Q44 (M9.1): technicians and partners receive at their projects' worksites.
     (
@@ -173,7 +183,7 @@ def test_the_other_categories_are_open_or_closed_as_the_person_left_them(
     sidebar, _bar, _sheet = parts(html)
     state = {
         key: bool(re.search(rf'<details[^>]*data-nav-group="{key}"[^>]*\sopen(\s|>)', sidebar))
-        for key in ALL_GROUPS
+        for key in BUSINESS_GROUPS
     }
     assert state == {
         "work": True,

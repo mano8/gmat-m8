@@ -6611,3 +6611,542 @@ msgstr "Ningún proyecto con obra está dentro de su acceso."
 #: apps/accounts/services/invitations.py:341
 msgid "Give the person's full name."
 msgstr "Indique el nombre completo de la persona."
+
+#: apps/core/navigation.py:212
+msgid "Administration"
+msgstr "Administración"
+
+#: apps/core/navigation.py:225 apps/organizations/templates/organizations/companies.html:4 apps/organizations/templates/organizations/companies.html:9 apps/organizations/templates/organizations/company.html:10
+msgid "Companies"
+msgstr "Empresas"
+
+#: apps/core/navigation.py:234 apps/organizations/templates/organizations/branch.html:11 apps/organizations/templates/organizations/branches.html:4 apps/organizations/templates/organizations/branches.html:9 apps/organizations/templates/organizations/companies.html:29 apps/organizations/templates/organizations/companies.html:41 apps/organizations/templates/organizations/company.html:64
+msgid "Branches"
+msgstr "Delegaciones"
+
+#: apps/organizations/forms.py:273
+msgid "All kinds"
+msgstr "Todos los tipos"
+
+#: apps/organizations/forms.py:281 apps/organizations/selectors/structure.py:28 apps/organizations/templates/organizations/companies.html:27 apps/organizations/templates/organizations/companies.html:39
+msgid "Legal name"
+msgstr "Razón social"
+
+#: apps/organizations/forms.py:286
+msgid "A joint venture records its member companies."
+msgstr "Una UTE registra sus empresas miembro."
+
+#: apps/organizations/forms.py:306
+msgid "Fixed once created: document numbers are built from it."
+msgstr "Fijo una vez creado: los números de los documentos se forman con él."
+
+#: apps/organizations/forms.py:327
+msgid "Share (%)"
+msgstr "Participación (%)"
+
+#: apps/organizations/forms.py:333
+msgid "Optional; informational."
+msgstr "Opcional; solo informativo."
+
+#: apps/organizations/forms.py:342
+msgid "Member company"
+msgstr "Empresa miembro"
+
+#: apps/organizations/forms.py:357
+msgid "All companies"
+msgstr "Todas las empresas"
+
+#: apps/organizations/forms.py:372
+#, python-format
+msgid "%(branch)s (inactive)"
+msgstr "%(branch)s (inactiva)"
+
+#: apps/organizations/forms.py:384 apps/organizations/forms.py:434 apps/organizations/selectors/structure.py:30 apps/organizations/templates/organizations/branch.html:44 apps/organizations/templates/organizations/branches.html:28 apps/organizations/templates/organizations/branches.html:41
+msgid "City"
+msgstr "Ciudad"
+
+#: apps/organizations/forms.py:389 apps/organizations/templates/organizations/branch.html:50
+msgid "Default warehouse"
+msgstr "Almacén por defecto"
+
+#: apps/organizations/forms.py:392
+msgid "None"
+msgstr "Ninguno"
+
+#: apps/organizations/forms.py:393
+msgid "Where goods are received by default; an active warehouse of the branch."
+msgstr "Donde se recibe la mercancía por defecto; un almacén activo de la delegación."
+
+#: apps/organizations/forms.py:431
+msgid "Unique in the company and fixed once created."
+msgstr "Único en la empresa y fijo una vez creado."
+
+#: apps/organizations/forms.py:439 apps/organizations/forms.py:481 apps/organizations/templates/organizations/branch.html:73
+msgid "Managing branch"
+msgstr "Delegación gestora"
+
+#: apps/organizations/forms.py:442 apps/organizations/forms.py:484
+msgid "None: it manages itself"
+msgstr "Ninguna: se gestiona sola"
+
+#: apps/organizations/forms.py:443
+msgid "Who works for the managing branch also reaches this one and its projects."
+msgstr "Quien trabaja para la delegación gestora también llega a esta y a sus obras."
+
+#: apps/organizations/forms.py:446 apps/organizations/structure_dialogs.py:238
+msgid "Allow self-approval"
+msgstr "Permitir la autoaprobación"
+
+#: apps/organizations/forms.py:448
+msgid "Lets a requester decide their own requests bought by this branch."
+msgstr "Permite que un solicitante decida sus propias solicitudes compradas por esta delegación."
+
+#: apps/organizations/services.py:82 tests/unit/organizations/test_structure_views.py:349
+msgid "The organization changed after this page was shown. Reload it to see what this change does now."
+msgstr "La organización cambió después de mostrarse esta página. Recárguela para ver qué hace ahora este cambio."
+
+#: apps/organizations/structure_dialogs.py:46 apps/organizations/templates/organizations/companies.html:14 apps/organizations/templates/organizations/companies.html:53
+msgid "New company"
+msgstr "Nueva empresa"
+
+#: apps/organizations/structure_dialogs.py:49 apps/organizations/structure_dialogs.py:185
+msgid "Create"
+msgstr "Crear"
+
+#: apps/organizations/structure_dialogs.py:51
+msgid "Its head-office branch is created with it."
+msgstr "Su delegación central se crea con ella."
+
+#: apps/organizations/structure_dialogs.py:61
+msgid "Edit the company"
+msgstr "Editar la empresa"
+
+#: apps/organizations/structure_dialogs.py:118 apps/organizations/templates/organizations/company.html:149
+msgid "Reactivate the company"
+msgstr "Reactivar la empresa"
+
+#: apps/organizations/structure_dialogs.py:120
+msgid "Keep the company inactive"
+msgstr "Mantener la empresa inactiva"
+
+#: apps/organizations/structure_dialogs.py:122
+msgid "Its active branches and its partners' roles grant access again."
+msgstr "Sus delegaciones activas y los roles de sus asociados vuelven a dar acceso."
+
+#: apps/organizations/structure_dialogs.py:123
+msgid "New documents can be made for its branches again."
+msgstr "Se pueden volver a crear documentos para sus delegaciones."
+
+#: apps/organizations/structure_dialogs.py:127 apps/organizations/templates/organizations/company.html:146
+msgid "Deactivate the company"
+msgstr "Desactivar la empresa"
+
+#: apps/organizations/structure_dialogs.py:129
+msgid "Keep the company active"
+msgstr "Mantener la empresa activa"
+
+#: apps/organizations/structure_dialogs.py:131
+msgid "Its branches and its partners' roles grant nothing while it is inactive."
+msgstr "Sus delegaciones y los roles de sus asociados no dan acceso mientras esté inactiva."
+
+#: apps/organizations/structure_dialogs.py:132
+msgid "No new document is made for its branches; managing branches lose them."
+msgstr "No se crea ningún documento nuevo para sus delegaciones; las delegaciones gestoras dejan de llegar a ellas."
+
+#: apps/organizations/structure_dialogs.py:133
+msgid "Nothing is deleted: it can be reactivated, and its history stays."
+msgstr "No se borra nada: se puede reactivar y su historial se conserva."
+
+#: apps/organizations/structure_dialogs.py:150
+msgid "Add a member company"
+msgstr "Añadir una empresa miembro"
+
+#: apps/organizations/structure_dialogs.py:155
+msgid "Members are informational: they change nobody's access."
+msgstr "Los miembros son informativos: no cambian el acceso de nadie."
+
+#: apps/organizations/structure_dialogs.py:164 apps/organizations/templates/organizations/company.html:129 apps/organizations/templates/organizations/company.html:143
+msgid "Change the share"
+msgstr "Cambiar la participación"
+
+#: apps/organizations/structure_dialogs.py:181 apps/organizations/templates/organizations/branches.html:14 apps/organizations/templates/organizations/branches.html:60 apps/organizations/templates/organizations/company.html:66 apps/organizations/templates/organizations/company.html:147
+msgid "New branch"
+msgstr "Nueva delegación"
+
+#: apps/organizations/structure_dialogs.py:187
+msgid "Its warehouses are added after it."
+msgstr "Sus almacenes se añaden después."
+
+#: apps/organizations/structure_dialogs.py:197
+msgid "Edit the branch"
+msgstr "Editar la delegación"
+
+#: apps/organizations/structure_dialogs.py:212 apps/organizations/templates/organizations/branch.html:90
+msgid "Change the managing branch"
+msgstr "Cambiar la delegación gestora"
+
+#: apps/organizations/structure_dialogs.py:220
+msgid "Who works for the managing branch reaches this branch, its projects and documents."
+msgstr "Quien trabaja para la delegación gestora llega a esta delegación, a sus obras y documentos."
+
+#: apps/organizations/structure_dialogs.py:221
+msgid "Who works for the branch that managed it until now no longer does."
+msgstr "Quien trabaja para la delegación que la gestionaba hasta ahora deja de hacerlo."
+
+#: apps/organizations/structure_dialogs.py:223
+msgid "Keep it as it is"
+msgstr "Dejarlo como está"
+
+#: apps/organizations/structure_dialogs.py:234
+msgid "Group administrators, material managers and engineers decide their own requests either way, through their role on the request and with a second factor."
+msgstr "Los administradores del grupo, encargados de material e ingenieros deciden sus propias solicitudes en cualquier caso, mediante su rol sobre la solicitud y con un segundo factor."
+
+#: apps/organizations/structure_dialogs.py:238
+msgid "Allow"
+msgstr "Permitir"
+
+#: apps/organizations/structure_dialogs.py:241
+msgid "Whoever reviews requests bought by this branch may then approve, reject, return or reduce their own requests too."
+msgstr "Quien revisa las solicitudes compradas por esta delegación podrá entonces aprobar, rechazar, devolver o reducir también sus propias solicitudes."
+
+#: apps/organizations/structure_dialogs.py:247
+msgid "Stop self-approval"
+msgstr "Retirar la autoaprobación"
+
+#: apps/organizations/structure_dialogs.py:247
+msgid "Stop"
+msgstr "Retirar"
+
+#: apps/organizations/structure_dialogs.py:249
+msgid "A reviewer's own requests bought by this branch then go to another reviewer."
+msgstr "Las solicitudes propias de un revisor compradas por esta delegación pasan entonces a otro revisor."
+
+#: apps/organizations/structure_dialogs.py:269 apps/organizations/templates/organizations/branch.html:20
+msgid "Its company is inactive: the branch grants nothing until the company is reactivated."
+msgstr "Su empresa está inactiva: la delegación no da acceso hasta que se reactive la empresa."
+
+#: apps/organizations/structure_dialogs.py:272 apps/organizations/templates/organizations/branch.html:167
+msgid "Reactivate the branch"
+msgstr "Reactivar la delegación"
+
+#: apps/organizations/structure_dialogs.py:274
+msgid "Keep the branch inactive"
+msgstr "Mantener la delegación inactiva"
+
+#: apps/organizations/structure_dialogs.py:276
+msgid "Its roles grant access again, and the branch that manages it reaches it."
+msgstr "Sus roles vuelven a dar acceso, y la delegación que la gestiona llega a ella."
+
+#: apps/organizations/structure_dialogs.py:277
+msgid "Its projects accept new documents again."
+msgstr "Sus obras vuelven a aceptar documentos nuevos."
+
+#: apps/organizations/structure_dialogs.py:282 apps/organizations/templates/organizations/branch.html:165
+msgid "Deactivate the branch"
+msgstr "Desactivar la delegación"
+
+#: apps/organizations/structure_dialogs.py:284
+msgid "Keep the branch active"
+msgstr "Mantener la delegación activa"
+
+#: apps/organizations/structure_dialogs.py:286
+msgid "Its roles grant nothing while it is inactive."
+msgstr "Sus roles no dan acceso mientras esté inactiva."
+
+#: apps/organizations/structure_dialogs.py:287
+msgid "The branch that manages it no longer reaches it, and it reaches none."
+msgstr "La delegación que la gestiona deja de llegar a ella, y ella no llega a ninguna."
+
+#: apps/organizations/structure_dialogs.py:288
+msgid "Its projects accept no new documents. Nothing is deleted."
+msgstr "Sus obras no aceptan documentos nuevos. No se borra nada."
+
+#: apps/organizations/templates/organizations/active_status.html:8
+msgctxt "place"
+msgid "Active"
+msgstr "Activo"
+
+#: apps/organizations/templates/organizations/active_status.html:10
+msgctxt "organization"
+msgid "Active"
+msgstr "Activa"
+
+#: apps/organizations/templates/organizations/active_status.html:15
+msgctxt "place"
+msgid "Inactive"
+msgstr "Inactivo"
+
+#: apps/organizations/templates/organizations/active_status.html:17
+msgctxt "organization"
+msgid "Inactive"
+msgstr "Inactiva"
+
+#: apps/organizations/templates/organizations/branch.html:35
+msgid "Branch details"
+msgstr "Datos de la delegación"
+
+#: apps/organizations/templates/organizations/branch.html:58
+#, python-format
+msgid "Executes %(executes)s · buys for %(buys)s"
+msgstr "Ejecuta %(executes)s · compra para %(buys)s"
+
+#: apps/organizations/templates/organizations/branch.html:70
+msgid "Who reaches it"
+msgstr "Quién llega a ella"
+
+#: apps/organizations/templates/organizations/branch.html:79
+msgid "Who works for it also reaches this branch, its projects and documents."
+msgstr "Quien trabaja para ella también llega a esta delegación, a sus obras y documentos."
+
+#: apps/organizations/templates/organizations/branch.html:83
+msgid "It manages other branches, so no branch can manage it (one level only)."
+msgstr "Gestiona otras delegaciones, así que ninguna puede gestionarla (un solo nivel)."
+
+#: apps/organizations/templates/organizations/branch.html:86
+msgid "None: it manages itself."
+msgstr "Ninguna: se gestiona sola."
+
+#: apps/organizations/templates/organizations/branch.html:95
+msgid "Self-approval"
+msgstr "Autoaprobación"
+
+#: apps/organizations/templates/organizations/branch.html:98
+msgctxt "self-approval"
+msgid "Allowed"
+msgstr "Permitida"
+
+#: apps/organizations/templates/organizations/branch.html:101
+msgctxt "self-approval"
+msgid "Not allowed"
+msgstr "No permitida"
+
+#: apps/organizations/templates/organizations/branch.html:106
+msgid "Whether a reviewer may decide their own requests that this branch buys for."
+msgstr "Si un revisor puede decidir sus propias solicitudes que compra esta delegación."
+
+#: apps/organizations/templates/organizations/branch.html:119
+msgid "Branches it manages"
+msgstr "Delegaciones que gestiona"
+
+#: apps/organizations/templates/organizations/branch.html:136
+msgid "Warehouses"
+msgstr "Almacenes"
+
+#: apps/organizations/templates/organizations/branch.html:145
+msgid "Default"
+msgstr "Por defecto"
+
+#: apps/organizations/templates/organizations/branch.html:155
+msgid "No warehouse yet."
+msgstr "Todavía no hay almacenes."
+
+#: apps/organizations/templates/organizations/branches.html:10
+msgid "Each branch is managed on its own; a managing branch also reaches the branches it manages."
+msgstr "Cada delegación se gestiona por separado; una delegación gestora también llega a las que gestiona."
+
+#: apps/organizations/templates/organizations/branches.html:29 apps/organizations/templates/organizations/branches.html:42
+msgid "Managed by"
+msgstr "Gestionada por"
+
+#: apps/organizations/templates/organizations/branches.html:56
+msgid "No branches"
+msgstr "Sin delegaciones"
+
+#: apps/organizations/templates/organizations/branches.html:56 apps/organizations/templates/organizations/company.html:95
+msgid "No branch matches the filters."
+msgstr "Ninguna delegación coincide con los filtros."
+
+#: apps/organizations/templates/organizations/companies.html:10
+msgid "The companies of the group, joint ventures included, and their branches."
+msgstr "Las empresas del grupo, UTE incluidas, y sus delegaciones."
+
+#: apps/organizations/templates/organizations/companies.html:49
+msgid "No companies"
+msgstr "Sin empresas"
+
+#: apps/organizations/templates/organizations/companies.html:49
+msgid "No company matches the filters."
+msgstr "Ninguna empresa coincide con los filtros."
+
+#: apps/organizations/templates/organizations/company.html:31
+msgid "Company details"
+msgstr "Datos de la empresa"
+
+#: apps/organizations/templates/organizations/company.html:52
+msgid "People with a role"
+msgstr "Personas con un rol"
+
+#: apps/organizations/templates/organizations/company.html:85
+#, python-format
+msgid "Managed by %(manager)s"
+msgstr "Gestionada por %(manager)s"
+
+#: apps/organizations/templates/organizations/company.html:105
+msgid "Joint-venture members"
+msgstr "Miembros de la UTE"
+
+#: apps/organizations/templates/organizations/company.html:106
+msgid "Add a member"
+msgstr "Añadir un miembro"
+
+#: apps/organizations/templates/organizations/company.html:109
+msgid "The companies that formed this joint venture, for reporting. Members change nobody's access."
+msgstr "Las empresas que formaron esta UTE, para los informes. Los miembros no cambian el acceso de nadie."
+
+#: apps/organizations/templates/organizations/company.html:122
+#, python-format
+msgid "Share %(share)s %%"
+msgstr "Participación %(share)s %%"
+
+#: apps/organizations/templates/organizations/company.html:124
+msgid "No share recorded"
+msgstr "Sin participación registrada"
+
+#: apps/organizations/templates/organizations/company.html:135
+msgid "No member recorded yet."
+msgstr "Todavía no hay miembros registrados."
+
+#: apps/organizations/templates/organizations/manager_preview.html:11
+msgid "Choose a managing branch to see whose access changes."
+msgstr "Elija una delegación gestora para ver de quién cambia el acceso."
+
+#: apps/organizations/templates/organizations/manager_preview_fragment.html:10
+msgid "This branch cannot manage it."
+msgstr "Esta delegación no puede gestionarla."
+
+#: apps/organizations/templates/organizations/scope_preview.html:8
+msgid "What changes"
+msgstr "Qué cambia"
+
+#: apps/organizations/templates/organizations/scope_preview.html:10
+msgid "Nobody's access changes."
+msgstr "No cambia el acceso de nadie."
+
+#: apps/organizations/templates/organizations/scope_preview.html:14
+msgid "These branches stop granting access:"
+msgstr "Estas delegaciones dejan de dar acceso:"
+
+#: apps/organizations/templates/organizations/scope_preview.html:22
+msgid "These branches grant access again:"
+msgstr "Estas delegaciones vuelven a dar acceso:"
+
+#: apps/organizations/templates/organizations/scope_preview.html:30
+msgid "Leave the scope of a managing branch:"
+msgstr "Salen del ámbito de una delegación gestora:"
+
+#: apps/organizations/templates/organizations/scope_preview.html:33
+#, python-format
+msgid "%(branch)s, no longer reached from %(manager)s"
+msgstr "%(branch)s, a la que ya no se llega desde %(manager)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:40
+msgid "Join the scope of a managing branch:"
+msgstr "Entran en el ámbito de una delegación gestora:"
+
+#: apps/organizations/templates/organizations/scope_preview.html:43
+#, python-format
+msgid "%(branch)s, reached from %(manager)s"
+msgstr "%(branch)s, a la que se llega desde %(manager)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:51
+msgid "Roles whose reach changes"
+msgstr "Roles cuyo alcance cambia"
+
+#: apps/organizations/templates/organizations/scope_preview.html:57
+msgid "Project shares whose reach changes"
+msgstr "Obras compartidas cuyo alcance cambia"
+
+#: apps/organizations/templates/organizations/scope_preview.html:67
+#, python-format
+msgid "%(total)s person no longer reaches any branch or project:"
+msgid_plural "%(total)s people no longer reach any branch or project:"
+msgstr[0] "%(total)s persona deja de llegar a toda delegación u obra:"
+msgstr[1] "%(total)s personas dejan de llegar a toda delegación u obra:"
+
+#: apps/organizations/templates/organizations/scope_preview.html:80 apps/organizations/templates/organizations/scope_preview.html:102 apps/organizations/templates/organizations/scope_preview.html:123
+#, python-format
+msgid "and %(more)s more"
+msgstr "y %(more)s más"
+
+#: apps/organizations/templates/organizations/scope_preview.html:83
+msgid "Their accounts and roles stay as they are."
+msgstr "Sus cuentas y roles se quedan como están."
+
+#: apps/organizations/templates/organizations/scope_preview.html:89
+#, python-format
+msgid "%(total)s person reaches a branch or project again:"
+msgid_plural "%(total)s people reach a branch or project again:"
+msgstr[0] "%(total)s persona vuelve a llegar a una delegación u obra:"
+msgstr[1] "%(total)s personas vuelven a llegar a una delegación u obra:"
+
+#: apps/organizations/templates/organizations/scope_preview.html:111
+msgid "These open documents prevent the deactivation:"
+msgstr "Estos documentos abiertos impiden la desactivación:"
+
+#: apps/organizations/templates/organizations/scope_preview.html:116
+#, python-format
+msgid "Order %(number)s"
+msgstr "Pedido %(number)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:118
+#, python-format
+msgid "Request %(number)s"
+msgstr "Solicitud %(number)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:126
+msgid "Close or finish them first; the deactivation is refused until then."
+msgstr "Ciérrelos o termínelos antes; hasta entonces se rechaza la desactivación."
+
+#: apps/organizations/views/branch_screens.py:179
+#, python-format
+msgid "Branch %(branch)s created."
+msgstr "Delegación %(branch)s creada."
+
+#: apps/organizations/views/branch_screens.py:198
+msgid "Branch saved."
+msgstr "Delegación guardada."
+
+#: apps/organizations/views/branch_screens.py:260
+msgid "Managing branch saved."
+msgstr "Delegación gestora guardada."
+
+#: apps/organizations/views/branch_screens.py:279
+msgid "Self-approval allowed."
+msgstr "Autoaprobación permitida."
+
+#: apps/organizations/views/branch_screens.py:279
+msgid "Self-approval stopped."
+msgstr "Autoaprobación retirada."
+
+#: apps/organizations/views/branch_screens.py:330
+msgid "Branch reactivated."
+msgstr "Delegación reactivada."
+
+#: apps/organizations/views/branch_screens.py:330
+msgid "Branch deactivated."
+msgstr "Delegación desactivada."
+
+#: apps/organizations/views/company_screens.py:136
+#, python-format
+msgid "Company %(code)s created."
+msgstr "Empresa %(code)s creada."
+
+#: apps/organizations/views/company_screens.py:155
+msgid "Company saved."
+msgstr "Empresa guardada."
+
+#: apps/organizations/views/company_screens.py:198
+msgid "Company reactivated."
+msgstr "Empresa reactivada."
+
+#: apps/organizations/views/company_screens.py:198
+msgid "Company deactivated."
+msgstr "Empresa desactivada."
+
+#: apps/organizations/views/company_screens.py:235 apps/organizations/views/company_screens.py:248
+msgid "Member added."
+msgstr "Miembro añadido."
+
+#: apps/organizations/views/company_screens.py:277
+msgid "Share saved."
+msgstr "Participación guardada."

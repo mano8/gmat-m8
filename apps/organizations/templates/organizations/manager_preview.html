@@ -1,0 +1,13 @@
+{% load i18n %}
+{% comment %}
+  The body of the managing-branch dialog (M10.2): the preview of the branch chosen, refreshed by
+  htmx into this element when the choice changes (preview_branch_manager). Parameter: data, a
+  ScopePreview or nothing yet.
+{% endcomment %}
+<div id="manager-preview" aria-live="polite" data-testid="manager-preview">
+  {% if data %}
+    {% include "organizations/scope_preview.html" %}
+  {% else %}
+    <p class="text-sm text-soft">{% translate "Choose a managing branch to see whose access changes." %}</p>
+  {% endif %}
+</div>

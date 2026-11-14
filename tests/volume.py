@@ -4,7 +4,9 @@
 100k audit events, 20k materials, 10k requests with 50k lines, 5k orders (15k lines and their
 allocations), 5k receipts (with their attributions), 2k handovers, and what the screens that
 list people and projects need (300 projects, 1,000 users with their memberships, 400
-invitations with a queued, sent or failed email, 500 suppliers). ``Scale`` sizes it.
+invitations with a queued, sent or failed email, 500 suppliers), and for the structure screens
+(M10.2) 150 companies with two branches each, one company in ten active, so the other screens'
+branch choices stay the size of a real group. ``Scale`` sizes it.
 
 Written with ``bulk_create`` (the triggers and constraints still run; the composite foreign
 keys are checked as rows go in, the others at the end by ``SET CONSTRAINTS ALL IMMEDIATE``),
@@ -34,7 +36,7 @@ from apps.handovers.models import Handover, HandoverLine
 from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.notifications.models import EmailOutbox, Kind, Status
-from apps.organizations.models import Branch, Membership
+from apps.organizations.models import Branch, Company, Membership
 from apps.projects.models import Project, ProjectAssignment
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
 from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
@@ -62,6 +64,7 @@ class Scale:
     users: int = 1_000
     invitations: int = 400
     suppliers: int = 500
+    companies: int = 150
 
 
 @dataclass
@@ -218,6 +221,35 @@ class _Builder:
         ]
         _insert(Supplier, rows)
         return self.done("suppliers", rows)
+
+    def organization(self) -> list[Company]:
+        """Companies of the group and their branches (M10.2's lists); one in ten active."""
+        companies = [
+            Company(
+                id=new_id(),
+                code=f"V{number:04}",
+                legal_name=f"Empresa volumen {number:04}",
+                kind=Company.Kind.JOINT_VENTURE if number % 7 == 0 else Company.Kind.STANDARD,
+                is_active=number % 10 == 0,
+            )
+            for number in range(self.scale.companies)
+        ]
+        _insert(Company, companies)
+        branches = [
+            Branch(
+                id=new_id(),
+                company=company,
+                code=code,
+                name=f"{company.legal_name} {code}",
+                city="Volumen",
+                is_active=code == "HQ" or number % 3 != 0,
+            )
+            for number, company in enumerate(companies)
+            for code in ("HQ", "NORTE")
+        ]
+        _insert(Branch, branches)
+        self.done("branches", branches)
+        return self.done("companies", companies)
 
     def projects(self) -> list[Project]:
         org = self.org
@@ -803,6 +835,7 @@ def build_volume(org: Org, people: People, scale: Scale | None = None) -> Volume
     builder = _Builder(org, people, scale)
     materials = builder.catalog()
     builder.suppliers()
+    builder.organization()
     projects = builder.projects()
     users = builder.users()
     hot_project, busy = builder.shared_projects(users, projects)

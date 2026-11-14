@@ -46,9 +46,9 @@ in backticks in the fourth.
 | `material_requests.MaterialRequest` | read-only | screen | `requests:start`, `requests:submit`, `requests:examine` and the review actions | |
 | `material_requests.MaterialRequestLine` | read-only | screen | `requests:add_line`, `requests:update_line`, `requests:apply_edit` | |
 | `mfa.Authenticator` | read-only | screen for its owner; the reset **needs a screen (M10.4)** | `org:reset_mfa` | Enrolment and removal by the owner at `/accounts/2fa/`; a lost factor today needs `manage reset_mfa` on the server. |
-| `organizations.Branch` | editable (`org.manage`) | **needs a screen (M10.2)** | `org:create_branch`, `org:update_branch`, `org:set_branch_manager`, `org:set_self_approval`, `org:deactivate_branch`, `org:reactivate_branch` | Incl. `managed_by`, `allow_self_approval`, the default warehouse, activity. |
-| `organizations.Company` | editable (`org.manage`) | **needs a screen (M10.2)** | `org:create_company`, `org:update_company`, `org:deactivate_company`, `org:reactivate_company` | `create_company` also makes the head-office branch. |
-| `organizations.JointVentureMember` | editable (`org.manage`) | **needs a screen (M10.2)** | `org:add_venture_member`, `org:update_venture_member` | On the joint venture's page. No removal, in the admin or the services. |
+| `organizations.Branch` | editable (`org.manage`) | screen (M10.2) | `org:create_branch`, `org:update_branch`, `org:set_branch_manager`, `org:set_self_approval`, `org:deactivate_branch`, `org:reactivate_branch` | Incl. `managed_by`, `allow_self_approval`, the default warehouse, activity. |
+| `organizations.Company` | editable (`org.manage`) | screen (M10.2) | `org:create_company`, `org:update_company`, `org:deactivate_company`, `org:reactivate_company` | `create_company` also makes the head-office branch. |
+| `organizations.JointVentureMember` | editable (`org.manage`) | screen (M10.2) | `org:add_venture_member`, `org:update_venture_member` | On the joint venture's page. No removal, in the admin or the services. |
 | `organizations.Membership` | read-only | screen | `org:grant_membership`, `org:revoke_membership`, `org:membership_validity` | On the person's page. |
 | `projects.Project` | read-only | screen | `projects:create`, `projects:update` | |
 | `projects.ProjectAssignment` | read-only | screen | `projects:assign`, `projects:revoke_assignment`, `projects:assignment_validity` | |
@@ -92,6 +92,8 @@ htmx and the whole page otherwise); danger dialogs open with Cancel focused.
 
 ### 3.1 Companies and joint ventures (M10.2): `/org/structure/companies/`
 
+Built in M10.2 (`apps/organizations/views/company_screens.py`).
+
 | URL | Name | Method | What |
 | --- | --- | --- | --- |
 | `companies/` | `org:companies` | GET | List: filters active/inactive and kind, search by code or name. |
@@ -108,6 +110,8 @@ htmx and the whole page otherwise); danger dialogs open with Cancel focused.
 | `venture-members/<id>/update/` | `org:update_venture_member` | POST | `update_joint_venture_member`. |
 
 ### 3.2 Branches (M10.2): `/org/structure/branches/`
+
+Built in M10.2 (`apps/organizations/views/branch_screens.py`). The managing branch is chosen in the dialog; each choice asks `org:preview_branch_manager` for its preview and the generation it was read at (an out-of-band swap of the form's hidden field). Self-approval posts the value to set (`allow=on|off`), never a toggle.
 
 | URL | Name | Method | What |
 | --- | --- | --- | --- |
@@ -176,6 +180,13 @@ who reaches what. Their dialog says it before the confirmation, from a selector
 The preview is a reading, not a promise: the service checks its preconditions again inside its
 transaction, under `AccessState` `FOR UPDATE`, and a refusal comes back into the dialog (409 or 422) with
 the service's reason.
+
+*Built in M10.2* (`apps/organizations/selectors/preview.py`, functions `company_activity`,
+`branch_activity`, `branch_manager`; ADR-0030). Reach means branches and projects: the catalog, which any
+effective role reads, is left out, so the people listed are those who "no longer reach any branch or
+project". The dialog carries the `org_generation` the preview was read at, and `update_company` /
+`update_branch` refuse it as `seen_generation` once the organization changed (code `edited`, 409); a
+submission that changes nothing is never refused.
 
 ### 3.7 Navigation
 

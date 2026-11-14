@@ -32,6 +32,26 @@ def _url(*names: str) -> Active:
     return lambda match: match.view_name in names
 
 
+#: The pages of the organization's structure under ``/org/`` (M10.2): not People's.
+COMPANY_PAGES = (
+    "companies",
+    "company",
+    "new_company",
+    "confirm_deactivate_company",
+    "confirm_reactivate_company",
+    "edit_venture_member",
+)
+BRANCH_PAGES = (
+    "branches",
+    "branch",
+    "new_branch",
+    "preview_branch_manager",
+    "confirm_deactivate_branch",
+    "confirm_reactivate_branch",
+)
+STRUCTURE_PAGES = (*COMPANY_PAGES, *BRANCH_PAGES)
+
+
 @dataclass(frozen=True)
 class Entry:
     """One place in the menu. ``rank`` orders the phone bar: the lowest reachable come first."""
@@ -148,7 +168,6 @@ CATEGORIES: tuple[Category, ...] = (
                 _app("projects"),
                 9,
             ),
-            Entry("people", _("People"), "org:people", "users", "org.manage", _app("org"), 10),
             Entry(
                 "catalog",
                 _("Catalog"),
@@ -184,6 +203,40 @@ CATEGORIES: tuple[Category, ...] = (
                 "export.csv",
                 _app("exports"),
                 14,
+            ),
+        ),
+    ),
+    # M10.2 (ADR-0030): what a group administrator administers, together; nobody else sees it.
+    Category(
+        "administration",
+        _("Administration"),
+        (
+            Entry(
+                "people",
+                _("People"),
+                "org:people",
+                "users",
+                "org.manage",
+                _app("org", but=STRUCTURE_PAGES),
+                15,
+            ),
+            Entry(
+                "companies",
+                _("Companies"),
+                "org:companies",
+                "landmark",
+                "org.manage",
+                _url(*(f"org:{name}" for name in COMPANY_PAGES)),
+                16,
+            ),
+            Entry(
+                "branches",
+                _("Branches"),
+                "org:branches",
+                "building",
+                "org.manage",
+                _url(*(f"org:{name}" for name in BRANCH_PAGES)),
+                17,
             ),
         ),
     ),

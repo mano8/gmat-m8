@@ -28,7 +28,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.access.authorization import authorize_in_txn
 from apps.access.context import AccessContext
-from apps.access.generations import lock_access_state, lock_users
+from apps.access.generations import lock_access_state, lock_users, org_generation
 from apps.access.policy import require_may_manage_account
 from apps.access.principals import Principal
 from apps.access.roles import PRIVILEGED_ROLES, Capability, Role
@@ -65,6 +65,25 @@ def _org_change(principal: Principal) -> User:
     locks = LockOrder()
     lock_access_state(locks, mode=LockMode.UPDATE)
     return authorize_in_txn(principal, Capability.ORG_MANAGE, locks=locks)
+
+
+def _require_seen(seen_generation: int | None) -> None:
+    """Refuse a change confirmed on a page whose preview is out of date (M10.2).
+
+    ``seen_generation`` is the ``AccessState.org_generation`` the page read its preview of the
+    change at; once the organization changed since, that preview no longer says what the
+    change does (``edited``: a 409 to the dialog). Called after ``_org_change``, under its
+    ``FOR UPDATE`` lock, and only for a change that changes something, so a second submission
+    of a change already made stays a no-op.
+    """
+    if seen_generation is not None and seen_generation != org_generation():
+        raise ValidationError(
+            _(
+                "The organization changed after this page was shown. Reload it to see what"
+                " this change does now."
+            ),
+            code="edited",
+        )
 
 
 def lock_for_user_change(
@@ -144,17 +163,21 @@ def create_company(
 
 
 @transactional
-def update_company(principal: Principal, company_id: UUID, **changes: Any) -> Company:
+def update_company(
+    principal: Principal, company_id: UUID, *, seen_generation: int | None = None, **changes: Any
+) -> Company:
     """Change a company's data or ``is_active``; ``code`` is fixed (plan §4.2).
 
     Deactivation is refused while a branch of the company has open documents (F62).
-    A joint venture with members cannot become ``STANDARD``.
+    A joint venture with members cannot become ``STANDARD``. ``seen_generation``: see
+    ``_require_seen``.
     """
     _org_change(principal)
     company = Company.objects.get(pk=company_id)
     diff = apply_changes(company, changes, COMPANY_FIELDS)
     if not diff:
         return company
+    _require_seen(seen_generation)
     company.full_clean()
     if (
         "kind" in diff
@@ -319,17 +342,21 @@ def create_branch(
 
 
 @transactional
-def update_branch(principal: Principal, branch_id: UUID, **changes: Any) -> Branch:
+def update_branch(
+    principal: Principal, branch_id: UUID, *, seen_generation: int | None = None, **changes: Any
+) -> Branch:
     """Change a branch's data, ``managed_by``, default warehouse or ``is_active``.
 
     ``company`` and ``code`` are fixed. ``managed_by`` stays one level deep (``clean`` and
     the trigger). Deactivation is refused while the branch has open documents (F62).
+    ``seen_generation``: see ``_require_seen``.
     """
     _org_change(principal)
     branch = Branch.objects.get(pk=branch_id)
     diff = apply_changes(branch, changes, BRANCH_FIELDS)
     if not diff:
         return branch
+    _require_seen(seen_generation)
     branch.full_clean()
     _check_default_warehouse(branch)
     if diff.get("is_active", {}).get("to") is False:

@@ -45,7 +45,7 @@ from apps.accounts.models import User
 from apps.accounts.sessions import bump_session_epoch
 from apps.audit.models import AuditEvent
 from apps.core.admin import ReadOnlyModelAdmin, ServiceBackedModelAdmin
-from apps.organizations.models import Company, Membership
+from apps.organizations.models import Branch, Company, Membership
 from tests.access.matrix import (
     ACTOR_NAMES,
     ADMIN_LOGIN,
@@ -337,6 +337,149 @@ def _object_url(name: str, key: str) -> Callable[[World], str]:
 
 def _person_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.people.tech_mad.pk])
+
+
+def _org_url(name: str, attr: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[getattr(world.org, attr).pk])
+
+
+def _company_d(name: str) -> Callable[[World], str]:
+    """The inactive company D of ``build_people``."""
+    return lambda world: reverse(name, args=[Company.objects.get(code="D").pk])
+
+
+def _branch_old(name: str) -> Callable[[World], str]:
+    """The inactive branch A-OLD of ``build_people``."""
+    return lambda world: reverse(name, args=[Branch.objects.get(code="OLD").pk])
+
+
+# Where each M10.2 URL with an object is tried: an active and an inactive company or branch,
+# and for a branch one that is managed and one that manages.
+COMPANY_POSITIONS = (("joint venture", "b"), ("standard", "c"))
+BRANCH_POSITIONS = (("managed", "b_mad"), ("managing", "a_mad"))
+
+
+def _positions(
+    name: str, methods: dict[str, Any], kind: str, *, htmx: Outcome | None = None, dialog: str = ""
+) -> tuple[Route, ...]:
+    """One route per position of ``kind`` (``company`` or ``branch``), the inactive one
+    included; with ``htmx``, the dialog's htmx request too (a POST's 422, a lazy GET's 200)."""
+    places = COMPANY_POSITIONS if kind == "company" else BRANCH_POSITIONS
+    inactive = _company_d(name) if kind == "company" else _branch_old(name)
+    routes = [Route(methods, position=where, path=_org_url(name, attr)) for where, attr in places]
+    routes.append(Route(methods, position="inactive", path=inactive))
+    if htmx is not None:
+        headers = {**HTMX, "HX-Target": f"{dialog}-content"} if dialog else HTMX
+        outcome = org_page() if htmx is OK else org_action(htmx)
+        routes.append(
+            Route(outcome, position="htmx", path=_org_url(name, places[0][1]), headers=headers)
+        )
+    return tuple(routes)
+
+
+def _structure_routes() -> dict[str, tuple[Route, ...]]:
+    lazy_new = {**HTMX, "HX-Target": "new-dialog-content"}
+    member = _object_url("org:edit_venture_member", "jointventuremember")
+    update_member = _object_url("org:update_venture_member", "jointventuremember")
+    return {
+        "org:companies": (Route(org_page()),),
+        "org:company": _positions("org:company", org_page(), "company"),
+        "org:new_company": (
+            Route(org_page()),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "org:create_company": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "org:update_company": _positions(
+            "org:update_company", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_deactivate_company": _positions(
+            "org:confirm_deactivate_company",
+            org_page(),
+            "company",
+            htmx=OK,
+            dialog="activity-dialog",
+        ),
+        "org:deactivate_company": _positions(
+            "org:deactivate_company", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_reactivate_company": _positions(
+            "org:confirm_reactivate_company",
+            org_page(),
+            "company",
+            htmx=OK,
+            dialog="activity-dialog",
+        ),
+        "org:reactivate_company": _positions(
+            "org:reactivate_company", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:add_venture_member": _positions(
+            "org:add_venture_member", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:edit_venture_member": (
+            Route(org_page(), path=member),
+            Route(
+                org_page(),
+                position="htmx",
+                path=member,
+                headers={**HTMX, "HX-Target": "share-dialog-content"},
+            ),
+        ),
+        "org:update_venture_member": (
+            Route(org_action(), path=update_member, note="no share: the share is cleared"),
+            Route(org_action(NO_CONTENT), position="htmx", path=update_member, headers=HTMX),
+        ),
+        "org:branches": (Route(org_page()),),
+        "org:branch": _positions("org:branch", org_page(), "branch"),
+        "org:new_branch": (
+            Route(org_page()),
+            Route(
+                org_page(),
+                position="from a company",
+                path=lambda world: f"{reverse('org:new_branch')}?company={world.org.b.pk}",
+            ),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "org:create_branch": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "org:update_branch": _positions(
+            "org:update_branch", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:preview_branch_manager": (
+            *_positions("org:preview_branch_manager", org_page(), "branch"),
+            Route(
+                org_page(),
+                position="htmx, a managing branch chosen",
+                path=lambda world: (
+                    f"{reverse('org:preview_branch_manager', args=[world.org.b_mad.pk])}"
+                    f"?managed_by={world.org.a_sev.pk}"
+                ),
+                headers=HTMX,
+            ),
+        ),
+        "org:set_branch_manager": _positions(
+            "org:set_branch_manager", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:set_self_approval": _positions(
+            "org:set_self_approval", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_deactivate_branch": _positions(
+            "org:confirm_deactivate_branch", org_page(), "branch", htmx=OK, dialog="activity-dialog"
+        ),
+        "org:deactivate_branch": _positions(
+            "org:deactivate_branch", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_reactivate_branch": _positions(
+            "org:confirm_reactivate_branch", org_page(), "branch", htmx=OK, dialog="activity-dialog"
+        ),
+        "org:reactivate_branch": _positions(
+            "org:reactivate_branch", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+    }
 
 
 UNKNOWN_ID = "00000000-0000-7000-8000-000000000000"
@@ -2083,6 +2226,10 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "org:revoke_invitation": (
         Route(org_action(), path=_object_url("org:revoke_invitation", "invitation")),
     ),
+    # M10.2: companies, joint ventures and branches; group administrators only (org.manage),
+    # every company and branch, active or not (S2). An empty POST changes nothing: the form is
+    # invalid (a plain POST is flashed and redirected, the dialog's gets 422).
+    **_structure_routes(),
     # Token pages: anonymous by design; no token in the session shows the generic page.
     "invitations:link": (
         Route(
@@ -2212,6 +2359,8 @@ PAGED_LISTS = (
     "projects:list",
     "org:people",
     "org:invitations",
+    "org:companies",
+    "org:branches",
     "requests:list",
     "requests:new",
     "requests:inbox",
@@ -2245,6 +2394,8 @@ PAGED_SECTIONS = {
     "requests:project_materials": "per_page=100&page=2&q=x&outstanding=on",
     "projects:detail": "assignments_per_page=100&assignments_page=2&assignments-state=revoked",
     "org:person": "memberships_page=2&projects_page=2&invitations_page=2&memberships-state=revoked",
+    "org:company": "branches_page=2&branches_per_page=100&branches-state=inactive&members_page=2",
+    "org:branch": "managed_page=2&warehouses_page=2",
     "audit:object": "per_page=100&page=2&q=x&since=2030-01-01",
 }
 

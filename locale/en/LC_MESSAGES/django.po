@@ -6427,3 +6427,542 @@ msgstr ""
 #: apps/accounts/services/invitations.py:341
 msgid "Give the person's full name."
 msgstr ""
+
+#: apps/core/navigation.py:212
+msgid "Administration"
+msgstr ""
+
+#: apps/core/navigation.py:225 apps/organizations/templates/organizations/companies.html:4 apps/organizations/templates/organizations/companies.html:9 apps/organizations/templates/organizations/company.html:10
+msgid "Companies"
+msgstr ""
+
+#: apps/core/navigation.py:234 apps/organizations/templates/organizations/branch.html:11 apps/organizations/templates/organizations/branches.html:4 apps/organizations/templates/organizations/branches.html:9 apps/organizations/templates/organizations/companies.html:29 apps/organizations/templates/organizations/companies.html:41 apps/organizations/templates/organizations/company.html:64
+msgid "Branches"
+msgstr ""
+
+#: apps/organizations/forms.py:273
+msgid "All kinds"
+msgstr ""
+
+#: apps/organizations/forms.py:281 apps/organizations/selectors/structure.py:28 apps/organizations/templates/organizations/companies.html:27 apps/organizations/templates/organizations/companies.html:39
+msgid "Legal name"
+msgstr ""
+
+#: apps/organizations/forms.py:286
+msgid "A joint venture records its member companies."
+msgstr ""
+
+#: apps/organizations/forms.py:306
+msgid "Fixed once created: document numbers are built from it."
+msgstr ""
+
+#: apps/organizations/forms.py:327
+msgid "Share (%)"
+msgstr ""
+
+#: apps/organizations/forms.py:333
+msgid "Optional; informational."
+msgstr ""
+
+#: apps/organizations/forms.py:342
+msgid "Member company"
+msgstr ""
+
+#: apps/organizations/forms.py:357
+msgid "All companies"
+msgstr ""
+
+#: apps/organizations/forms.py:372
+#, python-format
+msgid "%(branch)s (inactive)"
+msgstr ""
+
+#: apps/organizations/forms.py:384 apps/organizations/forms.py:434 apps/organizations/selectors/structure.py:30 apps/organizations/templates/organizations/branch.html:44 apps/organizations/templates/organizations/branches.html:28 apps/organizations/templates/organizations/branches.html:41
+msgid "City"
+msgstr ""
+
+#: apps/organizations/forms.py:389 apps/organizations/templates/organizations/branch.html:50
+msgid "Default warehouse"
+msgstr ""
+
+#: apps/organizations/forms.py:392
+msgid "None"
+msgstr ""
+
+#: apps/organizations/forms.py:393
+msgid "Where goods are received by default; an active warehouse of the branch."
+msgstr ""
+
+#: apps/organizations/forms.py:431
+msgid "Unique in the company and fixed once created."
+msgstr ""
+
+#: apps/organizations/forms.py:439 apps/organizations/forms.py:481 apps/organizations/templates/organizations/branch.html:73
+msgid "Managing branch"
+msgstr ""
+
+#: apps/organizations/forms.py:442 apps/organizations/forms.py:484
+msgid "None: it manages itself"
+msgstr ""
+
+#: apps/organizations/forms.py:443
+msgid "Who works for the managing branch also reaches this one and its projects."
+msgstr ""
+
+#: apps/organizations/forms.py:446 apps/organizations/structure_dialogs.py:238
+msgid "Allow self-approval"
+msgstr ""
+
+#: apps/organizations/forms.py:448
+msgid "Lets a requester decide their own requests bought by this branch."
+msgstr ""
+
+#: apps/organizations/services.py:82 tests/unit/organizations/test_structure_views.py:349
+msgid "The organization changed after this page was shown. Reload it to see what this change does now."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:46 apps/organizations/templates/organizations/companies.html:14 apps/organizations/templates/organizations/companies.html:53
+msgid "New company"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:49 apps/organizations/structure_dialogs.py:185
+msgid "Create"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:51
+msgid "Its head-office branch is created with it."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:61
+msgid "Edit the company"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:118 apps/organizations/templates/organizations/company.html:149
+msgid "Reactivate the company"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:120
+msgid "Keep the company inactive"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:122
+msgid "Its active branches and its partners' roles grant access again."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:123
+msgid "New documents can be made for its branches again."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:127 apps/organizations/templates/organizations/company.html:146
+msgid "Deactivate the company"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:129
+msgid "Keep the company active"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:131
+msgid "Its branches and its partners' roles grant nothing while it is inactive."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:132
+msgid "No new document is made for its branches; managing branches lose them."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:133
+msgid "Nothing is deleted: it can be reactivated, and its history stays."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:150
+msgid "Add a member company"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:155
+msgid "Members are informational: they change nobody's access."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:164 apps/organizations/templates/organizations/company.html:129 apps/organizations/templates/organizations/company.html:143
+msgid "Change the share"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:181 apps/organizations/templates/organizations/branches.html:14 apps/organizations/templates/organizations/branches.html:60 apps/organizations/templates/organizations/company.html:66 apps/organizations/templates/organizations/company.html:147
+msgid "New branch"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:187
+msgid "Its warehouses are added after it."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:197
+msgid "Edit the branch"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:212 apps/organizations/templates/organizations/branch.html:90
+msgid "Change the managing branch"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:220
+msgid "Who works for the managing branch reaches this branch, its projects and documents."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:221
+msgid "Who works for the branch that managed it until now no longer does."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:223
+msgid "Keep it as it is"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:234
+msgid "Group administrators, material managers and engineers decide their own requests either way, through their role on the request and with a second factor."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:238
+msgid "Allow"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:241
+msgid "Whoever reviews requests bought by this branch may then approve, reject, return or reduce their own requests too."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:247
+msgid "Stop self-approval"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:247
+msgid "Stop"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:249
+msgid "A reviewer's own requests bought by this branch then go to another reviewer."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:269 apps/organizations/templates/organizations/branch.html:20
+msgid "Its company is inactive: the branch grants nothing until the company is reactivated."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:272 apps/organizations/templates/organizations/branch.html:167
+msgid "Reactivate the branch"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:274
+msgid "Keep the branch inactive"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:276
+msgid "Its roles grant access again, and the branch that manages it reaches it."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:277
+msgid "Its projects accept new documents again."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:282 apps/organizations/templates/organizations/branch.html:165
+msgid "Deactivate the branch"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:284
+msgid "Keep the branch active"
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:286
+msgid "Its roles grant nothing while it is inactive."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:287
+msgid "The branch that manages it no longer reaches it, and it reaches none."
+msgstr ""
+
+#: apps/organizations/structure_dialogs.py:288
+msgid "Its projects accept no new documents. Nothing is deleted."
+msgstr ""
+
+#: apps/organizations/templates/organizations/active_status.html:8
+msgctxt "place"
+msgid "Active"
+msgstr ""
+
+#: apps/organizations/templates/organizations/active_status.html:10
+msgctxt "organization"
+msgid "Active"
+msgstr ""
+
+#: apps/organizations/templates/organizations/active_status.html:15
+msgctxt "place"
+msgid "Inactive"
+msgstr ""
+
+#: apps/organizations/templates/organizations/active_status.html:17
+msgctxt "organization"
+msgid "Inactive"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:35
+msgid "Branch details"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:58
+#, python-format
+msgid "Executes %(executes)s · buys for %(buys)s"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:70
+msgid "Who reaches it"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:79
+msgid "Who works for it also reaches this branch, its projects and documents."
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:83
+msgid "It manages other branches, so no branch can manage it (one level only)."
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:86
+msgid "None: it manages itself."
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:95
+msgid "Self-approval"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:98
+msgctxt "self-approval"
+msgid "Allowed"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:101
+msgctxt "self-approval"
+msgid "Not allowed"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:106
+msgid "Whether a reviewer may decide their own requests that this branch buys for."
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:119
+msgid "Branches it manages"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:136
+msgid "Warehouses"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:145
+msgid "Default"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branch.html:155
+msgid "No warehouse yet."
+msgstr ""
+
+#: apps/organizations/templates/organizations/branches.html:10
+msgid "Each branch is managed on its own; a managing branch also reaches the branches it manages."
+msgstr ""
+
+#: apps/organizations/templates/organizations/branches.html:29 apps/organizations/templates/organizations/branches.html:42
+msgid "Managed by"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branches.html:56
+msgid "No branches"
+msgstr ""
+
+#: apps/organizations/templates/organizations/branches.html:56 apps/organizations/templates/organizations/company.html:95
+msgid "No branch matches the filters."
+msgstr ""
+
+#: apps/organizations/templates/organizations/companies.html:10
+msgid "The companies of the group, joint ventures included, and their branches."
+msgstr ""
+
+#: apps/organizations/templates/organizations/companies.html:49
+msgid "No companies"
+msgstr ""
+
+#: apps/organizations/templates/organizations/companies.html:49
+msgid "No company matches the filters."
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:31
+msgid "Company details"
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:52
+msgid "People with a role"
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:85
+#, python-format
+msgid "Managed by %(manager)s"
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:105
+msgid "Joint-venture members"
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:106
+msgid "Add a member"
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:109
+msgid "The companies that formed this joint venture, for reporting. Members change nobody's access."
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:122
+#, python-format
+msgid "Share %(share)s %%"
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:124
+msgid "No share recorded"
+msgstr ""
+
+#: apps/organizations/templates/organizations/company.html:135
+msgid "No member recorded yet."
+msgstr ""
+
+#: apps/organizations/templates/organizations/manager_preview.html:11
+msgid "Choose a managing branch to see whose access changes."
+msgstr ""
+
+#: apps/organizations/templates/organizations/manager_preview_fragment.html:10
+msgid "This branch cannot manage it."
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:8
+msgid "What changes"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:10
+msgid "Nobody's access changes."
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:14
+msgid "These branches stop granting access:"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:22
+msgid "These branches grant access again:"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:30
+msgid "Leave the scope of a managing branch:"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:33
+#, python-format
+msgid "%(branch)s, no longer reached from %(manager)s"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:40
+msgid "Join the scope of a managing branch:"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:43
+#, python-format
+msgid "%(branch)s, reached from %(manager)s"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:51
+msgid "Roles whose reach changes"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:57
+msgid "Project shares whose reach changes"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:67
+#, python-format
+msgid "%(total)s person no longer reaches any branch or project:"
+msgid_plural "%(total)s people no longer reach any branch or project:"
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:80 apps/organizations/templates/organizations/scope_preview.html:102 apps/organizations/templates/organizations/scope_preview.html:123
+#, python-format
+msgid "and %(more)s more"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:83
+msgid "Their accounts and roles stay as they are."
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:89
+#, python-format
+msgid "%(total)s person reaches a branch or project again:"
+msgid_plural "%(total)s people reach a branch or project again:"
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:111
+msgid "These open documents prevent the deactivation:"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:116
+#, python-format
+msgid "Order %(number)s"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:118
+#, python-format
+msgid "Request %(number)s"
+msgstr ""
+
+#: apps/organizations/templates/organizations/scope_preview.html:126
+msgid "Close or finish them first; the deactivation is refused until then."
+msgstr ""
+
+#: apps/organizations/views/branch_screens.py:179
+#, python-format
+msgid "Branch %(branch)s created."
+msgstr ""
+
+#: apps/organizations/views/branch_screens.py:198
+msgid "Branch saved."
+msgstr ""
+
+#: apps/organizations/views/branch_screens.py:260
+msgid "Managing branch saved."
+msgstr ""
+
+#: apps/organizations/views/branch_screens.py:279
+msgid "Self-approval allowed."
+msgstr ""
+
+#: apps/organizations/views/branch_screens.py:279
+msgid "Self-approval stopped."
+msgstr ""
+
+#: apps/organizations/views/branch_screens.py:330
+msgid "Branch reactivated."
+msgstr ""
+
+#: apps/organizations/views/branch_screens.py:330
+msgid "Branch deactivated."
+msgstr ""
+
+#: apps/organizations/views/company_screens.py:136
+#, python-format
+msgid "Company %(code)s created."
+msgstr ""
+
+#: apps/organizations/views/company_screens.py:155
+msgid "Company saved."
+msgstr ""
+
+#: apps/organizations/views/company_screens.py:198
+msgid "Company reactivated."
+msgstr ""
+
+#: apps/organizations/views/company_screens.py:198
+msgid "Company deactivated."
+msgstr ""
+
+#: apps/organizations/views/company_screens.py:235 apps/organizations/views/company_screens.py:248
+msgid "Member added."
+msgstr ""
+
+#: apps/organizations/views/company_screens.py:277
+msgid "Share saved."
+msgstr ""
