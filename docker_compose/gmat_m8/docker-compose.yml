@@ -148,8 +148,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
-    # Gunicorn, with room for Argon2 under a burst of sign-ins (100 MiB per hash).
-    mem_limit: 1024m
+    # Gunicorn, with room for Argon2 under a burst of sign-ins: each hash holds 100 MiB, and the
+    # 3 workers x 4 threads can hash 12 passwords at once (+1.2 GiB, measured) over about 200 to
+    # 350 MiB of workers, so about 1.5 GiB at worst. 1024m let the kernel kill a worker under
+    # the live suite's burst of failed sign-ins on a 4-core runner (a 503).
+    mem_limit: 2048m
 
   # Decodes uploaded images, the riskiest parsing the application does (M8.3, X11): its own uid,
   # no network, no volume but its socket and a scratch tmpfs, and no secret in its environment.

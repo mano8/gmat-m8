@@ -33,7 +33,7 @@ services:
     image: ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}
     build: !reset null
     pull_policy: missing
-    mem_limit: 1024m
+    mem_limit: 2048m  # a burst of 12 sign-ins at once (Argon2): see docker-compose.yml
 
   decoder:
     image: ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}
