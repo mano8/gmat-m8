@@ -7213,8 +7213,8 @@ msgstr "Les quantités d'une unité utilisée gardent leurs décimales ; elles n
 msgid "Units of measure"
 msgstr "Unités de mesure"
 
-msgid "A unit's decimals say how many decimal places its quantities may have. An inactive unit is no longer offered for new materials; the ones that have it keep it."
-msgstr "Les décimales d'une unité indiquent combien de décimales ses quantités peuvent avoir. Une unité inactive n'est plus proposée pour de nouveaux matériels ; ceux qui l'ont la gardent."
+msgid "A unit's decimals say how many decimal places its quantities may have. A unit is deactivated once no active material and no request or order in progress uses it; it is then no longer offered, and what has it keeps it."
+msgstr "Les décimales d'une unité indiquent combien de décimales ses quantités peuvent avoir. Une unité se désactive quand aucun matériel actif ni aucune demande ou commande en cours ne l'utilise ; elle n'est alors plus proposée, et ce qui l'a la garde."
 
 msgid "New unit"
 msgstr "Nouvelle unité"
@@ -7400,3 +7400,57 @@ msgstr "Cette unité de mesure n'est pas active."
 
 msgid "This person has left: there is nothing to reset."
 msgstr "Cette personne est partie : il n'y a rien à réinitialiser."
+
+#: apps/catalog/unit_usage.py
+#, python-format
+msgid "%(count)d active material"
+msgid_plural "%(count)d active materials"
+msgstr[0] "%(count)d matériel actif"
+msgstr[1] "%(count)d matériels actifs"
+
+#: apps/material_requests/ledger.py
+#, python-format
+msgid "%(count)d line of a request in progress"
+msgid_plural "%(count)d lines of requests in progress"
+msgstr[0] "%(count)d ligne d'une demande en cours"
+msgstr[1] "%(count)d lignes de demandes en cours"
+
+#: apps/purchasing/ledger.py
+#, python-format
+msgid "%(count)d line of an order in progress"
+msgid_plural "%(count)d lines of orders in progress"
+msgstr[0] "%(count)d ligne d'une commande en cours"
+msgstr[1] "%(count)d lignes de commandes en cours"
+
+#: apps/catalog/services.py
+#, python-format
+msgid "This unit is still in use: %(uses)s. Deactivate those materials first; the requests and orders free it once they are finished, cancelled or closed."
+msgstr "Cette unité est encore utilisée : %(uses)s. Désactivez d'abord ces matériels ; les demandes et les commandes la libèrent une fois terminées, annulées ou clôturées."
+
+#: apps/catalog/services.py
+msgid "Its unit of measure is not active: reactivate the unit first."
+msgstr "Son unité de mesure n'est pas active : réactivez d'abord l'unité."
+
+#: apps/catalog/unit_dialogs.py apps/catalog/templates/catalog/units.html
+msgid "Deactivate the unit"
+msgstr "Désactiver l'unité"
+
+#: apps/catalog/unit_dialogs.py
+msgid "It is no longer offered for new materials, imports or lines outside the catalog."
+msgstr "Elle ne sera plus proposée pour de nouveaux matériels, les imports ni les lignes hors catalogue."
+
+#: apps/catalog/unit_dialogs.py
+msgid "What already has it keeps it. It can be reactivated."
+msgstr "Ce qui l'a déjà la garde. Elle peut être réactivée."
+
+#: apps/catalog/templates/catalog/unit_usage.html
+msgid "The unit is still in use: it cannot be deactivated yet."
+msgstr "L'unité est encore utilisée : elle ne peut pas encore être désactivée."
+
+#: apps/catalog/templates/catalog/unit_usage.html
+msgid "Deactivate those materials first. The requests and orders free it once they are finished, cancelled or closed."
+msgstr "Désactivez d'abord ces matériels. Les demandes et les commandes la libèrent une fois terminées, annulées ou clôturées."
+
+#: apps/catalog/templates/catalog/unit_usage.html
+msgid "No active material and no request or order in progress uses this unit."
+msgstr "Aucun matériel actif ni aucune demande ou commande en cours n'utilise cette unité."

@@ -22,6 +22,7 @@ from apps.access.context import AccessContext
 from apps.access.exceptions import NotInScope
 from apps.access.roles import Capability
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure, fold
+from apps.catalog.unit_usage import UnitUse, uses
 
 DEFAULT_PER_PAGE = 25
 MATERIAL_SORTS = {"reference": ("reference",), "name": ("name",)}
@@ -112,6 +113,12 @@ def unit_in_use(of: UnitOfMeasure) -> bool:
             if rows.exists():
                 return True
     return False
+
+
+def unit_uses(of: UnitOfMeasure) -> list[UnitUse]:
+    """What alive still uses the unit (active materials, lines in progress), as the
+    deactivation dialog shows it and ``update_unit`` refuses on it; empty when nothing does."""
+    return uses(of.pk)
 
 
 def _terms(query: str) -> list[str]:

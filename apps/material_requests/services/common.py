@@ -169,18 +169,24 @@ def _decided(request: MaterialRequest) -> bool:
 
 
 def _line_content(
-    *, material_id: UUID | None, free_text: str, unit_id: UUID | None, new_material: bool = True
+    *,
+    material_id: UUID | None,
+    free_text: str,
+    unit_id: UUID | None,
+    new_material: bool = True,
+    kept_unit: UUID | None = None,
 ) -> tuple[dict[str, Any], UnitOfMeasure]:
     """Validated material, description and unit of a line; a catalog line takes its
     material's unit (C9). Returns them with the unit, for the quantity's check.
 
     ``new_material``: the material is being chosen now, so it must be active; a line
-    keeps a material deactivated after it was added.
+    keeps a material deactivated after it was added. ``kept_unit``: the unit the line has,
+    which it keeps even if deactivated since; any other unit must be active (Q72).
     """
     free_text = free_text.strip()
     if material_id is None:
         return {"material_id": None, "free_text": free_text, "unit_id": unit_id}, _free_unit(
-            free_text, unit_id
+            free_text, unit_id, kept=kept_unit
         )
     material = Material.objects.select_related("unit").filter(pk=material_id).first()
     if material is None or (new_material and not material.is_active):
@@ -202,8 +208,9 @@ def _line_content(
     }, material.unit
 
 
-def _free_unit(free_text: str, unit_id: UUID | None) -> UnitOfMeasure:
-    """The unit of a non-catalog line, which must be described."""
+def _free_unit(free_text: str, unit_id: UUID | None, *, kept: UUID | None) -> UnitOfMeasure:
+    """The unit of a non-catalog line, which must be described: an active unit, or the one
+    the line already has (``kept``)."""
     if not free_text:
         raise ValidationError(
             {
@@ -216,6 +223,10 @@ def _free_unit(free_text: str, unit_id: UUID | None) -> UnitOfMeasure:
     found = UnitOfMeasure.objects.filter(pk=unit_id).first() if unit_id is not None else None
     if found is None:
         raise ValidationError({"unit": ValidationError(_("Choose a unit."), code="required")})
+    if not found.is_active and found.pk != kept:
+        raise ValidationError(
+            {"unit": ValidationError(_("This unit of measure is not active."), code="inactive")}
+        )
     return found
 
 
@@ -226,10 +237,15 @@ def _line_values(
     unit_id: UUID | None,
     requested_qty: Any,
     new_material: bool = True,
+    kept_unit: UUID | None = None,
 ) -> dict[str, Any]:
     """Validated line content (``_line_content``) and its quantity in that unit."""
     content, unit = _line_content(
-        material_id=material_id, free_text=free_text, unit_id=unit_id, new_material=new_material
+        material_id=material_id,
+        free_text=free_text,
+        unit_id=unit_id,
+        new_material=new_material,
+        kept_unit=kept_unit,
     )
     check_quantity(requested_qty, unit, "requested_qty")
     return {**content, "requested_qty": requested_qty}

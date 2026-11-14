@@ -606,8 +606,36 @@ def _place_routes() -> dict[str, tuple[Route, ...]]:
                 headers=HTMX,
             ),
         ),
+        "catalog:confirm_deactivate_unit": (
+            Route(
+                org_page(),
+                position="free",
+                path=unit("catalog:confirm_deactivate_unit", "spare_unit"),
+            ),
+            Route(
+                org_page(),
+                position="in use",
+                path=unit("catalog:confirm_deactivate_unit", "unitofmeasure"),
+            ),
+            Route(
+                org_page(),
+                position="htmx",
+                path=unit("catalog:confirm_deactivate_unit", "spare_unit"),
+                headers={**HTMX, "HX-Target": "activity-dialog-content"},
+            ),
+        ),
         "catalog:deactivate_unit": (
-            Route(org_action(), path=unit("catalog:deactivate_unit", "spare_unit")),
+            Route(
+                org_action(),
+                position="free",
+                path=unit("catalog:deactivate_unit", "spare_unit"),
+            ),
+            Route(
+                org_action(),
+                position="in use",
+                path=unit("catalog:deactivate_unit", "unitofmeasure"),
+                note="refused while an active material uses it: nothing changes",
+            ),
             Route(
                 org_action(NO_CONTENT),
                 position="htmx",

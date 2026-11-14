@@ -4,6 +4,7 @@ screen, pass axe in both colour schemes and are reached and left with the keyboa
 lists are in ``test_phone_layout`` (and so in ``test_accessibility``); the whole set-up flow is
 ``test_flow_administration``."""
 
+import re
 from collections.abc import Callable
 
 import pytest
@@ -111,6 +112,29 @@ def test_a_lazy_dialog_is_opened_and_left_by_keyboard(browsing: Browsing, viewpo
     stays_in_the_dialog(page, "dialog")
     closes_with_escape(page, dialog, opener)
     assert_focus_is_visible(page)
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_a_unit_in_use_says_so_and_stays_active(browsing: Browsing, viewport: str) -> None:
+    """The demo's materials use ``UD``: the confirmation names them, passes axe and keeps the
+    focus; confirming anyway brings the refusal into the dialog, and the unit stays."""
+    page = browsing.as_("admin", viewport)
+    page.goto("/catalog/units/?q=UD&state=active")
+    row = page.get_by_test_id("unit-row").filter(
+        has=page.locator(".doc-no", has_text=re.compile(r"^UD$"))
+    )
+    row.get_by_test_id("unit-deactivate-open").click()
+    dialog = page.get_by_test_id("unit-activity-dialog")
+    expect(dialog.get_by_test_id("unit-in-use")).to_be_visible()
+    fits(page, dialog, viewport)
+    found = audit_schemes(page, f"deactivate a unit in use {viewport}")
+    assert not found, "\n".join(found)
+    stays_in_the_dialog(page, "dialog")
+    dialog.get_by_test_id("unit-deactivate-submit").click()
+    expect(dialog.locator("[data-error-summary]")).to_be_visible()
+    expect(dialog).to_be_visible()
+    page.goto("/catalog/units/?q=UD&state=inactive")
+    expect(page.locator(".doc-no", has_text=re.compile(r"^UD$"))).to_have_count(0)
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,28 @@
+{% load i18n %}
+{% comment %}
+  The body of a unit's deactivation dialog (Q72, ADR-0030): what alive still uses the unit, so
+  the service will refuse to deactivate it. Parameter: data, a list of
+  apps.catalog.unit_usage.UnitUse, empty when nothing does.
+{% endcomment %}
+{% if data %}
+  <div class="rounded-lg border border-warn bg-warn-soft p-3 text-sm"
+       role="note"
+       data-testid="unit-in-use">
+    <p class="font-medium">{% translate "The unit is still in use: it cannot be deactivated yet." %}</p>
+    <ul class="mt-2 list-disc ps-5">
+      {% for use in data %}
+        <li>
+          {{ use.text }}
+          {% if use.examples %}({{ use.examples|join:", " }}{% if use.more %}, …{% endif %}){% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="mt-2">
+      {% translate "Deactivate those materials first. The requests and orders free it once they are finished, cancelled or closed." %}
+    </p>
+  </div>
+{% else %}
+  <p class="text-sm text-soft" data-testid="unit-unused">
+    {% translate "No active material and no request or order in progress uses this unit." %}
+  </p>
+{% endif %}

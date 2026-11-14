@@ -7,7 +7,7 @@
   <header class="page-head" data-testid="page-header">
     <div class="page-head-main">
       <h1>{% translate "Units of measure" %}</h1>
-      <p class="page-head-sub">{% translate "A unit's decimals say how many decimal places its quantities may have. An inactive unit is no longer offered for new materials; the ones that have it keep it." %}</p>
+      <p class="page-head-sub">{% translate "A unit's decimals say how many decimal places its quantities may have. A unit is deactivated once no active material and no request or order in progress uses it; it is then no longer offered, and what has it keeps it." %}</p>
     </div>
     <div class="page-head-actions">
       {% url 'catalog:new_unit' as new_url %}
@@ -48,11 +48,8 @@
                     {% url 'catalog:edit_unit' unit_id=unit.pk as edit_url %}
                     {% include "organizations/lazy_button.html" with url=edit_url dialog="edit-dialog" label=_("Edit") icon="pencil" testid="unit-edit-open" %}
                     {% if unit.is_active %}
-                      <form method="post"
-                            action="{% url 'catalog:deactivate_unit' unit_id=unit.pk %}">
-                        {% csrf_token %}
-                        {% include "components/button.html" with type="submit" label=_("Deactivate") variant="danger" icon="ban" %}
-                      </form>
+                      {% url 'catalog:confirm_deactivate_unit' unit_id=unit.pk as deactivate_url %}
+                      {% include "organizations/lazy_button.html" with url=deactivate_url dialog="activity-dialog" label=_("Deactivate") variant="danger" icon="ban" testid="unit-deactivate-open" %}
                     {% else %}
                       <form method="post"
                             action="{% url 'catalog:reactivate_unit' unit_id=unit.pk %}">
@@ -74,4 +71,5 @@
   {% endpartialdef %}
   {% include "components/dialog.html" with id="new-dialog" title=_("New unit of measure") testid="unit-new-dialog" %}
   {% include "components/dialog.html" with id="edit-dialog" title=_("Edit the unit") testid="unit-edit-dialog" %}
+  {% include "components/dialog.html" with id="activity-dialog" title=_("Deactivate the unit") tone="danger" testid="unit-activity-dialog" %}
 {% endblock content %}

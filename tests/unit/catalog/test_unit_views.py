@@ -64,6 +64,7 @@ GETS: list[tuple[str, Callable[[UnitOfMeasure], list[object]]]] = [
     ("catalog:units", lambda unit: []),
     ("catalog:new_unit", lambda unit: []),
     ("catalog:edit_unit", lambda unit: [unit.pk]),
+    ("catalog:confirm_deactivate_unit", lambda unit: [unit.pk]),
 ]
 POSTS: list[tuple[str, Callable[[UnitOfMeasure], list[object]]]] = [
     ("catalog:create_unit", lambda unit: []),
@@ -94,10 +95,18 @@ class TestWhoMay:
             assert admin.post(reverse(name, args=args(pallet))).status_code == 405, name
 
     @pytest.mark.parametrize(
-        "name", ["catalog:edit_unit", "catalog:update_unit", "catalog:deactivate_unit"]
+        "name",
+        [
+            "catalog:edit_unit",
+            "catalog:update_unit",
+            "catalog:confirm_deactivate_unit",
+            "catalog:deactivate_unit",
+        ],
     )
     def test_an_unknown_unit_is_404(self, admin: Client, name: str) -> None:
-        method = admin.get if name == "catalog:edit_unit" else admin.post
+        method = (
+            admin.get if name.endswith(("edit_unit", "confirm_deactivate_unit")) else admin.post
+        )
         assert method(reverse(name, args=[UNKNOWN])).status_code == 404
 
     def test_a_revoked_administrator_is_refused(
@@ -148,7 +157,7 @@ class TestList:
     ) -> None:
         page = admin.get(reverse("catalog:units"), {"q": "palet"}).content.decode()
         assert reverse("catalog:edit_unit", args=[pallet.pk]) in page
-        assert reverse("catalog:deactivate_unit", args=[pallet.pk]) in page
+        assert reverse("catalog:confirm_deactivate_unit", args=[pallet.pk]) in page
         assert reverse("catalog:reactivate_unit", args=[pallet.pk]) not in page
         services.update_unit(admin_principal, pallet.pk, is_active=False)
         again = admin.get(reverse("catalog:units"), {"q": "palet"}).content.decode()
@@ -309,8 +318,9 @@ class TestEdit:
 
 class TestActivity:
     def test_deactivates_and_reactivates(
-        self, people: People, admin: Client, used: UnitOfMeasure
+        self, people: People, admin: Client, admin_principal: Any, used: UnitOfMeasure
     ) -> None:
+        services.deactivate_material(admin_principal, Material.objects.get(reference="M-1").pk)
         response = admin.post(reverse("catalog:deactivate_unit", args=[used.pk]))
         assert response.status_code == 302 and response["Location"] == reverse("catalog:units")
         used.refresh_from_db()
@@ -326,6 +336,29 @@ class TestActivity:
         admin.post(reverse("catalog:deactivate_unit", args=[pallet.pk]))
         messages = [str(m) for m in admin.get(reverse("catalog:units")).context["messages"]]
         assert any("PAL" in message for message in messages)
+
+    def test_the_confirmation_dialog_says_what_uses_the_unit(
+        self, admin: Client, admin_principal: Any, pallet: UnitOfMeasure
+    ) -> None:
+        url = reverse("catalog:confirm_deactivate_unit", args=[pallet.pk])
+        free = admin.get(url, headers=in_dialog("activity-dialog"))
+        assert free.status_code == 200 and b"<html" not in free.content
+        assert b'data-testid="unit-deactivate-form"' in free.content
+        assert b'data-testid="unit-unused"' in free.content
+        services.create_material(admin_principal, reference="M-1", name="Thing", unit_id=pallet.pk)
+        used = admin.get(url)  # without htmx: a page of its own
+        assert b"<html" in used.content and b'data-testid="unit-in-use"' in used.content
+        assert b"M-1" in used.content
+
+    def test_the_refusal_reaches_the_dialog(self, admin: Client, used: UnitOfMeasure) -> None:
+        url = reverse("catalog:deactivate_unit", args=[used.pk])
+        response = admin.post(url, headers=HTMX)
+        assert response.status_code == 422 and codes(response) == {"in_use"}
+        assert b'data-testid="unit-in-use"' in response.content
+        assert UnitOfMeasure.objects.get(pk=used.pk).is_active
+        plain = admin.post(url)
+        assert plain.status_code == 302 and plain["Location"] == reverse("catalog:units")
+        assert UnitOfMeasure.objects.get(pk=used.pk).is_active
 
 
 # --- the choices of a material ---------------------------------------------------------------
@@ -355,8 +388,9 @@ class TestMaterialChoices:
     def test_a_material_that_has_it_keeps_it_when_edited(
         self, org: Org, people: People, admin_principal: Any, used: UnitOfMeasure
     ) -> None:
-        services.update_unit(admin_principal, used.pk, is_active=False)
         material = Material.objects.get(reference="M-1")
+        services.deactivate_material(admin_principal, material.pk)
+        services.update_unit(admin_principal, used.pk, is_active=False)
         client = client_for(people.mm_mad)
         form = client.get(reverse("catalog:edit", args=[material.pk])).context["form"]
         assert "PAL" in {unit.code for unit in form.fields["unit"].queryset}

@@ -6,7 +6,9 @@
   ``material_requests.ledger``: received R (attributed over every order), pending P, draft
   reservations Q and the allocated ceiling on draft or issued orders;
 - ``issued_orders``: the deactivation provider; an issued order blocks its branch and the
-  branch of the location it ships to (S9, F62).
+  branch of the location it ships to (S9, F62);
+- ``lines_using_unit``: the order lines in progress that keep a unit of measure from being
+  deactivated (Q72, ADR-0030).
 
 A waterfall needs every allocation of its order line, so loading a request line's figures
 reads the other allocations of the order lines it is on.
@@ -16,7 +18,9 @@ from collections.abc import Collection, Iterable
 from uuid import UUID
 
 from django.db.models import BooleanField, ExpressionWrapper, Q
+from django.utils.translation import ngettext
 
+from apps.catalog.unit_usage import UnitUse
 from apps.material_requests.ledger import Flows, open_q
 from apps.material_requests.models import MaterialRequestLine
 from apps.organizations.deactivation import OpenDocument
@@ -158,3 +162,19 @@ def issued_orders(branch_ids: Collection[UUID]) -> list[OpenDocument]:
         OpenDocument("purchase_order", str(number), pk)
         for number, pk in rows.values_list("number", "pk")
     )
+
+
+def lines_using_unit(unit_id: UUID) -> UnitUse | None:
+    """The order lines in progress in the unit (on a draft or issued order, not closed short;
+    Q72 as amended, ADR-0030): its deactivation waits for them."""
+    count = PurchaseOrderLine.objects.filter(
+        unit_id=unit_id,
+        po__status__in=(PurchaseOrder.Status.DRAFT, PurchaseOrder.Status.ISSUED),
+        closed_short_at__isnull=True,
+    ).count()
+    if not count:
+        return None
+    text = ngettext(
+        "%(count)d line of an order in progress", "%(count)d lines of orders in progress", count
+    )
+    return UnitUse("order_lines", count, text % {"count": count})

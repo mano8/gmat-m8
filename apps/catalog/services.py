@@ -15,11 +15,12 @@ takes the row lock of its own ``UPDATE``.
 - Materials are deactivated, never deleted.
 - Units of measure (Q72, ADR-0030) are installation-wide master data too, managed by
   ``org.manage``: ``create_unit`` and ``update_unit`` refuse a change of ``code`` or a lower
-  ``decimals`` while anything uses the unit, and never delete. ``update_unit`` locks the unit's
-  row ``FOR UPDATE``, so two changes of one unit (or of two codes to the same one) serialize.
-  A document that is written in the same instant is not held up (the foreign keys are checked at
-  commit, and a line reads its unit without a lock), so the check is a reading, as the dialogs'
-  previews are: ADR-0030 records that window.
+  ``decimals`` while anything uses the unit, refuse to deactivate it while an active material
+  or a line in progress uses it (``unit_usage``), and never delete. ``update_unit`` locks the
+  unit's row ``FOR UPDATE``, so two changes of one unit (or of two codes to the same one)
+  serialize. A document that is written in the same instant is not held up (the foreign keys
+  are checked at commit, and a line reads its unit without a lock), so the checks are
+  readings, as the dialogs' previews are: ADR-0030 records that window.
 """
 
 from typing import Any
@@ -35,6 +36,7 @@ from apps.access.roles import Capability
 from apps.audit.recorder import record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
 from apps.catalog.selectors import unit_in_use
+from apps.catalog.unit_usage import uses
 from apps.core import events
 from apps.core.changes import apply_changes
 from apps.core.db import constraint_errors
@@ -292,12 +294,24 @@ def _set_active(principal: Principal, material_id: UUID, active: bool) -> Materi
     _authorize(principal, material)
     if material.is_active == active:
         return material
+    if active:
+        _require_unit_active_for(material)
     material.is_active = active
     material.save(update_fields=["is_active", "updated_at"])
     action = "reactivated" if active else "deactivated"
     record(principal.audit_identity, f"material.{action}", obj=material)
     events.publish(f"material.{action}", material_id=material.pk)
     return material
+
+
+def _require_unit_active_for(material: Material) -> None:
+    """An active material has an active unit (Q72 as amended, ADR-0030): a unit is deactivated
+    only once its materials are, so one comes back only after its unit."""
+    if not UnitOfMeasure.objects.filter(pk=material.unit_id, is_active=True).exists():
+        raise ValidationError(
+            _("Its unit of measure is not active: reactivate the unit first."),
+            code="inactive_unit",
+        )
 
 
 @transactional
@@ -308,6 +322,7 @@ def deactivate_material(principal: Principal, material_id: UUID) -> Material:
 
 @transactional
 def reactivate_material(principal: Principal, material_id: UUID) -> Material:
+    """Offer a material again; refused while its unit of measure is inactive."""
     return _set_active(principal, material_id, True)
 
 
@@ -346,6 +361,25 @@ def _check_unit_in_use(unit: UnitOfMeasure, diff: dict[str, dict[str, Any]]) -> 
             code="in_use",
         )
     raise ValidationError(errors)
+
+
+def _check_deactivation(unit: UnitOfMeasure, diff: dict[str, dict[str, Any]]) -> None:
+    """Q72 as amended (ADR-0030): a unit is deactivated only once nothing alive uses it, no
+    active material and no line of a request or order in progress. Read under the unit's row
+    lock, so two changes of it serialize; a document written in the same instant is not held
+    up (the foreign keys are checked at commit), as for ``decimals``."""
+    if diff.get("is_active", {}).get("to") is not False:
+        return
+    found = uses(unit.pk)
+    if found:
+        raise ValidationError(
+            _(
+                "This unit is still in use: %(uses)s. Deactivate those materials first; the"
+                " requests and orders free it once they are finished, cancelled or closed."
+            ),
+            code="in_use",
+            params={"uses": ", ".join(use.text for use in found)},
+        )
 
 
 @transactional
@@ -390,8 +424,10 @@ def create_unit(
 def update_unit(principal: Principal, unit_id: UUID, **changes: Any) -> UnitOfMeasure:
     """Change a unit's ``name``, ``decimals``, ``code`` or whether it is active.
 
-    ``code`` is fixed and ``decimals`` only raised once anything uses the unit (Q72). An
-    inactive unit leaves the choices for new materials and imports; whatever has it keeps it.
+    ``code`` is fixed and ``decimals`` only raised once anything uses the unit (Q72). It is
+    deactivated only once no active material and no line in progress uses it; an inactive unit
+    leaves the choices for new materials, imports and free-text lines, and whatever already has
+    it keeps it.
     """
     _authorize_units(principal)
     unit = UnitOfMeasure.objects.select_for_update().get(pk=unit_id)
@@ -400,6 +436,7 @@ def update_unit(principal: Principal, unit_id: UUID, **changes: Any) -> UnitOfMe
         return unit
     unit.full_clean(validate_constraints=False)
     _check_unit_in_use(unit, diff)
+    _check_deactivation(unit, diff)
     with constraint_errors(UNIT_CONSTRAINTS):
         unit.save()
     record(principal.audit_identity, "unit.updated", obj=unit, data=diff)

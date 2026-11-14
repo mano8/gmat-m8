@@ -241,7 +241,7 @@ and the second-factor reset, and the admin made optional and read-only (ADR-0030
 | M10-3 | Low | `reset_user_mfa` did not refuse an offboarded person (the button was hidden, the service not): an audit entry and a mail queue for an account that left | Refused (`left`); the command shares the rule |
 | M10-4 | Info | A comment in the Caddyfile described a loopback default that an empty `ADMIN_ALLOWED_CIDRS` does not get (it matches nobody, which fails closed) | Comment corrected; behaviour unchanged |
 | M10-5 | Info | The preview's counts of roles and people can be stale: only `org_generation` is compared at confirmation | Recorded in ADR-0030 ("a reading, not a promise"); the service re-checks its own preconditions |
-| M10-6 | Info | Free-text request lines still offer an inactive unit | Recorded decision of M10.3, to confirm in the PR |
+| M10-6 | Info | Free-text request lines still offer an inactive unit | Changed at the maintainer's review: they take only active units (form and service), a line keeps the one it has; a unit is deactivated only once no active material and no line in progress uses it |
 | M10-7 | Info | Lowering a unit's decimals races with a document that starts using it in the same instant | Recorded in ADR-0030; the check is a reading under the unit's row lock |
 | M10-8 | Info | `import_catalog` rebuilt the list of active units for every row | Built only for the two error messages |
 

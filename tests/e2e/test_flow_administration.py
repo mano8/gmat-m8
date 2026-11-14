@@ -80,6 +80,18 @@ def create_unit(page: Page, code: str, name: str) -> None:
     expect(page.get_by_test_id("unit-row").filter(has_text=name)).to_be_visible()
 
 
+def deactivate_unit(page: Page, name: str) -> None:
+    """A unit nothing uses: the confirmation says so, and the unit becomes inactive."""
+    page.goto("/catalog/units/?state=active")
+    row = page.get_by_test_id("unit-row").filter(has_text=name)
+    row.get_by_test_id("unit-deactivate-open").click()
+    dialog = page.get_by_test_id("unit-activity-dialog")
+    expect(dialog.get_by_test_id("unit-unused")).to_be_visible()
+    submit(page, dialog, "unit-deactivate-submit")
+    page.goto("/catalog/units/?state=inactive")
+    expect(page.get_by_test_id("unit-row").filter(has_text=name)).to_be_visible()
+
+
 def accept_and_sign_in(browsing: Browsing, mailbox: Mailbox, person: Person) -> Page:
     link = mailbox.link(
         mailbox.wait_for(person.email, containing="/invite/"),
@@ -109,6 +121,7 @@ def test_set_up_an_organization_then_deactivate_a_branch(
     create_managed_branch(admin, code, branch_code, branch_name)
     create_warehouse(admin, f"Depot {run}")
     create_unit(admin, unit, f"Crate {run}")
+    deactivate_unit(admin, f"Crate {run}")
 
     # A person whose only role is at the new branch.
     pages.invite(

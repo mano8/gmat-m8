@@ -6991,7 +6991,7 @@ msgstr ""
 msgid "Units of measure"
 msgstr ""
 
-msgid "A unit's decimals say how many decimal places its quantities may have. An inactive unit is no longer offered for new materials; the ones that have it keep it."
+msgid "A unit's decimals say how many decimal places its quantities may have. A unit is deactivated once no active material and no request or order in progress uses it; it is then no longer offered, and what has it keeps it."
 msgstr ""
 
 msgid "New unit"
@@ -7177,4 +7177,58 @@ msgid "This unit of measure is not active."
 msgstr ""
 
 msgid "This person has left: there is nothing to reset."
+msgstr ""
+
+#: apps/catalog/unit_usage.py
+#, python-format
+msgid "%(count)d active material"
+msgid_plural "%(count)d active materials"
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/material_requests/ledger.py
+#, python-format
+msgid "%(count)d line of a request in progress"
+msgid_plural "%(count)d lines of requests in progress"
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/purchasing/ledger.py
+#, python-format
+msgid "%(count)d line of an order in progress"
+msgid_plural "%(count)d lines of orders in progress"
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/catalog/services.py
+#, python-format
+msgid "This unit is still in use: %(uses)s. Deactivate those materials first; the requests and orders free it once they are finished, cancelled or closed."
+msgstr ""
+
+#: apps/catalog/services.py
+msgid "Its unit of measure is not active: reactivate the unit first."
+msgstr ""
+
+#: apps/catalog/unit_dialogs.py apps/catalog/templates/catalog/units.html
+msgid "Deactivate the unit"
+msgstr ""
+
+#: apps/catalog/unit_dialogs.py
+msgid "It is no longer offered for new materials, imports or lines outside the catalog."
+msgstr ""
+
+#: apps/catalog/unit_dialogs.py
+msgid "What already has it keeps it. It can be reactivated."
+msgstr ""
+
+#: apps/catalog/templates/catalog/unit_usage.html
+msgid "The unit is still in use: it cannot be deactivated yet."
+msgstr ""
+
+#: apps/catalog/templates/catalog/unit_usage.html
+msgid "Deactivate those materials first. The requests and orders free it once they are finished, cancelled or closed."
+msgstr ""
+
+#: apps/catalog/templates/catalog/unit_usage.html
+msgid "No active material and no request or order in progress uses this unit."
 msgstr ""

@@ -425,7 +425,9 @@ def _content(
     if merged["material_id"] is not None and "unit_id" not in changes:
         merged["unit_id"] = None
     return _line_content(
-        **merged, new_material=merged["material_id"] not in {None, line.material_id}
+        **merged,
+        new_material=merged["material_id"] not in {None, line.material_id},
+        kept_unit=line.unit_id,
     )
 
 

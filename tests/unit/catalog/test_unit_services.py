@@ -168,6 +168,8 @@ class TestActivity:
     def test_deactivate_and_reactivate_keep_what_has_the_unit(
         self, admin_principal: SessionPrincipal, used: UnitOfMeasure
     ) -> None:
+        # Its material goes first: an active one keeps the unit active (test_unit_deactivation).
+        services.deactivate_material(admin_principal, Material.objects.get(reference="M-1").pk)
         off = services.update_unit(admin_principal, used.pk, is_active=False)
         assert off.is_active is False
         assert Material.objects.get(reference="M-1").unit_id == used.pk

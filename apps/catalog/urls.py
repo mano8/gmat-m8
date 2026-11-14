@@ -19,6 +19,11 @@ urlpatterns = [
     path("units/create/", unit_views.create_unit, name="create_unit"),
     path("units/<uuid:unit_id>/edit/", unit_views.edit_unit, name="edit_unit"),
     path("units/<uuid:unit_id>/update/", unit_views.update_unit, name="update_unit"),
+    path(
+        "units/<uuid:unit_id>/deactivate/confirm/",
+        unit_views.confirm_deactivate_unit,
+        name="confirm_deactivate_unit",
+    ),
     path("units/<uuid:unit_id>/deactivate/", unit_views.deactivate_unit, name="deactivate_unit"),
     path("units/<uuid:unit_id>/reactivate/", unit_views.reactivate_unit, name="reactivate_unit"),
     path("categories/", views.category_list, name="categories"),

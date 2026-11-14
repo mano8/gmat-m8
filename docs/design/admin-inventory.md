@@ -170,7 +170,8 @@ Built in M10.3 (`apps/catalog/unit_views.py`; ADR-0030 point 5).
 | `units/create/` | `catalog:create_unit` | POST | `create_unit`. |
 | `units/<id>/edit/` | `catalog:edit_unit` | GET | Lazy dialog per row; `code` and a lower `decimals` are disabled once a material uses the unit (the service decides). |
 | `units/<id>/update/` | `catalog:update_unit` | POST | `update_unit`. |
-| `units/<id>/deactivate/` | `catalog:deactivate_unit` | POST | A button on the row; existing materials keep the unit. |
+| `units/<id>/deactivate/confirm/` | `catalog:confirm_deactivate_unit` | GET | Lazy danger dialog per row: what deactivating does, and what still uses the unit (active materials, the first five named; lines of requests and orders in progress). |
+| `units/<id>/deactivate/` | `catalog:deactivate_unit` | POST | `update_unit(is_active=False)`: refused while an active material or a line in progress uses the unit; what already has it keeps it. |
 | `units/<id>/reactivate/` | `catalog:reactivate_unit` | POST | A button on the row. |
 
 ### 3.6 The preview of a scope-defining change

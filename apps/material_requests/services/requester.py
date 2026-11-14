@@ -219,7 +219,9 @@ def update_line(principal: Principal, line_id: UUID, **changes: Any) -> Material
     if merged["material_id"] is not None and "unit_id" not in changes:
         merged["unit_id"] = None  # the material's own unit
     values = _line_values(
-        **merged, new_material=merged["material_id"] not in {None, line.material_id}
+        **merged,
+        new_material=merged["material_id"] not in {None, line.material_id},
+        kept_unit=line.unit_id,
     )
     diff = apply_changes(line, values, LINE_FIELDS)
     if not diff:

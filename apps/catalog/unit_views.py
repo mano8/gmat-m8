@@ -4,14 +4,16 @@ Group administrators only (``org.manage``; 403 otherwise): units are installatio
 data, so there is no scope to be out of, only the capability. Reads go through the selectors;
 writes through ``create_unit`` / ``update_unit`` from POST-only views, each on its own URL,
 answering by the dialog contract of ``apps.core.responses``. The services hold the rules (a
-fixed ``code`` and no lower ``decimals`` once the unit is used); the form only says them first,
-and a refusal reaches the dialog with the service's reason.
+fixed ``code`` and no lower ``decimals`` once the unit is used, no deactivation while an
+active material or a line in progress uses it); the form and the deactivation dialog only say
+them first, and a refusal reaches the dialog with the service's reason.
 """
 
+from functools import partial
 from uuid import UUID
 
+from django.forms import Form
 from django.http import HttpRequest, HttpResponse
-from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_safe
 
@@ -21,14 +23,20 @@ from apps.access.roles import Capability
 from apps.catalog import selectors, services
 from apps.catalog.forms import UnitCreateForm, UnitFilterForm, UnitForm
 from apps.catalog.models import UnitOfMeasure
-from apps.catalog.unit_dialogs import edit_unit_dialog, new_unit_dialog, units_url
-from apps.core.dialogs import lazy
+from apps.catalog.unit_dialogs import (
+    deactivate_unit_dialog,
+    edit_unit_dialog,
+    new_unit_dialog,
+    units_url,
+)
+from apps.core.dialogs import ActionDialog, lazy
 from apps.core.listing import paginate, render_list
 from apps.core.responses import invalid, perform
 
 ORG = Capability.ORG_MANAGE
 NEW_IDS = "id_new_%s"
 EDIT_IDS = "id_unit_%s"
+ACTIVITY_IDS = "id_activity_%s"
 
 
 @require_safe
@@ -105,25 +113,41 @@ def update_unit(request: HttpRequest, unit_id: UUID) -> HttpResponse:
     )
 
 
-def _set_active(request: HttpRequest, unit_id: UUID, *, active: bool) -> HttpResponse:
-    ctx = access_for(request)
-    found = selectors.unit(ctx, unit_id)
-    done = (_("Unit %(code)s reactivated.") if active else _("Unit %(code)s deactivated.")) % {
-        "code": found.code
-    }
-    return perform(
-        request,
-        lambda: services.update_unit(ctx.principal, found.pk, is_active=active),
-        done,
-        reverse("catalog:units"),
-    )
+def _deactivate_dialog(unit: UnitOfMeasure, form: Form) -> ActionDialog:
+    return deactivate_unit_dialog(unit, form, partial(selectors.unit_uses, unit))
+
+
+@require_safe
+@require_capability(ORG)
+def confirm_deactivate_unit(request: HttpRequest, unit_id: UUID) -> HttpResponse:
+    """The dialog that deactivates a unit, with what still uses it (its POST is
+    ``deactivate_unit``)."""
+    found = selectors.unit(access_for(request), unit_id)
+    return lazy(request, _deactivate_dialog(found, Form(auto_id=ACTIVITY_IDS)))
 
 
 @mutating(ORG)
 def deactivate_unit(request: HttpRequest, unit_id: UUID) -> HttpResponse:
-    return _set_active(request, unit_id, active=False)
+    ctx = access_for(request)
+    found = selectors.unit(ctx, unit_id)
+    form = Form(request.POST, auto_id=ACTIVITY_IDS)
+    form.is_valid()  # no fields: the service's refusal can then be shown on it
+    return perform(
+        request,
+        lambda: services.update_unit(ctx.principal, found.pk, is_active=False),
+        _("Unit %(code)s deactivated.") % {"code": found.code},
+        units_url(),
+        dialog=_deactivate_dialog(found, form).dialog(),
+    )
 
 
 @mutating(ORG)
 def reactivate_unit(request: HttpRequest, unit_id: UUID) -> HttpResponse:
-    return _set_active(request, unit_id, active=True)
+    ctx = access_for(request)
+    found = selectors.unit(ctx, unit_id)
+    return perform(
+        request,
+        lambda: services.update_unit(ctx.principal, found.pk, is_active=True),
+        _("Unit %(code)s reactivated.") % {"code": found.code},
+        units_url(),
+    )
