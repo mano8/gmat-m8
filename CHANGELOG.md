@@ -260,6 +260,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- The database and backup images move to PostgreSQL 18.7 (`postgres:18-alpine`, a new digest in `docker-compose.yml`, `docker/backup/Dockerfile` and CI's service): the previous build carried `krb5-libs` 1.22.2-r1 and `libxslt` 1.1.43-r3, 19 HIGH findings per architecture in the nightly image scan (#52), fixed in 1.22.3-r0 and 1.1.43-r4. A minor PostgreSQL release: the data directory is kept as it is, nothing to dump or migrate; a deploy restarts `db` on the new image.
 - Accessibility findings of the first axe run: a disabled pagination link carried an `aria-label` its role does not allow (it is now a `role="link"`, as is the current page), the review page's facts list held a paragraph where a list may hold only terms and definitions, the theme switch was a `role="group"` form (the group is now its buttons), and the sign-in pages' header and theme switch were outside any landmark.
 - The filter sheet's own title and Close button showed above the filters from 40 rem wide, where the filters are a plain form. A menu or sheet that is a popover now closes when the keyboard moves past it, instead of staying open over the page.
 - A nightly image scan that does not finish now says so in the scan issue; a failed `targets` used to stay silent. The remaining Codacy findings are cleared.
