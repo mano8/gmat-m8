@@ -170,6 +170,13 @@ class CategoryCreateForm(IdempotentForm, CategoryForm):
 # --- units of measure (M10.3, Q72) -----------------------------------------------------
 
 
+class ReactivateForm(forms.Form):
+    """Reactivating a material; ``with_unit`` (the dialog's hidden field) brings its inactive
+    unit of measure back in the same step, for who may manage units."""
+
+    with_unit = forms.BooleanField(required=False, widget=forms.HiddenInput)
+
+
 class UnitFilterForm(forms.Form):
     q = forms.CharField(label=_("Search"), required=False, max_length=100)
     state = forms.ChoiceField(

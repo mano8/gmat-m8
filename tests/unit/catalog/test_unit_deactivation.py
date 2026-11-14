@@ -12,9 +12,11 @@ from typing import Any
 import pytest
 from django.core.exceptions import ValidationError
 from django.forms import Form, ModelChoiceField
+from django.urls import reverse
 from django.utils import timezone, translation
 
 from apps.access.context import AccessContext
+from apps.access.exceptions import AccessDenied
 from apps.access.principals import SessionPrincipal
 from apps.audit.models import AuditEvent
 from apps.catalog import selectors, services, unit_usage
@@ -26,10 +28,12 @@ from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.purchasing import ledger as order_ledger
 from apps.purchasing.models import PurchaseOrder
 from tests import orders
-from tests.org import Org, People
+from tests.org import Org, People, client_for
 from tests.support import error_codes, principal_for
 
 pytestmark = pytest.mark.django_db
+
+HTMX = {"HX-Request": "true"}
 
 Status = MaterialRequest.Status
 Decision = MaterialRequestLine.Decision
@@ -294,21 +298,116 @@ class TestProviders:
 # --- what an inactive unit may still do ------------------------------------------------------
 
 
+@pytest.fixture
+def asleep(admin_principal: SessionPrincipal, pallet: UnitOfMeasure) -> Material:
+    """An inactive material whose unit is inactive too."""
+    made = services.create_material(
+        admin_principal, reference="M-1", name="Thing", unit_id=pallet.pk
+    )
+    services.deactivate_material(admin_principal, made.pk)
+    deactivate(admin_principal, pallet)
+    return made
+
+
+def both_active(material: Material) -> tuple[bool, bool]:
+    material = Material.objects.select_related("unit").get(pk=material.pk)
+    return material.is_active, material.unit.is_active
+
+
 class TestMaterialReactivation:
-    def test_a_material_comes_back_only_after_its_unit(
-        self, admin_principal: SessionPrincipal, pallet: UnitOfMeasure
+    def test_alone_it_is_refused_while_its_unit_is_inactive(
+        self, admin_principal: SessionPrincipal, asleep: Material, pallet: UnitOfMeasure
+    ) -> None:
+        with translation.override("en"), pytest.raises(ValidationError) as exc:
+            services.reactivate_material(admin_principal, asleep.pk)
+        assert error_codes(exc) == {"inactive_unit"}
+        with translation.override("en"):
+            assert "PAL · Palet" in exc.value.messages[0]
+        assert both_active(asleep) == (False, False)
+        services.update_unit(admin_principal, pallet.pk, is_active=True)
+        assert services.reactivate_material(admin_principal, asleep.pk).is_active
+
+    def test_with_its_unit_both_come_back_in_one_step(
+        self, admin_principal: SessionPrincipal, asleep: Material
+    ) -> None:
+        services.reactivate_material(admin_principal, asleep.pk, with_unit=True)
+        assert both_active(asleep) == (True, True)
+        # Every row of a test shares its transaction's time: the events are told by their data.
+        back = AuditEvent.objects.filter(action="unit.updated", data__is_active__to=True)
+        assert [event.data for event in back] == [{"is_active": {"from": False, "to": True}}]
+        assert AuditEvent.objects.filter(action="material.reactivated").count() == 1
+
+    def test_the_unit_needs_who_may_manage_units(self, people: People, asleep: Material) -> None:
+        manager = principal_for(people.mm_mad)  # catalog.manage, not org.manage
+        with pytest.raises(AccessDenied):
+            services.reactivate_material(manager, asleep.pk, with_unit=True)
+        assert both_active(asleep) == (False, False)
+
+    def test_with_an_active_unit_nothing_more_is_needed(
+        self, people: People, admin_principal: SessionPrincipal, pallet: UnitOfMeasure
     ) -> None:
         made = services.create_material(
-            admin_principal, reference="M-1", name="Thing", unit_id=pallet.pk
+            admin_principal, reference="M-2", name="Other", unit_id=pallet.pk
         )
         services.deactivate_material(admin_principal, made.pk)
-        deactivate(admin_principal, pallet)
-        with pytest.raises(ValidationError) as exc:
-            services.reactivate_material(admin_principal, made.pk)
-        assert error_codes(exc) == {"inactive_unit"}
-        assert not Material.objects.get(pk=made.pk).is_active
-        services.update_unit(admin_principal, pallet.pk, is_active=True)
-        assert services.reactivate_material(admin_principal, made.pk).is_active
+        manager = principal_for(people.mm_mad)
+        services.reactivate_material(manager, made.pk, with_unit=True)
+        assert both_active(made) == (True, True)
+        assert not AuditEvent.objects.filter(
+            action="unit.updated", data__is_active__to=True
+        ).exists()
+
+
+class TestMaterialPage:
+    def test_a_group_administrator_gets_the_note_and_one_button_for_both(
+        self, people: People, asleep: Material
+    ) -> None:
+        page = client_for(people.group_admin).get(reverse("catalog:detail", args=[asleep.pk]))
+        content = page.content.decode()
+        assert 'data-testid="unit-inactive-note"' in content
+        assert 'data-testid="reactivate-open"' in content
+        assert 'data-testid="reactivate-form"' in content
+        assert 'name="with_unit"' in content and 'value="True"' in content
+        assert page.context["reactivate_dialog"] is not None
+
+    def test_a_material_manager_is_told_who_can_and_gets_no_button_that_would_fail(
+        self, people: People, asleep: Material
+    ) -> None:
+        page = client_for(people.mm_mad).get(reverse("catalog:detail", args=[asleep.pk]))
+        content = page.content.decode()
+        assert 'data-testid="unit-inactive-note"' in content
+        assert page.context["reactivate_dialog"] is None
+        assert reverse("catalog:reactivate", args=[asleep.pk]) not in content
+
+    def test_with_an_active_unit_the_plain_button_stays(
+        self, people: People, admin_principal: SessionPrincipal, pallet: UnitOfMeasure
+    ) -> None:
+        made = services.create_material(
+            admin_principal, reference="M-2", name="Other", unit_id=pallet.pk
+        )
+        services.deactivate_material(admin_principal, made.pk)
+        page = client_for(people.mm_mad).get(reverse("catalog:detail", args=[made.pk]))
+        content = page.content.decode()
+        assert 'data-testid="unit-inactive-note"' not in content
+        assert reverse("catalog:reactivate", args=[made.pk]) in content
+        assert page.context["reactivate_dialog"] is None
+
+    def test_the_dialog_reactivates_both(self, people: People, asleep: Material) -> None:
+        url = reverse("catalog:reactivate", args=[asleep.pk])
+        response = client_for(people.group_admin).post(url, {"with_unit": "True"}, headers=HTMX)
+        assert response.status_code == 204
+        assert response["HX-Redirect"] == reverse("catalog:detail", args=[asleep.pk])
+        assert both_active(asleep) == (True, True)
+
+    def test_a_forged_request_without_the_right_is_refused(
+        self, people: People, asleep: Material
+    ) -> None:
+        client = client_for(people.mm_mad)
+        url = reverse("catalog:reactivate", args=[asleep.pk])
+        assert client.post(url, {"with_unit": "True"}, headers=HTMX).status_code == 403
+        plain = client.post(url)
+        assert plain.status_code == 302  # the refusal is flashed on the material's page
+        assert both_active(asleep) == (False, False)
 
 
 class TestFreeTextLines:

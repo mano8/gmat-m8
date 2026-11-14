@@ -7206,7 +7206,8 @@ msgid "This unit is still in use: %(uses)s. Deactivate those materials first; th
 msgstr ""
 
 #: apps/catalog/services.py
-msgid "Its unit of measure is not active: reactivate the unit first."
+#, python-format
+msgid "Its unit of measure %(unit)s is not active: reactivate the unit first."
 msgstr ""
 
 #: apps/catalog/unit_dialogs.py apps/catalog/templates/catalog/units.html
@@ -7231,4 +7232,44 @@ msgstr ""
 
 #: apps/catalog/templates/catalog/unit_usage.html
 msgid "No active material and no request or order in progress uses this unit."
+msgstr ""
+
+#: apps/catalog/views.py
+msgid "Reactivate the material and its unit"
+msgstr ""
+
+#: apps/catalog/views.py
+msgid "Reactivate both"
+msgstr ""
+
+#: apps/catalog/views.py
+#, python-format
+msgid "The unit %(unit)s becomes active again: it is offered again for new materials, free-text lines and imports."
+msgstr ""
+
+#: apps/catalog/views.py
+msgid "The material is offered again in searches and new documents."
+msgstr ""
+
+#: apps/catalog/views.py
+msgid "Keep them inactive"
+msgstr ""
+
+#: apps/catalog/views.py
+#, python-format
+msgid "Material %(reference)s and its unit reactivated."
+msgstr ""
+
+#: apps/catalog/templates/catalog/detail.html
+msgid "Reactivate with its unit"
+msgstr ""
+
+#: apps/catalog/templates/catalog/detail.html
+#, python-format
+msgid "Its unit of measure, %(unit)s, is inactive too: the material comes back with its unit, in one step."
+msgstr ""
+
+#: apps/catalog/templates/catalog/detail.html
+#, python-format
+msgid "Its unit of measure, %(unit)s, is inactive: the material comes back only with its unit. A group administrator can reactivate both from this page, or the unit under Administration → Units of measure."
 msgstr ""

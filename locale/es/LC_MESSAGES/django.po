@@ -7390,8 +7390,9 @@ msgid "This unit is still in use: %(uses)s. Deactivate those materials first; th
 msgstr "Esta unidad sigue en uso: %(uses)s. Desactiva primero esos materiales; las solicitudes y los pedidos la liberan cuando terminan, se cancelan o se cierran."
 
 #: apps/catalog/services.py
-msgid "Its unit of measure is not active: reactivate the unit first."
-msgstr "Su unidad de medida no está activa: reactiva primero la unidad."
+#, python-format
+msgid "Its unit of measure %(unit)s is not active: reactivate the unit first."
+msgstr "Su unidad de medida %(unit)s no está activa: reactiva primero la unidad."
 
 #: apps/catalog/unit_dialogs.py apps/catalog/templates/catalog/units.html
 msgid "Deactivate the unit"
@@ -7416,3 +7417,43 @@ msgstr "Desactiva primero esos materiales. Las solicitudes y los pedidos la libe
 #: apps/catalog/templates/catalog/unit_usage.html
 msgid "No active material and no request or order in progress uses this unit."
 msgstr "Ningún material activo ni ninguna solicitud o pedido en curso usa esta unidad."
+
+#: apps/catalog/views.py
+msgid "Reactivate the material and its unit"
+msgstr "Reactivar el material y su unidad"
+
+#: apps/catalog/views.py
+msgid "Reactivate both"
+msgstr "Reactivar ambos"
+
+#: apps/catalog/views.py
+#, python-format
+msgid "The unit %(unit)s becomes active again: it is offered again for new materials, free-text lines and imports."
+msgstr "La unidad %(unit)s vuelve a estar activa: se ofrece de nuevo para materiales nuevos, líneas de texto libre e importaciones."
+
+#: apps/catalog/views.py
+msgid "The material is offered again in searches and new documents."
+msgstr "El material se ofrece de nuevo en las búsquedas y en los documentos nuevos."
+
+#: apps/catalog/views.py
+msgid "Keep them inactive"
+msgstr "Mantenerlos inactivos"
+
+#: apps/catalog/views.py
+#, python-format
+msgid "Material %(reference)s and its unit reactivated."
+msgstr "Material %(reference)s y su unidad reactivados."
+
+#: apps/catalog/templates/catalog/detail.html
+msgid "Reactivate with its unit"
+msgstr "Reactivar con su unidad"
+
+#: apps/catalog/templates/catalog/detail.html
+#, python-format
+msgid "Its unit of measure, %(unit)s, is inactive too: the material comes back with its unit, in one step."
+msgstr "Su unidad de medida, %(unit)s, también está inactiva: el material vuelve con su unidad, en un solo paso."
+
+#: apps/catalog/templates/catalog/detail.html
+#, python-format
+msgid "Its unit of measure, %(unit)s, is inactive: the material comes back only with its unit. A group administrator can reactivate both from this page, or the unit under Administration → Units of measure."
+msgstr "Su unidad de medida, %(unit)s, está inactiva: el material solo vuelve con su unidad. Un administrador del grupo puede reactivar ambos desde esta página, o la unidad en Administración → Unidades de medida."

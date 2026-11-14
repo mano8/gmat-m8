@@ -2,7 +2,8 @@
 branch managed by another, a warehouse and a unit of measure, then deactivates the branch and
 the person who worked there loses their access. Every step goes through the screens of M10.2 and
 M10.3; the dialogs state what they do, and the deactivation's preview names who is left without
-a branch or project."""
+a branch or project. A unit in use is deactivated only after its materials, and a material
+comes back with its unit in one step."""
 
 import re
 import uuid
@@ -13,6 +14,7 @@ from tests.e2e import pages
 from tests.e2e.conftest import Browsing
 from tests.e2e.mailbox import Mailbox
 from tests.e2e.provision import Person, sign_in
+from tests.e2e.test_accessibility import audit_schemes
 
 
 def open_lazy(page: Page, opener: str, dialog: str) -> Locator:
@@ -150,3 +152,56 @@ def test_set_up_an_organization_then_deactivate_a_branch(
     # The person's role grants nothing now: the page that opened is refused.
     response = worker.goto("/receiving/orders/")
     assert response is not None and response.status == 403
+
+
+def create_material(page: Page, reference: str, unit_code: str) -> str:
+    """A material in ``unit_code`` from the catalog's form; returns its page's URL."""
+    page.goto("/catalog/new/")
+    form = page.locator("main form.card")
+    form.locator("[name=reference]").fill(reference)
+    form.locator("[name=name]").fill(f"Material {reference}")
+    choose_containing(form.locator("[name=unit]"), f"{unit_code} ·")
+    form.locator("button[type=submit]").click()
+    page.wait_for_url(re.compile(r"/catalog/[0-9a-f-]{36}/$"))
+    return page.url
+
+
+def test_a_material_comes_back_with_its_unit_in_one_step(browsing: Browsing) -> None:
+    """A unit is deactivated only once its materials are, and its confirmation names them; a
+    material whose unit is inactive says so on its page, and a group administrator brings both
+    back from there in one dialog."""
+    run = uuid.uuid4().hex[:6].upper()
+    code, name, reference = f"R{run}", f"Roll {run}", f"MAT-{run}"
+    admin = browsing.as_("admin", "phone")
+    create_unit(admin, code, name)
+    material_url = create_material(admin, reference, code)
+
+    # The active material keeps the unit active: the confirmation says so and names it.
+    admin.goto("/catalog/units/?state=active")
+    admin.get_by_test_id("unit-row").filter(has_text=name).get_by_test_id(
+        "unit-deactivate-open"
+    ).click()
+    dialog = admin.get_by_test_id("unit-activity-dialog")
+    expect(dialog.get_by_test_id("unit-in-use")).to_contain_text(reference)
+    admin.keyboard.press("Escape")
+    expect(dialog).to_be_hidden()
+
+    # The material first, then the unit.
+    admin.goto(material_url)
+    admin.get_by_test_id("deactivate-open").click()
+    pages.send_dialog(admin, admin.get_by_test_id("deactivate-dialog"), "deactivate-submit")
+    deactivate_unit(admin, name)
+
+    # Its page says why it cannot come back alone, and one dialog brings both back.
+    admin.goto(material_url)
+    expect(admin.get_by_test_id("unit-inactive-note")).to_contain_text(code)
+    admin.get_by_test_id("reactivate-open").click()
+    dialog = admin.get_by_test_id("reactivate-dialog")
+    expect(dialog.get_by_test_id("reactivate-form")).to_be_visible()
+    found = audit_schemes(admin, "reactivate a material with its unit")
+    assert not found, "\n".join(found)
+    pages.send_dialog(admin, dialog, "reactivate-submit")
+    expect(admin.get_by_test_id("unit-inactive-note")).to_have_count(0)
+    expect(admin.get_by_test_id("deactivate-open")).to_be_visible()
+    admin.goto("/catalog/units/?state=active")
+    expect(admin.get_by_test_id("unit-row").filter(has_text=name)).to_be_visible()

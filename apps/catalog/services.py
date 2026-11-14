@@ -289,13 +289,15 @@ def update_material(principal: Principal, material_id: UUID, **changes: Any) -> 
     return material
 
 
-def _set_active(principal: Principal, material_id: UUID, active: bool) -> Material:
+def _set_active(
+    principal: Principal, material_id: UUID, active: bool, *, with_unit: bool = False
+) -> Material:
     material = Material.objects.select_for_update().get(pk=material_id)
     _authorize(principal, material)
     if material.is_active == active:
         return material
     if active:
-        _require_unit_active_for(material)
+        _unit_back_for(principal, material, with_unit=with_unit)
     material.is_active = active
     material.save(update_fields=["is_active", "updated_at"])
     action = "reactivated" if active else "deactivated"
@@ -304,14 +306,22 @@ def _set_active(principal: Principal, material_id: UUID, active: bool) -> Materi
     return material
 
 
-def _require_unit_active_for(material: Material) -> None:
+def _unit_back_for(principal: Principal, material: Material, *, with_unit: bool) -> None:
     """An active material has an active unit (Q72 as amended, ADR-0030): a unit is deactivated
-    only once its materials are, so one comes back only after its unit."""
-    if not UnitOfMeasure.objects.filter(pk=material.unit_id, is_active=True).exists():
+    only once its materials are, so one comes back only with its unit. ``with_unit`` reactivates
+    an inactive unit first, in the same transaction, for who may manage units (``org.manage``,
+    as ``update_unit``); without it an inactive unit refuses (``inactive_unit``)."""
+    unit = UnitOfMeasure.objects.get(pk=material.unit_id)
+    if unit.is_active:
+        return
+    if not with_unit:
         raise ValidationError(
-            _("Its unit of measure is not active: reactivate the unit first."),
+            _("Its unit of measure %(unit)s is not active: reactivate the unit first."),
             code="inactive_unit",
+            params={"unit": unit.label},
         )
+    _authorize_units(principal)
+    _change_unit(principal, unit.pk, {"is_active": True})
 
 
 @transactional
@@ -321,9 +331,12 @@ def deactivate_material(principal: Principal, material_id: UUID) -> Material:
 
 
 @transactional
-def reactivate_material(principal: Principal, material_id: UUID) -> Material:
-    """Offer a material again; refused while its unit of measure is inactive."""
-    return _set_active(principal, material_id, True)
+def reactivate_material(
+    principal: Principal, material_id: UUID, *, with_unit: bool = False
+) -> Material:
+    """Offer a material again. While its unit of measure is inactive it is refused, unless
+    ``with_unit`` brings the unit back too (``org.manage`` as well as ``catalog.manage``)."""
+    return _set_active(principal, material_id, True, with_unit=with_unit)
 
 
 # --- units of measure (Q72, ADR-0030) -----------------------------------------------
@@ -430,6 +443,12 @@ def update_unit(principal: Principal, unit_id: UUID, **changes: Any) -> UnitOfMe
     it keeps it.
     """
     _authorize_units(principal)
+    return _change_unit(principal, unit_id, changes)
+
+
+def _change_unit(principal: Principal, unit_id: UUID, changes: dict[str, Any]) -> UnitOfMeasure:
+    """``update_unit`` for an authorized caller: the unit's row ``FOR UPDATE``, the rules, the
+    write, the audit and the event."""
     unit = UnitOfMeasure.objects.select_for_update().get(pk=unit_id)
     diff = apply_changes(unit, _clean_unit(changes), UNIT_FIELDS)
     if not diff:
