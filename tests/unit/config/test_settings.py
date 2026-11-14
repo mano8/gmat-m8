@@ -50,6 +50,7 @@ def load_prod(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
             "DJANGO_HSTS_INCLUDE_SUBDOMAINS",
             "DJANGO_HSTS_PRELOAD",
             "DJANGO_ADMIN_URL_PATH",
+            "DJANGO_ADMIN_ENABLED",
         ]
         for name in unset:
             monkeypatch.delenv(name, raising=False)
@@ -104,6 +105,15 @@ def test_outbound_email_needs_an_smtp_host(load_prod) -> None:  # type: ignore[n
 def test_admin_url_path_is_configurable_and_defaults_to_admin(load_prod) -> None:  # type: ignore[no-untyped-def]
     assert load_prod().ADMIN_URL_PATH == "admin"
     assert load_prod(DJANGO_ADMIN_URL_PATH="ops-x7_k").ADMIN_URL_PATH == "ops-x7_k"
+
+
+def test_the_admin_is_off_unless_turned_on(load_prod) -> None:  # type: ignore[no-untyped-def]
+    """ADR-0030: production serves no admin unless the maintainer turns it on."""
+    assert load_prod().ADMIN_ENABLED is False
+    assert load_prod(DJANGO_ADMIN_ENABLED="true").ADMIN_ENABLED is True
+    assert load_prod(DJANGO_ADMIN_ENABLED="off").ADMIN_ENABLED is False
+    with pytest.raises(ImproperlyConfigured, match="DJANGO_ADMIN_ENABLED"):
+        load_prod(DJANGO_ADMIN_ENABLED="maybe")
 
 
 def _deploy_messages(prod: object) -> list[CheckMessage]:

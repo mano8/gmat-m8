@@ -1,10 +1,14 @@
-"""``manage reset_mfa --operator <email> --email <account> --reason "…"`` (plan §5, M8.3).
+"""``manage reset_mfa --operator <email> --email <account> --reason "…" --identity-checked``
+(plan §5, M8.3).
 
 For an account that lost its second factors (a lost phone and no recovery code): removes
 them all and ends every session of the account, through ``services.reset_user_mfa``. The
 operator needs ``org.manage`` (a superuser for a staff account), the audit keeps the reason
 with ``via=cli:reset_mfa``, and the account's next sign-in enrolls a new factor where its
-roles need one. Check the person's identity before running it (runbook ``user-admin.md``).
+roles need one. Check the person's identity outside the application before running it
+(runbook ``user-admin.md``); ``--identity-checked`` says so, and the audit keeps it (M10.4).
+A group administrator resets an ordinary account from the person's page; this command stays
+for a staff account and for when no administrator can sign in (ADR-0030).
 """
 
 from typing import Any
@@ -28,13 +32,23 @@ class Command(OperatorCommand):
         super().add_arguments(parser)
         parser.add_argument("--email", required=True, help="Address of the account to reset")
         parser.add_argument("--reason", required=True, help="Why (kept in the audit trail)")
+        parser.add_argument(
+            "--identity-checked",
+            action="store_true",
+            help="The person's identity was checked outside the application (required)",
+        )
 
     def handle_operator(self, principal: OperatorPrincipal, *args: Any, **options: Any) -> None:
         user = User.objects.filter(email=options["email"].strip().lower()).first()
         if user is None:
             raise CommandError("No account has that address.")
         try:
-            services.reset_user_mfa(principal, user.pk, reason=options["reason"])
+            services.reset_user_mfa(
+                principal,
+                user.pk,
+                reason=options["reason"],
+                identity_checked=options["identity_checked"],
+            )
         except AccessDenied as exc:
             raise CommandError("The operator may not reset this account's factors.") from exc
         except ValidationError as exc:

@@ -35,6 +35,7 @@ from apps.audit.models import AuditEvent
 from apps.audit.recorder import AuditIdentity, record
 from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
 from apps.handovers.models import Handover, HandoverLine
+from apps.locations.models import Location
 from apps.material_requests import revisions
 from apps.material_requests.models import (
     MaterialRequest,
@@ -46,8 +47,8 @@ from apps.material_requests.models import (
 from apps.notifications.models import EmailOutbox
 from apps.notifications.models import Status as MailStatus
 from apps.notifications.outbox import queue_security_email
-from apps.organizations.models import JointVentureMember, Membership
-from apps.projects.models import ProjectAssignment
+from apps.organizations.models import Branch, JointVentureMember, Membership
+from apps.projects.models import Project, ProjectAssignment
 from apps.receiving.models import GoodsReceipt, GoodsReceiptLine, ReceiptAttribution
 from tests.access.matrix import World, build_world
 from tests.orders import allocate, line, order
@@ -88,6 +89,35 @@ def _edited(world: World, key: str) -> None:
     )
 
 
+def _administered_places(world: World) -> None:
+    """What the warehouse, worksite and unit screens (M10.3) act on. Their activity actions
+    really change the row they are sent to, so each has a spare of its own (nothing else of the
+    world uses it), and the positions a page is read at are an active, an inactive and an
+    inactive branch's warehouse."""
+    org = world.org
+    place = Location.Kind.WAREHOUSE
+    world.objects["spare_warehouse"] = Location.objects.create(
+        kind=place, branch=org.a_sev, name="spare wh"
+    )
+    world.objects["closed_warehouse"] = Location.objects.create(
+        kind=place, branch=org.a_mad, name="closed wh", is_active=False
+    )
+    world.objects["old_branch_warehouse"] = Location.objects.create(
+        kind=place, branch=Branch.objects.get(code="OLD"), name="old wh"
+    )
+    spare = Project.objects.create(
+        code="SPARE-1",
+        name="SPARE-1",
+        branch=org.a_mad,
+        procurement_branch=org.a_mad,
+        status=Project.Status.ON_HOLD,
+    )
+    world.objects["spare_worksite"] = Location.objects.create(
+        kind=Location.Kind.WORKSITE, branch=org.a_mad, project=spare, name="site SPARE-1"
+    )
+    world.objects["spare_unit"] = UnitOfMeasure.objects.create(code="SPARE", name="Spare unit")
+
+
 def _admin_rows(world: World) -> None:
     """One row of each model the admin lists, for its object URLs."""
     people, org = world.people, world.org
@@ -110,6 +140,7 @@ def _admin_rows(world: World) -> None:
     )
     unit = UnitOfMeasure.objects.get(code="UD")
     world.objects["unitofmeasure"] = unit
+    _administered_places(world)
     world.objects["materialcategory"] = MaterialCategory.objects.create(name="Cables")
     world.objects["material"] = Material.objects.create(
         reference="CAB-25",

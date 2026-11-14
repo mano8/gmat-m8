@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from allauth.mfa.models import Authenticator
 from allauth.usersessions.models import UserSession
 from django.contrib.sessions.models import Session
 from django.db.models import Exists, OuterRef, Q, QuerySet
@@ -127,6 +128,12 @@ def person(ctx: AccessContext, user_id: UUID) -> User:
     if found is None:
         raise NotInScope(Capability.ORG_MANAGE)
     return found
+
+
+def has_second_factor(ctx: AccessContext, of: User) -> bool:
+    """Whether ``of`` has anything a second-factor reset removes (M10.4): an authenticator app,
+    a passkey, recovery codes. Only ``org.manage`` reads it."""
+    return _admin(ctx) and Authenticator.objects.filter(user_id=of.pk).exists()
 
 
 def assignments_of(

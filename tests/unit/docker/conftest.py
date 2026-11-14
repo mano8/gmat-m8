@@ -239,6 +239,12 @@ class World:
         ]
         path.write_text("\n".join([*lines, f"{key}={value}"]) + "\n", encoding="utf-8")
 
+    def _drop_env(self, key: str) -> None:
+        path = self.stack / ".env"
+        lines = path.read_text(encoding="utf-8").splitlines()
+        kept = [line for line in lines if not line.startswith(f"{key}=")]
+        path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+
 
 ENV_FILE = textwrap.dedent(
     """\

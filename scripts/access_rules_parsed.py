@@ -381,10 +381,7 @@ def _registers_without_admin(call: ast.Call) -> bool:
 
 def _plain_admin(node: ast.AST) -> str | None:
     if isinstance(node, ast.ClassDef) and any(name_of(base) == "ModelAdmin" for base in node.bases):
-        return (
-            f"{node.name} must be built on ServiceBackedModelAdmin "
-            "(apps.core.admin) or one of its subclasses"
-        )
+        return f"{node.name} must be built on ReadOnlyModelAdmin (apps.core.admin)"
     if isinstance(node, ast.Call) and _registers_without_admin(node):
         return "site.register(Model) without an admin class uses a plain ModelAdmin"
     return None
@@ -396,6 +393,63 @@ def _check_admin_classes(modules: list[Module], out: Violations) -> None:
             detail = _plain_admin(node)
             if detail:
                 out.add(module, node, "plain-model-admin", detail)
+
+
+# editable-admin ------------------------------------------------------------------------
+
+READ_ONLY_ADMIN = "ReadOnlyModelAdmin"
+# The bases a class of an ``admin.py`` may have: the read-only admin itself (never a subclass
+# of it, so nothing in between can turn writing back on) and a list filter.
+ADMIN_MODULE_BASES = frozenset({READ_ONLY_ADMIN, "SimpleListFilter"})
+# The same tuple as ``apps.core.admin.READ_ONLY_METHODS`` (a test compares them), plus
+# ``inlines``: an inline is a second form that saves.
+READ_ONLY_METHODS = (
+    "has_add_permission",
+    "has_change_permission",
+    "has_delete_permission",
+    "save_model",
+    "save_related",
+    "save_formset",
+    "delete_model",
+    "delete_queryset",
+    "get_actions",
+    "get_urls",
+    "changeform_view",
+)
+ADMIN_WRITE_NAMES = frozenset({*READ_ONLY_METHODS, "inlines"})
+
+
+def _defined_names(node: ast.ClassDef) -> set[str]:
+    names: set[str] = set()
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef):
+            names.add(item.name)
+        elif isinstance(item, ast.Assign):
+            names.update(name for target in item.targets if (name := name_of(target)))
+        elif isinstance(item, ast.AnnAssign) and (name := name_of(item.target)):
+            names.add(name)
+    return names
+
+
+def _editable_admin(module: Module, node: ast.ClassDef) -> str | None:
+    bases = {name_of(base) for base in node.bases}
+    if "ModelAdmin" in bases:
+        return None  # plain-model-admin reports it
+    if module.parts[-1] == "admin.py" and not bases <= ADMIN_MODULE_BASES:
+        return f"{node.name} must be built on {READ_ONLY_ADMIN} itself (ADR-0030)"
+    redefined = sorted(_defined_names(node) & ADMIN_WRITE_NAMES)
+    if READ_ONLY_ADMIN in bases and redefined:
+        return f"{node.name} redefines {', '.join(redefined)}: the admin is read-only (ADR-0030)"
+    return None
+
+
+def _check_editable_admins(modules: list[Module], out: Violations) -> None:
+    for module in modules:
+        if not module.rel.startswith("apps/"):
+            continue
+        for node in ast.walk(module.tree):
+            if isinstance(node, ast.ClassDef) and (detail := _editable_admin(module, node)):
+                out.add(module, node, "editable-admin", detail)
 
 
 # principal-constructor ----------------------------------------------------------------
@@ -521,6 +575,7 @@ def check_python(root: Path, allowlist: frozenset[tuple[str, str]]) -> list[str]
     _check_services(modules, out)
     _check_views(modules, out)
     _check_admin_classes(modules, out)
+    _check_editable_admins(modules, out)
     _check_principals(modules, registry, out)
     _check_mail(modules, out)
     return [*problems, *out.found]

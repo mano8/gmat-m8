@@ -1,0 +1,176 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {{ branch.company.code }}-{{ branch.code }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'org:branches' as crumb_url %}
+      {% with label=branch.company.code|add:"-"|add:branch.code %}
+        {% include "components/crumbs.html" with parent_label=_("Branches") parent_url=crumb_url current=label %}
+      {% endwith %}
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1>
+          <span class="doc-no">{{ branch.company.code }}-{{ branch.code }}</span> · {{ branch.name }}
+        </h1>
+        {% include "organizations/active_status.html" with obj=branch %}
+      </div>
+      {% if not branch.company.is_active %}
+        <p class="page-head-sub">{% translate "Its company is inactive: the branch grants nothing until the company is reactivated." %}</p>
+      {% endif %}
+    </div>
+    <div class="page-head-actions">
+      {% include "components/dialog_button.html" with dialog=edit_dialog.id label=_("Edit") icon="pencil" testid="branch-edit-open" %}
+      {% if branch.is_active %}
+        {% url 'org:confirm_deactivate_branch' branch_id=branch.pk as activity_url %}
+        {% include "organizations/lazy_button.html" with url=activity_url dialog="activity-dialog" label=_("Deactivate") variant="danger" icon="ban" testid="activity-open" %}
+      {% else %}
+        {% url 'org:confirm_reactivate_branch' branch_id=branch.pk as activity_url %}
+        {% include "organizations/lazy_button.html" with url=activity_url dialog="activity-dialog" label=_("Reactivate") icon="rotate-ccw" testid="activity-open" %}
+      {% endif %}
+    </div>
+  </header>
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Branch details' %}">
+    <dl class="facts">
+      <div>
+        <dt>{% translate "Company" %}</dt>
+        <dd>
+          <a href="{% url 'org:company' company_id=branch.company_id %}">{{ branch.company }}</a>
+        </dd>
+      </div>
+      <div>
+        <dt>{% translate "City" %}</dt>
+        <dd>
+          {{ branch.city|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt>{% translate "Default warehouse" %}</dt>
+        <dd data-testid="default-warehouse">
+          {{ branch.default_warehouse.name|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt>{% translate "Projects" %}</dt>
+        <dd class="tabular-nums" data-testid="project-counts">
+          {% blocktranslate with executes=projects.executes buys=projects.buys %}Executes {{ executes }} · buys for {{ buys }}{% endblocktranslate %}
+        </dd>
+      </div>
+      <div class="col-span-full">
+        <dt>{% translate "Address" %}</dt>
+        <dd>
+          {{ branch.address|default:"—"|linebreaksbr }}
+        </dd>
+      </div>
+    </dl>
+  </section>
+  <section class="card mb-4" aria-labelledby="access-title">
+    <h2 id="access-title" class="card-title">{% translate "Who reaches it" %}</h2>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid content-start gap-2" data-testid="managing-branch">
+        <h3 class="font-semibold">{% translate "Managing branch" %}</h3>
+        {% if branch.managed_by %}
+          <p>
+            <a href="{% url 'org:branch' branch_id=branch.managed_by_id %}">{{ branch.managed_by }}</a>
+          </p>
+          <p class="text-sm text-soft">
+            {% translate "Who works for it also reaches this branch, its projects and documents." %}
+          </p>
+        {% elif manages_others %}
+          <p class="text-sm text-soft">
+            {% translate "It manages other branches, so no branch can manage it (one level only)." %}
+          </p>
+        {% else %}
+          <p class="text-soft">{% translate "None: it manages itself." %}</p>
+        {% endif %}
+        {% if manager_dialog %}
+          <div>
+            {% include "components/dialog_button.html" with dialog=manager_dialog.id label=_("Change the managing branch") icon="git-branch" testid="manager-open" %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="grid content-start gap-2" data-testid="self-approval">
+        <h3 class="font-semibold">{% translate "Self-approval" %}</h3>
+        <p>
+          {% if branch.allow_self_approval %}
+            {% translate "Allowed" context "self-approval" as label %}
+            {% chip label "warn" %}
+          {% else %}
+            {% translate "Not allowed" context "self-approval" as label %}
+            {% chip label %}
+          {% endif %}
+        </p>
+        <p class="text-sm text-soft">
+          {% translate "Whether a reviewer may decide their own requests that this branch buys for." %}
+        </p>
+        <div>
+          {% include "components/dialog_button.html" with dialog=approval_dialog.id label=approval_dialog.title icon="user-check" testid="self-approval-open" %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% if managed.total %}
+    <section class="card mb-4"
+             id="managed"
+             aria-labelledby="managed-title"
+             data-list-section>
+      <h2 id="managed-title" class="card-title">{% translate "Branches it manages" %}</h2>
+      <ul class="divide-y divide-line">
+        {% for other in managed.rows %}
+          <li class="flex flex-wrap items-center justify-between gap-2 py-3"
+              data-testid="managed-branch">
+            <a href="{% url 'org:branch' branch_id=other.pk %}"><span class="doc-no">{{ other.company.code }}-{{ other.code }}</span> · {{ other.name }}</a>
+            {% include "organizations/active_status.html" with obj=other %}
+          </li>
+        {% endfor %}
+      </ul>
+      {% include "components/pagination.html" with listing=managed %}
+    </section>
+  {% endif %}
+  <section class="card mb-4"
+           id="warehouses"
+           aria-labelledby="warehouses-title"
+           data-list-section>
+    <h2 id="warehouses-title" class="card-title">{% translate "Warehouses" %}</h2>
+    <div class="mb-3 flex flex-wrap gap-2">
+      {% if branch.is_active and branch.company.is_active %}
+        {% include "organizations/lazy_button.html" with url=new_warehouse_url dialog="new-dialog" label=_("New warehouse") variant="primary" icon="plus" testid="warehouse-new-open" %}
+      {% endif %}
+      {% include "components/button.html" with href=warehouses_url label=_("Manage warehouses") icon="warehouse" %}
+    </div>
+    {% if warehouses.rows %}
+      <ul class="divide-y divide-line">
+        {% for warehouse in warehouses.rows %}
+          <li class="flex flex-wrap items-center justify-between gap-2 py-3"
+              data-testid="branch-warehouse">
+            <span>{{ warehouse.name }}</span>
+            <span class="flex flex-wrap gap-2">
+              {% if warehouse.pk == branch.default_warehouse_id %}
+                {% translate "Default" as label %}
+                {% chip label "brand" "check" %}
+              {% endif %}
+              {% include "organizations/active_status.html" with obj=warehouse place=True %}
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+      {% include "components/pagination.html" with listing=warehouses %}
+    {% else %}
+      <p class="text-soft">{% translate "No warehouse yet." %}</p>
+    {% endif %}
+  </section>
+  {# Inline dialogs of the page, and the shared lazy dialog of the activity change. #}
+  {% include "components/action_dialog.html" with d=edit_dialog %}
+  {% if manager_dialog %}
+    {% include "components/action_dialog.html" with d=manager_dialog %}
+  {% endif %}
+  {% include "components/action_dialog.html" with d=approval_dialog %}
+  {% include "components/dialog.html" with id="new-dialog" title=_("New warehouse") testid="warehouse-new-dialog" %}
+  {% if branch.is_active %}
+    {% include "components/dialog.html" with id="activity-dialog" title=_("Deactivate the branch") tone="danger" size="lg" testid="activity-dialog" %}
+  {% else %}
+    {% include "components/dialog.html" with id="activity-dialog" title=_("Reactivate the branch") size="lg" testid="activity-dialog" %}
+  {% endif %}
+{% endblock content %}

@@ -12,6 +12,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 INSTALLED_APPS = [
     "apps.accounts.apps.AdminConfig",  # django.contrib.admin with SecureAdminSite
+    # Before django.contrib.auth, whose `changepassword` it replaces with a refusal.
+    "apps.accounts.disabled_commands.apps.DisabledCommandsConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -73,8 +75,12 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
+# The Django admin is optional and read-only (ADR-0030): on in development and tests, off by
+# default in production (`config.settings.prod`). Off, no admin URL exists and its prefix answers
+# 404 like any unknown path; the admin app stays installed, so its system checks still run.
+ADMIN_ENABLED = env_bool("DJANGO_ADMIN_ENABLED", True)
 # URL prefix of the Django admin, without slashes. The compose stack passes the same value to
-# Caddy, which lets only the allowed networks reach it (plan §7.3).
+# Caddy, which lets only the allowed networks reach it while the admin is on (plan §7.3).
 ADMIN_URL_PATH = env_str("DJANGO_ADMIN_URL_PATH", "admin")
 if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", ADMIN_URL_PATH):
     raise ImproperlyConfigured(

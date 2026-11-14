@@ -23,9 +23,22 @@ dc run --rm web manage bootstrap_admin --email you@example.org --full-name "Your
 - `--superuser` also makes the account a **platform operator**. The recovery tooling (`recover.sh`, `post-restore-reconcile`) needs one, because it reconciles as a platform operator. Create at least one and keep it. The command refuses once an active administrator (or, with `--superuser`, an active platform operator) exists.
 - Open the link in a browser, set a password (12 characters at least), and the first sign-in enrolls MFA. Do it straight away and store the recovery codes offline.
 - If the link is lost before use, run the command again: it replaces the link.
-- `createsuperuser` is disabled on purpose. The Django admin needs a group administrator or platform operator with an MFA-verified session and an address in `ADMIN_ALLOWED_CIDRS`.
+- `createsuperuser` and `changepassword` are disabled on purpose.
+- Everything a group administrator manages has a screen in the app (the *Administration* menu). The Django admin is off in production unless `DJANGO_ADMIN_ENABLED` turns it on ([vps-setup.md](vps-setup.md)); even then it only shows records, read-only, to a group administrator or platform operator with an MFA-verified session and an address in `ADMIN_ALLOWED_CIDRS`.
 
 Everyone else is invited from the app.
+
+## Setting up the organization
+
+Group administrators set everything up under **Administration** in the menu; nothing needs the Django admin. Every change is audited, and none deletes anything: companies, branches, warehouses and units are deactivated, and reactivated if needed. Each screen asks for a session that passed MFA.
+
+1. **Companies** → *New company*: a code (fixed, document numbers are built from it), the legal name, the kind. Its head-office branch is made with it. A joint venture lists its member companies and their shares on its own page (*Add a member*, *Change the share*).
+2. **Branches** → *New branch* (or from the company's page): code (fixed), name, and optionally a **managing branch**: people who work for the managing branch also reach this branch, its projects and its documents (one level only). *Allow self-approval* lets requesters decide their own requests bought by the branch; group administrators, material managers and engineers already decide their own with a second factor, either way.
+3. **Warehouses** → *New warehouse* (or from the branch's page): name and address. Choose the branch's **default warehouse** on its page. A worksite comes with its project and is renamed, deactivated or reactivated from the project's page.
+4. **Units of measure** → *New unit*: code, name and decimals. Once a material, a request line or an order line uses a unit its code is fixed and its decimals can only be raised. An inactive unit is no longer offered for new materials or by `import_catalog`; what has it keeps it.
+5. Then **invite people** (below) and create projects.
+
+**Deactivating a company or a branch, or changing a branch's managing branch**, is the change with the widest reach, so its dialog first shows what it does: which branches stop granting access or leave a managing branch's scope, how many roles and project shares change what they reach, who will no longer reach any branch or project (by name, with a link to their page), and the open orders or requests that make the service refuse the deactivation until they are finished. Read it, then confirm. If somebody else changed the organization meanwhile, the confirmation is refused and the dialog asks you to reload, so the figures you read are the ones that apply. Nobody's account or role is removed: reactivating restores the access, and people can be offboarded separately.
 
 ## Inviting a person
 
@@ -71,21 +84,27 @@ Revoke a pending change from the same page. A person who cannot receive on the o
 
 ## Password resets
 
-The person uses **Forgot password** on the sign-in page. A reset never signs them in and the link lives one hour. Inactive accounts get no reset mail. There is nothing for an administrator to do except: *do not set passwords by hand on a shell* (`manage changepassword`). It writes no audit event, so a later restore cannot replay it. Offboard and re-invite instead.
+The person uses **Forgot password** on the sign-in page. A reset never signs them in and the link lives one hour. Inactive accounts get no reset mail. There is nothing for an administrator to do. A password is never set by hand on a shell: `manage changepassword` is disabled and says so, because it writes no audit event a later restore could replay. If the person cannot receive mail on their address anymore, offboard and re-invite instead.
 
 ## Lost second factor
 
 Check the person's identity **out of band** (call a number you already had, not one they give you now; or ask a colleague who knows them). Then:
 
 - If they have another authenticator or a recovery code, they sign in with it and manage factors themselves. A privileged account cannot remove its last factor.
-- Otherwise reset them:
+- Otherwise reset them from the app: People → the person → **Reset the second factor** (shown only when the person has one). Give the reason and tick that you checked their identity outside the application; both are kept in the audit trail, never a detail of how you checked. You need a session that passed MFA. You cannot reset your own factors: another administrator does.
+
+  It removes every second factor of the account, recovery codes included, ends its sessions and tells the owner by email (without the reason or who did it). The audit trail (`user.mfa_reset`) and the security log (`mfa_reset_by_admin`, with your account id) name you. At the next sign-in the account enrolls a new factor where its roles need one. Tell them to keep the new recovery codes offline.
+- **A staff or superuser account**, or when no administrator can sign in: the command line, run by a superuser operator for a staff account:
 
   ```bash
-  dc run --rm --no-deps web manage reset_mfa --operator you@example.org --email person@example.org --reason "lost phone, identity checked by phone with branch manager"
+  dc run --rm --no-deps web manage reset_mfa --operator you@example.org --email person@example.org --reason "lost phone, identity checked by phone with branch manager" --identity-checked
   ```
 
-  It removes every second factor of the account, ends its sessions and tells the owner by email (without the reason or who did it). The reason is kept in the audit trail. At the next sign-in the account enrolls a new factor where its roles need one. Tell them to keep the new recovery codes offline.
-- A staff or superuser account needs a superuser operator.
+  It does the same as the screen. `--identity-checked` is required and says you checked the person's identity outside the application.
+
+## A person's name
+
+People → the person → **Change the name**. The application shows people by name everywhere (an older account without one shows "—"), so correct a misspelt name or name an older account here. You may correct your own. Each change is audited (`user.renamed`, the old and the new name). A staff or superuser account's name is not changed from the app.
 
 ## Sessions, inactivity and notices
 
@@ -161,11 +180,15 @@ If the old key may have **leaked**, moving secrets to a new key is not enough: a
 
 | Task | Where |
 | --- | --- |
+| Companies, joint ventures, branches | Administration → Companies, Branches |
+| Warehouses, a branch's default | Administration → Warehouses; the branch's page |
+| Units of measure | Administration → Units of measure |
 | Invite, resend, revoke | People → Invitations |
 | Roles and scope | People → the person |
 | Leaver | People → the person → Offboard |
 | New address | People → the person → Change email |
-| Lost phone | `manage reset_mfa` |
+| Lost phone | People → the person → Reset the second factor (a staff account: `manage reset_mfa`) |
+| A person's name | People → the person → Change the name |
 | Retiring an MFA key | `manage reencrypt_mfa` |
 | A person's own sessions | Sessions, in their own menu |
 | After a restore | `manage confirm_account` |

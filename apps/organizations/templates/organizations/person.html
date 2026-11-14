@@ -17,9 +17,12 @@
         <p class="mt-2 text-sm text-soft">{% translate "Only a platform operator can change this account." %}</p>
       {% endif %}
     </div>
-    {% if manageable and employer_editable and person.is_active %}
+    {% if employer_editable %}
       <div class="page-head-actions">
-        {% include "components/dialog_button.html" with dialog="offboard-dialog" label=_("Offboard") variant="danger" icon="log-out" testid="offboard-open" %}
+        {% include "components/dialog_button.html" with dialog="rename-dialog" label=_("Change the name") variant="secondary" icon="pencil" testid="rename-open" %}
+        {% if manageable and person.is_active %}
+          {% include "components/dialog_button.html" with dialog="offboard-dialog" label=_("Offboard") variant="danger" icon="log-out" testid="offboard-open" %}
+        {% endif %}
       </div>
     {% endif %}
   </header>
@@ -166,6 +169,16 @@
           {% translate "The new address confirms the change; the current one can cancel it. It applies 24 hours after confirmation and ends every session of the account." %}
         </p>
       {% endif %}
+      {% if mfa_reset_dialog %}
+        <h3 class="mb-2 font-semibold">{% translate "Second factor" %}</h3>
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2"
+             data-testid="mfa-reset-section">
+          <p class="max-w-xl text-sm text-soft">
+            {% translate "The person lost their phone or security key and has no recovery code: remove every second factor, and they set up a new one." %}
+          </p>
+          {% include "components/dialog_button.html" with dialog=mfa_reset_dialog.id label=_("Reset the second factor") variant="danger" icon="key-round" testid="mfa-reset-open" %}
+        </div>
+      {% endif %}
     </section>
   {% endif %}
   {% active_filter_count invitation_filters as invitation_filter_count %}
@@ -207,8 +220,14 @@
   {% if manageable and person.is_active %}
     {% include "components/action_dialog.html" with d=grant_dialog %}
   {% endif %}
+  {% if employer_editable %}
+    {% include "components/action_dialog.html" with d=rename_dialog %}
+  {% endif %}
   {% if manageable and employer_editable and person.is_active %}
     {% include "components/action_dialog.html" with d=offboard_dialog %}
+  {% endif %}
+  {% if mfa_reset_dialog %}
+    {% include "components/action_dialog.html" with d=mfa_reset_dialog %}
   {% endif %}
   {% if email_revoke_dialog and manageable and employer_editable and person.is_active %}
     {% include "components/action_dialog.html" with d=email_revoke_dialog %}

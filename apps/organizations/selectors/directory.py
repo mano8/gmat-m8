@@ -1,4 +1,4 @@
-"""Reads for the organization screens (plan §3.4, §3.6).
+"""The choices of the people screens, a person's memberships and the people per branch.
 
 Branch choices come from ``visible_to``, so a form never offers a branch outside the
 user's scope for the capability it serves. Companies and memberships are installation-wide

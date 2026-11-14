@@ -2,7 +2,7 @@ import uuid
 from io import StringIO
 
 import pytest
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import IntegrityError, transaction
 
 from apps.accounts.models import SuperuserCreationDisabled, User
@@ -43,6 +43,15 @@ class TestUser:
                 "createsuperuser", "--noinput", "--email", "root@example.org", stdout=StringIO()
             )
         assert not User.objects.exists()
+
+    @pytest.mark.parametrize("args", [(), ("root@example.org",), ("--database", "default")])
+    def test_the_changepassword_command_is_disabled(self, args: tuple[str, ...]) -> None:
+        """ADR-0030: it would set a password with no audit event a restore could replay."""
+        user = User.objects.create_user("root@example.org", "a-long-test-password")
+        with pytest.raises(CommandError, match=r"changepassword is disabled.*Forgot password"):
+            call_command("changepassword", *args, stdout=StringIO())
+        user.refresh_from_db()
+        assert user.check_password("a-long-test-password")
 
     def test_create_user_ignores_privilege_flags_by_default(self) -> None:
         user = User.objects.create_user("b@example.org")

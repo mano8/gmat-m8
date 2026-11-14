@@ -237,10 +237,54 @@ def test_the_restore_drills_networks_are_all_internal(base: dict[str, Any]) -> N
     assert all(network["internal"] is True for network in drill["networks"].values())
 
 
-def test_production_needs_an_explicit_admin_allowlist() -> None:
-    """M8.3, X10: the base file's open default never reaches production."""
+def test_the_base_files_open_allowlist_never_reaches_production() -> None:
+    """M8.3, X10; ADR-0030: production needs no list while the admin is off, and an empty one
+    lets nobody in (``deploy.sh`` refuses it while the admin is on)."""
     caddy = compose("docker-compose.production.yml")["services"]["caddy"]
-    assert caddy["environment"]["ADMIN_ALLOWED_CIDRS"].startswith("${ADMIN_ALLOWED_CIDRS:?")
+    assert caddy["environment"]["ADMIN_ALLOWED_CIDRS"] == "${ADMIN_ALLOWED_CIDRS:-}"
+
+
+def test_caddy_and_web_read_one_admin_switch(base: dict[str, Any]) -> None:
+    """ADR-0030: off unless .env turns it on, set by compose so app.env cannot split them."""
+    for name in ("caddy", "web"):
+        environment = base["services"][name]["environment"]
+        assert environment["DJANGO_ADMIN_ENABLED"] == "${DJANGO_ADMIN_ENABLED:-false}", name
+    for template in ("app.env.example", "app.env.production.example"):
+        assert "DJANGO_ADMIN_ENABLED" not in (STACK / template).read_text(encoding="utf-8")
+    assert "\nDJANGO_ADMIN_ENABLED=false\n" in (STACK / ".env.example").read_text(encoding="utf-8")
+
+
+def test_caddy_gates_the_admin_only_while_it_is_on() -> None:
+    """Only the words that turn it off skip the gate; without a list nobody gets in."""
+    caddyfile = (STACK / "caddy" / "Caddyfile").read_text(encoding="utf-8")
+    assert (
+        'not expression `"{$DJANGO_ADMIN_ENABLED}" in ["", "0", "false", "no", "off"]`' in caddyfile
+    )
+    assert "@blocked not remote_ip {$ADMIN_ALLOWED_CIDRS:127.0.0.1/32 ::1/128}" in caddyfile
+
+
+def test_init_adds_the_admin_switch_to_an_existing_env(tmp_path: Path) -> None:
+    """An installation from before ADR-0030 gets the key, off, on its next init.sh."""
+    stack = tmp_path / "docker_compose" / "gmat_m8"
+    (stack / "clamav").mkdir(parents=True)
+    (tmp_path / "docker" / "postgres" / "initdb").mkdir(parents=True)
+    for name in ("init.sh", ".env.example", "app.env.example"):
+        (stack / name).write_bytes((STACK / name).read_bytes())
+    for name in ("clamd.conf", "freshclam.conf"):
+        (stack / "clamav" / name).write_bytes((STACK / "clamav" / name).read_bytes())
+    subprocess.run(["bash", "init.sh"], cwd=stack, check=True, capture_output=True)  # noqa: S607
+    env = stack / ".env"
+    kept = [line for line in env.read_text().splitlines() if not line.startswith("DJANGO_ADMIN_")]
+    env.write_text("\n".join(kept) + "\n")
+    result = subprocess.run(
+        ["bash", "init.sh"],  # noqa: S607
+        cwd=stack,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "added to .env: DJANGO_ADMIN_ENABLED" in result.stdout
+    assert env.read_text().splitlines()[-1] == "DJANGO_ADMIN_ENABLED=false"
 
 
 def test_the_restore_drill_never_sends() -> None:

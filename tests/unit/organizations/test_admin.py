@@ -1,13 +1,12 @@
 """Admin for organizations, locations and projects (plan §5 "Django Admin", §8.2).
 
-Group administrators reach the admin with session MFA; master data saves through the
-services (generation bumped, audit written); access models are read-only; staff
-accounts are out of a group administrator's reach; nothing is deleted.
+Group administrators reach the admin with session MFA; every model is read-only there,
+master data included (ADR-0030: it changes in the app's screens); staff accounts are out of
+a group administrator's reach; nothing is deleted.
 """
 
-from collections.abc import Callable, Collection
+from collections.abc import Callable
 from typing import Any
-from uuid import UUID
 
 import pytest
 from django.contrib import admin
@@ -16,15 +15,11 @@ from django.urls import reverse
 
 from apps.access.generations import org_generation
 from apps.access.models import AccessState
-from apps.access.principals import SessionPrincipal
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.core.admin import ReadOnlyModelAdmin
 from apps.locations.models import Location
-from apps.organizations.admin import MasterDataAdmin
-from apps.organizations.deactivation import OpenDocument, register_open_documents
 from apps.organizations.models import Branch, Company, JointVentureMember, Membership
-from apps.organizations.services import create_company
 from apps.projects.models import Project, ProjectAssignment
 from tests.support import enroll_totp, mfa_login
 
@@ -73,149 +68,109 @@ class TestAdmission:
         assert response["Location"] == "/admin/organizations/"
 
 
-class TestMasterData:
-    def test_create_a_company_through_the_service(self, admin_client: Client) -> None:
-        before = org_generation()
-        response = admin_client.post(
-            url(Company, "add"),
-            {"code": "C", "legal_name": "Partner C", "tax_id": "", "kind": "STANDARD"},
-        )
-        assert response.status_code == 302, response.content
-        company = Company.objects.get(code="C")
-        assert company.tax_id is None
-        assert Branch.objects.filter(company=company, code="HQ").exists()
-        assert AuditEvent.objects.filter(action="company.created", object_id=company.pk).exists()
-        assert org_generation() > before
+def _master_data(company: Company, branch: Branch) -> dict[type[Any], Any]:
+    """One record of each model the admin used to edit (ADR-0030: now read-only)."""
+    from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
+    from apps.suppliers.models import Supplier
 
-    def test_change_a_company_through_the_service(
-        self, admin_client: Client, company: Company
-    ) -> None:
-        response = admin_client.post(
-            url(Company, "change", company.pk),
-            {"legal_name": "A S.A.", "tax_id": "", "kind": "STANDARD", "is_active": "on"},
-        )
-        assert response.status_code == 302, response.content
-        assert Company.objects.get(pk=company.pk).legal_name == "A S.A."
-        event = AuditEvent.objects.get(action="company.updated")
-        assert event.data == {"legal_name": {"from": "Company A", "to": "A S.A."}}
+    venture = Company.objects.create(code="B", legal_name="UTE B", kind=Company.Kind.JOINT_VENTURE)
+    category = MaterialCategory.objects.create(name="Electricidad")
+    unit = UnitOfMeasure.objects.order_by("code")[0]
+    return {
+        Company: company,
+        Branch: branch,
+        JointVentureMember: JointVentureMember.objects.create(
+            venture=venture, member=company, share_pct=60
+        ),
+        Location: Location.objects.create(
+            kind=Location.Kind.WAREHOUSE, branch=branch, name="Almacén"
+        ),
+        MaterialCategory: category,
+        Material: Material.objects.create(
+            reference="CAB-1", name="Cable", unit=unit, category=category
+        ),
+        UnitOfMeasure: unit,
+        Supplier: Supplier.objects.create(name="Proveedor"),
+    }
 
-    def test_code_is_read_only_after_creation(self, admin_client: Client, company: Company) -> None:
-        admin_client.post(
-            url(Company, "change", company.pk),
-            {"code": "Z", "legal_name": "Company A", "kind": "STANDARD", "is_active": "on"},
-        )
-        assert Company.objects.get(pk=company.pk).code == "A"
 
-    def test_a_refusal_under_lock_is_shown(self, admin_client: Client, company: Company) -> None:
-        def provider(branch_ids: Collection[UUID]) -> list[OpenDocument]:
-            return [OpenDocument("purchase_order", "PED-A-2026-00001", UUID(int=1))]
+def _snapshot(obj: Any) -> dict[str, Any]:
+    fresh = type(obj).objects.get(pk=obj.pk)
+    return {field.attname: getattr(fresh, field.attname) for field in fresh._meta.concrete_fields}
 
-        unregister = register_open_documents(provider)
-        try:
-            change = url(Company, "change", company.pk)
-            response = admin_client.post(
-                change, {"legal_name": "Company A", "tax_id": "", "kind": "STANDARD"}, follow=True
-            )
-        finally:
-            unregister()
-        assert response.redirect_chain[0] == (change, 302)
-        assert "PED-A-2026-00001" in response.content.decode()
-        assert Company.objects.get(pk=company.pk).is_active is True
 
-    def test_form_validation_runs_before_the_service(
+class TestMasterDataIsReadOnly:
+    """Master data is changed only in the app's screens (ADR-0030, M10.5)."""
+
+    def test_a_group_admin_sees_it_and_cannot_save(
         self, admin_client: Client, company: Company, branch: Branch
     ) -> None:
-        hq = Branch.objects.get(company=company, code="HQ")
-        admin_client.post(
-            url(Branch, "change", branch.pk),
-            {"name": "Madrid", "managed_by": str(hq.pk), "is_active": "on"},
-        )
-        response = admin_client.post(
-            url(Branch, "change", hq.pk),
-            {"name": "HQ", "managed_by": str(branch.pk), "is_active": "on"},
-        )
-        assert response.status_code == 200  # the form is shown again with the error
-        assert Branch.objects.get(pk=hq.pk).managed_by_id is None
+        for model, obj in _master_data(company, branch).items():
+            assert admin_client.get(url(model, "changelist")).status_code == 200, model
+            change = url(model, "change", obj.pk)
+            page = admin_client.get(change)
+            assert page.status_code == 200, model
+            assert page.context["has_change_permission"] is False, model
+            assert b'name="_save"' not in page.content, model
+            before = _snapshot(obj)
+            assert admin_client.post(change, {"name": "Hijacked"}).status_code == 403, model
+            assert _snapshot(obj) == before, model
+            assert admin_client.get(url(model, "add")).status_code == 403, model
+            assert admin_client.post(url(model, "add"), {"name": "New"}).status_code == 403
+            assert admin_client.post(url(model, "delete", obj.pk)).status_code == 403, model
 
-    def test_branch_create_and_change(self, admin_client: Client, company: Company) -> None:
+    def test_no_bulk_action_is_offered_or_run(self, admin_client: Client, company: Company) -> None:
+        changelist = url(Company, "changelist")
+        assert admin_client.get(changelist).context["action_form"] is None
         response = admin_client.post(
-            url(Branch, "add"),
-            {"company": str(company.pk), "code": "SEV", "name": "Sevilla", "city": "Sevilla"},
+            changelist, {"action": "delete_selected", "_selected_action": [str(company.pk)]}
         )
-        assert response.status_code == 302, response.content
-        branch = Branch.objects.get(company=company, code="SEV")
-        warehouse = Location.objects.create(
-            kind=Location.Kind.WAREHOUSE, branch=branch, name="Almacén SEV"
-        )
-        form = admin_client.get(url(Branch, "change", branch.pk)).context["adminform"].form
-        assert list(form.fields["default_warehouse"].queryset) == [warehouse]
-        assert branch not in form.fields["managed_by"].queryset
-        before = org_generation()
-        response = admin_client.post(
-            url(Branch, "change", branch.pk),
-            {"name": "Sevilla", "default_warehouse": str(warehouse.pk)},
-        )
-        assert response.status_code == 302, response.content
-        branch.refresh_from_db()
-        assert (branch.default_warehouse_id, branch.is_active) == (warehouse.pk, False)
-        assert org_generation() == before + 1  # deactivated in the same save
+        assert response.status_code in {200, 302}
+        assert Company.objects.filter(pk=company.pk, is_active=True).exists()
 
-    def test_joint_venture_members(
-        self, admin_client: Client, admin_principal: SessionPrincipal, company: Company
+    def test_nothing_changes_the_generation_or_the_audit(
+        self, admin_client: Client, company: Company
     ) -> None:
-        venture = create_company(
-            admin_principal, code="B", legal_name="UTE B", kind=Company.Kind.JOINT_VENTURE
+        before = (org_generation(), AuditEvent.objects.count())
+        admin_client.post(
+            url(Company, "change", company.pk),
+            {"legal_name": "A S.A.", "kind": "STANDARD", "is_active": ""},
         )
-        form = admin_client.get(url(JointVentureMember, "add")).context["adminform"].form
-        assert list(form.fields["venture"].queryset) == [venture]
-        response = admin_client.post(
-            url(JointVentureMember, "add"),
-            {"venture": str(venture.pk), "member": str(company.pk), "share_pct": "60"},
-        )
-        assert response.status_code == 302, response.content
-        member = JointVentureMember.objects.get()
-        response = admin_client.post(
-            url(JointVentureMember, "change", member.pk), {"share_pct": "40"}
-        )
-        assert response.status_code == 302, response.content
-        member.refresh_from_db()
-        assert str(member.share_pct) == "40.00"
+        admin_client.post(url(Company, "add"), {"code": "C", "legal_name": "C", "kind": "STANDARD"})
+        assert (org_generation(), AuditEvent.objects.count()) == before
+        assert not Company.objects.filter(code="C").exists()
 
-    def test_warehouses(self, admin_client: Client, branch: Branch) -> None:
-        response = admin_client.post(
-            url(Location, "add"), {"branch": str(branch.pk), "name": "Almacén", "address": ""}
-        )
-        assert response.status_code == 302, response.content
-        warehouse = Location.objects.get(branch=branch)
-        assert warehouse.kind == Location.Kind.WAREHOUSE
-        response = admin_client.post(
-            url(Location, "change", warehouse.pk), {"name": "Central", "address": ""}
-        )
-        assert response.status_code == 302, response.content
-        warehouse.refresh_from_db()
-        assert (warehouse.name, warehouse.is_active) == ("Central", False)
-
-    def test_a_platform_operator_only_views_master_data(
+    def test_a_platform_operator_only_views_it(
         self, operator_client: Client, company: Company
     ) -> None:
         assert operator_client.get(url(Company, "changelist")).status_code == 200
         assert operator_client.get(url(Company, "change", company.pk)).status_code == 200
         assert operator_client.get(url(Company, "add")).status_code == 403
-        operator_client.post(
+        response = operator_client.post(
             url(Company, "change", company.pk),
             {"legal_name": "Hijacked", "kind": "STANDARD", "is_active": "on"},
         )
+        assert response.status_code == 403
         assert Company.objects.get(pk=company.pk).legal_name == "Company A"
 
 
 class TestReadOnlyAndStaff:
-    @pytest.mark.parametrize("model", [Membership, Project, ProjectAssignment, AccessState, User])
-    def test_access_models_are_read_only(self, model: type[Any]) -> None:
-        assert isinstance(admin.site._registry[model], ReadOnlyModelAdmin)
-
-    @pytest.mark.parametrize("model", [Company, Branch, JointVentureMember, Location])
-    def test_master_data_is_service_backed(self, model: type[Any]) -> None:
-        assert isinstance(admin.site._registry[model], MasterDataAdmin)
+    @pytest.mark.parametrize(
+        "model",
+        [
+            Membership,
+            Project,
+            ProjectAssignment,
+            AccessState,
+            User,
+            Company,
+            Branch,
+            JointVentureMember,
+            Location,
+        ],
+    )
+    def test_every_model_is_read_only(self, model: type[Any]) -> None:
+        assert type(admin.site._registry[model]).__mro__[1] is ReadOnlyModelAdmin
 
     def test_a_group_admin_cannot_edit_a_staff_account(
         self, admin_client: Client, make_user: Callable[..., User]

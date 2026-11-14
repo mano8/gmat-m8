@@ -1,0 +1,151 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags list_tags %}
+{% block head_title %}
+  {{ company.code }} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      {% url 'org:companies' as crumb_url %}
+      {% include "components/crumbs.html" with parent_label=_("Companies") parent_url=crumb_url current=company.code %}
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1>
+          <span class="doc-no">{{ company.code }}</span> · {{ company.legal_name }}
+        </h1>
+        {% include "organizations/active_status.html" with obj=company %}
+      </div>
+      <p class="page-head-sub">{{ company.get_kind_display }}</p>
+    </div>
+    <div class="page-head-actions">
+      {% include "components/dialog_button.html" with dialog=edit_dialog.id label=_("Edit") icon="pencil" testid="company-edit-open" %}
+      {% if company.is_active %}
+        {% url 'org:confirm_deactivate_company' company_id=company.pk as activity_url %}
+        {% include "organizations/lazy_button.html" with url=activity_url dialog="activity-dialog" label=_("Deactivate") variant="danger" icon="ban" testid="activity-open" %}
+      {% else %}
+        {% url 'org:confirm_reactivate_company' company_id=company.pk as activity_url %}
+        {% include "organizations/lazy_button.html" with url=activity_url dialog="activity-dialog" label=_("Reactivate") icon="rotate-ccw" testid="activity-open" %}
+      {% endif %}
+    </div>
+  </header>
+  <section class="@container card mb-4"
+           aria-label="{% translate 'Company details' %}">
+    <dl class="facts">
+      <div>
+        <dt>{% translate "Code" %}</dt>
+        <dd class="doc-no">
+          {{ company.code }}
+        </dd>
+      </div>
+      <div>
+        <dt>{% translate "Tax id" %}</dt>
+        <dd>
+          {{ company.tax_id|default:"—" }}
+        </dd>
+      </div>
+      <div>
+        <dt>{% translate "Kind" %}</dt>
+        <dd>
+          {{ company.get_kind_display }}
+        </dd>
+      </div>
+      <div>
+        <dt>{% translate "People with a role" %}</dt>
+        <dd class="tabular-nums" data-testid="people-count">
+          {{ people_count }}
+        </dd>
+      </div>
+    </dl>
+  </section>
+  <section class="card mb-4"
+           id="branches"
+           aria-labelledby="branches-title"
+           data-list-section>
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2 id="branches-title" class="card-title mb-0">{% translate "Branches" %}</h2>
+      {% if company.is_active %}
+        {% include "organizations/lazy_button.html" with url=new_branch_url dialog="new-dialog" label=_("New branch") icon="plus" testid="branch-new-open" %}
+      {% endif %}
+    </div>
+    {% url 'org:company' company_id=company.pk as company_url %}
+    {% include "components/list_toolbar.html" with form=branch_filters listing=branches form_id="branches-filter" scoped=True select="#branches-results" target="#branches-results" action=company_url grid="sm:grid-cols-[12rem_auto]" %}
+    <div id="branches-results">
+      {% include "components/list_summary.html" with form=branch_filters listing=branches %}
+      {% if branches.rows %}
+        <ul class="divide-y divide-line">
+          {% for branch in branches.rows %}
+            <li class="flex flex-wrap items-center justify-between gap-2 py-3"
+                data-testid="company-branch">
+              <div>
+                <p class="font-medium">
+                  <a href="{% url 'org:branch' branch_id=branch.pk %}"><span class="doc-no">{{ company.code }}-{{ branch.code }}</span> · {{ branch.name }}</a>
+                </p>
+                <p class="text-sm text-soft">
+                  {{ branch.city|default:"—" }}
+                  {% if branch.managed_by %}
+                    · {% blocktranslate with manager=branch.managed_by %}Managed by {{ manager }}{% endblocktranslate %}
+                  {% endif %}
+                </p>
+              </div>
+              {% include "organizations/active_status.html" with obj=branch %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% include "components/pagination.html" with listing=branches %}
+      {% else %}
+        <p class="text-soft">{% translate "No branch matches the filters." %}</p>
+      {% endif %}
+    </div>
+  </section>
+  {% if members is not None %}
+    <section class="card mb-4"
+             id="members"
+             aria-labelledby="members-title"
+             data-list-section>
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="members-title" class="card-title mb-0">{% translate "Joint-venture members" %}</h2>
+        {% include "components/dialog_button.html" with dialog=member_dialog.id label=_("Add a member") icon="plus" testid="member-add-open" %}
+      </div>
+      <p class="mb-3 text-sm text-soft">
+        {% translate "The companies that formed this joint venture, for reporting. Members change nobody's access." %}
+      </p>
+      {% if members.rows %}
+        <ul class="divide-y divide-line">
+          {% for member in members.rows %}
+            <li class="flex flex-wrap items-center justify-between gap-2 py-3"
+                data-testid="venture-member">
+              <div>
+                <p class="font-medium">
+                  <a href="{% url 'org:company' company_id=member.member_id %}"><span class="doc-no">{{ member.member.code }}</span> · {{ member.member.legal_name }}</a>
+                </p>
+                <p class="text-sm text-soft tabular-nums">
+                  {% if member.share_pct is not None %}
+                    {% blocktranslate with share=member.share_pct %}Share {{ share }} %{% endblocktranslate %}
+                  {% else %}
+                    {% translate "No share recorded" %}
+                  {% endif %}
+                </p>
+              </div>
+              {% url 'org:edit_venture_member' member_id=member.pk as share_url %}
+              {% include "organizations/lazy_button.html" with url=share_url dialog="share-dialog" label=_("Change the share") icon="pencil" variant="secondary" testid="share-open" %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% include "components/pagination.html" with listing=members %}
+      {% else %}
+        <p class="text-soft">{% translate "No member recorded yet." %}</p>
+      {% endif %}
+    </section>
+  {% endif %}
+  {# Inline dialogs of the page, and one shared lazy dialog per kind of action. #}
+  {% include "components/action_dialog.html" with d=edit_dialog %}
+  {% if member_dialog %}
+    {% include "components/action_dialog.html" with d=member_dialog %}
+    {% include "components/dialog.html" with id="share-dialog" title=_("Change the share") testid="share-dialog" %}
+  {% endif %}
+  {% if company.is_active %}
+    {% include "components/dialog.html" with id="activity-dialog" title=_("Deactivate the company") tone="danger" size="lg" testid="activity-dialog" %}
+    {% include "components/dialog.html" with id="new-dialog" title=_("New branch") size="lg" testid="branch-new-dialog" %}
+  {% else %}
+    {% include "components/dialog.html" with id="activity-dialog" title=_("Reactivate the company") size="lg" testid="activity-dialog" %}
+  {% endif %}
+{% endblock content %}

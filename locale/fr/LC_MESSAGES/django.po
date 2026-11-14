@@ -6649,3 +6649,754 @@ msgstr "Aucun projet avec chantier n'est dans votre périmètre d'accès."
 #: apps/accounts/services/invitations.py:341
 msgid "Give the person's full name."
 msgstr "Indiquez le nom complet de la personne."
+
+#: apps/core/navigation.py:212
+msgid "Administration"
+msgstr "Administration"
+
+#: apps/core/navigation.py:225 apps/organizations/templates/organizations/companies.html:4 apps/organizations/templates/organizations/companies.html:9 apps/organizations/templates/organizations/company.html:10
+msgid "Companies"
+msgstr "Sociétés"
+
+#: apps/core/navigation.py:234 apps/organizations/templates/organizations/branch.html:11 apps/organizations/templates/organizations/branches.html:4 apps/organizations/templates/organizations/branches.html:9 apps/organizations/templates/organizations/companies.html:29 apps/organizations/templates/organizations/companies.html:41 apps/organizations/templates/organizations/company.html:64
+msgid "Branches"
+msgstr "Agences"
+
+#: apps/organizations/forms.py:273
+msgid "All kinds"
+msgstr "Tous les types"
+
+#: apps/organizations/forms.py:281 apps/organizations/selectors/structure.py:28 apps/organizations/templates/organizations/companies.html:27 apps/organizations/templates/organizations/companies.html:39
+msgid "Legal name"
+msgstr "Raison sociale"
+
+#: apps/organizations/forms.py:286
+msgid "A joint venture records its member companies."
+msgstr "Un groupement enregistre ses sociétés membres."
+
+#: apps/organizations/forms.py:306
+msgid "Fixed once created: document numbers are built from it."
+msgstr "Fixe une fois créé : les numéros des documents en sont formés."
+
+#: apps/organizations/forms.py:327
+msgid "Share (%)"
+msgstr "Participation (%)"
+
+#: apps/organizations/forms.py:333
+msgid "Optional; informational."
+msgstr "Facultatif ; à titre informatif."
+
+#: apps/organizations/forms.py:342
+msgid "Member company"
+msgstr "Société membre"
+
+#: apps/organizations/forms.py:357
+msgid "All companies"
+msgstr "Toutes les sociétés"
+
+#: apps/organizations/forms.py:372
+#, python-format
+msgid "%(branch)s (inactive)"
+msgstr "%(branch)s (inactive)"
+
+#: apps/organizations/forms.py:384 apps/organizations/forms.py:434 apps/organizations/selectors/structure.py:30 apps/organizations/templates/organizations/branch.html:44 apps/organizations/templates/organizations/branches.html:28 apps/organizations/templates/organizations/branches.html:41
+msgid "City"
+msgstr "Ville"
+
+#: apps/organizations/forms.py:389 apps/organizations/templates/organizations/branch.html:50
+msgid "Default warehouse"
+msgstr "Entrepôt par défaut"
+
+#: apps/organizations/forms.py:392
+msgid "None"
+msgstr "Aucun"
+
+#: apps/organizations/forms.py:393
+msgid "Where goods are received by default; an active warehouse of the branch."
+msgstr "Où les marchandises sont reçues par défaut ; un entrepôt actif de l'agence."
+
+#: apps/organizations/forms.py:431
+msgid "Unique in the company and fixed once created."
+msgstr "Unique dans la société et fixe une fois créé."
+
+#: apps/organizations/forms.py:439 apps/organizations/forms.py:481 apps/organizations/templates/organizations/branch.html:73
+msgid "Managing branch"
+msgstr "Agence gestionnaire"
+
+#: apps/organizations/forms.py:442 apps/organizations/forms.py:484
+msgid "None: it manages itself"
+msgstr "Aucune : elle se gère seule"
+
+#: apps/organizations/forms.py:443
+msgid "Who works for the managing branch also reaches this one and its projects."
+msgstr "Qui travaille pour l'agence gestionnaire accède aussi à celle-ci et à ses chantiers."
+
+#: apps/organizations/forms.py:446 apps/organizations/structure_dialogs.py:238
+msgid "Allow self-approval"
+msgstr "Autoriser l'auto-approbation"
+
+#: apps/organizations/forms.py:448
+msgid "Lets a requester decide their own requests bought by this branch."
+msgstr "Permet à un demandeur de décider de ses propres demandes achetées par cette agence."
+
+#: apps/organizations/services.py:82 tests/unit/organizations/test_structure_views.py:349
+msgid "The organization changed after this page was shown. Reload it to see what this change does now."
+msgstr "L'organisation a changé après l'affichage de cette page. Rechargez-la pour voir ce que fait ce changement maintenant."
+
+#: apps/organizations/structure_dialogs.py:46 apps/organizations/templates/organizations/companies.html:14 apps/organizations/templates/organizations/companies.html:53
+msgid "New company"
+msgstr "Nouvelle société"
+
+#: apps/organizations/structure_dialogs.py:49 apps/organizations/structure_dialogs.py:185
+msgid "Create"
+msgstr "Créer"
+
+#: apps/organizations/structure_dialogs.py:51
+msgid "Its head-office branch is created with it."
+msgstr "Son agence siège est créée avec elle."
+
+#: apps/organizations/structure_dialogs.py:61
+msgid "Edit the company"
+msgstr "Modifier la société"
+
+#: apps/organizations/structure_dialogs.py:118 apps/organizations/templates/organizations/company.html:149
+msgid "Reactivate the company"
+msgstr "Réactiver la société"
+
+#: apps/organizations/structure_dialogs.py:120
+msgid "Keep the company inactive"
+msgstr "Garder la société inactive"
+
+#: apps/organizations/structure_dialogs.py:122
+msgid "Its active branches and its partners' roles grant access again."
+msgstr "Ses agences actives et les rôles de ses partenaires donnent de nouveau accès."
+
+#: apps/organizations/structure_dialogs.py:123
+msgid "New documents can be made for its branches again."
+msgstr "De nouveaux documents peuvent de nouveau être créés pour ses agences."
+
+#: apps/organizations/structure_dialogs.py:127 apps/organizations/templates/organizations/company.html:146
+msgid "Deactivate the company"
+msgstr "Désactiver la société"
+
+#: apps/organizations/structure_dialogs.py:129
+msgid "Keep the company active"
+msgstr "Garder la société active"
+
+#: apps/organizations/structure_dialogs.py:131
+msgid "Its branches and its partners' roles grant nothing while it is inactive."
+msgstr "Ses agences et les rôles de ses partenaires ne donnent aucun accès tant qu'elle est inactive."
+
+#: apps/organizations/structure_dialogs.py:132
+msgid "No new document is made for its branches; managing branches lose them."
+msgstr "Aucun nouveau document n'est créé pour ses agences ; les agences gestionnaires n'y accèdent plus."
+
+#: apps/organizations/structure_dialogs.py:133
+msgid "Nothing is deleted: it can be reactivated, and its history stays."
+msgstr "Rien n'est supprimé : elle peut être réactivée et son historique reste."
+
+#: apps/organizations/structure_dialogs.py:150
+msgid "Add a member company"
+msgstr "Ajouter une société membre"
+
+#: apps/organizations/structure_dialogs.py:155
+msgid "Members are informational: they change nobody's access."
+msgstr "Les membres sont informatifs : ils ne changent l'accès de personne."
+
+#: apps/organizations/structure_dialogs.py:164 apps/organizations/templates/organizations/company.html:129 apps/organizations/templates/organizations/company.html:143
+msgid "Change the share"
+msgstr "Modifier la participation"
+
+#: apps/organizations/structure_dialogs.py:181 apps/organizations/templates/organizations/branches.html:14 apps/organizations/templates/organizations/branches.html:60 apps/organizations/templates/organizations/company.html:66 apps/organizations/templates/organizations/company.html:147
+msgid "New branch"
+msgstr "Nouvelle agence"
+
+#: apps/organizations/structure_dialogs.py:187
+msgid "Its warehouses are added after it."
+msgstr "Ses entrepôts sont ajoutés ensuite."
+
+#: apps/organizations/structure_dialogs.py:197
+msgid "Edit the branch"
+msgstr "Modifier l'agence"
+
+#: apps/organizations/structure_dialogs.py:212 apps/organizations/templates/organizations/branch.html:90
+msgid "Change the managing branch"
+msgstr "Changer l'agence gestionnaire"
+
+#: apps/organizations/structure_dialogs.py:220
+msgid "Who works for the managing branch reaches this branch, its projects and documents."
+msgstr "Qui travaille pour l'agence gestionnaire accède à cette agence, à ses chantiers et à ses documents."
+
+#: apps/organizations/structure_dialogs.py:221
+msgid "Who works for the branch that managed it until now no longer does."
+msgstr "Qui travaille pour l'agence qui la gérait jusqu'ici n'y accède plus."
+
+#: apps/organizations/structure_dialogs.py:223
+msgid "Keep it as it is"
+msgstr "Laisser tel quel"
+
+#: apps/organizations/structure_dialogs.py:234
+msgid "Group administrators, material managers and engineers decide their own requests either way, through their role on the request and with a second factor."
+msgstr "Les administrateurs du groupe, chargés de matériel et ingénieurs décident de leurs propres demandes dans tous les cas, par leur rôle sur la demande et avec un second facteur."
+
+#: apps/organizations/structure_dialogs.py:238
+msgid "Allow"
+msgstr "Autoriser"
+
+#: apps/organizations/structure_dialogs.py:241
+msgid "Whoever reviews requests bought by this branch may then approve, reject, return or reduce their own requests too."
+msgstr "Qui examine les demandes achetées par cette agence pourra alors aussi approuver, refuser, renvoyer ou réduire ses propres demandes."
+
+#: apps/organizations/structure_dialogs.py:247
+msgid "Stop self-approval"
+msgstr "Retirer l'auto-approbation"
+
+#: apps/organizations/structure_dialogs.py:247
+msgid "Stop"
+msgstr "Retirer"
+
+#: apps/organizations/structure_dialogs.py:249
+msgid "A reviewer's own requests bought by this branch then go to another reviewer."
+msgstr "Les demandes propres d'un examinateur achetées par cette agence vont alors à un autre examinateur."
+
+#: apps/organizations/structure_dialogs.py:269 apps/organizations/templates/organizations/branch.html:20
+msgid "Its company is inactive: the branch grants nothing until the company is reactivated."
+msgstr "Sa société est inactive : l'agence ne donne aucun accès tant que la société n'est pas réactivée."
+
+#: apps/organizations/structure_dialogs.py:272 apps/organizations/templates/organizations/branch.html:167
+msgid "Reactivate the branch"
+msgstr "Réactiver l'agence"
+
+#: apps/organizations/structure_dialogs.py:274
+msgid "Keep the branch inactive"
+msgstr "Garder l'agence inactive"
+
+#: apps/organizations/structure_dialogs.py:276
+msgid "Its roles grant access again, and the branch that manages it reaches it."
+msgstr "Ses rôles donnent de nouveau accès, et l'agence qui la gère y accède."
+
+#: apps/organizations/structure_dialogs.py:277
+msgid "Its projects accept new documents again."
+msgstr "Ses chantiers acceptent de nouveau de nouveaux documents."
+
+#: apps/organizations/structure_dialogs.py:282 apps/organizations/templates/organizations/branch.html:165
+msgid "Deactivate the branch"
+msgstr "Désactiver l'agence"
+
+#: apps/organizations/structure_dialogs.py:284
+msgid "Keep the branch active"
+msgstr "Garder l'agence active"
+
+#: apps/organizations/structure_dialogs.py:286
+msgid "Its roles grant nothing while it is inactive."
+msgstr "Ses rôles ne donnent aucun accès tant qu'elle est inactive."
+
+#: apps/organizations/structure_dialogs.py:287
+msgid "The branch that manages it no longer reaches it, and it reaches none."
+msgstr "L'agence qui la gère n'y accède plus, et elle n'accède à aucune."
+
+#: apps/organizations/structure_dialogs.py:288
+msgid "Its projects accept no new documents. Nothing is deleted."
+msgstr "Ses chantiers n'acceptent aucun nouveau document. Rien n'est supprimé."
+
+#: apps/organizations/templates/organizations/active_status.html:8
+msgctxt "place"
+msgid "Active"
+msgstr "Actif"
+
+#: apps/organizations/templates/organizations/active_status.html:10
+msgctxt "organization"
+msgid "Active"
+msgstr "Active"
+
+#: apps/organizations/templates/organizations/active_status.html:15
+msgctxt "place"
+msgid "Inactive"
+msgstr "Inactif"
+
+#: apps/organizations/templates/organizations/active_status.html:17
+msgctxt "organization"
+msgid "Inactive"
+msgstr "Inactive"
+
+#: apps/organizations/templates/organizations/branch.html:35
+msgid "Branch details"
+msgstr "Détails de l'agence"
+
+#: apps/organizations/templates/organizations/branch.html:58
+#, python-format
+msgid "Executes %(executes)s · buys for %(buys)s"
+msgstr "Exécute %(executes)s · achète pour %(buys)s"
+
+#: apps/organizations/templates/organizations/branch.html:70
+msgid "Who reaches it"
+msgstr "Qui y accède"
+
+#: apps/organizations/templates/organizations/branch.html:79
+msgid "Who works for it also reaches this branch, its projects and documents."
+msgstr "Qui travaille pour elle accède aussi à cette agence, à ses chantiers et à ses documents."
+
+#: apps/organizations/templates/organizations/branch.html:83
+msgid "It manages other branches, so no branch can manage it (one level only)."
+msgstr "Elle gère d'autres agences, donc aucune ne peut la gérer (un seul niveau)."
+
+#: apps/organizations/templates/organizations/branch.html:86
+msgid "None: it manages itself."
+msgstr "Aucune : elle se gère seule."
+
+#: apps/organizations/templates/organizations/branch.html:95
+msgid "Self-approval"
+msgstr "Auto-approbation"
+
+#: apps/organizations/templates/organizations/branch.html:98
+msgctxt "self-approval"
+msgid "Allowed"
+msgstr "Autorisée"
+
+#: apps/organizations/templates/organizations/branch.html:101
+msgctxt "self-approval"
+msgid "Not allowed"
+msgstr "Non autorisée"
+
+#: apps/organizations/templates/organizations/branch.html:106
+msgid "Whether a reviewer may decide their own requests that this branch buys for."
+msgstr "Si un examinateur peut décider de ses propres demandes achetées par cette agence."
+
+#: apps/organizations/templates/organizations/branch.html:119
+msgid "Branches it manages"
+msgstr "Agences qu'elle gère"
+
+#: apps/organizations/templates/organizations/branch.html:136
+msgid "Warehouses"
+msgstr "Entrepôts"
+
+#: apps/organizations/templates/organizations/branch.html:145
+msgid "Default"
+msgstr "Par défaut"
+
+#: apps/organizations/templates/organizations/branch.html:155
+msgid "No warehouse yet."
+msgstr "Aucun entrepôt pour l'instant."
+
+#: apps/organizations/templates/organizations/branches.html:10
+msgid "Each branch is managed on its own; a managing branch also reaches the branches it manages."
+msgstr "Chaque agence est gérée séparément ; une agence gestionnaire accède aussi à celles qu'elle gère."
+
+#: apps/organizations/templates/organizations/branches.html:29 apps/organizations/templates/organizations/branches.html:42
+msgid "Managed by"
+msgstr "Gérée par"
+
+#: apps/organizations/templates/organizations/branches.html:56
+msgid "No branches"
+msgstr "Aucune agence"
+
+#: apps/organizations/templates/organizations/branches.html:56 apps/organizations/templates/organizations/company.html:95
+msgid "No branch matches the filters."
+msgstr "Aucune agence ne correspond aux filtres."
+
+#: apps/organizations/templates/organizations/companies.html:10
+msgid "The companies of the group, joint ventures included, and their branches."
+msgstr "Les sociétés du groupe, groupements compris, et leurs agences."
+
+#: apps/organizations/templates/organizations/companies.html:49
+msgid "No companies"
+msgstr "Aucune société"
+
+#: apps/organizations/templates/organizations/companies.html:49
+msgid "No company matches the filters."
+msgstr "Aucune société ne correspond aux filtres."
+
+#: apps/organizations/templates/organizations/company.html:31
+msgid "Company details"
+msgstr "Détails de la société"
+
+#: apps/organizations/templates/organizations/company.html:52
+msgid "People with a role"
+msgstr "Personnes avec un rôle"
+
+#: apps/organizations/templates/organizations/company.html:85
+#, python-format
+msgid "Managed by %(manager)s"
+msgstr "Gérée par %(manager)s"
+
+#: apps/organizations/templates/organizations/company.html:105
+msgid "Joint-venture members"
+msgstr "Membres du groupement"
+
+#: apps/organizations/templates/organizations/company.html:106
+msgid "Add a member"
+msgstr "Ajouter un membre"
+
+#: apps/organizations/templates/organizations/company.html:109
+msgid "The companies that formed this joint venture, for reporting. Members change nobody's access."
+msgstr "Les sociétés qui ont formé ce groupement, pour les rapports. Les membres ne changent l'accès de personne."
+
+#: apps/organizations/templates/organizations/company.html:122
+#, python-format
+msgid "Share %(share)s %%"
+msgstr "Participation %(share)s %%"
+
+#: apps/organizations/templates/organizations/company.html:124
+msgid "No share recorded"
+msgstr "Aucune participation enregistrée"
+
+#: apps/organizations/templates/organizations/company.html:135
+msgid "No member recorded yet."
+msgstr "Aucun membre enregistré pour l'instant."
+
+#: apps/organizations/templates/organizations/manager_preview.html:11
+msgid "Choose a managing branch to see whose access changes."
+msgstr "Choisissez une agence gestionnaire pour voir de qui l'accès change."
+
+#: apps/organizations/templates/organizations/manager_preview_fragment.html:10
+msgid "This branch cannot manage it."
+msgstr "Cette agence ne peut pas la gérer."
+
+#: apps/organizations/templates/organizations/scope_preview.html:8
+msgid "What changes"
+msgstr "Ce qui change"
+
+#: apps/organizations/templates/organizations/scope_preview.html:10
+msgid "Nobody's access changes."
+msgstr "L'accès de personne ne change."
+
+#: apps/organizations/templates/organizations/scope_preview.html:14
+msgid "These branches stop granting access:"
+msgstr "Ces agences ne donnent plus accès :"
+
+#: apps/organizations/templates/organizations/scope_preview.html:22
+msgid "These branches grant access again:"
+msgstr "Ces agences donnent de nouveau accès :"
+
+#: apps/organizations/templates/organizations/scope_preview.html:30
+msgid "Leave the scope of a managing branch:"
+msgstr "Quittent le périmètre d'une agence gestionnaire :"
+
+#: apps/organizations/templates/organizations/scope_preview.html:33
+#, python-format
+msgid "%(branch)s, no longer reached from %(manager)s"
+msgstr "%(branch)s, qui n'est plus accessible depuis %(manager)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:40
+msgid "Join the scope of a managing branch:"
+msgstr "Rejoignent le périmètre d'une agence gestionnaire :"
+
+#: apps/organizations/templates/organizations/scope_preview.html:43
+#, python-format
+msgid "%(branch)s, reached from %(manager)s"
+msgstr "%(branch)s, accessible depuis %(manager)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:51
+msgid "Roles whose reach changes"
+msgstr "Rôles dont la portée change"
+
+#: apps/organizations/templates/organizations/scope_preview.html:57
+msgid "Project shares whose reach changes"
+msgstr "Chantiers partagés dont la portée change"
+
+#: apps/organizations/templates/organizations/scope_preview.html:67
+#, python-format
+msgid "%(total)s person no longer reaches any branch or project:"
+msgid_plural "%(total)s people no longer reach any branch or project:"
+msgstr[0] "%(total)s personne n'accède plus à aucune agence ni aucun chantier :"
+msgstr[1] "%(total)s personnes n'accèdent plus à aucune agence ni aucun chantier :"
+
+#: apps/organizations/templates/organizations/scope_preview.html:80 apps/organizations/templates/organizations/scope_preview.html:102 apps/organizations/templates/organizations/scope_preview.html:123
+#, python-format
+msgid "and %(more)s more"
+msgstr "et %(more)s de plus"
+
+#: apps/organizations/templates/organizations/scope_preview.html:83
+msgid "Their accounts and roles stay as they are."
+msgstr "Leurs comptes et leurs rôles restent tels quels."
+
+#: apps/organizations/templates/organizations/scope_preview.html:89
+#, python-format
+msgid "%(total)s person reaches a branch or project again:"
+msgid_plural "%(total)s people reach a branch or project again:"
+msgstr[0] "%(total)s personne accède de nouveau à une agence ou un chantier :"
+msgstr[1] "%(total)s personnes accèdent de nouveau à une agence ou un chantier :"
+
+#: apps/organizations/templates/organizations/scope_preview.html:111
+msgid "These open documents prevent the deactivation:"
+msgstr "Ces documents ouverts empêchent la désactivation :"
+
+#: apps/organizations/templates/organizations/scope_preview.html:116
+#, python-format
+msgid "Order %(number)s"
+msgstr "Commande %(number)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:118
+#, python-format
+msgid "Request %(number)s"
+msgstr "Demande %(number)s"
+
+#: apps/organizations/templates/organizations/scope_preview.html:126
+msgid "Close or finish them first; the deactivation is refused until then."
+msgstr "Clôturez-les ou terminez-les d'abord ; d'ici là la désactivation est refusée."
+
+#: apps/organizations/views/branch_screens.py:179
+#, python-format
+msgid "Branch %(branch)s created."
+msgstr "Agence %(branch)s créée."
+
+#: apps/organizations/views/branch_screens.py:198
+msgid "Branch saved."
+msgstr "Agence enregistrée."
+
+#: apps/organizations/views/branch_screens.py:260
+msgid "Managing branch saved."
+msgstr "Agence gestionnaire enregistrée."
+
+#: apps/organizations/views/branch_screens.py:279
+msgid "Self-approval allowed."
+msgstr "Auto-approbation autorisée."
+
+#: apps/organizations/views/branch_screens.py:279
+msgid "Self-approval stopped."
+msgstr "Auto-approbation retirée."
+
+#: apps/organizations/views/branch_screens.py:330
+msgid "Branch reactivated."
+msgstr "Agence réactivée."
+
+#: apps/organizations/views/branch_screens.py:330
+msgid "Branch deactivated."
+msgstr "Agence désactivée."
+
+#: apps/organizations/views/company_screens.py:136
+#, python-format
+msgid "Company %(code)s created."
+msgstr "Société %(code)s créée."
+
+#: apps/organizations/views/company_screens.py:155
+msgid "Company saved."
+msgstr "Société enregistrée."
+
+#: apps/organizations/views/company_screens.py:198
+msgid "Company reactivated."
+msgstr "Société réactivée."
+
+#: apps/organizations/views/company_screens.py:198
+msgid "Company deactivated."
+msgstr "Société désactivée."
+
+#: apps/organizations/views/company_screens.py:235 apps/organizations/views/company_screens.py:248
+msgid "Member added."
+msgstr "Membre ajouté."
+
+#: apps/organizations/views/company_screens.py:277
+msgid "Share saved."
+msgstr "Participation enregistrée."
+
+msgid "Short and unique, such as UD, M or KG. Fixed once anything uses the unit."
+msgstr "Court et unique, comme UD, M ou KG. Fixe dès que quelque chose utilise l'unité."
+
+msgid "Decimals"
+msgstr "Décimales"
+
+msgid "The unit is in use: its code is fixed."
+msgstr "L'unité est utilisée : son code est fixe."
+
+msgid "The unit is in use: its decimals can be raised, not lowered."
+msgstr "L'unité est utilisée : ses décimales peuvent être augmentées, pas réduites."
+
+msgid "A unit with this code exists."
+msgstr "Une unité avec ce code existe déjà."
+
+msgid "A unit in use keeps its code. Add a new unit and deactivate this one."
+msgstr "Une unité utilisée garde son code. Ajoutez une nouvelle unité et désactivez celle-ci."
+
+msgid "Quantities in a unit in use keep their decimals; they can only be raised."
+msgstr "Les quantités d'une unité utilisée gardent leurs décimales ; elles ne peuvent qu'être augmentées."
+
+msgid "Units of measure"
+msgstr "Unités de mesure"
+
+msgid "A unit's decimals say how many decimal places its quantities may have. An inactive unit is no longer offered for new materials; the ones that have it keep it."
+msgstr "Les décimales d'une unité indiquent combien de décimales ses quantités peuvent avoir. Une unité inactive n'est plus proposée pour de nouveaux matériels ; ceux qui l'ont la gardent."
+
+msgid "New unit"
+msgstr "Nouvelle unité"
+
+msgid "No units"
+msgstr "Aucune unité"
+
+msgid "No unit matches the filters."
+msgstr "Aucune unité ne correspond aux filtres."
+
+msgid "New unit of measure"
+msgstr "Nouvelle unité de mesure"
+
+msgid "Edit the unit"
+msgstr "Modifier l'unité"
+
+msgid "A unit is never deleted: it can be deactivated, and its history stays."
+msgstr "Une unité n'est jamais supprimée : elle peut être désactivée et son historique reste."
+
+msgid "Materials, requests and orders that use this unit keep their quantities."
+msgstr "Les matériels, demandes et commandes qui utilisent cette unité gardent leurs quantités."
+
+#, python-format
+msgid "Unit %(code)s created."
+msgstr "Unité %(code)s créée."
+
+#, python-format
+msgid "Unit %(code)s saved."
+msgstr "Unité %(code)s enregistrée."
+
+#, python-format
+msgid "Unit %(code)s reactivated."
+msgstr "Unité %(code)s réactivée."
+
+#, python-format
+msgid "Unit %(code)s deactivated."
+msgstr "Unité %(code)s désactivée."
+
+msgid "New warehouse"
+msgstr "Nouvel entrepôt"
+
+msgid "To make it the branch's default, choose it on the branch's page."
+msgstr "Pour en faire l'entrepôt par défaut de l'agence, choisissez-le sur la page de l'agence."
+
+msgid "Edit the warehouse"
+msgstr "Modifier l'entrepôt"
+
+msgid "Deactivate the warehouse"
+msgstr "Désactiver l'entrepôt"
+
+msgid "Goods can no longer be received or handed over from it."
+msgstr "On ne pourra plus y recevoir de matériel ni en remettre depuis celui-ci."
+
+msgid "Receipts and handovers already posted keep it. It can be reactivated."
+msgstr "Les réceptions et remises déjà enregistrées le gardent. Il peut être réactivé."
+
+msgid "It is the default warehouse of its branch: choose another default on the branch's page first."
+msgstr "C'est l'entrepôt par défaut de son agence : choisissez d'abord un autre sur la page de l'agence."
+
+msgid "Edit the worksite"
+msgstr "Modifier le chantier"
+
+msgid "The worksite is where the project's goods arrive."
+msgstr "Le chantier est l'endroit où arrive le matériel du projet."
+
+msgid "Deactivate the worksite"
+msgstr "Désactiver le chantier"
+
+msgid "Goods can no longer be received at the project's worksite."
+msgstr "On ne pourra plus recevoir de matériel sur le chantier du projet."
+
+msgid "Receipts already posted keep it. It can be reactivated."
+msgstr "Les réceptions déjà enregistrées le gardent. Il peut être réactivé."
+
+msgid "Reactivate the worksite"
+msgstr "Réactiver le chantier"
+
+msgid "Goods can be received at the project's worksite again."
+msgstr "On pourra de nouveau recevoir du matériel sur le chantier du projet."
+
+msgid "Keep it inactive"
+msgstr "Le garder inactif"
+
+msgid "Where each branch receives goods and hands them over from. A worksite comes with its project and is changed on the project's page."
+msgstr "L'endroit où chaque agence reçoit le matériel et d'où elle le remet. Un chantier vient avec son projet et se modifie sur la page du projet."
+
+msgid "No warehouses"
+msgstr "Aucun entrepôt"
+
+msgid "No warehouse matches the filters."
+msgstr "Aucun entrepôt ne correspond aux filtres."
+
+#, python-format
+msgid "Warehouse %(name)s created."
+msgstr "Entrepôt %(name)s créé."
+
+#, python-format
+msgid "Warehouse %(name)s saved."
+msgstr "Entrepôt %(name)s enregistré."
+
+#, python-format
+msgid "Warehouse %(name)s deactivated."
+msgstr "Entrepôt %(name)s désactivé."
+
+#, python-format
+msgid "Warehouse %(name)s reactivated."
+msgstr "Entrepôt %(name)s réactivé."
+
+msgid "Worksite saved."
+msgstr "Chantier enregistré."
+
+msgid "Worksite reactivated."
+msgstr "Chantier réactivé."
+
+msgid "Worksite deactivated."
+msgstr "Chantier désactivé."
+
+msgid "Manage warehouses"
+msgstr "Gérer les entrepôts"
+
+msgid "Where the project's goods arrive and are received."
+msgstr "L'endroit où arrive et est reçu le matériel du projet."
+
+msgid "Worksite location"
+msgstr "Emplacement du chantier"
+
+msgid "Check the person's identity outside the application first."
+msgstr "Vérifiez d'abord l'identité de la personne en dehors de l'application."
+
+msgid "The name is too long."
+msgstr "Le nom est trop long."
+
+msgid "Kept in the audit trail, e.g. a lost phone and no recovery code."
+msgstr "Conservé dans le journal d'audit ; p. ex. un téléphone perdu et aucun code de récupération."
+
+msgid "I checked this person's identity outside the application."
+msgstr "J'ai vérifié l'identité de cette personne en dehors de l'application."
+
+msgid "Change the name"
+msgstr "Modifier le nom"
+
+msgid "Every page, mail and history shows the person by this name."
+msgstr "Toutes les pages, tous les courriels et historiques désignent la personne par ce nom."
+
+msgid "Reset the second factor"
+msgstr "Réinitialiser le second facteur"
+
+msgid "Reset"
+msgstr "Réinitialiser"
+
+msgid "Every second factor of the account is removed, recovery codes included."
+msgstr "Tous les seconds facteurs du compte sont supprimés, codes de récupération compris."
+
+msgid "Every session of the account ends at once."
+msgstr "Toutes les sessions du compte prennent fin immédiatement."
+
+msgid "The person is told by email."
+msgstr "La personne en est avertie par courriel."
+
+msgid "If their roles need a second factor, they set up a new one at their next sign-in."
+msgstr "Si ses rôles exigent un second facteur, elle en configure un nouveau à sa prochaine connexion."
+
+msgid "Whoever asks for this may not be the person: check who they are by a way you trust outside the application, such as a call to a number you already had."
+msgstr "Celui qui le demande n'est peut-être pas la personne : vérifiez qui c'est par un moyen de confiance en dehors de l'application, par exemple un appel à un numéro que vous aviez déjà."
+
+msgid "Keep the factors"
+msgstr "Conserver les facteurs"
+
+msgid "Second factor"
+msgstr "Second facteur"
+
+msgid "The person lost their phone or security key and has no recovery code: remove every second factor, and they set up a new one."
+msgstr "La personne a perdu son téléphone ou sa clé de sécurité et n'a aucun code de récupération : supprimez tous les seconds facteurs, elle en configurera un nouveau."
+
+msgid "Name saved."
+msgstr "Nom enregistré."
+
+msgid "Second factors removed and sessions ended; a notice to the person is queued."
+msgstr "Seconds facteurs supprimés et sessions terminées ; l'avis à la personne est en file d'envoi."
+
+msgid "This unit of measure is not active."
+msgstr "Cette unité de mesure n'est pas active."
+
+msgid "This person has left: there is nothing to reset."
+msgstr "Cette personne est partie : il n'y a rien à réinitialiser."

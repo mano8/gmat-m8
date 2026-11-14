@@ -11,6 +11,8 @@ sensitive security messages; their links carry the raw token, which nothing else
 - Token principals (``apps.accounts.tokens``) accept an invitation, or confirm or cancel an
   email change, each exactly once.
 - ``bootstrap_admin`` invites the first group administrator while none exists (F76).
+- Administrators reset a lost second factor (M8.3; from the person's page since M10.4) and
+  correct a person's full name (M10.4).
 - Anyone signed in ends their own other sessions (M8.3, X5).
 - The worker applies confirmed email changes after the cooling-off
   (``apps.accounts.housekeeping``).
@@ -29,11 +31,14 @@ from apps.accounts.services.common import (
     REASON_RESENT,
 )
 from apps.accounts.services.credentials import (
+    FULL_NAME_MAX_LENGTH,
+    MFA_RESET_OPERATION,
     MFA_SECRET_FIELDS,
     MfaReencryption,
     end_other_sessions,
     end_own_session,
     reencrypt_mfa_secrets,
+    rename_user,
     reset_user_mfa,
 )
 from apps.accounts.services.email_changes import (
@@ -58,9 +63,11 @@ __all__ = [
     "EMAIL_CHANGE_CONFIRMABLE",
     "EMAIL_CHANGE_CONFIRM_MAIL",
     "EMAIL_CHANGE_NOTICE_MAIL",
+    "FULL_NAME_MAX_LENGTH",
     "INVITATION_MAIL",
     "INVITATION_PENDING",
     "MFA_RESET_MAIL",
+    "MFA_RESET_OPERATION",
     "MFA_SECRET_FIELDS",
     "REASON_OFFBOARDED",
     "REASON_REPLACED",
@@ -79,6 +86,7 @@ __all__ = [
     "offboard_user",
     "parse_grants",
     "reencrypt_mfa_secrets",
+    "rename_user",
     "request_email_change",
     "resend_invitation",
     "reset_user_mfa",

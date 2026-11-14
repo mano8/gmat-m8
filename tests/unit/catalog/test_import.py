@@ -7,7 +7,7 @@ import pytest
 from django.core.management.base import CommandError
 
 from apps.audit.models import AuditEvent
-from apps.catalog.models import Material, MaterialCategory
+from apps.catalog.models import Material, MaterialCategory, UnitOfMeasure
 from tests.imports import run_import, write_csv, write_xlsx
 from tests.org import Org
 
@@ -182,6 +182,56 @@ class TestErrors:
         assert "line 4: unit: unknown unit 'PARSEC'" in report and "UD" in report
         assert not Material.objects.exists() and not MaterialCategory.objects.exists()
         assert not AuditEvent.objects.filter(action__startswith="material.").exists()
+
+    def test_an_inactive_unit_is_refused_for_a_new_material(
+        self, tmp_path: Path, operator: str, people: Any
+    ) -> None:
+        """Q72: a unit taken out of use leaves the choices of the import too, and the report
+        names the units that are still open."""
+        UnitOfMeasure.objects.filter(code="CAJA").update(is_active=False)
+        lines = [HEADER, "OK-1,Fine,UD,,,,,,,", "BOX-1,A box,caja,,,,,,,"]
+        with pytest.raises(CommandError, match="nothing was written") as caught:
+            run_import("import_catalog", write_csv(tmp_path / "u.csv", lines), operator)
+        report = caught.value.output  # type: ignore[attr-defined]
+        assert "line 3: unit: unit 'caja' is inactive (use one of" in report
+        assert "CAJA" not in report.split("use one of", 1)[1]  # not offered again
+        assert not Material.objects.exists()
+
+    def test_an_unknown_unit_lists_only_the_active_ones(
+        self, tmp_path: Path, operator: str
+    ) -> None:
+        UnitOfMeasure.objects.filter(code="CAJA").update(is_active=False)
+        with pytest.raises(CommandError) as caught:
+            run_import(
+                "import_catalog",
+                write_csv(tmp_path / "u.csv", [HEADER, "BAD,Thing,PARSEC,,,,,,,"]),
+                operator,
+            )
+        assert "CAJA" not in caught.value.output.split("use one of", 1)[1]  # type: ignore[attr-defined]
+
+    def test_a_material_that_has_an_inactive_unit_keeps_it_through_an_import(
+        self, tmp_path: Path, operator: str
+    ) -> None:
+        run_import(
+            "import_catalog", write_csv(tmp_path / "a.csv", [HEADER, "BOX-1,A box,CAJA"]), operator
+        )
+        UnitOfMeasure.objects.filter(code="CAJA").update(is_active=False)
+        out = run_import(
+            "import_catalog",
+            write_csv(tmp_path / "b.csv", [HEADER, "BOX-1,A bigger box,CAJA"]),
+            operator,
+        )
+        assert "1 updated" in out
+        assert Material.objects.get(reference="BOX-1").name == "A bigger box"
+        # Changing it to another inactive unit is a new choice, and refused.
+        UnitOfMeasure.objects.filter(code="BOLSA").update(is_active=False)
+        with pytest.raises(CommandError, match="nothing was written"):
+            run_import(
+                "import_catalog",
+                write_csv(tmp_path / "c.csv", [HEADER, "BOX-1,A bigger box,BOLSA"]),
+                operator,
+            )
+        assert Material.objects.get(reference="BOX-1").unit.code == "CAJA"
 
     def test_dry_run_reports_and_writes_nothing(self, tmp_path: Path, operator: str) -> None:
         out = run_import(

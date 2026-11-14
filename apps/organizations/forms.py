@@ -1,5 +1,10 @@
-"""Forms of the group-administrator screens (plan §3.4, §5). Choices come from selectors."""
+"""Forms of the group-administrator screens (plan §3.4, §5, M10.2). Choices come from selectors.
 
+The services authorize and validate again in their transaction; these forms only shape what is
+sent (a code in upper case, an empty tax id as none).
+"""
+
+from decimal import Decimal
 from typing import Any
 
 from django import forms
@@ -8,11 +13,18 @@ from django.utils.translation import gettext_lazy as _
 from apps.access.context import AccessContext
 from apps.access.roles import BRANCH_ROLES, COMPANY_ROLES, ROLE_ASSIGNMENT_KIND, Capability, Role
 from apps.accounts import selectors as account_selectors
-from apps.accounts.services import AssignmentGrant, MembershipGrant
+from apps.accounts.services import (
+    FULL_NAME_MAX_LENGTH,
+    MFA_RESET_OPERATION,
+    AssignmentGrant,
+    MembershipGrant,
+)
 from apps.core.forms import IdempotentForm, datetime_field
 from apps.core.listing import REVOCATION_CHOICES
 from apps.notifications.models import Status
 from apps.organizations import selectors
+from apps.organizations.models import Branch, Company
+from apps.organizations.services import NewBranch
 from apps.projects import selectors as project_selectors
 from apps.projects.forms import BranchChoiceField
 from apps.projects.models import ProjectAssignment
@@ -185,6 +197,31 @@ class ReasonForm(forms.Form):
     reason = forms.CharField(label=_("Reason"), required=False, max_length=200)
 
 
+class RenameForm(forms.Form):
+    """A person's full name (M10.4, ADR-0029): required; the service checks it again."""
+
+    full_name = forms.CharField(label=_("Full name"), max_length=FULL_NAME_MAX_LENGTH)
+
+
+class MfaResetForm(IdempotentForm):
+    """Remove a person's lost second factors (M10.4): a reason, and the administrator's word
+    that the person's identity was checked outside the application (never a detail of it)."""
+
+    operation = MFA_RESET_OPERATION
+
+    reason = forms.CharField(
+        label=_("Reason"),
+        max_length=200,
+        help_text=_("Kept in the audit trail, e.g. a lost phone and no recovery code."),
+    )
+    identity_checked = forms.BooleanField(
+        label=_("I checked this person's identity outside the application."),
+        error_messages={
+            "required": _("Check the person's identity outside the application first.")
+        },
+    )
+
+
 class InvitationForm(IdempotentForm, RoleTargetMixin):
     """Invite an email address with one role (and a project for site managers and partners)."""
 
@@ -249,3 +286,266 @@ class InvitationForm(IdempotentForm, RoleTargetMixin):
             "assignments": assignments,
             "idempotency_key": data["idempotency_key"],
         }
+
+
+# --- companies, joint ventures and branches (M10.2) ------------------------------------------
+
+STATE_CHOICES = [
+    ("", _("All")),
+    (selectors.STATE_ACTIVE, _("Active")),
+    (selectors.STATE_INACTIVE, _("Inactive")),
+]
+
+
+class CompanyFilterForm(forms.Form):
+    q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    kind = forms.ChoiceField(
+        label=_("Kind"), required=False, choices=[("", _("All kinds")), *Company.Kind.choices]
+    )
+    state = forms.ChoiceField(label=_("Status"), required=False, choices=STATE_CHOICES)
+
+
+class CompanyForm(forms.Form):
+    """A company's data; ``code`` is fixed once it exists (plan §4.2)."""
+
+    legal_name = forms.CharField(label=_("Legal name"), max_length=200)
+    tax_id = forms.CharField(label=_("Tax id"), max_length=32, required=False)
+    kind = forms.ChoiceField(
+        label=_("Kind"),
+        choices=Company.Kind.choices,
+        help_text=_("A joint venture records its member companies."),
+    )
+
+    def clean_tax_id(self) -> str | None:
+        return str(self.cleaned_data["tax_id"]).strip() or None
+
+    def values(self) -> dict[str, Any]:
+        return {name: self.cleaned_data[name] for name in ("legal_name", "tax_id", "kind")}
+
+    @staticmethod
+    def initial_for(company: Company) -> dict[str, Any]:
+        return {"legal_name": company.legal_name, "tax_id": company.tax_id, "kind": company.kind}
+
+
+class CompanyCreateForm(IdempotentForm, CompanyForm):
+    operation = "company.create"
+
+    code = forms.CharField(
+        label=_("Code"),
+        max_length=20,
+        help_text=_("Fixed once created: document numbers are built from it."),
+    )
+    field_order = ["code", "legal_name", "tax_id", "kind"]
+
+    def clean_code(self) -> str:
+        return str(self.cleaned_data["code"]).strip().upper()
+
+    def create_kwargs(self) -> dict[str, Any]:
+        data = self.cleaned_data
+        return {**self.values(), "code": data["code"], "idempotency_key": data["idempotency_key"]}
+
+
+class ScopeChangeForm(forms.Form):
+    """The confirmation of a scope-defining change: the ``org_generation`` its preview was
+    read at, which the service compares under its lock (a change since answers 409)."""
+
+    seen_generation = forms.IntegerField(widget=forms.HiddenInput, min_value=0)
+
+
+def share_field() -> forms.DecimalField:
+    return forms.DecimalField(
+        label=_("Share (%)"),
+        required=False,
+        max_digits=5,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        max_value=100,
+        help_text=_("Optional; informational."),
+    )
+
+
+class VentureMemberForm(IdempotentForm):
+    """A member company joining a joint venture."""
+
+    operation = "joint_venture_member.add"
+
+    member = CompanyChoiceField(label=_("Member company"), queryset=None)
+    share_pct = share_field()
+
+    def __init__(self, *args: Any, ctx: AccessContext, venture: Company, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["member"].queryset = selectors.venture_candidates(ctx, venture)  # type: ignore[attr-defined]
+
+
+class VentureShareForm(forms.Form):
+    share_pct = share_field()
+
+
+class BranchFilterForm(forms.Form):
+    q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    company = CompanyChoiceField(
+        label=_("Company"), queryset=None, required=False, empty_label=_("All companies")
+    )
+    state = forms.ChoiceField(label=_("Status"), required=False, choices=STATE_CHOICES)
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["company"].queryset = selectors.company_choices(ctx)  # type: ignore[attr-defined]
+
+
+class ManagerChoiceField(BranchChoiceField):
+    """A managing branch; an inactive one says so (it reaches nothing while inactive)."""
+
+    def label_from_instance(self, obj: Any) -> str:
+        label = super().label_from_instance(obj)
+        live = obj.is_active and obj.company.is_active
+        return label if live else _("%(branch)s (inactive)") % {"branch": label}
+
+
+class WarehouseChoiceField(forms.ModelChoiceField):  # type: ignore[type-arg]
+    def label_from_instance(self, obj: Any) -> str:
+        return str(obj.name)
+
+
+class BranchForm(forms.Form):
+    """A branch's data and its default warehouse; ``company`` and ``code`` are fixed."""
+
+    name = forms.CharField(label=_("Name"), max_length=200)
+    city = forms.CharField(label=_("City"), max_length=100, required=False)
+    address = forms.CharField(
+        label=_("Address"), required=False, widget=forms.Textarea(attrs={"rows": 2})
+    )
+    default_warehouse = WarehouseChoiceField(
+        label=_("Default warehouse"),
+        queryset=None,
+        required=False,
+        empty_label=_("None"),
+        help_text=_("Where goods are received by default; an active warehouse of the branch."),
+    )
+
+    def __init__(self, *args: Any, ctx: AccessContext, branch: Branch, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["default_warehouse"].queryset = selectors.default_warehouse_choices(  # type: ignore[attr-defined]
+            ctx, branch
+        )
+
+    def values(self) -> dict[str, Any]:
+        data = self.cleaned_data
+        warehouse = data["default_warehouse"]
+        return {
+            "name": data["name"],
+            "city": data["city"],
+            "address": data["address"],
+            "default_warehouse_id": warehouse.pk if warehouse else None,
+        }
+
+    @staticmethod
+    def initial_for(branch: Branch) -> dict[str, Any]:
+        return {
+            "name": branch.name,
+            "city": branch.city,
+            "address": branch.address,
+            "default_warehouse": branch.default_warehouse_id,
+        }
+
+
+class BranchCreateForm(IdempotentForm):
+    """A new branch of an active company; its warehouses come after it (Q3)."""
+
+    operation = "branch.create"
+
+    company = CompanyChoiceField(label=_("Company"), queryset=None)
+    code = forms.CharField(
+        label=_("Code"),
+        max_length=20,
+        help_text=_("Unique in the company and fixed once created."),
+    )
+    name = forms.CharField(label=_("Name"), max_length=200)
+    city = forms.CharField(label=_("City"), max_length=100, required=False)
+    address = forms.CharField(
+        label=_("Address"), required=False, widget=forms.Textarea(attrs={"rows": 2})
+    )
+    managed_by = ManagerChoiceField(
+        label=_("Managing branch"),
+        queryset=None,
+        required=False,
+        empty_label=_("None: it manages itself"),
+        help_text=_("Who works for the managing branch also reaches this one and its projects."),
+    )
+    allow_self_approval = forms.BooleanField(
+        label=_("Allow self-approval"),
+        required=False,
+        help_text=_("Lets a requester decide their own requests bought by this branch."),
+    )
+
+    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["company"].queryset = selectors.companies(ctx)  # type: ignore[attr-defined]
+        self.fields["managed_by"].queryset = selectors.manager_candidates(ctx)  # type: ignore[attr-defined]
+
+    def clean_code(self) -> str:
+        return str(self.cleaned_data["code"]).strip().upper()
+
+    def new_branch(self) -> NewBranch:
+        data = self.cleaned_data
+        manager = data["managed_by"]
+        return NewBranch(
+            company_id=data["company"].pk,
+            code=data["code"],
+            name=data["name"],
+            city=data["city"],
+            address=data["address"],
+            managed_by_id=manager.pk if manager else None,
+            allow_self_approval=data["allow_self_approval"],
+        )
+
+
+MANAGER_PREVIEW = "manager-preview"
+
+
+class BranchManagerForm(ScopeChangeForm):
+    """The managing branch of a branch. Choosing one asks for the preview of the change
+    (``preview_url``, htmx) into the dialog's ``MANAGER_PREVIEW`` element."""
+
+    managed_by = ManagerChoiceField(
+        label=_("Managing branch"),
+        queryset=None,
+        required=False,
+        empty_label=_("None: it manages itself"),
+    )
+
+    def __init__(
+        self, *args: Any, ctx: AccessContext, branch: Branch, preview_url: str, **kwargs: Any
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        field = self.fields["managed_by"]
+        field.queryset = selectors.manager_candidates(ctx, branch)  # type: ignore[attr-defined]
+        field.widget.attrs.update(
+            {
+                "hx-get": preview_url,
+                "hx-trigger": "change",
+                "hx-target": f"#{MANAGER_PREVIEW}",
+                "hx-swap": "innerHTML",
+                "hx-sync": "this:replace",
+            }
+        )
+
+    def manager_id(self) -> Any:
+        manager = self.cleaned_data["managed_by"]
+        return manager.pk if manager else None
+
+
+class SelfApprovalForm(forms.Form):
+    """Turn self-approval on or off: the value to set, never a toggle (a double submit sets
+    the same value again)."""
+
+    allow = forms.ChoiceField(choices=[("on", "on"), ("off", "off")], widget=forms.HiddenInput)
+
+    def allowed(self) -> bool:
+        return bool(self.cleaned_data["allow"] == "on")
+
+
+class StateFilterForm(forms.Form):
+    """Narrows a section of companies' or branches' rows by state (a page with sections)."""
+
+    state = forms.ChoiceField(label=_("Status"), required=False, choices=STATE_CHOICES)

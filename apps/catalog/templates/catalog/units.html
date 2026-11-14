@@ -1,0 +1,77 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Units of measure" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Units of measure" %}</h1>
+      <p class="page-head-sub">{% translate "A unit's decimals say how many decimal places its quantities may have. An inactive unit is no longer offered for new materials; the ones that have it keep it." %}</p>
+    </div>
+    <div class="page-head-actions">
+      {% url 'catalog:new_unit' as new_url %}
+      {% include "organizations/lazy_button.html" with url=new_url dialog="new-dialog" label=_("New unit") variant="primary" icon="plus" testid="unit-new-open" %}
+    </div>
+  </header>
+  {% url 'catalog:units' as list_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#unit-results" action=list_url grid="sm:grid-cols-[1fr_10rem_auto]" %}
+  {% partialdef results inline %}
+    <div id="unit-results">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              {% include "components/sort_header.html" with listing=listing key="code" label=_("Code") %}
+              {% include "components/sort_header.html" with listing=listing key="name" label=_("Name") %}
+              {% include "components/sort_header.html" with listing=listing key="decimals" label=_("Decimals") %}
+              <th scope="col">{% translate "Materials" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+              <th scope="col">
+                <span class="sr-only">{% translate "Actions" %}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for unit in listing.rows %}
+              <tr data-testid="unit-row">
+                <td data-label="{% translate 'Code' %}">
+                  <span class="doc-no">{{ unit.code }}</span>
+                </td>
+                <td data-label="{% translate 'Name' %}">{{ unit.name }}</td>
+                <td data-label="{% translate 'Decimals' %}" class="num">{{ unit.decimals }}</td>
+                <td data-label="{% translate 'Materials' %}" class="num">{{ unit.material_count }}</td>
+                <td data-label="{% translate 'Status' %}">{% include "organizations/active_status.html" with obj=unit %}</td>
+                <td>
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    {% url 'catalog:edit_unit' unit_id=unit.pk as edit_url %}
+                    {% include "organizations/lazy_button.html" with url=edit_url dialog="edit-dialog" label=_("Edit") icon="pencil" testid="unit-edit-open" %}
+                    {% if unit.is_active %}
+                      <form method="post"
+                            action="{% url 'catalog:deactivate_unit' unit_id=unit.pk %}">
+                        {% csrf_token %}
+                        {% include "components/button.html" with type="submit" label=_("Deactivate") variant="danger" icon="ban" %}
+                      </form>
+                    {% else %}
+                      <form method="post"
+                            action="{% url 'catalog:reactivate_unit' unit_id=unit.pk %}">
+                        {% csrf_token %}
+                        {% include "components/button.html" with type="submit" label=_("Reactivate") icon="rotate-ccw" %}
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" with listing=listing %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No units") text=_("No unit matches the filters.") icon="scale" %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+  {% include "components/dialog.html" with id="new-dialog" title=_("New unit of measure") testid="unit-new-dialog" %}
+  {% include "components/dialog.html" with id="edit-dialog" title=_("Edit the unit") testid="unit-edit-dialog" %}
+{% endblock content %}

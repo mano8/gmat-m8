@@ -9,6 +9,7 @@ Authorization is the views' and services' as before: nothing here decides who ma
 """
 
 from dataclasses import dataclass, replace
+from typing import Any
 
 from django.forms import Form
 from django.http import HttpRequest, HttpResponse
@@ -31,6 +32,9 @@ class ActionDialog:
     action will do, one sentence each (a destructive dialog states them); ``note`` is a single
     paragraph of help; ``warning`` a note that deserves more attention. ``tone`` is ``"danger"``
     for a destructive action: the danger badge, a danger submit button and Cancel focused first.
+    ``body`` names a template drawn under the form's fields with ``data``, for what the plain
+    texts cannot say (the preview of a scope change); a function as ``data`` is called only
+    when the dialog is drawn, so a POST that succeeds never works it out.
     """
 
     id: str
@@ -52,6 +56,8 @@ class ActionDialog:
     back: str = ""
     label: str = ""  # what the button or menu item that opens it says (default: the title)
     icon: str = ""  # that button's icon, a Lucide name
+    body: str = ""  # a template drawn under the fields, with ``data`` (M10.2: a preview)
+    data: Any = None  # what ``body`` shows; a function is called only when it is drawn
 
     @property
     def opener_label(self) -> str:

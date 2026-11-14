@@ -21,9 +21,11 @@ allowed only to its ``price.view`` holders (``Route.allowed_for``), so a warehou
 operator reading an order is checked priceless.
 """
 
+import importlib
 import io
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import timedelta
 from typing import Any
@@ -35,17 +37,18 @@ from django.contrib import admin
 from django.contrib.auth.hashers import make_password
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.urls import reverse
+from django.test import override_settings
+from django.urls import clear_url_caches, reverse
 from django.utils import timezone
 from PIL import Image
 
-from apps.access.admin import CapabilityModelAdmin
+import config.urls
 from apps.access.models import AccessState
 from apps.accounts.models import User
 from apps.accounts.sessions import bump_session_epoch
 from apps.audit.models import AuditEvent
-from apps.core.admin import ReadOnlyModelAdmin, ServiceBackedModelAdmin
-from apps.organizations.models import Company, Membership
+from apps.core.admin import ReadOnlyModelAdmin
+from apps.organizations.models import Branch, Company, Membership
 from tests.access.matrix import (
     ACTOR_NAMES,
     ADMIN_LOGIN,
@@ -163,28 +166,24 @@ SUPPLIER_SENTINELS = frozenset(
     {Sentinel.SUPPLIER_NAME, Sentinel.SUPPLIER_EMAIL, Sentinel.SUPPLIER_PHONE}
 )
 
-# Access and document models are read-only; master data is editable by GROUP_ADMIN only
-# (the platform operator only views it). Nothing is ever deleted (plan §5, §8.2).
-READ_ONLY_MODELS = {
+# Every model is read-only in the admin, master data included: it changes in the app's
+# screens (ADR-0030). Nothing is ever deleted (plan §5, §8.2).
+ADMIN_MODELS = {
     "accounts": ("user", "invitation", "emailchangerequest"),
     "account": ("emailaddress",),
     "mfa": ("authenticator",),
     "audit": ("auditevent",),
     "access": ("accessstate",),
-    "organizations": ("membership",),
+    "organizations": ("company", "jointventuremember", "branch", "membership"),
     "projects": ("project", "projectassignment"),
-    "catalog": ("unitofmeasure",),
+    "locations": ("location",),
+    "catalog": ("materialcategory", "material", "unitofmeasure"),
+    "suppliers": ("supplier",),
     "material_requests": ("materialrequest", "materialrequestline"),
     "purchasing": ("purchaseorder", "purchaseorderline", "purchaseallocation"),
     "receiving": ("goodsreceipt", "goodsreceiptline", "receiptattribution"),
     "handovers": ("handover", "handoverline"),
     "attachments": ("attachment", "attachmentreservation", "storagequota", "mediadeletion"),
-}
-MASTER_DATA_MODELS = {
-    "organizations": ("company", "jointventuremember", "branch"),
-    "locations": ("location",),
-    "catalog": ("materialcategory", "material"),
-    "suppliers": ("supplier",),
 }
 # The admin pages of a model that shows its own sentinels: the supplier's contact details
 # (also in an order's supplier snapshot) and the allocations' quantities. Prices never
@@ -198,36 +197,25 @@ ADMIN_SENTINELS = {
 
 def _admin_model_routes() -> dict[str, Route]:
     routes: dict[str, Route] = {}
-    for editable, models in ((False, READ_ONLY_MODELS), (True, MASTER_DATA_MODELS)):
-        for app, names in models.items():
-            for model in names:
-                base = f"admin:{app}_{model}"
-                if editable:
-                    # An empty form answers 200 with errors: access granted, nothing saved.
-                    # A joint-venture member's only editable field is optional, so its
-                    # empty change is valid and saved through the service.
-                    change_post = REDIRECT if model == "jointventuremember" else OK
-                    add = admin_page(OK, OK, operator_get=DENIED, operator_post=DENIED)
-                    change = admin_page(OK, change_post, operator_post=DENIED)
-                else:
-                    add = admin_page(DENIED, DENIED)
-                    change = admin_page(OK, DENIED)
-                views = {
-                    "changelist": admin_page(OK, OK),
-                    "add": add,
-                    "history": admin_page(OK, OK),
-                    "delete": admin_page(DENIED, DENIED),
-                    "change": change,
-                }
-                shown = ADMIN_SENTINELS.get(model, frozenset())
-                for view, methods in views.items():
-                    key = f"{base}_{view}"
-                    routes[key] = Route(methods, path=admin_model_path(key), allowed=shown)
-                routes[f"admin:{app}/{model}/<path:object_id>/"] = Route(
-                    admin_page(REDIRECT, REDIRECT),
-                    path=admin_redirect_path(app, model),
-                    allowed=shown,
-                )
+    for app, names in ADMIN_MODELS.items():
+        for model in names:
+            base = f"admin:{app}_{model}"
+            views = {
+                "changelist": admin_page(OK, OK),
+                "add": admin_page(DENIED, DENIED),
+                "history": admin_page(OK, OK),
+                "delete": admin_page(DENIED, DENIED),
+                "change": admin_page(OK, DENIED),
+            }
+            shown = ADMIN_SENTINELS.get(model, frozenset())
+            for view, methods in views.items():
+                key = f"{base}_{view}"
+                routes[key] = Route(methods, path=admin_model_path(key), allowed=shown)
+            routes[f"admin:{app}/{model}/<path:object_id>/"] = Route(
+                admin_page(REDIRECT, REDIRECT),
+                path=admin_redirect_path(app, model),
+                allowed=shown,
+            )
     return routes
 
 
@@ -337,6 +325,306 @@ def _object_url(name: str, key: str) -> Callable[[World], str]:
 
 def _person_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.people.tech_mad.pk])
+
+
+def _org_url(name: str, attr: str) -> Callable[[World], str]:
+    return lambda world: reverse(name, args=[getattr(world.org, attr).pk])
+
+
+def _company_d(name: str) -> Callable[[World], str]:
+    """The inactive company D of ``build_people``."""
+    return lambda world: reverse(name, args=[Company.objects.get(code="D").pk])
+
+
+def _branch_old(name: str) -> Callable[[World], str]:
+    """The inactive branch A-OLD of ``build_people``."""
+    return lambda world: reverse(name, args=[Branch.objects.get(code="OLD").pk])
+
+
+# Where each M10.2 URL with an object is tried: an active and an inactive company or branch,
+# and for a branch one that is managed and one that manages.
+COMPANY_POSITIONS = (("joint venture", "b"), ("standard", "c"))
+BRANCH_POSITIONS = (("managed", "b_mad"), ("managing", "a_mad"))
+
+
+def _positions(
+    name: str, methods: dict[str, Any], kind: str, *, htmx: Outcome | None = None, dialog: str = ""
+) -> tuple[Route, ...]:
+    """One route per position of ``kind`` (``company`` or ``branch``), the inactive one
+    included; with ``htmx``, the dialog's htmx request too (a POST's 422, a lazy GET's 200)."""
+    places = COMPANY_POSITIONS if kind == "company" else BRANCH_POSITIONS
+    inactive = _company_d(name) if kind == "company" else _branch_old(name)
+    routes = [Route(methods, position=where, path=_org_url(name, attr)) for where, attr in places]
+    routes.append(Route(methods, position="inactive", path=inactive))
+    if htmx is not None:
+        headers = {**HTMX, "HX-Target": f"{dialog}-content"} if dialog else HTMX
+        outcome = org_page() if htmx is OK else org_action(htmx)
+        routes.append(
+            Route(outcome, position="htmx", path=_org_url(name, places[0][1]), headers=headers)
+        )
+    return tuple(routes)
+
+
+def _structure_routes() -> dict[str, tuple[Route, ...]]:
+    lazy_new = {**HTMX, "HX-Target": "new-dialog-content"}
+    member = _object_url("org:edit_venture_member", "jointventuremember")
+    update_member = _object_url("org:update_venture_member", "jointventuremember")
+    return {
+        "org:companies": (Route(org_page()),),
+        "org:company": _positions("org:company", org_page(), "company"),
+        "org:new_company": (
+            Route(org_page()),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "org:create_company": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "org:update_company": _positions(
+            "org:update_company", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_deactivate_company": _positions(
+            "org:confirm_deactivate_company",
+            org_page(),
+            "company",
+            htmx=OK,
+            dialog="activity-dialog",
+        ),
+        "org:deactivate_company": _positions(
+            "org:deactivate_company", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_reactivate_company": _positions(
+            "org:confirm_reactivate_company",
+            org_page(),
+            "company",
+            htmx=OK,
+            dialog="activity-dialog",
+        ),
+        "org:reactivate_company": _positions(
+            "org:reactivate_company", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:add_venture_member": _positions(
+            "org:add_venture_member", org_action(), "company", htmx=UNPROCESSABLE
+        ),
+        "org:edit_venture_member": (
+            Route(org_page(), path=member),
+            Route(
+                org_page(),
+                position="htmx",
+                path=member,
+                headers={**HTMX, "HX-Target": "share-dialog-content"},
+            ),
+        ),
+        "org:update_venture_member": (
+            Route(org_action(), path=update_member, note="no share: the share is cleared"),
+            Route(org_action(NO_CONTENT), position="htmx", path=update_member, headers=HTMX),
+        ),
+        "org:branches": (Route(org_page()),),
+        "org:branch": _positions("org:branch", org_page(), "branch"),
+        "org:new_branch": (
+            Route(org_page()),
+            Route(
+                org_page(),
+                position="from a company",
+                path=lambda world: f"{reverse('org:new_branch')}?company={world.org.b.pk}",
+            ),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "org:create_branch": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "org:update_branch": _positions(
+            "org:update_branch", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:preview_branch_manager": (
+            *_positions("org:preview_branch_manager", org_page(), "branch"),
+            Route(
+                org_page(),
+                position="htmx, a managing branch chosen",
+                path=lambda world: (
+                    f"{reverse('org:preview_branch_manager', args=[world.org.b_mad.pk])}"
+                    f"?managed_by={world.org.a_sev.pk}"
+                ),
+                headers=HTMX,
+            ),
+        ),
+        "org:set_branch_manager": _positions(
+            "org:set_branch_manager", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:set_self_approval": _positions(
+            "org:set_self_approval", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_deactivate_branch": _positions(
+            "org:confirm_deactivate_branch", org_page(), "branch", htmx=OK, dialog="activity-dialog"
+        ),
+        "org:deactivate_branch": _positions(
+            "org:deactivate_branch", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+        "org:confirm_reactivate_branch": _positions(
+            "org:confirm_reactivate_branch", org_page(), "branch", htmx=OK, dialog="activity-dialog"
+        ),
+        "org:reactivate_branch": _positions(
+            "org:reactivate_branch", org_action(), "branch", htmx=UNPROCESSABLE
+        ),
+    }
+
+
+# Where each M10.3 warehouse URL is tried: the active, the inactive and an inactive branch's.
+WAREHOUSE_POSITIONS = (
+    ("active", "spare_warehouse"),
+    ("inactive", "closed_warehouse"),
+    ("inactive branch", "old_branch_warehouse"),
+)
+
+
+def _warehouse_positions(
+    name: str, methods: dict[str, Any], *, htmx: Outcome | None = None, dialog: str = ""
+) -> tuple[Route, ...]:
+    """One route per position of a warehouse; with ``htmx``, the dialog's request too (a POST's
+    422, a lazy GET's 200)."""
+    routes = [
+        Route(methods, position=where, path=_object_url(name, key))
+        for where, key in WAREHOUSE_POSITIONS
+    ]
+    if htmx is not None:
+        headers = {**HTMX, "HX-Target": f"{dialog}-content"} if dialog else HTMX
+        outcome = org_page() if htmx is OK else org_action(htmx)
+        routes.append(
+            Route(
+                outcome, position="htmx", path=_object_url(name, "spare_warehouse"), headers=headers
+            )
+        )
+    return tuple(routes)
+
+
+def _place_routes() -> dict[str, tuple[Route, ...]]:
+    """Warehouses and worksites (M10.3, inventory §3.3) and units of measure (§3.5): group
+    administrators only (org.manage). A warehouse's or a worksite's activity actions have no
+    field, so they change the spare row they are sent to; every other POST is an empty form."""
+    lazy_new = {**HTMX, "HX-Target": "new-dialog-content"}
+    unit = _object_url
+    site = _object_url
+    return {
+        "locations:warehouses": (Route(org_page()),),
+        "locations:new_warehouse": (
+            Route(org_page()),
+            Route(
+                org_page(),
+                position="from a branch",
+                path=lambda world: (
+                    f"{reverse('locations:new_warehouse')}?branch={world.org.a_sev.pk}"
+                ),
+            ),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "locations:create_warehouse": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "locations:edit_warehouse": _warehouse_positions(
+            "locations:edit_warehouse", org_page(), htmx=OK, dialog="edit-dialog"
+        ),
+        "locations:update_warehouse": _warehouse_positions(
+            "locations:update_warehouse", org_action(), htmx=UNPROCESSABLE
+        ),
+        "locations:confirm_deactivate_warehouse": _warehouse_positions(
+            "locations:confirm_deactivate_warehouse", org_page(), htmx=OK, dialog="activity-dialog"
+        ),
+        "locations:deactivate_warehouse": _warehouse_positions(
+            "locations:deactivate_warehouse", org_action(), htmx=NO_CONTENT
+        ),
+        "locations:reactivate_warehouse": _warehouse_positions(
+            "locations:reactivate_warehouse", org_action(), htmx=NO_CONTENT
+        ),
+        "locations:update_worksite": (
+            Route(
+                org_action(),
+                path=site("locations:update_worksite", "spare_worksite"),
+                note="an empty form: nothing changes",
+            ),
+            Route(
+                org_action(UNPROCESSABLE),
+                position="htmx",
+                path=site("locations:update_worksite", "spare_worksite"),
+                headers=HTMX,
+            ),
+        ),
+        "locations:deactivate_worksite": (
+            Route(org_action(), path=site("locations:deactivate_worksite", "spare_worksite")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=site("locations:deactivate_worksite", "spare_worksite"),
+                headers=HTMX,
+            ),
+        ),
+        "locations:reactivate_worksite": (
+            Route(org_action(), path=site("locations:reactivate_worksite", "spare_worksite")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=site("locations:reactivate_worksite", "spare_worksite"),
+                headers=HTMX,
+            ),
+        ),
+        "catalog:units": (Route(org_page()),),
+        "catalog:new_unit": (
+            Route(org_page()),
+            Route(org_page(), position="htmx", headers=lazy_new),
+        ),
+        "catalog:create_unit": (
+            Route(org_action(), note="an empty form: nothing is created"),
+            Route(org_action(UNPROCESSABLE), position="htmx", headers=HTMX),
+        ),
+        "catalog:edit_unit": (
+            Route(org_page(), position="free", path=unit("catalog:edit_unit", "spare_unit")),
+            Route(org_page(), position="in use", path=unit("catalog:edit_unit", "unitofmeasure")),
+            Route(
+                org_page(),
+                position="htmx",
+                path=unit("catalog:edit_unit", "spare_unit"),
+                headers={**HTMX, "HX-Target": "edit-dialog-content"},
+            ),
+        ),
+        "catalog:update_unit": (
+            Route(
+                org_action(),
+                position="free",
+                path=unit("catalog:update_unit", "spare_unit"),
+                note="an empty form: nothing changes",
+            ),
+            Route(
+                org_action(),
+                position="in use",
+                path=unit("catalog:update_unit", "unitofmeasure"),
+            ),
+            Route(
+                org_action(UNPROCESSABLE),
+                position="htmx",
+                path=unit("catalog:update_unit", "spare_unit"),
+                headers=HTMX,
+            ),
+        ),
+        "catalog:deactivate_unit": (
+            Route(org_action(), path=unit("catalog:deactivate_unit", "spare_unit")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=unit("catalog:deactivate_unit", "spare_unit"),
+                headers=HTMX,
+            ),
+        ),
+        "catalog:reactivate_unit": (
+            Route(org_action(), path=unit("catalog:reactivate_unit", "spare_unit")),
+            Route(
+                org_action(NO_CONTENT),
+                position="htmx",
+                path=unit("catalog:reactivate_unit", "spare_unit"),
+                headers=HTMX,
+            ),
+        ),
+    }
 
 
 UNKNOWN_ID = "00000000-0000-7000-8000-000000000000"
@@ -2019,6 +2307,32 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "org:request_email_change": (
         Route(org_action(), path=_person_url("org:request_email_change")),
     ),
+    # M10.4: inline dialogs of the person's page. An empty form changes nothing: a flash
+    # without htmx, the dialog again (422) with it.
+    "org:rename_person": (
+        Route(org_action(), path=_person_url("org:rename_person"), note="no name: nothing changes"),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:rename_person"),
+            headers=HTMX,
+            note="no name from the dialog: the form again with its errors",
+        ),
+    ),
+    "org:reset_mfa": (
+        Route(
+            org_action(),
+            path=_person_url("org:reset_mfa"),
+            note="no reason, no identity tick: the factors stay",
+        ),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:reset_mfa"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
     "org:revoke_membership": (
         Route(org_action(), path=_object_url("org:revoke_membership", "membership")),
         Route(
@@ -2083,6 +2397,12 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "org:revoke_invitation": (
         Route(org_action(), path=_object_url("org:revoke_invitation", "invitation")),
     ),
+    # M10.2: companies, joint ventures and branches; group administrators only (org.manage),
+    # every company and branch, active or not (S2). An empty POST changes nothing: the form is
+    # invalid (a plain POST is flashed and redirected, the dialog's gets 422).
+    **_structure_routes(),
+    # M10.3: warehouses, worksites and units of measure; group administrators only.
+    **_place_routes(),
     # Token pages: anonymous by design; no token in the session shows the generic page.
     "invitations:link": (
         Route(
@@ -2212,6 +2532,10 @@ PAGED_LISTS = (
     "projects:list",
     "org:people",
     "org:invitations",
+    "org:companies",
+    "org:branches",
+    "locations:warehouses",
+    "catalog:units",
     "requests:list",
     "requests:new",
     "requests:inbox",
@@ -2245,6 +2569,8 @@ PAGED_SECTIONS = {
     "requests:project_materials": "per_page=100&page=2&q=x&outstanding=on",
     "projects:detail": "assignments_per_page=100&assignments_page=2&assignments-state=revoked",
     "org:person": "memberships_page=2&projects_page=2&invitations_page=2&memberships-state=revoked",
+    "org:company": "branches_page=2&branches_per_page=100&branches-state=inactive&members_page=2",
+    "org:branch": "managed_page=2&warehouses_page=2",
     "audit:object": "per_page=100&page=2&q=x&since=2030-01-01",
 }
 
@@ -2320,23 +2646,28 @@ def test_other_methods_are_refused_everywhere(world: World, key: str) -> None:
 # --- admin (plan §8.2) -------------------------------------------------------------------
 
 
-class TestAdmin:
-    def test_every_admin_is_service_backed(self) -> None:
-        for model, model_admin in admin.site._registry.items():
-            assert isinstance(model_admin, ServiceBackedModelAdmin), model
+@contextmanager
+def _admin_switched_off() -> Iterator[None]:
+    """The URLconf as production builds it by default: no admin prefix at all."""
+    try:
+        with override_settings(ADMIN_ENABLED=False):
+            importlib.reload(config.urls)
+            clear_url_caches()
+            yield
+    finally:
+        importlib.reload(config.urls)
+        clear_url_caches()
 
-    def test_access_and_document_models_are_read_only_and_the_rest_master_data(self) -> None:
+
+class TestAdmin:
+    def test_every_admin_is_read_only(self) -> None:
         registered = {
             (model._meta.app_label, model._meta.model_name): model_admin
             for model, model_admin in admin.site._registry.items()
         }
-        read_only = {(app, m) for app, names in READ_ONLY_MODELS.items() for m in names}
-        master = {(app, m) for app, names in MASTER_DATA_MODELS.items() for m in names}
-        assert set(registered) == read_only | master
-        for key in read_only:
-            assert isinstance(registered[key], ReadOnlyModelAdmin), key
-        for key in master:
-            assert isinstance(registered[key], CapabilityModelAdmin), key
+        assert set(registered) == {(app, m) for app, names in ADMIN_MODELS.items() for m in names}
+        for key, model_admin in registered.items():
+            assert isinstance(model_admin, ReadOnlyModelAdmin), key
 
     def test_no_admin_offers_the_bulk_delete(self, world: World) -> None:
         client = world.client("group_admin")
@@ -2346,17 +2677,40 @@ class TestAdmin:
             assert response.status_code == 200, url
             assert b'value="delete_selected"' not in response.content, url
 
-    def test_a_master_data_save_goes_through_its_service(self, world: World) -> None:
-        """Deactivating company C (``is_active`` left unticked): generation bumped, audited."""
+    def test_a_master_data_save_is_refused(self, world: World) -> None:
+        """Deactivating company C from the admin (``is_active`` left unticked): 403, nothing."""
         generation = AccessState.objects.get().org_generation
         response = world.client("group_admin").post(
             reverse("admin:organizations_company_change", args=[world.org.c.pk]),
             {"legal_name": "Company C", "kind": "STANDARD", "tax_id": ""},
         )
-        assert response.status_code == 302
-        assert Company.objects.get(pk=world.org.c.pk).is_active is False
-        assert AccessState.objects.get().org_generation > generation
-        assert AuditEvent.objects.filter(action="company.updated", object_id=world.org.c.pk)
+        assert response.status_code == 403
+        assert Company.objects.get(pk=world.org.c.pk).is_active is True
+        assert AccessState.objects.get().org_generation == generation
+        assert not AuditEvent.objects.filter(action="company.updated", object_id=world.org.c.pk)
+
+    def test_switched_off_the_prefix_is_an_unknown_path_for_every_actor(self, world: World) -> None:
+        """``DJANGO_ADMIN_ENABLED`` off (production's default, ADR-0030): the admin has no URL,
+        so each actor, the operator and the admitted group administrator included, gets what an
+        unknown path gives them (their own sign-in or step-up redirect, or the 404), by every
+        method, and never an admin page or the admin's own login."""
+        paths = ("/admin/", "/admin/login/", "/admin/organizations/company/")
+        problems: list[str] = []
+        with _admin_switched_off():
+            for actor in ACTOR_NAMES:
+                for method in TABLE_METHODS:
+                    unknown = send(world.client(actor), method, "/no/such/page/")
+                    for path in paths:
+                        got = send(world.client(actor), method, path)
+                        location = got.get("Location", "")
+                        if (got.status_code, location) != (
+                            unknown.status_code,
+                            unknown.get("Location", ""),
+                        ):
+                            problems.append(f"{method} {path} as {actor}: {got.status_code}")
+                        if got.status_code == 200 or "/admin/" in location:
+                            problems.append(f"{method} {path} as {actor}: reaches the admin")
+        assert problems == []
 
     def test_a_group_admin_cannot_touch_a_staff_account(self, world: World) -> None:
         operator = world.people.operator

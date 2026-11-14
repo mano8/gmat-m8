@@ -2,13 +2,21 @@
 ``<select>``); the services authorize and validate again in their transaction."""
 
 from typing import Any
+from uuid import UUID
 
 from django import forms
+from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.catalog import selectors
-from apps.catalog.models import EAN_PATTERN, Material, MaterialCategory
+from apps.catalog.models import (
+    EAN_PATTERN,
+    MAX_UNIT_DECIMALS,
+    Material,
+    MaterialCategory,
+    UnitOfMeasure,
+)
 from apps.core.forms import IdempotentForm
 
 
@@ -68,9 +76,12 @@ class MaterialForm(forms.Form):
         help_text=_("Kept in the warehouse, so it can be handed over from stock."),
     )
 
-    def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
+    def __init__(
+        self, *args: Any, ctx: AccessContext, keep_unit: UUID | None = None, **kwargs: Any
+    ) -> None:
+        """``keep_unit``: the unit a material being edited has, offered even when inactive."""
         super().__init__(*args, **kwargs)
-        self.fields["unit"].queryset = selectors.units(ctx)  # type: ignore[attr-defined]
+        self.fields["unit"].queryset = selectors.active_units(ctx, keep=keep_unit)  # type: ignore[attr-defined]
         self.fields["category"].queryset = selectors.categories(ctx)  # type: ignore[attr-defined]
 
     def values(self) -> dict[str, Any]:
@@ -151,6 +162,75 @@ class CategoryForm(forms.Form):
 
 class CategoryCreateForm(IdempotentForm, CategoryForm):
     operation = "category.create"
+
+    def create_kwargs(self) -> dict[str, Any]:
+        return {**self.values(), "idempotency_key": self.cleaned_data["idempotency_key"]}
+
+
+# --- units of measure (M10.3, Q72) -----------------------------------------------------
+
+
+class UnitFilterForm(forms.Form):
+    q = forms.CharField(label=_("Search"), required=False, max_length=100)
+    state = forms.ChoiceField(
+        label=_("Status"),
+        required=False,
+        choices=[
+            ("", _("All")),
+            (selectors.STATE_ACTIVE, _("Active")),
+            (selectors.STATE_INACTIVE, _("Inactive")),
+        ],
+    )
+
+
+class UnitForm(forms.Form):
+    """A unit's data. For a unit in use (``in_use``) the code is shown but fixed, and the
+    decimals can only be raised; the service decides, this tells the person first (Q72)."""
+
+    code = forms.CharField(
+        label=_("Code"),
+        max_length=10,
+        help_text=_("Short and unique, such as UD, M or KG. Fixed once anything uses the unit."),
+    )
+    name = forms.CharField(label=_("Name"), max_length=50)
+    decimals = forms.IntegerField(
+        label=_("Decimals"),
+        min_value=0,
+        max_value=MAX_UNIT_DECIMALS,
+        help_text=_("How many decimal places a quantity in this unit may have."),
+    )
+
+    def __init__(
+        self,
+        *args: Any,
+        unit: UnitOfMeasure | None = None,
+        in_use: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        if unit is None:
+            return
+        self.initial = {"code": unit.code, "name": unit.name, "decimals": unit.decimals}
+        if in_use:
+            self.fields["code"].disabled = True  # the posted value is ignored
+            self.fields["code"].help_text = _("The unit is in use: its code is fixed.")
+            self.fields["decimals"].validators.append(MinValueValidator(unit.decimals))
+            self.fields["decimals"].widget.attrs["min"] = unit.decimals
+            self.fields["decimals"].help_text = _(
+                "The unit is in use: its decimals can be raised, not lowered."
+            )
+
+    def clean_code(self) -> str:
+        return str(self.cleaned_data["code"]).strip().upper()
+
+    def values(self) -> dict[str, Any]:
+        data = self.cleaned_data
+        return {"code": data["code"], "name": data["name"], "decimals": data["decimals"]}
+
+
+class UnitCreateForm(IdempotentForm, UnitForm):
+    operation = "unit.create"
+    field_order = ["code", "name", "decimals"]
 
     def create_kwargs(self) -> dict[str, Any]:
         return {**self.values(), "idempotency_key": self.cleaned_data["idempotency_key"]}
