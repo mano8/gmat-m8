@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -170,9 +171,48 @@ def test_empty_section_is_refused(tools: ModuleType) -> None:
         tools.release_notes(changelog, "1.2.0")
 
 
-def test_repository_changelog_has_an_unreleased_section(tools: ModuleType) -> None:
+CHANGELOG_HEADER = re.compile(r"^## \[(?P<name>[^\]]+)\](?P<rest>[^\n]*)$", re.M)
+RELATIVE_LINK = re.compile(r"\]\((?![a-z][a-z0-9+.-]*:|#)[^)\s]+\)")
+
+
+def _repository_changelog(tools: ModuleType) -> tuple[str, list[re.Match[str]]]:
     changelog = (tools.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert tools.release_notes(changelog, "Unreleased").strip()
+    return changelog, list(CHANGELOG_HEADER.finditer(changelog))
+
+
+def test_repository_changelog_has_one_unreleased_section_first(tools: ModuleType) -> None:
+    # It may be empty: a release PR moves its entries under the new version and leaves a fresh,
+    # empty one above it (docs/release.md, step 1).
+    _, headers = _repository_changelog(tools)
+    names = [header["name"] for header in headers]
+    assert names[:1] == ["Unreleased"]
+    assert names.count("Unreleased") == 1
+
+
+def _core(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("-", 1)[0].split("."))
+
+
+def test_repository_changelog_versions_are_dated_unique_and_newest_first(
+    tools: ModuleType,
+) -> None:
+    _, headers = _repository_changelog(tools)
+    versions = [header["name"] for header in headers[1:]]
+    assert len(versions) == len(set(versions))
+    assert [_core(v) for v in versions] == sorted((_core(v) for v in versions), reverse=True)
+    for header in headers[1:]:
+        assert tools.VERSION_PATTERN.match(header["name"]), header["name"]
+        assert re.fullmatch(r" - \d{4}-\d{2}-\d{2}", header["rest"]), header.group(0)
+
+
+def test_repository_changelog_versions_have_notes_with_absolute_links(tools: ModuleType) -> None:
+    # A version's notes become the GitHub Release body, where a link relative to the repository
+    # root is dead: they link to the file at the release's tag.
+    changelog, headers = _repository_changelog(tools)
+    for header in headers[1:]:
+        notes = tools.release_notes(changelog, header["name"])
+        assert notes.strip()
+        assert not RELATIVE_LINK.findall(notes), header["name"]
 
 
 # ------------------------------------------------------------------------- manifest

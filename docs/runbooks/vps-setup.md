@@ -1,6 +1,6 @@
 # VPS setup
 
-From an empty Debian 13 server to a stack that is ready for its first `./deploy.sh`. It is the work of step H8.6; the first release (H8.7) comes after it. Allow half a day, most of it waiting for DNS, the SMTP account and the offsite storage.
+From an empty Debian 13 server to a stack that is ready for its first `./deploy.sh`. It is the work of step H8.6; the first release, v0.1.0, which opens the pilot (H8.7, [pilot.md](pilot.md)), comes after it. Allow half a day, most of it waiting for DNS, the SMTP account and the offsite storage.
 
 Who does this: the maintainer, by hand. Agents never touch the server.
 
@@ -198,7 +198,7 @@ A full copy of `.env` and `app.env` in the offline storage is the simplest way t
 
 ## 8. First start and first checks
 
-The first deploy is part of H8.7, after the first release exists. Until then you can check everything that does not need images:
+The first deploy is part of H8.7, after the first release (v0.1.0) exists. Until then you can check everything that does not need images:
 
 ```bash
 cd ~/gmat-m8/docker_compose/gmat_m8

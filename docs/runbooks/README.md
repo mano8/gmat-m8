@@ -5,6 +5,7 @@ Written for the maintainer, who runs the production VPS alone. Each page can be 
 | I need to … | Read |
 | --- | --- |
 | Set up the server for the first time (H8.6) | [vps-setup.md](vps-setup.md) |
+| Run the pilot: the 0.x releases, what to try for real, when v1.0.0 can follow | [pilot.md](pilot.md) |
 | Put a release on the server, or undo a bad one | [deploy-rollback.md](deploy-rollback.md) |
 | Check backups, run the quarterly drill, restore, prune offsite | [backup-restore.md](backup-restore.md) |
 | Record the result of a drill | [drill-log.md](drill-log.md) |
