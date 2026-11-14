@@ -2,11 +2,20 @@
 
 The first releases are numbered `0.x`. They run on the production server, for a small group of real users, so that everything the test suites cannot prove is tried for real before the application is called stable: the server, the real mail and offsite storage, a real restore, an upgrade, and people doing their work on their own phones. The pilot ends when the [exit criteria](#exit-criteria-for-v100) hold; then v1.0.0 is released and the other branches join.
 
-Written for the maintainer. It uses the other runbooks rather than repeating them; keep a copy of this page (or an issue made from it) and tick the boxes as you go.
+Written for the maintainer. It uses the other runbooks rather than repeating them; keep a copy of this page (or an issue made from it) and tick the boxes as you go. Commands run on the VPS as `deploy`, as in the other runbooks:
+
+```bash
+cd ~/gmat-m8/docker_compose/gmat_m8
+alias dc='docker compose -f docker-compose.yml -f docker-compose.production.yml'
+```
 
 ## Versions during the pilot
 
-- **v0.1.0** is the first release. Each round of corrections that the pilot asks for is a new release: **`0.Y.0`** when it carries a migration, changes a behaviour or adds a screen, **`0.Y.Z`** for a fix without a migration. There can be as many as needed (v0.2.0, v0.3.0, …). Semantic Versioning promises nothing stable below 1.0.0; this project still writes every change into `CHANGELOG.md`.
+- **v0.1.0** is the first release. Each round of corrections that the pilot asks for is a new release, as many as needed (v0.2.0, v0.3.0, …). The number says what an upgrade involves:
+  - **`0.Y.0`** when the release carries a migration, or changes what people do or may do: a new screen or step, a changed rule or permission;
+  - **`0.Y.Z`** otherwise: fixes that make the application do what it already claims to do, without a migration.
+
+  When in doubt, take `0.Y.0`. Semantic Versioning promises nothing stable below 1.0.0; this project still writes every change into `CHANGELOG.md`.
 - Every 0.x release goes through the whole pipeline, exactly as v1.0.0 will: a `## [X.Y.Z]` section in `CHANGELOG.md` merged by PR, `verify_release.py`, the tag, `docker-publish`, `./deploy.sh X.Y.Z` ([../release.md](../release.md), [deploy-rollback.md](deploy-rollback.md)). No step is skipped because the version starts with 0: the pilot is also the rehearsal of the release routine.
 - The migration statements apply from v0.2.0 on: write `Irreversible migration: …` or `Old code works on the new schema: …` in the notes when they are true.
 - While the pilot runs, `main` takes what the pilot needs: fixes, corrections of screens and wording, documentation. Large new features wait until v1.0.0 is tagged, so that each 0.x release changes only what the pilot is testing.

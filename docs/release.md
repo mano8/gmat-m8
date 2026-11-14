@@ -23,7 +23,7 @@ Nothing is signed or released unless every earlier step passed. Only the digests
 
 ## Release procedure (maintainer)
 
-1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh `## [Unreleased]` above it. Two statements have a line of their own. The publish workflow copies them into the signed manifest, and the deploy tooling reads them only from there (ADR-0017):
+1. **Write the notes.** In a pull request, move the entries of `## [Unreleased]` in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD` and leave a fresh, empty `## [Unreleased]` above it. The section becomes the GitHub Release's body, where a link relative to the repository is dead: turn each one into an absolute link to the file at the release's tag (`https://github.com/<owner>/gmat-m8/blob/vX.Y.Z/docs/…`; `tests/unit/scripts/test_release_tools.py` refuses a relative one in a version section). Two statements have a line of their own. The publish workflow copies them into the signed manifest, and the deploy tooling reads them only from there (ADR-0017):
    - `Irreversible migration: <what>` makes `deploy.sh` ask for the version to be typed, and `recover.sh migrate-back` refuse: going back then means restoring the pre-deploy dump.
    - `Old code works on the new schema: <why>` is the only thing that lets `recover.sh rollback-images` start the previous images after the commit point.
 
