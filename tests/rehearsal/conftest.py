@@ -421,7 +421,8 @@ def make_world(
             "HTTP_PORT": str(http_port),
             "HTTPS_PORT": str(https_port),
             "EDGE_SUBNET": subnet,
-            "ADMIN_ALLOWED_CIDRS": "203.0.113.0/24",
+            # The admin is off (the template's default, ADR-0030), so no allowlist is needed.
+            "ADMIN_ALLOWED_CIDRS": "",
             "RESTIC_REPOSITORY": "rest:http://rest-append:8000/gmat",
             "RESTIC_PASSWORD": OFFSITE_PASSWORD,
             "APP_DIGEST": "sha256:" + "0" * 64,

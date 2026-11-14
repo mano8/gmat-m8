@@ -18,7 +18,9 @@
           {% include "components/button.html" with href=edit_url label=_("Edit") %}
           {% if material.is_active %}
             {% include "components/dialog_button.html" with dialog="deactivate-dialog" label=_("Deactivate") variant="danger" icon="ban" testid="deactivate-open" %}
-          {% else %}
+          {% elif reactivate_dialog %}
+            {% include "components/dialog_button.html" with dialog="reactivate-dialog" label=_("Reactivate with its unit") variant="primary" icon="rotate-ccw" testid="reactivate-open" %}
+          {% elif not unit_blocked %}
             <form method="post"
                   action="{% url 'catalog:reactivate' material_id=material.pk %}">
               {% csrf_token %}
@@ -29,6 +31,21 @@
       {% endif %}
     </div>
   </header>
+  {% if unit_blocked %}
+    <p class="mb-4 rounded-lg border border-warn bg-warn-soft p-3 text-sm"
+       role="note"
+       data-testid="unit-inactive-note">
+      {% if reactivate_dialog %}
+        {% blocktranslate trimmed with unit=material.unit.label %}
+          Its unit of measure, {{ unit }}, is inactive too: the material comes back with its unit, in one step.
+        {% endblocktranslate %}
+      {% else %}
+        {% blocktranslate trimmed with unit=material.unit.label %}
+          Its unit of measure, {{ unit }}, is inactive: the material comes back only with its unit. A group administrator can reactivate both from this page, or the unit under Administration → Units of measure.
+        {% endblocktranslate %}
+      {% endif %}
+    </p>
+  {% endif %}
   <section class="@container card">
     <dl class="facts">
       <div>
@@ -81,5 +98,8 @@
   </section>
   {% if deactivate_dialog and material.is_active %}
     {% include "components/action_dialog.html" with d=deactivate_dialog %}
+  {% endif %}
+  {% if reactivate_dialog %}
+    {% include "components/action_dialog.html" with d=reactivate_dialog %}
   {% endif %}
 {% endblock content %}

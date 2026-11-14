@@ -127,7 +127,7 @@
   // --- Dialogs (M8b.3) ------------------------------------------------------------------------
   // Native <dialog> elements opened by invoker commands (commandfor/command). Where the browser
   // lacks them, this opens and closes the dialog the same way. Focus goes back to the opener.
-  var nativeCommands = "commandForElement" in HTMLButtonElement.prototype;
+  var nativeCommands = "commandForElement" in document.createElement("button");
   var openers = new WeakMap();
 
   function dialogOf(element) {
@@ -145,32 +145,41 @@
     }
   }
 
+  function commandedDialog(button) {
+    var dialog = document.getElementById(button.getAttribute("commandfor"));
+    return dialog && dialog.tagName === "DIALOG" ? dialog : null;
+  }
+
+  // An item of a menu (a popover): the menu closes and the focus later returns to the button
+  // that opened the menu, since the item itself is hidden by then.
+  function returnTarget(button) {
+    var menu = button.closest("[popover]");
+    if (!menu) {
+      return button;
+    }
+    var invoker = menu.id ? document.querySelector('[popovertarget="' + menu.id + '"]') : null;
+    if (menu.matches(":popover-open")) {
+      menu.hidePopover();
+    }
+    return invoker || button;
+  }
+
+  function showCommanded(button, dialog) {
+    openers.set(dialog, returnTarget(button));
+    if (!nativeCommands && !dialog.open) {
+      dialog.showModal();
+    }
+  }
+
   document.addEventListener("click", function (event) {
     var button = event.target.closest("button[commandfor]");
-    if (!button) {
-      return;
-    }
-    var dialog = document.getElementById(button.getAttribute("commandfor"));
-    if (!dialog || dialog.tagName !== "DIALOG") {
+    var dialog = button ? commandedDialog(button) : null;
+    if (!dialog) {
       return;
     }
     var command = button.getAttribute("command");
     if (command === "show-modal") {
-      // An item of a menu (a popover): the menu closes and the focus later returns to the
-      // button that opened the menu, since the item itself is hidden by then.
-      var menu = button.closest("[popover]");
-      var returnTo = button;
-      if (menu) {
-        var invoker = menu.id ? document.querySelector('[popovertarget="' + menu.id + '"]') : null;
-        if (menu.matches(":popover-open")) {
-          menu.hidePopover();
-        }
-        returnTo = invoker || button;
-      }
-      openers.set(dialog, returnTo);
-      if (!nativeCommands && !dialog.open) {
-        dialog.showModal();
-      }
+      showCommanded(button, dialog);
     } else if (command === "close" && !nativeCommands && dialog.open) {
       dialog.close();
     }

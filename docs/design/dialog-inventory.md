@@ -45,6 +45,14 @@ open with Cancel focused.
 | | Change an assignment's validity | `<details>` per row of a paged list | lazy dialog (`edit_assignment_validity`) |
 | | Revoke an assignment | form per row | lazy dialog, destructive (`confirm_revoke_assignment`) |
 | Supplier, material | Deactivate | form | inline dialog (destructive) |
+| Company (M10.2) | Edit; add a joint-venture member | — (admin) | inline dialogs |
+| | Change a member's share | — (admin) | lazy dialog per member row (`edit_venture_member`) |
+| | Deactivate, reactivate | — (admin) | lazy dialog with the preview of whose access changes (deactivate destructive; `confirm_deactivate_company`, `confirm_reactivate_company`) |
+| Company and branch lists (M10.2) | New company, new branch | — (admin) | lazy dialogs (`new_company`, `new_branch`; a company's page opens the branch one with `?company=`) |
+| Branch (M10.2) | Edit (name, city, address, default warehouse) | — (admin) | inline dialog |
+| | Change the managing branch | — (admin) | inline dialog (destructive); the preview follows the choice (`preview_branch_manager`) |
+| | Allow or stop self-approval | — (admin) | inline dialog naming the self-decision rule |
+| | Deactivate, reactivate | — (admin) | lazy dialog with the preview (deactivate destructive) |
 | Attachments panel | Remove an attachment | `<details>` per file | inline dialog per file (a moderator's reason is required) |
 | Draft request | Not in the catalog? | `<details>` | inline dialog |
 | | Discard the draft | form | inline dialog (destructive) |

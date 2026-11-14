@@ -1,6 +1,6 @@
 # ADR-0028: Every business role receives at the worksites of its projects
 
-- **Status:** Proposed (M9.1, the maintainer's decision Q44 of 2026-11-04, issue #32; accepted when the phase PR merges)
+- **Status:** Accepted (M9.1, the maintainer's decision Q44 of 2026-11-04, issue #32; implemented in PR #54, merged 2026-11-13; status recorded at the maintainer's review of PR #55, 2026-11-14)
 - **Date:** 2026-11-12
 - **Governs:** `apps/access/roles.py`, `apps/access/scopes.py`, `apps/receiving/services.py`, `apps/receiving/selectors.py`
 - **Amends:** [ADR-0010](0010-business-rules.md) (Q9), plan §3.4 (the `receipt.view` and `receipt.post` rows of the capability matrix and the notes on technicians, partners and site managers)

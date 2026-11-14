@@ -69,7 +69,7 @@ file is fetched only for characters outside it (`unicode-range`). `@font-face` i
 | Version | `lucide-static` 1.61.0 |
 | Source | `https://registry.npmjs.org/lucide-static/-/lucide-static-1.61.0.tgz`, file `package/icon-nodes.json` |
 | Tarball integrity | `sha512-yLAiQB3MWUJEstsEDAwenSA3m7vr1tdLvgnC16Q/XMxRRma0DWwMs8M2bWlvgShrIs1m2mWMJ+0AiahqQO4GrA==` (matches the registry) |
-| `icons.json` sha256 | `f19ce98f11eefec6e75b5ea05cd18de0303a3c0c05dd72c98c765e53e8d5eafa` |
+| `icons.json` sha256 | `b09b23b009a7dc7c9709904eb9b3e1eeeed6669196502c75da08cc1c90419481` |
 
 Only the icons the application draws, as the shapes of a 24 x 24 box. `{% icon "name" %}`
 (`apps/core/templatetags/ui_tags.py`) reads the file once and builds each SVG with escaped

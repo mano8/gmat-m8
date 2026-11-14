@@ -8,7 +8,9 @@ python3). Each command prints plain text for the shell and exits non-zero on a m
   manifest FILE --version V --repository OWNER/NAME --image-prefix PREFIX
                             validates a verified release-manifest.json; prints KEY=VALUE lines
   states MANIFEST KEY       exit 0 when the signed manifest states this about its migrations
-  admin-cidrs VALUE         refuses an allowlist that is open or holds Docker's bridge ranges
+  admin-cidrs VALUE [--enabled DJANGO_ADMIN_ENABLED]
+                            refuses an allowlist that is open or holds Docker's bridge ranges,
+                            while the admin is on (without --enabled it is taken as on)
   dump-version MANIFEST     the app version a backup manifest was taken with
   dump-time MANIFEST        when a backup was taken (a restore's loss window starts there)
   compare-counts MANIFEST RESTORED
@@ -33,6 +35,9 @@ DOCKER_RANGES = tuple(
 )
 # The widest network an allowlist may name, by IP version: an office, a VPN, a provider's block.
 WIDEST_PREFIX = {4: 8, 6: 32}
+# DJANGO_ADMIN_ENABLED as config.env.env_bool reads it (empty: production's default, off).
+ADMIN_ON = frozenset({"1", "true", "yes", "on"})
+ADMIN_OFF = frozenset({"", "0", "false", "no", "off"})
 IMAGE_NAMES = {"app": "gmat-m8", "backup": "gmat-m8-backup"}
 MIGRATION_KEYS = ("irreversible", "old_code_works")
 
@@ -106,6 +111,16 @@ def check_manifest(
     }
 
 
+def admin_enabled(value: str) -> bool:
+    """Whether ``web`` will serve the admin; a word Django would refuse is refused here."""
+    word = value.strip().lower()
+    if word not in ADMIN_ON | ADMIN_OFF:
+        raise Refused(
+            f"DJANGO_ADMIN_ENABLED: {value!r} is not one of {sorted(ADMIN_ON | ADMIN_OFF)}"
+        )
+    return word in ADMIN_ON
+
+
 def check_admin_cidrs(value: str) -> None:
     """Production names the networks that reach the admin, and never a bridge range. Read as
     networks, not strings: ``0::/0`` and ``::/1`` are as open as ``::/0``."""
@@ -156,6 +171,9 @@ def _manifest(args: argparse.Namespace) -> str:
 
 
 def _admin_cidrs(args: argparse.Namespace) -> str:
+    """The allowlist matters only while the admin is on (ADR-0030): off, it has no URL."""
+    if args.enabled is not None and not admin_enabled(args.enabled):
+        return "the admin is off: no allowlist needed"
     check_admin_cidrs(args.value)
     return ""
 
@@ -203,7 +221,9 @@ def _parser() -> argparse.ArgumentParser:
     states = commands.add_parser("states")
     states.add_argument("manifest")
     states.add_argument("key", choices=MIGRATION_KEYS)
-    commands.add_parser("admin-cidrs").add_argument("value")
+    cidrs = commands.add_parser("admin-cidrs")
+    cidrs.add_argument("value")
+    cidrs.add_argument("--enabled")
     commands.add_parser("dump-version").add_argument("manifest")
     commands.add_parser("dump-time").add_argument("manifest")
     counts = commands.add_parser("compare-counts")

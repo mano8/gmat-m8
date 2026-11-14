@@ -14,7 +14,7 @@ Sign-up is closed, accounts are created by invitation, and privileged roles need
 - Email login, closed sign-up, enumeration prevention, POST-only logout. Allauth's email-management and email-confirmation views are off.
 - TOTP and recovery codes, secrets encrypted at rest with `MFA_ENCRYPTION_KEYS`; passkeys are opt-in.
 - Argon2id password hashing.
-- The Django admin logs in through allauth and requires a session-level MFA check. Access and document models are read-only there; deletes are unavailable.
+- The Django admin logs in through allauth and requires a session-level MFA check. Deletes are unavailable. *Amended 2026-11-13 by [ADR-0030](0030-administration-in-the-app.md):* every model is read-only there (until then, access and document models were), and the admin is off by default in production; administration happens in the app's screens.
 - Email addresses are changed by administrators only (Q26); the new address confirms and the old one can cancel for 24 h.
 - No external identity provider in the MVP. allauth can act as an OIDC client later.
 

@@ -34,7 +34,7 @@ cd docker_compose/gmat_m8
 
 | Step | What | If it fails |
 | --- | --- | --- |
-| 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the env files (0600), the admin allowlist, the offsite repository setting and the checkout. | Nothing changed. Fix and run again. |
+| 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the env files (0600), the admin allowlist (only while `DJANGO_ADMIN_ENABLED` turns the admin on), the offsite repository setting and the checkout. | Nothing changed. Fix and run again. |
 | 2 | Downloads the manifest, verifies its **signature** and the signature of both images against the workflow identity of that tag, checks version, repository and registry, pulls both images **by digest**. | Nothing changed, the site stayed open. |
 | 3 | Preflight: pulls the third-party images (Caddy, PostgreSQL, ClamAV), then with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
 | 4 | **Gates on**: `flags/maintenance.on` and `flags/worker.paused`. Confirms from outside that Caddy answers 503. | Gates stay on. |
@@ -115,6 +115,14 @@ This loses data, so it is a decision, not a reflex:
 - The CHANGELOG already has the release notes; nothing to edit on the server.
 - If the release changed **Caddy**, the Caddyfile or the maintenance page, the deploy restarted Caddy behind the gates, so it already applies.
 - If anything about the release surprised you, write it in the incident log or the next release's notes.
+
+## Turning the Django admin on or off
+
+Everything is administered in the app. The Django admin is an optional, read-only view of the records, off by default (ADR-0030). A `.env` from before it was optional gets `DJANGO_ADMIN_ENABLED=false` from `bash init.sh`, so the first deploy of that release turns the admin off; nothing else changes.
+
+1. In `.env`, set `DJANGO_ADMIN_ENABLED=true` and `ADMIN_ALLOWED_CIDRS` to the addresses that may reach it (see [vps-setup.md](vps-setup.md#env-compose-level)); to turn it off, set `false` (the allowlist can then be emptied).
+2. Run `./deploy.sh <the version already running>`. It refuses, before anything changes, an admin that is on without an allowlist, with an open one or with Docker's ranges, then restarts `web` and Caddy behind the gates with the new value.
+3. Check: on, `https://<domain>/<ADMIN_URL_PATH>/` sends you to the sign-in from an allowed address and answers 404 from any other; off, it answers 404 from everywhere.
 
 ## Emergency: the site is down and no deploy is running
 

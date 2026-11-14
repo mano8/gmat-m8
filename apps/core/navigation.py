@@ -15,7 +15,6 @@ from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.middleware import access_for
-from apps.core.preferences import CATEGORY_KEYS
 
 #: The bottom bar holds this many entries and a "More" button (the maintainer's four plus More).
 PHONE_BAR_SIZE = 4
@@ -30,6 +29,35 @@ def _app(*names: str, but: tuple[str, ...] = ()) -> Active:
 
 def _url(*names: str) -> Active:
     return lambda match: match.view_name in names
+
+
+#: The pages of the organization's structure under ``/org/`` (M10.2): not People's.
+COMPANY_PAGES = (
+    "companies",
+    "company",
+    "new_company",
+    "confirm_deactivate_company",
+    "confirm_reactivate_company",
+    "edit_venture_member",
+)
+BRANCH_PAGES = (
+    "branches",
+    "branch",
+    "new_branch",
+    "preview_branch_manager",
+    "confirm_deactivate_branch",
+    "confirm_reactivate_branch",
+)
+STRUCTURE_PAGES = (*COMPANY_PAGES, *BRANCH_PAGES)
+#: The warehouse pages (M10.3), lazy dialogs opened as pages of their own included.
+WAREHOUSE_PAGES = (
+    "warehouses",
+    "new_warehouse",
+    "edit_warehouse",
+    "confirm_deactivate_warehouse",
+)
+#: The units of measure pages under ``/catalog/units/`` (M10.3): Administration's, not Catalog's.
+UNIT_PAGES = ("units", "new_unit", "edit_unit")
 
 
 @dataclass(frozen=True)
@@ -148,14 +176,13 @@ CATEGORIES: tuple[Category, ...] = (
                 _app("projects"),
                 9,
             ),
-            Entry("people", _("People"), "org:people", "users", "org.manage", _app("org"), 10),
             Entry(
                 "catalog",
                 _("Catalog"),
                 "catalog:list",
                 "package",
                 "catalog.view",
-                _app("catalog"),
+                _app("catalog", but=UNIT_PAGES),
                 11,
             ),
             Entry(
@@ -187,9 +214,62 @@ CATEGORIES: tuple[Category, ...] = (
             ),
         ),
     ),
+    # M10.2 (ADR-0030): what a group administrator administers, together; nobody else sees it.
+    Category(
+        "administration",
+        _("Administration"),
+        (
+            Entry(
+                "people",
+                _("People"),
+                "org:people",
+                "users",
+                "org.manage",
+                _app("org", but=STRUCTURE_PAGES),
+                15,
+            ),
+            Entry(
+                "companies",
+                _("Companies"),
+                "org:companies",
+                "landmark",
+                "org.manage",
+                _url(*(f"org:{name}" for name in COMPANY_PAGES)),
+                16,
+            ),
+            Entry(
+                "branches",
+                _("Branches"),
+                "org:branches",
+                "building",
+                "org.manage",
+                _url(*(f"org:{name}" for name in BRANCH_PAGES)),
+                17,
+            ),
+            Entry(
+                "warehouses",
+                _("Warehouses"),
+                "locations:warehouses",
+                "warehouse",
+                "org.manage",
+                _url(*(f"locations:{name}" for name in WAREHOUSE_PAGES)),
+                18,
+            ),
+            Entry(
+                "units",
+                _("Units of measure"),
+                "catalog:units",
+                "scale",
+                "org.manage",
+                _url(*(f"catalog:{name}" for name in UNIT_PAGES)),
+                19,
+            ),
+        ),
+    ),
 )
 
-assert tuple(category.key for category in CATEGORIES) == CATEGORY_KEYS  # noqa: S101
+# ``tests/unit/core/test_ui_navigation.py`` keeps these keys equal to ``CATEGORY_KEYS``, the
+# cookie's allowlist.
 
 
 @dataclass(frozen=True)

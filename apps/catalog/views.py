@@ -28,6 +28,7 @@ from apps.catalog.forms import (
     MaterialCreateForm,
     MaterialFilterForm,
     MaterialForm,
+    ReactivateForm,
 )
 from apps.catalog.models import Material, MaterialCategory
 from apps.core.dialogs import ActionDialog
@@ -91,10 +92,16 @@ def material_detail(request: HttpRequest, material_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     material = selectors.material(ctx, material_id)
     manageable = selectors.manageable(ctx, material)
+    # Q72 as amended: an inactive material whose unit is inactive comes back only with it. Who
+    # may also manage units gets one dialog that reactivates both; the others are told who can.
+    blocked = manageable and not material.is_active and not material.unit.is_active
+    both = blocked and ctx.has(Capability.ORG_MANAGE)
     context = {
         "material": material,
         "manageable": manageable,
+        "unit_blocked": blocked,
         "deactivate_dialog": deactivate_dialog(material, Form()) if manageable else None,
+        "reactivate_dialog": reactivate_dialog(material, _with_unit()) if both else None,
     }
     return render(request, "catalog/detail.html", context)
 
@@ -133,7 +140,9 @@ def material_create(request: HttpRequest) -> HttpResponse:
 def material_edit(request: HttpRequest, material_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     material = _manageable(request, material_id)
-    form = MaterialForm(initial=MaterialForm.initial_for(material), ctx=ctx)
+    form = MaterialForm(
+        initial=MaterialForm.initial_for(material), ctx=ctx, keep_unit=material.unit_id
+    )
     return render(request, "catalog/form.html", {"form": form, "material": material})
 
 
@@ -141,7 +150,7 @@ def material_edit(request: HttpRequest, material_id: UUID) -> HttpResponse:
 def material_update(request: HttpRequest, material_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     material = _manageable(request, material_id)
-    form = MaterialForm(request.POST, ctx=ctx)
+    form = MaterialForm(request.POST, ctx=ctx, keep_unit=material.unit_id)
     if form.is_valid():
         try:
             services.update_material(ctx.principal, material.pk, **form.values())
@@ -178,33 +187,69 @@ def deactivate_dialog(material: Material, form: Form) -> ActionDialog:
     )
 
 
-def _set_active(request: HttpRequest, material_id: UUID, *, active: bool) -> HttpResponse:
-    ctx = access_for(request)
-    material = _manageable(request, material_id)
-    action = services.reactivate_material if active else services.deactivate_material
-    form = Form(request.POST)
-    form.is_valid()  # no fields: a service refusal can then be shown on it
-    return perform(
-        request,
-        lambda: action(ctx.principal, material.pk),
-        _("Material %(reference)s reactivated.") % {"reference": material.reference}
-        if active
-        else _("Material %(reference)s deactivated.") % {"reference": material.reference},
-        reverse("catalog:detail", args=[material.pk]),
-        dialog=None
-        if active
-        else deactivate_dialog(material, form).dialog(),  # only that one is a dialog
+def _with_unit() -> ReactivateForm:
+    return ReactivateForm(initial={"with_unit": True})
+
+
+def reactivate_dialog(material: Material, form: Form) -> ActionDialog:
+    """Reactivating a material whose unit is inactive: both come back in one step (the
+    service checks ``org.manage`` for the unit as well as ``catalog.manage``)."""
+    return ActionDialog(
+        id="reactivate-dialog",
+        title=_("Reactivate the material and its unit"),
+        description=f"{material.reference} · {material.name}",
+        icon="rotate-ccw",
+        action=reverse("catalog:reactivate", args=[material.pk]),
+        submit=_("Reactivate both"),
+        form=form,
+        consequences=(
+            _(
+                "The unit %(unit)s becomes active again: it is offered again for new materials,"
+                " free-text lines and imports."
+            )
+            % {"unit": material.unit.label},
+            _("The material is offered again in searches and new documents."),
+        ),
+        cancel=_("Keep them inactive"),
+        testid="reactivate-form",
+        submit_testid="reactivate-submit",
     )
 
 
 @mutating(MANAGE)
 def material_deactivate(request: HttpRequest, material_id: UUID) -> HttpResponse:
-    return _set_active(request, material_id, active=False)
+    ctx = access_for(request)
+    material = _manageable(request, material_id)
+    form = Form(request.POST)
+    form.is_valid()  # no fields: a service refusal can then be shown on it
+    return perform(
+        request,
+        lambda: services.deactivate_material(ctx.principal, material.pk),
+        _("Material %(reference)s deactivated.") % {"reference": material.reference},
+        reverse("catalog:detail", args=[material.pk]),
+        dialog=deactivate_dialog(material, form).dialog(),
+    )
 
 
 @mutating(MANAGE)
 def material_reactivate(request: HttpRequest, material_id: UUID) -> HttpResponse:
-    return _set_active(request, material_id, active=True)
+    """The page's button, or its dialog with ``with_unit`` when the unit is inactive too."""
+    ctx = access_for(request)
+    material = _manageable(request, material_id)
+    form = ReactivateForm(request.POST)
+    with_unit = form.is_valid() and form.cleaned_data["with_unit"]
+    done = (
+        _("Material %(reference)s and its unit reactivated.")
+        if with_unit
+        else _("Material %(reference)s reactivated.")
+    )
+    return perform(
+        request,
+        lambda: services.reactivate_material(ctx.principal, material.pk, with_unit=with_unit),
+        done % {"reference": material.reference},
+        reverse("catalog:detail", args=[material.pk]),
+        dialog=reactivate_dialog(material, form).dialog() if with_unit else None,
+    )
 
 
 # --- categories ---------------------------------------------------------------------

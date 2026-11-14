@@ -150,7 +150,30 @@ def test_check_deploy_passes_with_the_stack_configuration(stack: Stack) -> None:
     assert "no issues" in result.stdout + result.stderr
 
 
+def _admin_enabled(stack: Stack) -> bool:
+    return stack.env_value("DJANGO_ADMIN_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+
+
+def test_an_admin_that_is_off_is_an_unknown_path(stack: Stack) -> None:
+    """ADR-0030: the default. Django answers its 404 page, as for any unknown path."""
+    if _admin_enabled(stack):
+        pytest.skip("this stack's .env turns the admin on")
+    path = stack.env_value("ADMIN_URL_PATH", "admin")
+    unknown = _unmasked(stack.get("/no-such-page/").text)
+    for url in (f"/{path}/", f"/{path}/login/"):
+        response = stack.get(url)
+        assert response.status == 404, url
+        assert _unmasked(response.text) == unknown, url
+
+
+def _unmasked(page: str) -> str:
+    """The page without its CSRF token, masked afresh in every response."""
+    return re.sub(r'"X-CSRFToken": "[^"]+"', '"X-CSRFToken": ""', page)
+
+
 def test_admin_lives_at_the_configured_path(stack: Stack) -> None:
+    if not _admin_enabled(stack):
+        pytest.skip("the admin is off (DJANGO_ADMIN_ENABLED)")
     path = stack.env_value("ADMIN_URL_PATH", "admin")
     response = stack.get(f"/{path}/")
     assert response.status == 302

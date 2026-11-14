@@ -231,6 +231,45 @@ class TestMaterials:
         assert services.update_material(admin_principal, free.pk, unit_id=cable.unit_id)
 
 
+class TestInactiveUnit:
+    """Q72: an inactive unit is no longer given to a material, whatever the caller; a material
+    that has it keeps it (the rule is the service's, the form and the import only narrow the
+    choices)."""
+
+    @pytest.fixture
+    def retired(self) -> UnitOfMeasure:
+        UnitOfMeasure.objects.filter(code="KG").update(is_active=False)
+        return UnitOfMeasure.objects.get(code="KG")
+
+    def test_a_new_material_refuses_it(
+        self, admin_principal: SessionPrincipal, retired: UnitOfMeasure
+    ) -> None:
+        with pytest.raises(ValidationError) as exc:
+            services.create_material(
+                admin_principal, reference="NEW-1", name="New", unit_id=retired.pk
+            )
+        assert "inactive" in error_codes(exc.value)
+        assert not Material.objects.filter(reference="NEW-1").exists()
+
+    def test_changing_to_it_is_refused(
+        self, admin_principal: SessionPrincipal, cable: Material, retired: UnitOfMeasure
+    ) -> None:
+        with pytest.raises(ValidationError) as exc:
+            services.update_material(admin_principal, cable.pk, unit_id=retired.pk)
+        assert "inactive" in error_codes(exc.value)
+        cable.refresh_from_db()
+        assert cable.unit.code == "UD"
+
+    def test_a_material_that_has_it_keeps_it_and_can_still_be_edited(
+        self, admin_principal: SessionPrincipal, cable: Material, unit: UnitOfMeasure
+    ) -> None:
+        UnitOfMeasure.objects.filter(pk=unit.pk).update(is_active=False)
+        edited = services.update_material(
+            admin_principal, cable.pk, name="Renamed", unit_id=unit.pk
+        )
+        assert edited.name == "Renamed" and edited.unit_id == unit.pk
+
+
 class TestAuthorization:
     """``catalog.manage``: group administrators and material managers, nobody else."""
 

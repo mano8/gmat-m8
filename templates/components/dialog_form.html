@@ -3,8 +3,9 @@
   The form of an action dialog (M8b.4): what the dialog holds, and what comes back alone (422)
   when the form is invalid or the service refuses it. Parameter: d, an apps.core.dialogs.ActionDialog.
   The consequences are what the action will do, one sentence each; the form's visible fields
-  follow, its hidden ones (idempotency key, seen version) are kept; Cancel closes the dialog and
-  has the focus in a destructive one.
+  follow, its hidden ones (idempotency key, seen version) are kept, then d.body (a template, with
+  data=d.data) when the dialog has more to show; Cancel closes the dialog and has the focus in a
+  destructive one.
 {% endcomment %}
 <form method="post"
       action="{{ d.action }}"
@@ -34,6 +35,9 @@
       </ul>
     {% endif %}
     {% for field in d.form.visible_fields %}{{ field.as_field_group }}{% endfor %}
+    {% if d.body %}
+      {% include d.body with data=d.data %}
+    {% endif %}
   </div>
   <fieldset class="dialog-foot" data-dialog-actions>
     {% if d.modal %}

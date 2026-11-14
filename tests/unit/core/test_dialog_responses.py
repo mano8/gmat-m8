@@ -18,7 +18,9 @@ from django.contrib.messages.storage.cookie import CookieStorage
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
+from django.urls import reverse, reverse_lazy
 from django.utils import translation
+from django.utils.translation import gettext_lazy
 from django_htmx.middleware import HtmxDetails
 
 from apps.core import responses
@@ -148,6 +150,31 @@ class TestPerform:
         response = perform(request, lambda: None, "Done.", "/to/", dialog=dialog_for(form))
         assert response.status_code == 204 and response["HX-Redirect"] == "/to/"
         assert flashed(request) == ["Done."]  # shown on the page htmx navigates to
+
+    def test_the_flash_and_the_place_may_follow_the_result(self) -> None:
+        """M10.2: a create goes to the page of what it made."""
+        request = make_request(htmx=True)
+        response = perform(
+            request, lambda: "e7", lambda made: f"Made {made}.", lambda made: f"/made/{made}/"
+        )
+        assert response.status_code == 204 and response["HX-Redirect"] == "/made/e7/"
+        assert flashed(request) == ["Made e7."]
+
+    def test_a_lazy_flash_and_a_lazy_place_are_fixed_values(self) -> None:
+        """``gettext_lazy`` and ``reverse_lazy`` results are not functions of the result."""
+        request = make_request()
+        response = perform(request, lambda: "e7", gettext_lazy("Done."), reverse_lazy("core:home"))
+        assert response.status_code == 302 and response["Location"] == reverse("core:home")
+        assert flashed(request) == ["Done."]
+
+    def test_a_place_that_follows_the_result_needs_failed_to(self) -> None:
+        request = make_request()
+        with pytest.raises(TypeError, match="failed_to"):
+            perform(request, refuse(ValidationError("No.")), "Done.", lambda made: "/x/")
+        response = perform(
+            request, refuse(ValidationError("No.")), "Done.", lambda made: "/x/", failed_to="/f/"
+        )
+        assert response["Location"] == "/f/"
 
     def test_a_refusal_plain_is_flashed_and_goes_to_failed_to(self) -> None:
         request = make_request()

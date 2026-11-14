@@ -1,0 +1,84 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Warehouses" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Warehouses" %}</h1>
+      <p class="page-head-sub">{% translate "Where each branch receives goods and hands them over from. A worksite comes with its project and is changed on the project's page." %}</p>
+    </div>
+    <div class="page-head-actions">
+      {% url 'locations:new_warehouse' as new_url %}
+      {% include "organizations/lazy_button.html" with url=new_url dialog="new-dialog" label=_("New warehouse") variant="primary" icon="plus" testid="warehouse-new-open" %}
+    </div>
+  </header>
+  {% url 'locations:warehouses' as list_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#warehouse-results" action=list_url grid="sm:grid-cols-[1fr_16rem_10rem_auto]" %}
+  {% partialdef results inline %}
+    <div id="warehouse-results">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              {% include "components/sort_header.html" with listing=listing key="name" label=_("Name") %}
+              {% include "components/sort_header.html" with listing=listing key="branch" label=_("Branch") %}
+              <th scope="col">{% translate "Address" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+              <th scope="col">
+                <span class="sr-only">{% translate "Actions" %}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for warehouse in listing.rows %}
+              <tr data-testid="warehouse-row">
+                <td data-label="{% translate 'Name' %}">
+                  <span class="font-medium">{{ warehouse.name }}</span>
+                </td>
+                <td data-label="{% translate 'Branch' %}">
+                  <a class="doc-no"
+                     href="{% url 'org:branch' branch_id=warehouse.branch_id %}">{{ warehouse.branch.company.code }}-{{ warehouse.branch.code }}</a>
+                </td>
+                <td data-label="{% translate 'Address' %}">{{ warehouse.address|default:"—"|linebreaksbr }}</td>
+                <td data-label="{% translate 'Status' %}">
+                  <span class="flex flex-wrap gap-2">
+                    {% include "organizations/active_status.html" with obj=warehouse place=True %}
+                    {% if warehouse.is_default %}
+                      {% translate "Default" as label %}
+                      {% chip label "brand" "check" %}
+                    {% endif %}
+                  </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    {% url 'locations:edit_warehouse' location_id=warehouse.pk as edit_url %}
+                    {% include "organizations/lazy_button.html" with url=edit_url dialog="edit-dialog" label=_("Edit") icon="pencil" testid="warehouse-edit-open" %}
+                    {% if warehouse.is_active %}
+                      {% url 'locations:confirm_deactivate_warehouse' location_id=warehouse.pk as deactivate_url %}
+                      {% include "organizations/lazy_button.html" with url=deactivate_url dialog="activity-dialog" label=_("Deactivate") variant="danger" icon="ban" testid="warehouse-deactivate-open" %}
+                    {% else %}
+                      <form method="post"
+                            action="{% url 'locations:reactivate_warehouse' location_id=warehouse.pk %}">
+                        {% csrf_token %}
+                        {% include "components/button.html" with type="submit" label=_("Reactivate") icon="rotate-ccw" %}
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" with listing=listing %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No warehouses") text=_("No warehouse matches the filters.") icon="warehouse" %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+  {% include "components/dialog.html" with id="new-dialog" title=_("New warehouse") testid="warehouse-new-dialog" %}
+  {% include "components/dialog.html" with id="edit-dialog" title=_("Edit the warehouse") testid="warehouse-edit-dialog" %}
+  {% include "components/dialog.html" with id="activity-dialog" title=_("Deactivate the warehouse") tone="danger" testid="warehouse-activity-dialog" %}
+{% endblock content %}

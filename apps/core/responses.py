@@ -31,6 +31,7 @@ from django.forms import Form
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render, resolve_url
 from django.utils.cache import patch_vary_headers
+from django.utils.functional import Promise
 from django.utils.translation import gettext as _
 
 from apps.core.forms import add_service_errors, error_text, form_error_text
@@ -130,30 +131,43 @@ def _refused(
     return go(request, to)
 
 
-def perform(
+type Outcome[T] = str | Promise | Callable[[T], str]
+"""A flash or a place after a service call: fixed, or worked out from what it returned (the
+page of the document a create made)."""
+
+
+def _outcome[T](value: Outcome[T], result: T) -> str:
+    return value(result) if callable(value) else str(value)
+
+
+def perform[T](
     request: HttpRequest,
-    call: Callable[[], object],
-    done: str,
-    to: str,
+    call: Callable[[], T],
+    done: Outcome[T],
+    to: Outcome[T],
     *,
     failed_to: str = "",
     dialog: Dialog | None = None,
 ) -> HttpResponse:
     """Run a service call: flash its outcome and go to ``to`` (``failed_to`` if it failed).
 
-    With ``dialog``, an htmx POST that the service refuses gets the form again with the
-    refusal on it (422) instead of the flash.
+    ``done`` and ``to`` may be functions of what the call returned; ``failed_to`` is then
+    required, the place a refusal goes back to. With ``dialog``, an htmx POST that the
+    service refuses gets the form again with the refusal on it (422) instead of the flash.
     """
     try:
-        call()
+        result = call()
     except ValidationError as exc:
-        return _refused(request, exc, failed_to or to, dialog)
+        back = failed_to or to
+        if not isinstance(back, str):
+            raise TypeError("perform: failed_to is required when to is a function") from exc
+        return _refused(request, exc, back, dialog)
     except IdempotencyError as exc:
         return idempotency_failure(request, exc)
     except RetryExhausted:
         return conflict(request)
-    messages.success(request, done)
-    return go(request, to)
+    messages.success(request, _outcome(done, result))
+    return go(request, _outcome(to, result))
 
 
 def invalid(

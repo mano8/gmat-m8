@@ -1,0 +1,107 @@
+"""Group-administrator screens (plan §3.4, §5): ``org.manage`` only, 403 otherwise.
+
+- ``people_screens`` (M2.6): people, memberships, offboarding, email changes, invitations;
+- ``account_actions`` (M10.4): a person's full name and a lost second factor;
+- ``company_screens`` (M10.2): companies and the members of a joint venture;
+- ``branch_screens`` (M10.2): branches, their managing branch, self-approval and activity.
+
+Reads go through the selectors; writes through the services, from POST-only views on their
+own URLs.
+"""
+
+from apps.organizations.views.account_actions import rename_person, reset_mfa
+from apps.organizations.views.branch_screens import (
+    branch,
+    branches,
+    confirm_deactivate_branch,
+    confirm_reactivate_branch,
+    create_branch,
+    deactivate_branch,
+    new_branch,
+    preview_branch_manager,
+    reactivate_branch,
+    set_branch_manager,
+    set_self_approval,
+    update_branch,
+)
+from apps.organizations.views.company_screens import (
+    add_venture_member,
+    companies,
+    company,
+    confirm_deactivate_company,
+    confirm_reactivate_company,
+    create_company,
+    deactivate_company,
+    edit_venture_member,
+    new_company,
+    reactivate_company,
+    update_company,
+    update_venture_member,
+)
+from apps.organizations.views.people_screens import (
+    create_invitation,
+    email_change_delivery,
+    grant_membership,
+    invitation_delivery,
+    invitations,
+    membership_revoke_form,
+    membership_validity,
+    membership_validity_form,
+    new_invitation,
+    offboard,
+    people,
+    person,
+    request_email_change,
+    resend_invitation,
+    revoke_email_change,
+    revoke_invitation,
+    revoke_membership,
+    set_employer,
+)
+
+__all__ = [
+    "add_venture_member",
+    "branch",
+    "branches",
+    "companies",
+    "company",
+    "confirm_deactivate_branch",
+    "confirm_deactivate_company",
+    "confirm_reactivate_branch",
+    "confirm_reactivate_company",
+    "create_branch",
+    "create_company",
+    "create_invitation",
+    "deactivate_branch",
+    "deactivate_company",
+    "edit_venture_member",
+    "email_change_delivery",
+    "grant_membership",
+    "invitation_delivery",
+    "invitations",
+    "membership_revoke_form",
+    "membership_validity",
+    "membership_validity_form",
+    "new_branch",
+    "new_company",
+    "new_invitation",
+    "offboard",
+    "people",
+    "person",
+    "preview_branch_manager",
+    "reactivate_branch",
+    "reactivate_company",
+    "rename_person",
+    "request_email_change",
+    "resend_invitation",
+    "reset_mfa",
+    "revoke_email_change",
+    "revoke_invitation",
+    "revoke_membership",
+    "set_branch_manager",
+    "set_employer",
+    "set_self_approval",
+    "update_branch",
+    "update_company",
+    "update_venture_member",
+]

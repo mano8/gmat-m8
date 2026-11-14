@@ -1,0 +1,20 @@
+{% load i18n ui_tags %}
+{% comment %}
+  An organization's or a place's activity as a chip. Parameters: obj, and place=True for a
+  warehouse (the word agrees with it: a company or branch is feminine in Spanish and French).
+{% endcomment %}
+{% if obj.is_active %}
+  {% if place %}
+    {% translate "Active" context "place" as label %}
+  {% else %}
+    {% translate "Active" context "organization" as label %}
+  {% endif %}
+  {% chip label "ok" %}
+{% else %}
+  {% if place %}
+    {% translate "Inactive" context "place" as label %}
+  {% else %}
+    {% translate "Inactive" context "organization" as label %}
+  {% endif %}
+  {% chip label %}
+{% endif %}

@@ -26,6 +26,8 @@ from apps.core.idempotency import IdempotencyError
 from apps.core.listing import ListScope, paginate, render_list
 from apps.core.locking import RetryExhausted
 from apps.core.responses import conflict, form_again, go, idempotency_failure, invalid, perform
+from apps.locations import selectors as location_selectors
+from apps.locations.dialogs import worksite_dialogs
 from apps.projects import selectors, services
 from apps.projects.forms import (
     AssignmentFilterForm,
@@ -92,8 +94,12 @@ def _detail(
         default_per_page=selectors.SECTION_PER_PAGE,
         scope=ASSIGNMENTS_SCOPE,
     )
+    worksite = location_selectors.worksite_of(ctx, project.pk)
     context = {
         "project": project,
+        # The worksite's own dialogs, for who administers the organization (M10.3).
+        "worksite": worksite,
+        "worksite_dialogs": worksite_dialogs(worksite) if worksite else None,
         # "Receive materials" where the expected deliveries lead to a form (Q44, ADR-0028).
         "receives_here": receiving_selectors.worksite(ctx, project.pk) is not None,
         "manageable": manageable,

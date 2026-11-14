@@ -29,11 +29,13 @@ from django.urls import reverse
 
 from apps.access.context import AccessContext
 from apps.audit.models import AuditEvent
-from apps.catalog.models import Material
+from apps.catalog.models import Material, UnitOfMeasure
 from apps.core.listing import cursor_page
 from apps.dashboards.panels import COUNT_CAP
 from apps.handovers.models import Handover
+from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.organizations.models import Branch, Company
 from apps.purchasing import selectors as purchasing_selectors
 from apps.purchasing.models import PurchaseOrder
 from apps.receiving import selectors as receiving_selectors
@@ -168,6 +170,30 @@ SCREENS = (
     ),
     Screen(
         "people", reverse_("org:people"), ("group_admin",), {"role": "TECHNICIAN", "q": "persona 1"}
+    ),
+    Screen(
+        "companies",
+        reverse_("org:companies"),
+        ("group_admin",),
+        {"kind": "STANDARD", "q": "volumen"},
+    ),
+    Screen(
+        "branches",
+        reverse_("org:branches"),
+        ("group_admin",),
+        {"state": "active", "q": "volumen"},
+    ),
+    Screen(
+        "warehouses",
+        reverse_("locations:warehouses"),
+        ("group_admin",),
+        {"state": "active", "q": "volumen"},
+    ),
+    Screen(
+        "units",
+        reverse_("catalog:units"),
+        ("group_admin",),
+        {"state": "active", "q": "volumen"},
     ),
     Screen(
         "invitations",
@@ -348,6 +374,10 @@ def test_the_dataset_has_the_specified_size(world: World) -> None:
         "orders": (PurchaseOrder.objects.count(), 4_000),  # drafts and all, never fewer
         "receipts": (GoodsReceipt.objects.count(), 4_500),
         "handovers": (Handover.objects.count(), 2_000),
+        "companies": (Company.objects.count(), 150),
+        "branches": (Branch.objects.count(), 300),
+        "warehouses": (Location.objects.filter(kind="WAREHOUSE").count(), 300),
+        "units": (UnitOfMeasure.objects.count(), 120),
     }
     for what, (found, at_least) in counts.items():
         assert found >= at_least, f"{what}: {found} < {at_least}"

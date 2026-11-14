@@ -32,7 +32,7 @@ ASSETS = {
         120_000,
     ),
     "lucide/icons.json": (
-        "f19ce98f11eefec6e75b5ea05cd18de0303a3c0c05dd72c98c765e53e8d5eafa",
+        "b09b23b009a7dc7c9709904eb9b3e1eeeed6669196502c75da08cc1c90419481",
         "lucide/LICENSE",
         60_000,
     ),

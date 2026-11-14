@@ -139,7 +139,7 @@ class LineAddForm(forms.Form):
 
 
 class FreeLineForm(IdempotentForm):
-    """A material that is not in the catalog: described, with its unit."""
+    """A material that is not in the catalog: described, with its unit (an active one, Q72)."""
 
     operation = "request_line.add"
 
@@ -149,7 +149,7 @@ class FreeLineForm(IdempotentForm):
 
     def __init__(self, *args: Any, ctx: AccessContext, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["unit"].queryset = catalog_selectors.units(ctx)  # type: ignore[attr-defined]
+        self.fields["unit"].queryset = catalog_selectors.active_units(ctx)  # type: ignore[attr-defined]
 
 
 class QuantityForm(forms.Form):
@@ -427,7 +427,10 @@ class LineChangeForm(IdempotentForm):
         super().__init__(*args, **kwargs)
         self.line = line
         self.fields["material"].queryset = catalog_selectors.materials(ctx)  # type: ignore[attr-defined]
-        self.fields["unit"].queryset = catalog_selectors.units(ctx)  # type: ignore[attr-defined]
+        # Active units, and the one the line has (it keeps it once deactivated; Q72).
+        self.fields["unit"].queryset = catalog_selectors.active_units(  # type: ignore[attr-defined]
+            ctx, keep=line.unit_id if line is not None else None
+        )
 
     def clean(self) -> dict[str, Any]:
         data: dict[str, Any] = super().clean() or {}

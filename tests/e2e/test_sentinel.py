@@ -119,7 +119,7 @@ def test_secrets_never_reach_a_log_or_a_referer(
     admin.goto("/org/people/?q=" + address)
     admin.get_by_role("link", name=address, exact=True).click()
     admin.fill("#id_new_email", new_address)
-    admin.get_by_role("button", name="Change").click()
+    admin.get_by_role("button", name="Change", exact=True).click()
     change_path = "/account/email-change/"
     change = mailbox.link(
         mailbox.wait_for(new_address, ignore=seen, containing=change_path), change_path

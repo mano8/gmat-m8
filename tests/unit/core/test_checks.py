@@ -54,6 +54,7 @@ class TestAlwaysOnChecks:
         assert checks.check_security_cache(None) == []
         assert checks.check_logging(None) == []
         assert checks.check_admin_base_class(None) == []
+        assert checks.check_admin_read_only(None) == []
         assert checks.check_idempotency_windows(None) == []
         assert checks.check_no_smtp_in_requests(None) == []
 

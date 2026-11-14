@@ -1,6 +1,6 @@
 # ADR-0029: People are shown by name; an address only where managing them needs it
 
-- **Status:** Proposed (the maintainer's decision in the review of the M9 pull request, #54, 2026-11-13; accepted when that PR merges)
+- **Status:** Accepted (the maintainer's decision in the review of the M9 pull request, #54, 2026-11-13; implemented there, merged 2026-11-13; status recorded at the maintainer's review of PR #55, 2026-11-14)
 - **Date:** 2026-11-13
 - **Governs:** `apps/accounts/people.py`, `apps/accounts/templatetags/people.py`, `apps/accounts/management/commands/bootstrap_admin.py`, `apps/accounts/services/invitations.py`, `apps/organizations/forms.py`, `apps/material_requests/selectors/reviewer.py`
 
@@ -21,7 +21,7 @@ The screens showed a person as `full_name|default:email`: the name, or the addre
    - The requests CSV export keeps the requester's address (maintainer, 2026-11-13); `export.csv` belongs to the managing roles.
    - The audit viewer shows the actor label the audit log recorded at the time, an address, to `audit.view` holders (group administrators, material managers, engineers); the log is append-only.
    - The Django admin shows addresses to its admitted users (group administrators and platform operators).
-5. **Accounts without a name** show "—" until an administrator names them; editing a person's name in the app comes with M10 (administration in the app).
+5. **Accounts without a name** show "—" until an administrator names them. *Delivered in M10.4 (ADR-0030, point 6):* a group administrator sets or corrects a person's full name on the person's page (`org:rename_person`, `accounts.services.rename_user`).
 
 ## Consequences
 

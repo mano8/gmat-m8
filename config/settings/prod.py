@@ -20,6 +20,10 @@ if env_bool("DJANGO_DEBUG", False):
 
 SECRET_KEY = env_secret("DJANGO_SECRET_KEY", min_length=50)
 
+# The admin is off unless the maintainer turns it on (ADR-0030); deploy.sh then requires
+# ADMIN_ALLOWED_CIDRS, the networks Caddy lets reach it.
+ADMIN_ENABLED = env_bool("DJANGO_ADMIN_ENABLED", False)
+
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 DATABASES = {"default": database_from_env()}
 if "*" in ALLOWED_HOSTS:

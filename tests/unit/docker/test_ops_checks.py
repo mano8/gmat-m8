@@ -191,6 +191,33 @@ class TestAdminCidrs:
     )
     def test_open_docker_or_broken_lists_are_refused(self, value: str) -> None:
         assert run("admin-cidrs", value) == 2
+        assert run("admin-cidrs", value, "--enabled", "true") == 2
+
+    @pytest.mark.parametrize("enabled", ["", "0", "false", "No", "OFF", " off "])
+    @pytest.mark.parametrize("value", ["", "0.0.0.0/0 ::/0", "172.17.0.1/32"])
+    def test_an_admin_that_is_off_needs_none(
+        self, value: str, enabled: str, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """ADR-0030: the words of ``config.env.env_bool``; empty is production's default."""
+        assert run("admin-cidrs", value, "--enabled", enabled) == 0
+        assert "the admin is off" in capsys.readouterr().out
+
+    @pytest.mark.parametrize("enabled", ["1", "true", "Yes", "ON"])
+    def test_an_admin_that_is_on_needs_one(self, enabled: str) -> None:
+        assert run("admin-cidrs", "", "--enabled", enabled) == 2
+        assert run("admin-cidrs", "203.0.113.0/24", "--enabled", enabled) == 0
+
+    def test_a_word_django_would_refuse_is_refused(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert run("admin-cidrs", "203.0.113.0/24", "--enabled", "maybe") == 2
+        assert "DJANGO_ADMIN_ENABLED: 'maybe'" in capsys.readouterr().err
+
+    def test_the_words_are_djangos(self) -> None:
+        from config import env
+
+        assert env._TRUE == checks.ADMIN_ON
+        assert env._FALSE | {""} == checks.ADMIN_OFF
 
 
 class TestBackupManifest:

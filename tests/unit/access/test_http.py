@@ -1,13 +1,9 @@
-"""The request side of the engine: ``require`` (S7), view guards, middleware, ``{% can %}``.
-
-Also the admin's permissions through ``CapabilityModelAdmin``.
-"""
+"""The request side of the engine: ``require`` (S7), view guards, middleware, ``{% can %}``."""
 
 from collections.abc import Callable
 from typing import Any
 
 import pytest
-from django.contrib import admin
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.backends.db import SessionStore
 from django.http import HttpRequest, HttpResponse, HttpResponseBase
@@ -15,7 +11,6 @@ from django.template import Context, Template, TemplateSyntaxError
 from django.test import Client, RequestFactory, override_settings
 from django.urls import path, reverse
 
-from apps.access.admin import CapabilityModelAdmin
 from apps.access.context import AccessContext
 from apps.access.exceptions import AccessDenied, MethodNotAllowed, NotInScope, StaleSession
 from apps.access.middleware import AccessContextMiddleware, access_for, context_for_request
@@ -269,22 +264,3 @@ class TestCanTag:
             Template("{% load access %}{% can %}x{% endcan %}")
         with pytest.raises(TemplateSyntaxError, match="Usage"):
             Template('{% load access %}{% can "a" b c %}x{% endcan %}')
-
-
-class TestCapabilityModelAdmin:
-    class BranchEditor(CapabilityModelAdmin):
-        edit_capability = MANAGE
-
-    def test_edits_need_the_capability_within_scope(self, org: Org, member: Member) -> None:
-        editor = self.BranchEditor(Branch, admin.site)
-        manager = request_as(member(Role.MATERIAL_MANAGER, branch=org.a_mad))
-        technician = request_as(member(Role.TECHNICIAN, branch=org.a_mad))
-        assert editor.may_edit(manager) is True
-        assert editor.may_edit(manager, org.a_mad) is True
-        assert editor.may_edit(manager, org.a_sev) is False
-        assert editor.may_edit(technician) is False
-
-    def test_an_unscoped_model_needs_the_capability_only(self, member: Member) -> None:
-        editor = self.BranchEditor(User, admin.site)
-        admin_user = member(Role.GROUP_ADMIN)
-        assert editor.may_edit(request_as(admin_user), admin_user) is True

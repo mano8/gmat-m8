@@ -19,7 +19,7 @@ from django import forms
 THEMES = ("light", "dark")
 HIDDEN = "hidden"
 #: The navigation's categories (``apps.core.navigation``), the only keys a cookie may fold.
-CATEGORY_KEYS = ("work", "purchasing", "site", "organization", "insights")
+CATEGORY_KEYS = ("work", "purchasing", "site", "organization", "insights", "administration")
 FOLD_PREFIX = "f-"
 MAX_COOKIE_BYTES = 128
 

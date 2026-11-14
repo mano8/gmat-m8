@@ -1,0 +1,54 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Companies" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Companies" %}</h1>
+      <p class="page-head-sub">{% translate "The companies of the group, joint ventures included, and their branches." %}</p>
+    </div>
+    <div class="page-head-actions">
+      {% url 'org:new_company' as new_url %}
+      {% include "organizations/lazy_button.html" with url=new_url dialog="new-dialog" label=_("New company") variant="primary" icon="plus" testid="company-new-open" %}
+    </div>
+  </header>
+  {% url 'org:companies' as list_url %}
+  {% include "components/list_toolbar.html" with form=filters listing=listing target="#company-results" action=list_url grid="sm:grid-cols-[1fr_12rem_10rem_auto]" %}
+  {% partialdef results inline %}
+    <div id="company-results">
+      {% include "components/list_summary.html" with form=filters listing=listing %}
+      {% if listing.rows %}
+        <table class="table-responsive">
+          <thead>
+            <tr>
+              {% include "components/sort_header.html" with listing=listing key="code" label=_("Code") %}
+              {% include "components/sort_header.html" with listing=listing key="name" label=_("Legal name") %}
+              <th scope="col">{% translate "Kind" %}</th>
+              <th scope="col">{% translate "Branches" %}</th>
+              <th scope="col">{% translate "Status" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for company in listing.rows %}
+              <tr data-testid="company-row">
+                <td data-label="{% translate 'Code' %}">
+                  <a class="doc-no" href="{% url 'org:company' company_id=company.pk %}">{{ company.code }}</a>
+                </td>
+                <td data-label="{% translate 'Legal name' %}">{{ company.legal_name }}</td>
+                <td data-label="{% translate 'Kind' %}">{{ company.get_kind_display }}</td>
+                <td data-label="{% translate 'Branches' %}" class="tabular-nums">{{ company.branch_count }}</td>
+                <td data-label="{% translate 'Status' %}">{% include "organizations/active_status.html" with obj=company %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% include "components/pagination.html" with listing=listing %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No companies") text=_("No company matches the filters.") icon="landmark" %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+  {% include "components/dialog.html" with id="new-dialog" title=_("New company") testid="company-new-dialog" %}
+{% endblock content %}

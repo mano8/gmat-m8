@@ -1,0 +1,16 @@
+{% load i18n %}
+{% comment %}
+  The answer of preview_branch_manager: the preview for the dialog's #manager-preview, and the
+  generation it was read at, swapped out of band into the form's hidden field (the service
+  refuses a confirmation given on an organization that changed since).
+{% endcomment %}
+{% if data %}
+  {% include "organizations/scope_preview.html" %}
+{% else %}
+  <p class="text-sm text-soft">{% translate "This branch cannot manage it." %}</p>
+{% endif %}
+<input type="hidden"
+       name="seen_generation"
+       value="{{ generation }}"
+       id="{{ field_id }}"
+       hx-swap-oob="true">

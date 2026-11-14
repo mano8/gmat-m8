@@ -4,9 +4,10 @@
 #
 #   ./deploy.sh X.Y.Z       # the supported way to run it (plan §9)
 #
-# Needs in .env: APP_DOMAIN (a public name), ACME_EMAIL, ADMIN_ALLOWED_CIDRS (who may reach the
-# admin: production has no default, and deploy.sh refuses an open list), APP_DIGEST,
-# BACKUP_DIGEST, and app.env copied from app.env.production.example.
+# Needs in .env: APP_DOMAIN (a public name), ACME_EMAIL, APP_DIGEST, BACKUP_DIGEST, and app.env
+# copied from app.env.production.example. The admin is off unless DJANGO_ADMIN_ENABLED turns it
+# on; then ADMIN_ALLOWED_CIDRS names who may reach it (deploy.sh refuses an empty or open list,
+# and an empty one lets nobody in here: the base file's open default never reaches production).
 
 services:
   caddy:
@@ -21,7 +22,7 @@ services:
       HTTP_PROTOCOLS: "h1 h2 h3"
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
       APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
-      ADMIN_ALLOWED_CIDRS: ${ADMIN_ALLOWED_CIDRS:?set ADMIN_ALLOWED_CIDRS in .env}
+      ADMIN_ALLOWED_CIDRS: ${ADMIN_ALLOWED_CIDRS:-}
     mem_limit: 128m
 
   migrate:

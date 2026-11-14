@@ -119,8 +119,11 @@ check_env_files() {
     if [ -z "$(env_value RESTIC_REPOSITORY)" ] && [ "${DEPLOY_ALLOW_NO_OFFSITE:-0}" != 1 ]; then
         die "RESTIC_REPOSITORY is empty: the pre-deploy dump needs its offsite copy"
     fi
+    # The admin is optional (ADR-0030): its allowlist is required, and never open, only while
+    # DJANGO_ADMIN_ENABLED turns it on.
     python3 ops/checks.py admin-cidrs "$(env_value ADMIN_ALLOWED_CIDRS)" \
-        || die "set ADMIN_ALLOWED_CIDRS in .env: who may reach the admin (runbook vps-setup.md)"
+        --enabled "$(env_value DJANGO_ADMIN_ENABLED)" >/dev/null \
+        || die "with DJANGO_ADMIN_ENABLED on, ADMIN_ALLOWED_CIDRS in .env names who may reach the admin (runbook vps-setup.md)"
 }
 
 # The compose files on this machine must be the release's own. Outside a git checkout (a

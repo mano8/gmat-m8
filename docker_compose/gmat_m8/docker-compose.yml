@@ -65,6 +65,8 @@ services:
       MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-11MiB}
       CADDY_READ_BODY_TIMEOUT: ${CADDY_READ_BODY_TIMEOUT:-120s}
       HTTP_PROTOCOLS: ${HTTP_PROTOCOLS:-h1 h2}
+      # The allowlist applies to the admin's prefix only while web serves the admin (ADR-0030).
+      DJANGO_ADMIN_ENABLED: ${DJANGO_ADMIN_ENABLED:-false}
       ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
       ADMIN_ALLOWED_CIDRS: ${ADMIN_ALLOWED_CIDRS:-0.0.0.0/0 ::/0}
     volumes:
@@ -123,7 +125,9 @@ services:
       # Only Caddy, on the pinned edge subnet, may set forwarded headers.
       FORWARDED_ALLOW_IPS: ${EDGE_SUBNET:-172.30.80.0/24}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
-      # The same prefix Caddy restricts to ADMIN_ALLOWED_CIDRS.
+      # Off unless .env turns it on; the same switch and prefix Caddy restricts to
+      # ADMIN_ALLOWED_CIDRS. Set here, never in app.env, so Caddy and web always agree.
+      DJANGO_ADMIN_ENABLED: ${DJANGO_ADMIN_ENABLED:-false}
       DJANGO_ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
     # Attachments (M6.4): stored files and uploads in progress; never served from here. The
     # scanner's and the decoder's sockets (read only is enough to connect, and web cannot

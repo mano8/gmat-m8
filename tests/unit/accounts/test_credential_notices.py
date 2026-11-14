@@ -92,7 +92,9 @@ class TestMfaReset:
     ) -> None:
         user = make_user("lost-phone@example.org")
         enroll_totp(user)
-        services.reset_user_mfa(principal_for(people.group_admin), user.pk, reason="Lost phone")
+        services.reset_user_mfa(
+            principal_for(people.group_admin), user.pk, reason="Lost phone", identity_checked=True
+        )
         [(subject, body)] = mail_to(user.email)
         assert "second factors" in subject
         assert "every session" in body
@@ -107,5 +109,7 @@ class TestMfaReset:
     ) -> None:
         user = make_user("lost-phone@example.org")
         with pytest.raises(Exception, match=r"reason|motivo|raison|Give"):
-            services.reset_user_mfa(principal_for(people.group_admin), user.pk, reason=" ")
+            services.reset_user_mfa(
+                principal_for(people.group_admin), user.pk, reason=" ", identity_checked=True
+            )
         assert mail_to(user.email) == []

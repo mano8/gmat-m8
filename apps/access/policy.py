@@ -83,9 +83,14 @@ def is_platform_operator(user: Any) -> bool:
     return bool(getattr(user, "is_authenticated", False) and user.is_active and user.is_superuser)
 
 
+def is_staff_account(target: Any) -> bool:
+    """A platform operator's account: staff or superuser (plan §3.4)."""
+    return bool(target.is_staff or target.is_superuser)
+
+
 def may_manage_account(actor: Any, target: Any) -> bool:
     """Only a superuser acts on a staff or superuser account (plan §3.4)."""
-    return not (target.is_staff or target.is_superuser) or bool(actor.is_superuser)
+    return not is_staff_account(target) or bool(actor.is_superuser)
 
 
 def require_may_manage_account(actor: Any, target: Any) -> None:

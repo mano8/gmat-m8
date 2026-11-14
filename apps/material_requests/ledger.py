@@ -13,6 +13,10 @@ closed short, whatever the request's state; it is **open** when it is live and i
 is ``APPROVED``. The ledger quantities follow the plan's table; the commitment floor
 max(D, R) + P + Q is state-independent, so an approved quantity can never be reduced below
 what has been delivered, received or committed (I13).
+
+Deactivation preconditions registered from here: an approved request with an outstanding
+quantity blocks its branches (S9, F62), and a line in progress blocks its unit of measure
+(``lines_using_unit``, Q72 as amended, ADR-0030).
 """
 
 from collections.abc import Callable, Collection, Iterable, Mapping
@@ -21,7 +25,9 @@ from decimal import Decimal
 from uuid import UUID
 
 from django.db.models import Q
+from django.utils.translation import ngettext
 
+from apps.catalog.unit_usage import UnitUse
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.organizations.deactivation import OpenDocument
 
@@ -186,7 +192,7 @@ def auto_reopen_eligible(request: MaterialRequest, ledgers: Iterable[LineLedger]
     )
 
 
-# --- deactivation preconditions (S9, F62) ---------------------------------------------
+# --- deactivation preconditions (S9, F62; a unit's, Q72) -------------------------------
 
 
 def requests_with_outstanding(branch_ids: Collection[UUID]) -> list[OpenDocument]:
@@ -212,3 +218,24 @@ def requests_with_outstanding(branch_ids: Collection[UUID]) -> list[OpenDocument
             if ledger.outstanding > 0
         }
     )
+
+
+def in_progress_q() -> Q:
+    """Lines still in progress: not rejected in a draft or submitted request, or open (live in
+    an ``APPROVED`` request). A rejected, cancelled or closed request has none."""
+    being_written = Q(request__status__in=(Status.DRAFT, Status.SUBMITTED)) & ~Q(
+        decision=Decision.REJECTED
+    )
+    return being_written | open_q()
+
+
+def lines_using_unit(unit_id: UUID) -> UnitUse | None:
+    """The request lines in progress in the unit (Q72 as amended, ADR-0030): its deactivation
+    waits for them. A line keeps a unit deactivated once it is finished or closed."""
+    count = MaterialRequestLine.objects.filter(in_progress_q(), unit_id=unit_id).count()
+    if not count:
+        return None
+    text = ngettext(
+        "%(count)d line of a request in progress", "%(count)d lines of requests in progress", count
+    )
+    return UnitUse("request_lines", count, text % {"count": count})

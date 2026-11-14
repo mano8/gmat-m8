@@ -95,3 +95,44 @@ def revoke_email_change_dialog(change: EmailChangeRequest, form: Form) -> Action
         testid="email-revoke-form",
         submit_testid="email-revoke-submit",
     )
+
+
+def rename_dialog(person: User, form: Form) -> ActionDialog:
+    """Correct the full name people see (M10.4): an inline dialog of the page."""
+    return ActionDialog(
+        id="rename-dialog",
+        title=_("Change the name"),
+        icon="pencil",
+        action=reverse("org:rename_person", args=[person.pk]),
+        submit=_("Save"),
+        form=form,
+        note=_("Every page, mail and history shows the person by this name."),
+        testid="rename-form",
+        submit_testid="rename-submit",
+    )
+
+
+def mfa_reset_dialog(person: User, form: Form) -> ActionDialog:
+    """Remove a lost second factor (M10.4, ADR-0030): a danger dialog of the page."""
+    return ActionDialog(
+        id="mfa-reset-dialog",
+        title=_("Reset the second factor"),
+        icon="key-round",
+        tone="danger",
+        action=reverse("org:reset_mfa", args=[person.pk]),
+        submit=_("Reset"),
+        form=form,
+        consequences=(
+            _("Every second factor of the account is removed, recovery codes included."),
+            _("Every session of the account ends at once."),
+            _("The person is told by email."),
+            _("If their roles need a second factor, they set up a new one at their next sign-in."),
+        ),
+        warning=_(
+            "Whoever asks for this may not be the person: check who they are by a way you trust "
+            "outside the application, such as a call to a number you already had."
+        ),
+        cancel=_("Keep the factors"),
+        testid="mfa-reset-form",
+        submit_testid="mfa-reset-submit",
+    )

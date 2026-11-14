@@ -17,16 +17,19 @@ Python rules (parsed, so comments and docstrings never match):
   or an ORM write) without reaching ``authorize_in_txn``, directly or through its helpers;
 - ``get-view-calls-service``: a view that reaches a service without being POST-only
   (``@mutating``, ``@require_POST``, ``post_only=True``, ``MutatingViewMixin``) (F66);
-- ``plain-model-admin``: a ``ModelAdmin`` not built on the service-backed base (F60), or
+- ``plain-model-admin``: a ``ModelAdmin`` not built on the read-only base (F60), or
   ``site.register(Model)`` without an admin class;
+- ``editable-admin``: a class of an ``admin.py`` built on anything but ``ReadOnlyModelAdmin``
+  itself (or a list filter), or one that redefines a write path of it or declares inlines
+  (ADR-0030);
 - ``principal-constructor``: a token, system or operator principal constructed outside
   the modules of ``apps.access.principals.CONSTRUCTOR_MODULES`` (read from that file);
 - ``mail-outside-outbox``: SMTP or Django's mail-sending API outside the outbox worker.
 
 Exit status 1 lists every violation. An allowlist entry names one file and one rule and
 needs a reviewer's approval in the PR that adds it. The runtime keeps its own checks
-(``gmat.E005`` for admin classes, the principals' constructor check), so a construct this
-script cannot see statically is still refused.
+(``gmat.E005`` and ``gmat.E024`` for admin classes, the principals' constructor
+check), so a construct this script cannot see statically is still refused.
 
 The parsed rules are in ``access_rules_parsed.py``, on what ``access_rules_ast.py`` reads.
 """
@@ -71,8 +74,9 @@ YAML_COMMENT = re.compile(r"#.*$", re.MULTILINE)
 # (posix path relative to the repository root, rule) pairs that are allowed.
 ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
     {
-        # The service-backed base itself (plan §5, "Django Admin").
+        # The read-only base itself (plan §5, "Django Admin"; ADR-0030).
         ("apps/core/admin.py", "plain-model-admin"),
+        ("apps/core/admin.py", "editable-admin"),
         # The single upload entry point: admission must run before CSRF parses the body
         # (plan §5 "Attachments", F73); its inner view is csrf_protect.
         ("apps/attachments/views.py", "csrf_exempt"),

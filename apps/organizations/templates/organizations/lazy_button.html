@@ -1,0 +1,17 @@
+{% load ui_tags %}
+{% comment %}
+  The opener of a lazy dialog (M8b.4): a link to the form's own GET page that htmx loads into
+  the page's shared dialog instead. Parameters: url, dialog (the shared dialog's id), label,
+  variant ("primary", "secondary", "danger" or empty), icon, testid.
+{% endcomment %}
+<a class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'secondary' %} btn-secondary{% elif variant == 'danger' %} btn-danger{% endif %}"
+   href="{{ url }}"
+   hx-get="{{ url }}"
+   hx-target="#{{ dialog }}-content"
+   data-dialog-open="{{ dialog }}"
+   {% if testid %}data-testid="{{ testid }}"{% endif %}>
+  {% if icon %}
+    {% icon icon classes="size-5" %}
+  {% endif %}
+  {{ label }}
+</a>
