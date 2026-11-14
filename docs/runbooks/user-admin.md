@@ -23,7 +23,8 @@ dc run --rm web manage bootstrap_admin --email you@example.org --full-name "Your
 - `--superuser` also makes the account a **platform operator**. The recovery tooling (`recover.sh`, `post-restore-reconcile`) needs one, because it reconciles as a platform operator. Create at least one and keep it. The command refuses once an active administrator (or, with `--superuser`, an active platform operator) exists.
 - Open the link in a browser, set a password (12 characters at least), and the first sign-in enrolls MFA. Do it straight away and store the recovery codes offline.
 - If the link is lost before use, run the command again: it replaces the link.
-- `createsuperuser` is disabled on purpose. The Django admin needs a group administrator or platform operator with an MFA-verified session and an address in `ADMIN_ALLOWED_CIDRS`.
+- `createsuperuser` and `changepassword` are disabled on purpose.
+- Everything a group administrator manages has a screen in the app (the *Administration* menu). The Django admin is off in production unless `DJANGO_ADMIN_ENABLED` turns it on ([vps-setup.md](vps-setup.md)); even then it only shows records, read-only, to a group administrator or platform operator with an MFA-verified session and an address in `ADMIN_ALLOWED_CIDRS`.
 
 Everyone else is invited from the app.
 
@@ -71,7 +72,7 @@ Revoke a pending change from the same page. A person who cannot receive on the o
 
 ## Password resets
 
-The person uses **Forgot password** on the sign-in page. A reset never signs them in and the link lives one hour. Inactive accounts get no reset mail. There is nothing for an administrator to do except: *do not set passwords by hand on a shell* (`manage changepassword`). It writes no audit event, so a later restore cannot replay it. Offboard and re-invite instead.
+The person uses **Forgot password** on the sign-in page. A reset never signs them in and the link lives one hour. Inactive accounts get no reset mail. There is nothing for an administrator to do. A password is never set by hand on a shell: `manage changepassword` is disabled and says so, because it writes no audit event a later restore could replay. If the person cannot receive mail on their address anymore, offboard and re-invite instead.
 
 ## Lost second factor
 

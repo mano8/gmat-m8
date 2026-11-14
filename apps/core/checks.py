@@ -123,16 +123,50 @@ def check_logging(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
 def check_admin_base_class(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
     from django.contrib import admin
 
-    from apps.core.admin import ServiceBackedModelAdmin
+    from apps.core.admin import ReadOnlyModelAdmin
 
     return [
         Error(
             f"{type(model_admin).__name__} for {model._meta.label} is not built on "
-            "ServiceBackedModelAdmin",
+            "ReadOnlyModelAdmin",
             id="gmat.E005",
         )
         for model, model_admin in admin.site._registry.items()
-        if not isinstance(model_admin, ServiceBackedModelAdmin)
+        if not isinstance(model_admin, ReadOnlyModelAdmin)
+    ]
+
+
+def _editable_admin_problems(admin_class: type) -> list[str]:
+    """What turns writing back on in ``admin_class``: a redefined write path, an inline."""
+    from apps.core.admin import READ_ONLY_METHODS, ReadOnlyModelAdmin
+
+    problems = [
+        f"redefines {name}"
+        for name in READ_ONLY_METHODS
+        if getattr(admin_class, name, None) is not getattr(ReadOnlyModelAdmin, name)
+    ]
+    if getattr(admin_class, "inlines", ()):
+        problems.append("declares inlines (a second form that saves)")
+    return problems
+
+
+@register()
+def check_admin_read_only(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+    """No registered admin can add, change or delete (ADR-0030).
+
+    The methods are compared themselves, so it needs no request and holds while the admin
+    is off: the admin app stays installed and its models registered.
+    """
+    from django.contrib import admin
+
+    return [
+        Error(
+            f"{type(model_admin).__name__} for {model._meta.label} {problem}: "
+            "the admin is read-only, changes go through the app",
+            id="gmat.E024",
+        )
+        for model, model_admin in admin.site._registry.items()
+        for problem in _editable_admin_problems(type(model_admin))
     ]
 
 

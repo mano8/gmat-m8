@@ -144,8 +144,9 @@ bash init.sh        # creates .env and app.env with generated secrets, mode 0600
 | --- | --- |
 | `APP_DOMAIN` | the public name, for example `gmat.example.org` |
 | `ACME_EMAIL` | an address that gets Let's Encrypt's expiry notices |
-| `ADMIN_URL_PATH` | something not guessable, no slashes. Not secret, but it keeps scanners away |
-| `ADMIN_ALLOWED_CIDRS` | **required.** The addresses that may reach the admin, for example your office's fixed address: `203.0.113.7/32`. There is no way around this one: the production overlay needs the value, and `deploy.sh` refuses `0.0.0.0/0`, and also any range that overlaps Docker's bridges (`172.16.0.0/12`, `192.168.0.0/16`), because behind Docker's proxy a visitor can look like one of them. Exception X10 |
+| `DJANGO_ADMIN_ENABLED` | leave `false`. Everything is administered in the app; the Django admin is an optional, read-only view of the records (ADR-0030). Off, no admin URL exists and the two keys below do not matter. Turn it on (`true`) only to inspect something, together with `ADMIN_ALLOWED_CIDRS`, then run `./deploy.sh` with the running version again; turn it off the same way |
+| `ADMIN_URL_PATH` | something not guessable, no slashes. Not secret, but it keeps scanners away. Used only while the admin is on |
+| `ADMIN_ALLOWED_CIDRS` | needed **only while the admin is on**, and then there is no way around it. The addresses that may reach the admin, for example your office's fixed address: `203.0.113.7/32`. While the admin is on, `deploy.sh` refuses an empty list, `0.0.0.0/0`, and also any range that overlaps Docker's bridges (`172.16.0.0/12`, `192.168.0.0/16`), because behind Docker's proxy a visitor can look like one of them; Caddy lets nobody in with an empty list. Exception X10. Leave it empty while the admin is off |
 | `GITHUB_READ_TOKEN` | leave empty. Only a fork with private packages sets it, to a **classic** token with only `read:packages`: GHCR refuses a fine-grained one after a successful login |
 | `SMTP_PASSWORD` | the SMTP account's password. Only the worker receives it |
 | `RESTIC_REPOSITORY`, `RESTIC_PASSWORD`, `RESTIC_REST_USERNAME`, `RESTIC_REST_PASSWORD` (or `AWS_*` for S3) | the **append-only** credentials. `RESTIC_REPOSITORY` must not be empty: `deploy.sh` refuses |
@@ -203,7 +204,8 @@ The first deploy is part of H8.7, after the first release exists. Until then you
 cd ~/gmat-m8/docker_compose/gmat_m8
 stat -c '%a %n' .env app.env                       # 600 for both
 ls -ld backups flags                               # owned by deploy (uid 1000); backups is 0700
-python3 ops/checks.py admin-cidrs "$(sed -n 's/^ADMIN_ALLOWED_CIDRS=//p' .env)" && echo ok
+python3 ops/checks.py admin-cidrs "$(sed -n 's/^ADMIN_ALLOWED_CIDRS=//p' .env)" \
+    --enabled "$(sed -n 's/^DJANGO_ADMIN_ENABLED=//p' .env)" && echo ok   # "the admin is off" while it is
 dig +short gmat.example.org                        # the VPS's address
 cosign version && docker compose version && flock --version | head -1
 ```
@@ -254,5 +256,5 @@ Reviews to put in the calendar: the **quarterly** drill; the exception register 
 - `ufw status` shows 22, 80, 443 only; nothing else listens (`ss -tlnp`).
 - The server is x86-64 and has swap (`uname -m`, `swapon --show`).
 - `.env` and `app.env` are mode 0600, filled in, and copied to the offline storage together with the restic password.
-- The checks of step 8 pass: DNS resolves, and the admin allowlist is accepted.
+- The checks of step 8 pass: DNS resolves, and the admin is off (or, if you turned it on, its allowlist is accepted).
 - The uptime monitor exists and you know what each alert means.

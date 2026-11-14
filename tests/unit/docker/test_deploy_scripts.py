@@ -235,6 +235,7 @@ class TestRefused:
 
     def test_an_open_admin_allowlist(self, ready: World) -> None:
         """No flag gets past it (M8.3): X10 was not accepted."""
+        ready._set_env("DJANGO_ADMIN_ENABLED", "true")
         ready._set_env("ADMIN_ALLOWED_CIDRS", "0.0.0.0/0 ::/0")
         ready.env["DEPLOY_ALLOW_OPEN_ADMIN"] = "1"
         result = ready.run("deploy.sh", VERSION)
@@ -249,11 +250,35 @@ class TestRefused:
         assert "nothing changed" in result.stderr
         assert ready.gates() == (False, False)
 
-    def test_no_admin_allowlist(self, ready: World) -> None:
+    @pytest.mark.parametrize("enabled", ["true", "On", "1"])
+    def test_an_admin_turned_on_without_an_allowlist(self, ready: World, enabled: str) -> None:
+        ready._set_env("DJANGO_ADMIN_ENABLED", enabled)
         ready._set_env("ADMIN_ALLOWED_CIDRS", "")
         result = ready.run("deploy.sh", VERSION)
         assert result.returncode != 0
-        assert "ADMIN_ALLOWED_CIDRS" in result.stderr
+        assert "ADMIN_ALLOWED_CIDRS is empty" in result.stderr
+        assert ready.gates() == (False, False)
+
+    @pytest.mark.parametrize(
+        "enabled", [None, "", "false", "off"], ids=["absent", "empty", "f", "o"]
+    )
+    @pytest.mark.parametrize("cidrs", [None, "", "0.0.0.0/0 ::/0"], ids=["absent", "empty", "open"])
+    def test_an_admin_that_is_off_needs_no_allowlist(
+        self, ready: World, enabled: str | None, cidrs: str | None
+    ) -> None:
+        """ADR-0030: off, the admin has no URL, so its allowlist does not matter."""
+        for key, value in (("DJANGO_ADMIN_ENABLED", enabled), ("ADMIN_ALLOWED_CIDRS", cidrs)):
+            ready._set_env(key, value or "")
+            if value is None:
+                ready._drop_env(key)
+        assert ready.run("deploy.sh", VERSION).returncode == 0
+
+    def test_a_switch_django_would_refuse(self, ready: World) -> None:
+        ready._set_env("DJANGO_ADMIN_ENABLED", "maybe")
+        result = ready.run("deploy.sh", VERSION)
+        assert result.returncode != 0
+        assert "DJANGO_ADMIN_ENABLED: 'maybe'" in result.stderr
+        assert ready.gates() == (False, False)
 
     def test_no_offsite_repository(self, ready: World) -> None:
         ready._set_env("RESTIC_REPOSITORY", "")

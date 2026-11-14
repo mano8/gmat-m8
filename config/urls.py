@@ -1,9 +1,14 @@
 from django.conf import settings
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import URLPattern, URLResolver, include, path
+
+# The admin exists only while it is on (ADR-0030): off, its prefix is an unknown path (404).
+admin_urls: list[URLPattern | URLResolver] = (
+    [path(f"{settings.ADMIN_URL_PATH}/", admin.site.urls)] if settings.ADMIN_ENABLED else []
+)
 
 urlpatterns = [
-    path(f"{settings.ADMIN_URL_PATH}/", admin.site.urls),
+    *admin_urls,
     path("accounts/", include("apps.accounts.urls")),
     path("invite/", include("apps.accounts.invitation_urls")),
     path("account/notifications/", include("apps.notifications.urls")),

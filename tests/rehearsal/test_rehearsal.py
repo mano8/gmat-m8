@@ -118,6 +118,12 @@ def test_the_first_deploy_of_v_n(world: World) -> None:
     assert world.worker_state() == "running"
     bootstrap(world)
     assert int(world.sql("SELECT count(*) FROM catalog_material")) > 100
+    # ADR-0030: the admin is off and no allowlist is set; its prefix is an unknown path.
+    assert (world.env_value("DJANGO_ADMIN_ENABLED"), world.env_value("ADMIN_ALLOWED_CIDRS")) == (
+        "false",
+        "",
+    )
+    assert public(world, "/admin/") == 404
     note(f"first deploy {V1} from an empty database, gate window {window(result.stderr)}")
 
 
@@ -142,6 +148,29 @@ def test_v_n_to_v_n_plus_one(world: World) -> None:
     after = counts(world)
     assert after["materials"] == before["materials"]
     note(f"{V1} -> {V2}: dump {row[4]}, gate window {window(result.stderr)}")
+
+
+def _set_env(world: World, key: str, value: str) -> None:
+    path = world.compose_dir / ".env"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    kept = [line for line in lines if not line.startswith(f"{key}=")]
+    path.write_text("\n".join([*kept, f"{key}={value}"]) + "\n", encoding="utf-8")
+
+
+def test_an_admin_turned_on_without_its_allowlist_is_refused(world: World) -> None:
+    """ADR-0030: the allowlist is required only while the admin is on, and then before anything."""
+    before = len(world.deployed())
+    _set_env(world, "DJANGO_ADMIN_ENABLED", "true")
+    try:
+        result = world.deploy(V2, check=False)
+    finally:
+        _set_env(world, "DJANGO_ADMIN_ENABLED", "false")
+    assert result.returncode != 0
+    assert "ADMIN_ALLOWED_CIDRS is empty" in result.stderr
+    assert world.gates() == (False, False)
+    assert public(world) == 200
+    assert len(world.deployed()) == before
+    note("admin on without an allowlist: refused before step 2, nothing changed")
 
 
 # --- a forced smoke failure after migrate -----------------------------------------------------

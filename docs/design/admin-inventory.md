@@ -14,10 +14,14 @@ Each entry is in one of four classes:
   the admin, while on, only shows them.
 - **operator**: stays on the command line, with the reason.
 
-Table 1 is a contract: M10.5 adds a test that every model registered in the admin has a row here and
-that each URL name in its *In the app* column has a POST row in the access acceptance matrix
-(`ROUTES`) once its step is done. Keep the model label in backticks in the first column and the URL names
-in backticks in the fourth.
+Table 1 is a contract: `tests/access/test_admin_inventory.py` (M10.5) fails when a model registered
+in the admin has no row here or a row names a model no longer registered, when a URL name of the *In
+the app* column has no GET, HEAD and POST rows in the access acceptance matrix (`ROUTES`), and when a
+row still says *needs a screen*. Keep the model label in backticks in the first column and the URL
+names in backticks in the fourth.
+
+Since M10.5 the admin is off unless `DJANGO_ADMIN_ENABLED` turns it on, and read-only for every
+model: the *Admin today* column records what it allowed when this inventory was taken.
 
 ## 1. Models registered in the admin
 
@@ -76,7 +80,7 @@ written only by their services and the worker. M10 changes none of them.
 | `worker`, `verify_internal` | operator | The outbox worker's process, and the deploy's readiness check (plan §9). |
 | `seed_demo`, `styleguide` | operator (dev and test only) | Refused by production settings. |
 | `createsuperuser` | disabled | Raises; `bootstrap_admin --superuser` instead (F76). |
-| `changepassword` (Django) | **to disable (M10.5)** | It writes no audit event, so a restore cannot replay it; the runbooks only say not to use it. M10.5 replaces it with a command that refuses, as `createsuperuser` does, pointing to *Forgot password* and to offboarding with a new invitation. |
+| `changepassword` (Django) | disabled (M10.5) | It writes no audit event, so a restore cannot replay it. `apps.accounts.disabled_commands` (listed before `django.contrib.auth`, whose command it replaces) refuses it, pointing to *Forgot password* and to offboarding with a new invitation. |
 | `account_unsetmultipleprimaryemails` (allauth) | operator | A data repair for allauth's address rows; never needed while addresses change only through the email-change flow. |
 | Django's other commands (`migrate`, `collectstatic`, `compilemessages`, `check`, `createcachetable`, `clearsessions`, `dbshell`, `shell`, …) | operator | Run by the image's entrypoint, the deploy or the maintainer; no administration of business data. |
 
@@ -201,21 +205,27 @@ without `org.manage` sees a change. The entries rank after *Exports* in the phon
 *More*. *People* is active on `org:people`, `org:person` and the invitation pages only, now that `/org/`
 holds the structure pages too, and *Catalog* is not active on `/catalog/units/`.
 
-## 4. What M10.5 builds against this inventory
+## 4. What M10.5 built against this inventory
 
-- **Every model read-only.** `ServiceBackedModelAdmin` loses `may_edit`, `save_via_service`,
-  `form_values`, `adopt` and the `changeform_view` override; its add and change permissions are false;
-  `CapabilityModelAdmin`, `MasterDataAdmin` and `CatalogDataAdmin` go, and each `ModelAdmin` above
-  becomes a `ReadOnlyModelAdmin`.
-- **System check `gmat.E024`**, next to `gmat.E005`: every registered `ModelAdmin`, and every inline it
-  declares, is a `ReadOnlyModelAdmin` (or a read-only inline base) whose `has_add_permission`,
-  `has_change_permission`, `save_model`, `save_related`, `save_formset` and `get_actions` are the base's own
-  methods, not overrides. Comparing the methods themselves needs no request and catches a subclass
-  that turns editing back on. It runs with the admin off too: the admin app stays installed and its
-  models registered.
-- **Access-rule check** (`scripts/check_access_rules.py`): a class in an `admin.py` that defines one of
-  those methods, or is built on anything but `ReadOnlyModelAdmin`, fails.
+- **Every model read-only.** `ServiceBackedModelAdmin`, `CapabilityModelAdmin`, `MasterDataAdmin` and
+  `CatalogDataAdmin` are gone; `apps.core.admin.ReadOnlyModelAdmin` is the one base, with false add,
+  change and delete permissions, save and delete methods that raise `PermissionDenied`, no bulk action
+  at all, and `lookup_allowed` as before. Each `ModelAdmin` above is built on it directly and keeps only
+  its list columns, filters, search and the fields it shows.
+- **System check `gmat.E024`**, next to `gmat.E005` (now "built on `ReadOnlyModelAdmin`"): every
+  registered `ModelAdmin` keeps the base's own methods for each name of
+  `apps.core.admin.READ_ONLY_METHODS` (`has_add_permission`, `has_change_permission`,
+  `has_delete_permission`, `save_model`, `save_related`, `save_formset`, `delete_model`,
+  `delete_queryset`, `get_actions`, `get_urls`, `changeform_view`), compared by identity, so a class in
+  between cannot hide an override. No admin declares inlines: none exists, so rather than a read-only
+  inline base, any inline is refused (a second form that saves). It runs with the admin off too.
+- **Access-rule check** `editable-admin` (`scripts/check_access_rules.py`): a class of an `admin.py`
+  built on anything but `ReadOnlyModelAdmin` itself (or a list filter), or any class built on it that
+  defines one of those names or `inlines`, fails. Its copy of the names is kept equal to
+  `READ_ONLY_METHODS` by a test.
 - **Inventory test** (`tests/access/test_admin_inventory.py`): parses table 1; every model in
-  `admin.site._registry` has a row; every URL name in the *In the app* column resolves and has a POST row
-  in `ROUTES`; no row says *needs a screen* once M10.6 is done.
-- **`changepassword` disabled** (§2).
+  `admin.site._registry` has a row and every row a registered model; every URL name in the *In the
+  app* column has its rows in `ROUTES`; no row says *needs a screen* (M10.2–M10.4 added them all).
+- **The switch** `DJANGO_ADMIN_ENABLED` (off in production unless `.env` turns it on, on in
+  development and tests), the conditional Caddy rule and allowlist check, and **`changepassword`
+  disabled** (§2).

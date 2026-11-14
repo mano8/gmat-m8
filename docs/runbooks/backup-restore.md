@@ -191,7 +191,7 @@ Your to-do list, in order:
 5. **Check the data**: open the dashboard, a recent request, a recent receipt, an attachment. Compare the newest document numbers with what people remember.
 6. Record the incident ([incident.md](incident.md)) and delete `preserved/<time>` when it is closed.
 
-Do **not** use Django's `changepassword` on a shell to fix an account: it writes no audit event, so a later restore could not replay it. Use the invitation flow.
+Django's `changepassword` is disabled (it writes no audit event, so a later restore could not replay it): to fix an account, use *Forgot password* or the invitation flow.
 
 ## Offsite retention and pruning (maintainer's machine only)
 

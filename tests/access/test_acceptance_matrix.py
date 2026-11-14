@@ -39,12 +39,11 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
-from apps.access.admin import CapabilityModelAdmin
 from apps.access.models import AccessState
 from apps.accounts.models import User
 from apps.accounts.sessions import bump_session_epoch
 from apps.audit.models import AuditEvent
-from apps.core.admin import ReadOnlyModelAdmin, ServiceBackedModelAdmin
+from apps.core.admin import ReadOnlyModelAdmin
 from apps.organizations.models import Branch, Company, Membership
 from tests.access.matrix import (
     ACTOR_NAMES,
@@ -163,28 +162,24 @@ SUPPLIER_SENTINELS = frozenset(
     {Sentinel.SUPPLIER_NAME, Sentinel.SUPPLIER_EMAIL, Sentinel.SUPPLIER_PHONE}
 )
 
-# Access and document models are read-only; master data is editable by GROUP_ADMIN only
-# (the platform operator only views it). Nothing is ever deleted (plan §5, §8.2).
-READ_ONLY_MODELS = {
+# Every model is read-only in the admin, master data included: it changes in the app's
+# screens (ADR-0030). Nothing is ever deleted (plan §5, §8.2).
+ADMIN_MODELS = {
     "accounts": ("user", "invitation", "emailchangerequest"),
     "account": ("emailaddress",),
     "mfa": ("authenticator",),
     "audit": ("auditevent",),
     "access": ("accessstate",),
-    "organizations": ("membership",),
+    "organizations": ("company", "jointventuremember", "branch", "membership"),
     "projects": ("project", "projectassignment"),
-    "catalog": ("unitofmeasure",),
+    "locations": ("location",),
+    "catalog": ("materialcategory", "material", "unitofmeasure"),
+    "suppliers": ("supplier",),
     "material_requests": ("materialrequest", "materialrequestline"),
     "purchasing": ("purchaseorder", "purchaseorderline", "purchaseallocation"),
     "receiving": ("goodsreceipt", "goodsreceiptline", "receiptattribution"),
     "handovers": ("handover", "handoverline"),
     "attachments": ("attachment", "attachmentreservation", "storagequota", "mediadeletion"),
-}
-MASTER_DATA_MODELS = {
-    "organizations": ("company", "jointventuremember", "branch"),
-    "locations": ("location",),
-    "catalog": ("materialcategory", "material"),
-    "suppliers": ("supplier",),
 }
 # The admin pages of a model that shows its own sentinels: the supplier's contact details
 # (also in an order's supplier snapshot) and the allocations' quantities. Prices never
@@ -198,36 +193,25 @@ ADMIN_SENTINELS = {
 
 def _admin_model_routes() -> dict[str, Route]:
     routes: dict[str, Route] = {}
-    for editable, models in ((False, READ_ONLY_MODELS), (True, MASTER_DATA_MODELS)):
-        for app, names in models.items():
-            for model in names:
-                base = f"admin:{app}_{model}"
-                if editable:
-                    # An empty form answers 200 with errors: access granted, nothing saved.
-                    # A joint-venture member's only editable field is optional, so its
-                    # empty change is valid and saved through the service.
-                    change_post = REDIRECT if model == "jointventuremember" else OK
-                    add = admin_page(OK, OK, operator_get=DENIED, operator_post=DENIED)
-                    change = admin_page(OK, change_post, operator_post=DENIED)
-                else:
-                    add = admin_page(DENIED, DENIED)
-                    change = admin_page(OK, DENIED)
-                views = {
-                    "changelist": admin_page(OK, OK),
-                    "add": add,
-                    "history": admin_page(OK, OK),
-                    "delete": admin_page(DENIED, DENIED),
-                    "change": change,
-                }
-                shown = ADMIN_SENTINELS.get(model, frozenset())
-                for view, methods in views.items():
-                    key = f"{base}_{view}"
-                    routes[key] = Route(methods, path=admin_model_path(key), allowed=shown)
-                routes[f"admin:{app}/{model}/<path:object_id>/"] = Route(
-                    admin_page(REDIRECT, REDIRECT),
-                    path=admin_redirect_path(app, model),
-                    allowed=shown,
-                )
+    for app, names in ADMIN_MODELS.items():
+        for model in names:
+            base = f"admin:{app}_{model}"
+            views = {
+                "changelist": admin_page(OK, OK),
+                "add": admin_page(DENIED, DENIED),
+                "history": admin_page(OK, OK),
+                "delete": admin_page(DENIED, DENIED),
+                "change": admin_page(OK, DENIED),
+            }
+            shown = ADMIN_SENTINELS.get(model, frozenset())
+            for view, methods in views.items():
+                key = f"{base}_{view}"
+                routes[key] = Route(methods, path=admin_model_path(key), allowed=shown)
+            routes[f"admin:{app}/{model}/<path:object_id>/"] = Route(
+                admin_page(REDIRECT, REDIRECT),
+                path=admin_redirect_path(app, model),
+                allowed=shown,
+            )
     return routes
 
 
@@ -2659,22 +2643,14 @@ def test_other_methods_are_refused_everywhere(world: World, key: str) -> None:
 
 
 class TestAdmin:
-    def test_every_admin_is_service_backed(self) -> None:
-        for model, model_admin in admin.site._registry.items():
-            assert isinstance(model_admin, ServiceBackedModelAdmin), model
-
-    def test_access_and_document_models_are_read_only_and_the_rest_master_data(self) -> None:
+    def test_every_admin_is_read_only(self) -> None:
         registered = {
             (model._meta.app_label, model._meta.model_name): model_admin
             for model, model_admin in admin.site._registry.items()
         }
-        read_only = {(app, m) for app, names in READ_ONLY_MODELS.items() for m in names}
-        master = {(app, m) for app, names in MASTER_DATA_MODELS.items() for m in names}
-        assert set(registered) == read_only | master
-        for key in read_only:
-            assert isinstance(registered[key], ReadOnlyModelAdmin), key
-        for key in master:
-            assert isinstance(registered[key], CapabilityModelAdmin), key
+        assert set(registered) == {(app, m) for app, names in ADMIN_MODELS.items() for m in names}
+        for key, model_admin in registered.items():
+            assert isinstance(model_admin, ReadOnlyModelAdmin), key
 
     def test_no_admin_offers_the_bulk_delete(self, world: World) -> None:
         client = world.client("group_admin")
@@ -2684,17 +2660,17 @@ class TestAdmin:
             assert response.status_code == 200, url
             assert b'value="delete_selected"' not in response.content, url
 
-    def test_a_master_data_save_goes_through_its_service(self, world: World) -> None:
-        """Deactivating company C (``is_active`` left unticked): generation bumped, audited."""
+    def test_a_master_data_save_is_refused(self, world: World) -> None:
+        """Deactivating company C from the admin (``is_active`` left unticked): 403, nothing."""
         generation = AccessState.objects.get().org_generation
         response = world.client("group_admin").post(
             reverse("admin:organizations_company_change", args=[world.org.c.pk]),
             {"legal_name": "Company C", "kind": "STANDARD", "tax_id": ""},
         )
-        assert response.status_code == 302
-        assert Company.objects.get(pk=world.org.c.pk).is_active is False
-        assert AccessState.objects.get().org_generation > generation
-        assert AuditEvent.objects.filter(action="company.updated", object_id=world.org.c.pk)
+        assert response.status_code == 403
+        assert Company.objects.get(pk=world.org.c.pk).is_active is True
+        assert AccessState.objects.get().org_generation == generation
+        assert not AuditEvent.objects.filter(action="company.updated", object_id=world.org.c.pk)
 
     def test_a_group_admin_cannot_touch_a_staff_account(self, world: World) -> None:
         operator = world.people.operator

@@ -409,9 +409,12 @@ class TestModelAdmin:
             "plain-model-admin"
         ]
 
-    def test_service_backed_admins_are_fine(self, script: ModuleType, tmp_path: Path) -> None:
+    def test_read_only_admins_are_fine(self, script: ModuleType, tmp_path: Path) -> None:
         source = (
-            "@admin.register(Thing)\nclass A(ReadOnlyModelAdmin):\n    pass\n"
+            "@admin.register(Thing)\nclass A(ReadOnlyModelAdmin):\n"
+            "    list_display = ('name',)\n"
+            "    def get_queryset(self, request):\n        return super().get_queryset(request)\n"
+            "class Filter(admin.SimpleListFilter):\n    pass\n"
             "admin.site.register(Other, OtherAdmin)\n"
             "admin.site.register(Third, admin_class=ThirdAdmin)\n"
             "admin.site.unregister(Group)\n"
@@ -420,6 +423,49 @@ class TestModelAdmin:
 
     def test_the_base_class_is_allowlisted(self, script: ModuleType) -> None:
         assert ("apps/core/admin.py", "plain-model-admin") in script.ALLOWLIST
+        assert ("apps/core/admin.py", "editable-admin") in script.ALLOWLIST
+
+
+class TestEditableAdmin:
+    """ADR-0030: no class can turn a write path of the read-only admin back on (M10.5)."""
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "    def has_change_permission(self, request, obj=None):\n        return True\n",
+            "    def save_model(self, request, obj, form, change):\n        obj.save()\n",
+            "    async def changeform_view(self, *args):\n        pass\n",
+            "    get_actions = lambda self, request: {}\n",
+            "    inlines = [LineInline]\n",
+            "    inlines: list = []\n",
+        ],
+        ids=["permission", "save", "async-view", "assigned", "inlines", "annotated"],
+    )
+    def test_a_redefined_write_path_is_reported(
+        self, script: ModuleType, tmp_path: Path, body: str
+    ) -> None:
+        source = f"class A(ReadOnlyModelAdmin):\n{body}"
+        for rel in ("apps/x/admin.py", "apps/x/other.py"):
+            found = _violations(script, tmp_path / rel.replace("/", "-"), {rel: source})
+            assert _rules(found) == ["editable-admin"], rel
+
+    @pytest.mark.parametrize(
+        "bases", ["EditableBase", "ReadOnlyModelAdmin, Mixin", "admin.ReadOnlyModelAdmin, X"]
+    )
+    def test_any_other_base_in_an_admin_module_is_reported(
+        self, script: ModuleType, tmp_path: Path, bases: str
+    ) -> None:
+        source = f"class A({bases}):\n    pass\n"
+        found = _violations(script, tmp_path, {"apps/x/admin.py": source})
+        assert _rules(found) == ["editable-admin"]
+        assert "must be built on ReadOnlyModelAdmin itself" in found[0]
+
+    def test_outside_an_admin_module_other_classes_are_fine(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        source = "class A(Form):\n    def save_model(self):\n        pass\n"
+        assert _violations(script, tmp_path, {"apps/x/forms.py": source}) == []
+        assert _violations(script, tmp_path, {"scripts/admin.py": "class A(B):\n    pass\n"}) == []
 
 
 class TestPrincipalConstructors:

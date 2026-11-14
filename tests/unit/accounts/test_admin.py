@@ -12,7 +12,7 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 
 from apps.accounts.models import User
-from apps.core.admin import ReadOnlyModelAdmin, ServiceBackedModelAdmin
+from apps.core.admin import ReadOnlyModelAdmin
 from tests.support import enroll_totp, mfa_login, password_login
 
 pytestmark = pytest.mark.django_db
@@ -84,9 +84,9 @@ class TestAdminLogin:
 
 
 class TestRegistrations:
-    def test_every_admin_is_service_backed(self) -> None:
+    def test_every_admin_is_read_only(self) -> None:
         assert all(
-            isinstance(model_admin, ServiceBackedModelAdmin)
+            isinstance(model_admin, ReadOnlyModelAdmin)
             for model_admin in admin.site._registry.values()
         )
 
@@ -109,33 +109,3 @@ class TestRegistrations:
 
     def test_password_hashes_are_never_shown(self) -> None:
         assert "password" in (admin.site._registry[User].exclude or ())
-
-
-class TestServiceBackedBase:
-    def make(self) -> ServiceBackedModelAdmin:
-        return ServiceBackedModelAdmin(Group, admin.site)
-
-    def test_saving_requires_a_service(self) -> None:
-        request = RequestFactory().post(ADMIN)
-        with pytest.raises(NotImplementedError):
-            self.make().save_model(request, Group(name="x"), None, change=False)
-
-    def test_save_goes_through_the_service(self) -> None:
-        calls: list[tuple[Any, bool]] = []
-
-        class GroupAdmin(ServiceBackedModelAdmin):
-            def save_via_service(self, request: Any, obj: Any, form: Any, change: bool) -> None:
-                calls.append((obj, change))
-
-        group = Group(name="x")
-        GroupAdmin(Group, admin.site).save_model(RequestFactory().post(ADMIN), group, None, True)
-        assert calls == [(group, True)]
-
-    def test_deletes_are_impossible(self) -> None:
-        request = RequestFactory().post(ADMIN)
-        model_admin = self.make()
-        assert model_admin.has_delete_permission(request) is False
-        with pytest.raises(PermissionError):
-            model_admin.delete_model(request, Group(name="x"))
-        with pytest.raises(PermissionError):
-            model_admin.delete_queryset(request, Group.objects.none())

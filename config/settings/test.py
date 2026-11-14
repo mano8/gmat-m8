@@ -32,6 +32,8 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 MFA_ENCRYPTION_KEYS = [derived_fernet_key("test")]
 OUTBOX_ENCRYPTION_KEYS = [derived_fernet_key("outbox-test")]
 OUTBOUND_EMAIL = True
+# On, read-only, so its pages stay tested (ADR-0030); the off case reloads the URLconf.
+ADMIN_ENABLED = True
 # A slow run must not change a page's queries, or give two actors of one account a session row
 # the other can end; the tests about activity set the interval themselves.
 SESSION_TOUCH_INTERVAL = 10**9
