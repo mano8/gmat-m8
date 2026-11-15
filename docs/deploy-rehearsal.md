@@ -24,7 +24,7 @@ Real: both images built from the checkout and pulled by digest from a registry; 
 
 Stand-ins, because they cannot exist outside the release pipeline or the VPS:
 
-- **Keyless signatures.** Only a tag push in GitHub Actions can produce one. A stand-in `cosign` on PATH knows what was "signed" and checks the identity and issuer it is given. Both refusals below run the **real cosign** (v2.5.0), so the positive path of a real signature is first proven by the publish workflow's own verification step and then by the first real deploy (H8.7).
+- **Keyless signatures.** Only a tag push in GitHub Actions can produce one. A stand-in `cosign` on PATH knows what was "signed" and checks the identity and issuer it is given. Both refusals below run the **real cosign** (rehearsed with v2.5.0; a refusal holds with any version, but a real deploy needs v3.0.6 or newer to find the release's signatures, see [runbooks/vps-setup.md](runbooks/vps-setup.md)), so the positive path of a real signature is first proven by the publish workflow's own verification step and then by the first real deploy (H8.7).
 - **GitHub's API.** A small local server answers `GITHUB_API_URL`. The signature decides what is trusted, wherever the files came from.
 - **The registry** is local, plain HTTP; `DEPLOY_IMAGE_PREFIX` names it. `ghcr.io` login is not exercised.
 - **The certificate** is Caddy's internal CA for `localhost`; ACME needs a real domain (H8.6).

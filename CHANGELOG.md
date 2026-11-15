@@ -4,6 +4,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Fixed
+
+- The VPS runbook installed cosign v2.5.0, which does not find the signatures of a release (signed with cosign 3), so the first deploy stopped at its signature check. It now installs v3.0.6 and says why an older version fails.
+
 ## [0.1.0] - 2026-11-14
 
 The first release. It opens the pilot: the 0.x releases run on the production server for one branch and a few people of each role, and each round of corrections the pilot asks for is a new 0.x release, until the exit criteria of [docs/runbooks/pilot.md](https://github.com/mano8/gmat-m8/blob/v0.1.0/docs/runbooks/pilot.md) hold and v1.0.0 follows. Below 1.0.0, a minor version may change behaviour and the data model; every change is still recorded here.
