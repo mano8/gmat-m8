@@ -223,6 +223,9 @@ __marimo__/
 # plans
 .plans/**
 
+# dev docs
+.dev_docs/**
+
 # gmat-m8: environment files (only *.example templates are committed)
 *.env
 !*.env.example
