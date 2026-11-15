@@ -105,16 +105,16 @@ timedatectl                                     # System clock synchronized: yes
    ```
 
    `flock` and `timeout` come from `util-linux` and `coreutils`; Python 3 is only used for small JSON checks (`ops/checks.py`), no packages needed.
-3. **`cosign`.** Every release is verified with it, so install it from the project's release page and check the download against the published checksums. The deploy was rehearsed with v2.5.0 or newer.
+3. **`cosign`.** Every release is verified with it, so install it from the project's release page and check the download against the published checksums. It must be **v3.0.6 or newer**: the release workflow signs with cosign 3 (`sigstore/cosign-installer` v4), whose signatures cosign 2 does not find, so with a 2.x `deploy.sh` stops at step 2 ("the signature of ... does not verify", cosign itself says "no signatures found") before changing anything.
 
    ```bash
-   VER=v2.5.0
+   VER=v3.0.6
    cd "$(mktemp -d)"
    curl -fsSLO "https://github.com/sigstore/cosign/releases/download/$VER/cosign-linux-amd64"
    curl -fsSLO "https://github.com/sigstore/cosign/releases/download/$VER/cosign_checksums.txt"
    sha256sum --ignore-missing -c cosign_checksums.txt     # must say: cosign-linux-amd64: OK
    sudo install -m 0755 cosign-linux-amd64 /usr/local/bin/cosign
-   cosign version
+   cosign version                                       # GitVersion: v3.0.6 or newer
    ```
 
 ## 5. Get the code
