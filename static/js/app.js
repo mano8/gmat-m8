@@ -285,6 +285,34 @@
     button.setAttribute("aria-label", button.getAttribute(hidden ? "data-label-show" : "data-label-hide"));
   });
 
+  // Request entry: Enter in a quantity (or Remove) moves the focus on to the control the server
+  // named in data-focus-next, once the answer is in and carries no error. A stepper button or the
+  // change of a Tab sends "step" or is not a submit, so the focus stays where htmx put it back.
+  var focusNext = null;
+  document.addEventListener("htmx:configRequest", function (event) {
+    var form = event.detail.elt;
+    var named = form.getAttribute && form.getAttribute("data-focus-next");
+    var trigger = event.detail.triggeringEvent;
+    var stepped = event.detail.parameters && event.detail.parameters.step;
+    focusNext = named && trigger && trigger.type === "submit" && !stepped ? named : null;
+  });
+  document.addEventListener("htmx:afterSettle", function (event) {
+    var wanted = focusNext;
+    focusNext = null;
+    var swapped = event.detail.target;
+    if (!wanted || !swapped || swapped.id !== "draft-lines" || swapped.querySelector("[data-testid=lines-error]")) {
+      return;
+    }
+    var next = document.getElementById(wanted);
+    if (!next) {
+      return;
+    }
+    next.focus();
+    if (next.select) {
+      next.select();
+    }
+  });
+
   // The theme switch: System, Light or Dark takes effect without a reload. The server writes the
   // same on <html> for the next page, so the first paint is right.
   document.addEventListener("click", function (event) {

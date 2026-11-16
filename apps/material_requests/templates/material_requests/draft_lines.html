@@ -14,7 +14,8 @@
   </h2>
   {% if error %}<p role="alert" class="errorlist" data-testid="lines-error">{{ error }}</p>{% endif %}
   {% for entry in lines %}
-    {% with line=entry.line %}
+    {% with line=entry.line following=lines|at:forloop.counter previous_index=forloop.counter0|add:"-1" %}
+    {% with previous=lines|at:previous_index %}
       <div class="border-b border-line py-3 last:border-b-0"
            data-line="{{ line.line_no }}">
         <p class="font-medium">{{ line.description }}</p>
@@ -29,6 +30,7 @@
                 hx-swap="outerHTML"
                 hx-trigger="submit, change"
                 hx-sync="this:replace"
+                data-focus-next="{% if following %}qty-{{ following.line.pk }}{% else %}review-link{% endif %}"
                 class="flex items-center gap-1">
             {% csrf_token %}
             {# Enter in the field submits through this first button: it sets the typed value. #}
@@ -36,9 +38,12 @@
             <button type="submit"
                     name="step"
                     value="dec"
+                    id="dec-{{ line.pk }}"
                     class="btn px-0 w-11"
                     aria-label="{% translate 'One less' %}">−</button>
             <input type="text"
+                   id="qty-{{ line.pk }}"
+                   enterkeyhint="{% if following %}next{% else %}done{% endif %}"
                    name="requested_qty"
                    value="{{ line.requested_qty|quantity }}"
                    inputmode="decimal"
@@ -48,6 +53,7 @@
             <button type="submit"
                     name="step"
                     value="inc"
+                    id="inc-{{ line.pk }}"
                     class="btn px-0 w-11"
                     aria-label="{% translate 'One more' %}">+</button>
           </form>
@@ -55,12 +61,14 @@
                 action="{% url 'requests:remove_line' line_id=line.pk %}"
                 hx-post="{% url 'requests:remove_line' line_id=line.pk %}"
                 hx-target="#draft-lines"
-                hx-swap="outerHTML">
+                hx-swap="outerHTML"
+                data-focus-next="{% if following %}qty-{{ following.line.pk }}{% elif forloop.first %}id_q{% else %}qty-{{ previous.line.pk }}{% endif %}">
             {% csrf_token %}
-            <button type="submit" class="btn btn-link">{% translate "Remove" %}</button>
+            <button type="submit" id="remove-{{ line.pk }}" class="btn btn-link">{% translate "Remove" %}</button>
           </form>
         </div>
       </div>
+    {% endwith %}
     {% endwith %}
   {% empty %}
     <p class="py-2 text-soft">{% translate "No material yet. Pick one above." %}</p>
@@ -75,7 +83,7 @@
     <div class="sticky bottom-16 -mx-4 mt-3 bg-raised/95 px-4 py-2 sm:-mx-6 sm:px-6 md:bottom-0">
       {% url 'requests:review' request_id=request_obj.pk as review_url %}
       {% blocktranslate asvar review_label count counter=lines|length %}Review and submit: {{ counter }} line{% plural %}Review and submit: {{ counter }} lines{% endblocktranslate %}
-      {% include "components/button.html" with href=review_url label=review_label variant="primary" block=True %}
+      {% include "components/button.html" with href=review_url label=review_label variant="primary" block=True html_id="review-link" %}
     </div>
   {% endif %}
 </section>
