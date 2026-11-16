@@ -28,6 +28,9 @@ def panel_url(key: str) -> str:
     return reverse("dashboard:panel", kwargs={"key": key})
 
 
+ORGANIZATION = {"overview", "branch-people", "branch-requests"}
+
+
 def placeholders(html: str) -> set[str]:
     return {key for key in panels.BY_KEY if f'data-testid="panel-{key}"' in html}
 
@@ -41,14 +44,61 @@ class TestHome:
         assert f'hx-get="{panel_url("my-requests")}"' in html
         assert 'hx-trigger="load"' in html
 
-    def test_a_group_administrator_gets_every_panel(self, people: People) -> None:
+    def test_a_group_administrators_home_has_no_organization_panel(self, people: People) -> None:
         html = client_for(people.group_admin).get(reverse("core:home")).content.decode()
-        assert placeholders(html) == set(panels.BY_KEY)
+        assert placeholders(html) == set(panels.BY_KEY) - ORGANIZATION
+        assert "panel-dispatches" in html
+        assert f'href="{reverse("dashboard:administration")}"' in html  # the menu entry
 
     def test_an_account_without_membership_gets_the_empty_state(self, people: People) -> None:
         response = client_for(people.nobody, mfa=False).get(reverse("core:home"))
         assert response.status_code == 200
         assert placeholders(response.content.decode()) == set()
+
+
+class TestAdministration:
+    url = "/dashboard/administration/"
+
+    def test_the_overview_lists_the_organization_panels_lazily(self, people: People) -> None:
+        response = client_for(people.group_admin).get(self.url)
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert placeholders(html) == ORGANIZATION
+        assert f'hx-get="{panel_url("overview")}"' in html
+        assert "no-store" in response["Cache-Control"]
+        assert 'data-testid="key-figures"' not in html  # the key figures stay on home
+        assert "<h1>" in html
+
+    def test_the_url_and_the_name_are_stable(self) -> None:
+        assert reverse("dashboard:administration") == self.url
+
+    def test_it_draws_charts_so_it_loads_chart_js_and_has_the_period(self, people: People) -> None:
+        html = client_for(people.group_admin).get(self.url + "?weeks=26").content.decode()
+        assert "chart.umd" in html and "charts.js" in html
+        assert "weeks=26" in html
+        assert f'hx-get="{panel_url("branch-people")}?weeks=26"' in html
+
+    def test_an_invalid_period_falls_back_to_the_default(self, people: People) -> None:
+        html = client_for(people.group_admin).get(self.url + "?weeks=5").content.decode()
+        assert f'hx-get="{panel_url("branch-people")}?weeks=12"' in html
+
+    def test_head_is_answered_and_nothing_else(self, people: People) -> None:
+        client = client_for(people.group_admin)
+        assert client.head(self.url).status_code == 200
+        assert client.post(self.url).status_code == 405
+
+    def test_it_needs_org_manage(self, people: People) -> None:
+        for user in (people.mm_mad, people.engineer, people.tech_mad, people.wo_mad):
+            assert client_for(user).get(self.url).status_code == 403
+        assert client_for(people.partner, mfa=False).get(self.url).status_code == 403
+
+    def test_a_signed_out_visitor_is_sent_to_the_login(self) -> None:
+        response = Client().get(self.url)
+        assert response.status_code == 302 and "login" in response["Location"]
+
+    def test_a_panel_fragment_still_answers_whatever_its_board(self, people: People) -> None:
+        """The fragment needs the panel's own capabilities, not a board."""
+        assert client_for(people.group_admin).get(panel_url("branch-people")).status_code == 200
 
 
 class TestPanel:

@@ -7510,3 +7510,15 @@ msgstr[1] "%(count)s lignes attendent une décision : chacune est approuvée à 
 #: apps/material_requests/views/review_dialogs.py
 msgid "The request is then approved."
 msgstr "La demande est alors approuvée."
+
+#: apps/core/navigation.py
+msgid "Overview"
+msgstr "Aperçu"
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "Administration overview"
+msgstr "Aperçu de l'administration"
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "The companies, branches and people of the organization."
+msgstr "Les sociétés, agences et personnes de l'organisation."

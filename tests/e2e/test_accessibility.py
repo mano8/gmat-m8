@@ -33,6 +33,9 @@ OPTIONS = {
 }
 AUDITED = {**SCREENS, "eng-mad": ["/", "/requests/inbox/", "/purchasing/orders/"]}
 
+# The pages that draw charts: axe waits for their panels (M14.3: the administration overview too).
+CHART_PAGES = ("/", "/dashboard/administration/")
+
 REPORT: list[str] = []
 
 
@@ -102,7 +105,7 @@ def test_the_home_pages_and_the_lists(browsing: Browsing, person: str, viewport:
     for path in AUDITED[person]:
         page.goto(path)
         expect(page.locator("main h1").first).to_be_visible()
-        found += audit_schemes(page, f"{person} {path} {viewport}", charts=path == "/")
+        found += audit_schemes(page, f"{person} {path} {viewport}", charts=path in CHART_PAGES)
     assert not found, "\n".join(found)
 
 

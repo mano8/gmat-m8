@@ -27,6 +27,7 @@ from django.utils.translation import gettext_lazy
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
 from apps.core.listing import head
+from apps.dashboards.boards import Board
 from apps.dashboards.chart import ChartPanel
 from apps.dashboards.charts import CHARTS
 from apps.handovers import selectors as handover_selectors
@@ -76,6 +77,7 @@ class Panel:
     query: str = ""
     requires: tuple[str, ...] = ()
     kind: str = "list"
+    board: Board = Board.HOME
 
 
 # --- formatting ---------------------------------------------------------------------------
@@ -485,6 +487,7 @@ LISTS: tuple[Panel, ...] = (
         overview,
         "org:people",
         gettext_lazy("There is no active branch."),
+        board=Board.ADMINISTRATION,
     ),
 )
 #: Every panel: the charts (M8b.5) and the task lists, each loaded from ``dashboard:panel``.
@@ -497,6 +500,10 @@ def capabilities(panel: Panel | ChartPanel) -> tuple[str, ...]:
     return (panel.capability, *panel.requires)
 
 
-def visible(ctx: AccessContext) -> list[Panel | ChartPanel]:
-    """The panels whose capabilities the user holds somewhere."""
-    return [panel for panel in PANELS if all(ctx.has(each) for each in capabilities(panel))]
+def visible(ctx: AccessContext, board: Board = Board.HOME) -> list[Panel | ChartPanel]:
+    """The panels of ``board`` whose capabilities the user holds somewhere."""
+    return [
+        panel
+        for panel in PANELS
+        if panel.board is board and all(ctx.has(each) for each in capabilities(panel))
+    ]

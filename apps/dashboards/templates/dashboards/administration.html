@@ -1,0 +1,20 @@
+{% extends "layouts/app.html" %}
+{% load i18n %}
+{% block head_title %}
+  {% translate "Administration overview" %} · gmat-m8
+{% endblock head_title %}
+{% block extra_head %}
+  {% include "dashboards/_chart_scripts.html" %}
+{% endblock extra_head %}
+{% block content %}
+  <div class="@container">
+    <header class="page-head" data-testid="page-header">
+      <div class="page-head-main">
+        <h1>{% translate "Administration overview" %}</h1>
+        <p class="page-head-sub">{% translate "The companies, branches and people of the organization." %}</p>
+      </div>
+      <div class="page-head-actions">{% include "dashboards/_period.html" %}</div>
+    </header>
+    {% include "dashboards/_board.html" %}
+  </div>
+{% endblock content %}

@@ -18,6 +18,7 @@ from django.utils.translation import gettext_lazy
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
 from apps.core.stats import top
+from apps.dashboards.boards import Board
 from apps.dashboards.chart import (
     BAR,
     HBAR,
@@ -349,6 +350,7 @@ CHARTS: tuple[ChartPanel, ...] = (
         gettext_lazy("No request was submitted in these weeks."),
         requires=(C.REQUEST_VIEW,),
         wide=True,
+        board=Board.ADMINISTRATION,
     ),
     ChartPanel(
         "branch-people",
@@ -357,6 +359,7 @@ CHARTS: tuple[ChartPanel, ...] = (
         branch_people,
         "org:people",
         gettext_lazy("No branch has anyone with a valid role."),
+        board=Board.ADMINISTRATION,
     ),
     ChartPanel(
         "request-progress",

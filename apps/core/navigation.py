@@ -220,13 +220,22 @@ CATEGORIES: tuple[Category, ...] = (
         _("Administration"),
         (
             Entry(
+                "overview",
+                _("Overview"),
+                "dashboard:administration",
+                "layout-dashboard",
+                "org.manage",
+                _url("dashboard:administration"),
+                15,
+            ),
+            Entry(
                 "people",
                 _("People"),
                 "org:people",
                 "users",
                 "org.manage",
                 _app("org", but=STRUCTURE_PAGES),
-                15,
+                16,
             ),
             Entry(
                 "companies",
@@ -235,7 +244,7 @@ CATEGORIES: tuple[Category, ...] = (
                 "landmark",
                 "org.manage",
                 _url(*(f"org:{name}" for name in COMPANY_PAGES)),
-                16,
+                17,
             ),
             Entry(
                 "branches",
@@ -244,7 +253,7 @@ CATEGORIES: tuple[Category, ...] = (
                 "building",
                 "org.manage",
                 _url(*(f"org:{name}" for name in BRANCH_PAGES)),
-                17,
+                18,
             ),
             Entry(
                 "warehouses",
@@ -253,7 +262,7 @@ CATEGORIES: tuple[Category, ...] = (
                 "warehouse",
                 "org.manage",
                 _url(*(f"locations:{name}" for name in WAREHOUSE_PAGES)),
-                18,
+                19,
             ),
             Entry(
                 "units",
@@ -262,7 +271,7 @@ CATEGORIES: tuple[Category, ...] = (
                 "scale",
                 "org.manage",
                 _url(*(f"catalog:{name}" for name in UNIT_PAGES)),
-                19,
+                20,
             ),
         ),
     ),

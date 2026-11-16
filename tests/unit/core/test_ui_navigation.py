@@ -61,6 +61,7 @@ ROLES: list[tuple[str, list[str], list[str]]] = [
         "group_admin",
         ALL_GROUPS,
         [
+            "/dashboard/administration/",
             "/org/people/",
             "/org/structure/companies/",
             "/org/structure/branches/",
@@ -250,6 +251,8 @@ def test_the_quick_action_is_there_only_with_request_create(org: Org, people: Pe
 @pytest.mark.parametrize(
     ("path", "current"),
     [
+        ("/dashboard/administration/", "/dashboard/administration/"),
+        ("/", "/"),
         ("/org/warehouses/", "/org/warehouses/"),
         ("/catalog/units/", "/catalog/units/"),
         ("/catalog/", "/catalog/"),
@@ -263,3 +266,12 @@ def test_the_administration_pages_mark_their_own_entry_not_the_catalogs(
     sidebar, _bar, _sheet = parts(page(client_for(people.group_admin), path))
     marked = re.findall(r'href="([^"]+)"\s+class="nav-link"\s+aria-current="page"', sidebar)
     assert marked == [current]
+
+
+def test_the_overview_is_the_first_entry_of_administration(org: Org, people: People) -> None:
+    """M14.3: the overview heads the category, and the top bar names it under Administration."""
+    administration = next(c for c in CATEGORIES if c.key == "administration")
+    assert administration.entries[0].key == "overview"
+    html = page(client_for(people.group_admin), "/dashboard/administration/")
+    assert re.search(r"Administraci|Administration", html)
+    assert re.search(r"Resumen|Overview|Vue d", html)

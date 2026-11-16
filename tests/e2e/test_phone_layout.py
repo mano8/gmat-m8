@@ -10,6 +10,7 @@ from tests.e2e.conftest import PHONE, Browsing
 SCREENS = {
     "admin": [
         "/",
+        "/dashboard/administration/",
         "/org/people/",
         "/org/invitations/",
         "/org/structure/companies/",

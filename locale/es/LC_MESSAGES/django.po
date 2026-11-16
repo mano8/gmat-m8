@@ -7472,3 +7472,15 @@ msgstr[1] "%(count)s líneas esperan una decisión: cada una se aprueba con la c
 #: apps/material_requests/views/review_dialogs.py
 msgid "The request is then approved."
 msgstr "La solicitud queda entonces aprobada."
+
+#: apps/core/navigation.py
+msgid "Overview"
+msgstr "Resumen"
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "Administration overview"
+msgstr "Resumen de la administración"
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "The companies, branches and people of the organization."
+msgstr "Las empresas, sucursales y personas de la organización."

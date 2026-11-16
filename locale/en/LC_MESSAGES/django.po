@@ -7288,3 +7288,15 @@ msgstr[1] ""
 #: apps/material_requests/views/review_dialogs.py
 msgid "The request is then approved."
 msgstr ""
+
+#: apps/core/navigation.py
+msgid "Overview"
+msgstr ""
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "Administration overview"
+msgstr ""
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "The companies, branches and people of the organization."
+msgstr ""

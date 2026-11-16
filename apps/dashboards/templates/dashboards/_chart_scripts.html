@@ -1,0 +1,7 @@
+{% load static %}
+{% comment %}The scripts of a board that draws charts. Context: draws_charts.{% endcomment %}
+{% if draws_charts %}
+  {# Chart.js and its driver load only on a page that draws a chart (ADR-0027, Q63). #}
+  <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" defer></script>
+  <script src="{% static 'js/charts.js' %}" defer></script>
+{% endif %}

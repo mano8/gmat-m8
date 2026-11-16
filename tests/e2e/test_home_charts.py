@@ -49,6 +49,37 @@ def test_the_home_page_of_each_role(browsing: Browsing, person: str, viewport: s
         assert overflow(page) <= 0, f"{person}: the home page scrolls sideways"
 
 
+ORGANIZATION_PANELS = ("overview", "branch-people", "branch-requests")
+
+
+def test_the_organization_panels_are_on_the_administration_overview(browsing: Browsing) -> None:
+    """M14.3 (Q81): the group administrator's home keeps the day-to-day work, the overview holds
+    the organization's three panels, and Supplier emails to check stays on home."""
+    page = browsing.as_("admin", "desktop")
+    page.goto("/")
+    settled(page)
+    for key in ORGANIZATION_PANELS:
+        expect(page.get_by_test_id(f"panel-{key}")).to_have_count(0)
+    expect(page.get_by_test_id("panel-dispatches")).to_have_count(1)
+    page.get_by_role("link", name="Overview").first.click()
+    expect(page.locator("main h1").first).to_have_text("Administration overview")
+    settled(page)
+    for key in ORGANIZATION_PANELS:
+        expect(page.get_by_test_id(f"panel-{key}")).to_have_count(1)
+    expect(page.get_by_test_id("panel-dispatches")).to_have_count(0)
+    expect(page.get_by_test_id("key-figures")).to_have_count(0)
+    drawn_charts(page)
+    period = page.get_by_role("navigation", name="Period")
+    period.get_by_role("link", name="4 weeks").click()
+    settled(page)
+    expect(period.get_by_role("link", name="4 weeks")).to_have_attribute("aria-current", "true")
+
+
+def test_the_overview_is_the_group_administrators_only(browsing: Browsing) -> None:
+    response = browsing.as_("tech-mad", "desktop").goto("/dashboard/administration/")
+    assert response is not None and response.status == 403
+
+
 def test_the_period_and_the_keyboard(browsing: Browsing) -> None:
     page = browsing.as_("admin", "desktop")
     page.goto("/?weeks=4")

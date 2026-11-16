@@ -149,6 +149,15 @@ CHARTS = (
     chart("handover-projects", "wo_mad", "group_admin"),
     chart("branch-requests", "group_admin"),
     chart("branch-people", "group_admin"),
+    # M14.3: the administration overview is the placeholders only; its panels are measured above.
+    Screen(
+        "administration-overview",
+        reverse_("dashboard:administration"),
+        ("group_admin",),
+        {"weeks": "4"},
+        size="weeks",
+        largest="26",
+    ),
     Screen(
         "key-figures",
         reverse_("dashboard:tiles"),

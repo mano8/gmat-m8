@@ -863,6 +863,10 @@ def _panel_url(key: str) -> Callable[[World], str]:
     return lambda world: reverse("dashboard:panel", kwargs={"key": key})
 
 
+def _administration_url(query: str) -> Callable[[World], str]:
+    return lambda world: reverse("dashboard:administration") + query
+
+
 def dashboard_routes() -> tuple[Route, ...]:
     panels = tuple(
         Route(
@@ -1182,6 +1186,11 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         ),
     ),
     "dashboard:panel": dashboard_routes(),
+    # M14.3 (Q81): the organization's overview, ``org.manage`` only; it renders placeholders.
+    "dashboard:administration": (
+        Route(org_page()),
+        Route(org_page(), position="invalid period", path=_administration_url("?weeks=abc")),
+    ),
     # The key figures (M8b.5): every signed-in session, each tile through its own scope.
     "dashboard:tiles": (
         Route(
