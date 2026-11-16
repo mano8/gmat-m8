@@ -287,28 +287,38 @@
 
   // Request entry: Enter in a quantity (or Remove) moves the focus on to the control the server
   // named in data-focus-next, once the answer is in and carries no error. A stepper button or the
-  // change of a Tab sends "step" or is not a submit, so the focus stays where htmx put it back.
+  // change of a Tab is named "step" or is not a submit, so the focus stays where htmx put it back.
   var focusNext = null;
-  document.addEventListener("htmx:configRequest", function (event) {
-    var form = event.detail.elt;
-    var named = form.getAttribute && form.getAttribute("data-focus-next");
-    var trigger = event.detail.triggeringEvent;
-    var stepped = event.detail.parameters && event.detail.parameters.step;
-    focusNext = named && trigger && trigger.type === "submit" && !stepped ? named : null;
-  });
+  var focusBack = "";
+  document.addEventListener(
+    "submit",
+    function (event) {
+      var named = event.target.getAttribute && event.target.getAttribute("data-focus-next");
+      var stepper = event.submitter && event.submitter.name === "step";
+      focusNext = named && !stepper ? named : null;
+      focusBack = document.activeElement && document.activeElement.id;
+    },
+    true
+  );
   document.addEventListener("htmx:afterSettle", function (event) {
-    var wanted = focusNext;
-    focusNext = null;
     var swapped = event.detail.target;
-    if (!wanted || !swapped || swapped.id !== "draft-lines" || swapped.querySelector("[data-testid=lines-error]")) {
+    if (!swapped || swapped.id !== "draft-lines") {
       return;
     }
-    var next = document.getElementById(wanted);
+    var wanted = focusNext;
+    var back = focusBack;
+    focusNext = null;
+    focusBack = "";
+    // outerHTML: the event names the replaced element, so the answer is read from the page
+    if (wanted && document.querySelector("#draft-lines [data-testid=lines-error]")) {
+      wanted = back; // a refused quantity: the focus stays on its field
+    }
+    var next = wanted && document.getElementById(wanted);
     if (!next) {
       return;
     }
     next.focus();
-    if (next.select) {
+    if (next.select && next.type === "text") {
       next.select();
     }
   });
