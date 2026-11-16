@@ -139,6 +139,19 @@ def test_each_kind_of_dialog_by_keyboard(
     expect(opener).to_be_focused()
     assert_focus_is_visible(page)
 
+    # A confirmation opened from the page's head (M14.2): a button, then the dialog's own stops.
+    approve_all = page.get_by_test_id("approve-all-open")
+    focus_by_keyboard(page, approve_all)
+    assert_focus_is_visible(page)
+    page.keyboard.press("Enter")
+    asking = page.get_by_test_id("approve-all-dialog")
+    expect(asking).to_be_visible()
+    stays_in_the_dialog(page, "dialog")
+    page.keyboard.press("Escape")
+    expect(asking).to_be_hidden()
+    expect(approve_all).to_be_focused()
+    assert_focus_is_visible(page)
+
     # A destructive confirmation, opened from a menu item: the way out has the focus.
     menu_button = page.locator("[popovertarget=request-menu]")
     focus_by_keyboard(page, menu_button)

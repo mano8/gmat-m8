@@ -13,6 +13,8 @@ from playwright.sync_api import Locator, Page, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 REQUEST_NUMBER = re.compile(r"SOL-[A-Z]+-[A-Z]+-\d{4}-\d{5}")
+# The review page, with or without the line it opens at (M14.2).
+EXAMINE_URL = re.compile(r"/examine/(#line-\d+)?$")
 
 
 def line_of(page: Page, reference: str) -> Locator:
@@ -98,14 +100,14 @@ def open_in_inbox(page: Page, number: str, status: str = "") -> None:
     page.goto("/requests/inbox/" + (f"?status={status}" if status else ""))
     row = page.locator("[data-testid=inbox-row]", has_text=number)
     row.get_by_role("link").first.click()
-    page.wait_for_url("**/examine/")
+    page.wait_for_url(EXAMINE_URL)
     expect(page.get_by_test_id("examine-number")).to_have_text(number)
 
 
 def approve_all(page: Page, number: str) -> None:
     open_in_inbox(page, number)
     page.get_by_test_id("approve-all").click()
-    page.wait_for_url("**/examine/")
+    page.wait_for_url(EXAMINE_URL)
     expect(page.locator("main")).to_contain_text("Approved")
     expect(page.get_by_test_id("approve-all")).to_have_count(0)
 
@@ -121,7 +123,7 @@ def source_by_purchase(page: Page, number: str, references: list[str]) -> None:
         form = review_line(page, reference).get_by_test_id("sourcing-form")
         form.locator("select").select_option(label="Purchase")
         form.get_by_role("button", name="Save sourcing").click()
-        page.wait_for_url("**/examine/")
+        page.wait_for_url(EXAMINE_URL)
         expect(review_line(page, reference)).to_contain_text("Purchase")
 
 
@@ -257,9 +259,21 @@ def open_line_dialog(page: Page, reference: str) -> Locator:
 
 
 def send_dialog(page: Page, dialog: Locator, button: str) -> None:
-    """Send a dialog's form that will be accepted: the whole page navigates (``HX-Redirect``)."""
-    with page.expect_navigation():
-        dialog.get_by_test_id(button).click()
+    """Send a dialog's form that will be accepted: the whole page is loaded again (``HX-Redirect``,
+    and ``HX-Refresh`` when the address names a line of the page). A marker on the document tells
+    when it is the new one: a fragment alone is a navigation that loads nothing."""
+    page.evaluate("window.__beforeDialog = true")
+    dialog.get_by_test_id(button).click()
+    # Not ``wait_for_function``: it evaluates a string inside the page, which the CSP refuses.
+    for _ in range(150):
+        try:
+            if page.evaluate("window.__beforeDialog === undefined"):
+                break
+        except PlaywrightError:  # the document is being replaced under the call
+            pass
+        page.wait_for_timeout(100)
+    else:
+        raise AssertionError("the page was not loaded again after the dialog was sent")
     expect(dialog).to_be_hidden()
 
 
@@ -273,7 +287,7 @@ def change_line(
     form.locator("input[name=requested_qty]").fill(quantity)
     form.locator("[name=reason]").fill(reason)
     send_dialog(page, dialog, "save-and-approve" if approve else "save-edit")
-    expect(page).to_have_url(re.compile(r"/examine/$"))
+    expect(page).to_have_url(EXAMINE_URL)
 
 
 def invite(

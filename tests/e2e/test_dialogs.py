@@ -5,8 +5,6 @@ dialog and the focus returns to the button that opened it; an invalid form comes
 errors in the open dialog, the focus on the summary; a valid one updates the page and shows the
 flash. The CSP listener of ``browsing`` fails the test on any violation."""
 
-import re
-
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
@@ -114,6 +112,6 @@ def test_change_a_line_in_a_dialog(browsing: Browsing, viewport: str) -> None:
     expect(form.locator("input[name=requested_qty]")).to_have_value("4")  # kept as typed
     form.locator("[name=reason]").fill("Four are enough")
     pages.send_dialog(engineer, dialog, "save-edit")
-    expect(engineer).to_have_url(re.compile(r"/examine/$"))
+    expect(engineer).to_have_url(pages.EXAMINE_URL)
     expect(engineer.get_by_text("Line 1 changed.")).to_be_visible()
     expect(pages.review_line(engineer, material)).to_contain_text("Edited")

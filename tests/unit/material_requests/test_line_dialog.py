@@ -136,7 +136,7 @@ class TestTheDialogPage:
         client = client_for(people.engineer)
         response = client.get(url("edit_line", line), headers=HTMX)
         assert response.status_code == 204
-        assert response["HX-Redirect"] == url("examine", live)
+        assert response["HX-Redirect"] == f"{url('examine', live)}#line-1"
         page = client.get(response["HX-Redirect"])
         assert "This line can no longer be edited." in messages_of(page)
 
@@ -151,7 +151,8 @@ class TestSendingTheDialog:
             client, fragment(client, url("edit_line", line)), requested_qty="9", reason="Fewer"
         )
         assert response.status_code == 204
-        assert response["HX-Redirect"] == url("examine", found)
+        assert response["HX-Redirect"] == f"{url('examine', found)}#line-1"
+        assert response["HX-Refresh"] == "true"  # a fragment alone would not reload the page
         assert "Location" not in response
         assert "Line 1 changed." in messages_of(client.get(response["HX-Redirect"]))
         line.refresh_from_db()
@@ -195,10 +196,14 @@ class TestSendingTheDialog:
         shown = fragment(client, url("edit_line", line))
         assert send(client, shown, requested_qty="11", reason="Twice").status_code == 204
         replay = send(client, shown, requested_qty="11", reason="Twice")
-        assert replay.status_code == 204 and replay["HX-Redirect"] == url("examine", found)
+        assert (
+            replay.status_code == 204 and replay["HX-Redirect"] == f"{url('examine', found)}#line-1"
+        )
         # The same key with other data never makes a second change.
         other = send(client, shown, requested_qty="3", reason="Other")
-        assert other.status_code == 204 and other["HX-Redirect"] == url("examine", found)
+        assert (
+            other.status_code == 204 and other["HX-Redirect"] == f"{url('examine', found)}#line-1"
+        )
         assert revisions() == 1
         line.refresh_from_db()
         assert line.requested_qty == Decimal("11")

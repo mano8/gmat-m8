@@ -92,6 +92,15 @@ class TestGo:
         assert response["HX-Redirect"] == "/there/"
         assert "Location" not in response and varies(response)
 
+    def test_a_fragment_makes_htmx_reload_the_page_it_scrolls_to(self) -> None:
+        """A URL that differs from the page's only by its fragment loads nothing: htmx must
+        reload, or the page keeps its stale data and misses the flash (M14.2)."""
+        response = go(make_request(htmx=True), "/there/#line-2")
+        assert response.status_code == 204 and response["HX-Redirect"] == "/there/#line-2"
+        assert response["HX-Refresh"] == "true"
+        assert "HX-Refresh" not in go(make_request(htmx=True), "/there/")
+        assert go(make_request(), "/there/#line-2")["Location"] == "/there/#line-2"
+
     def test_a_url_name_with_its_arguments(self) -> None:
         response = go(make_request(htmx=True), "receiving:detail", receipt_id=UUID(int=1))
         assert response["HX-Redirect"] == f"/receiving/{UUID(int=1)}/"

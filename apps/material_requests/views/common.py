@@ -59,9 +59,22 @@ def _on_line(request: HttpRequest, line_id: UUID, capability: str) -> MaterialRe
     return line
 
 
-def _examine_url(found: MaterialRequest | MaterialRequestLine) -> str:
+def line_anchor(line_no: int) -> str:
+    """The fragment of a line's card on the review page (``id="line-<n>"``)."""
+    return f"line-{line_no}"
+
+
+def _examine_url(found: MaterialRequest | MaterialRequestLine, line_no: int | None = None) -> str:
+    """The review page, opened at the card of ``line_no`` when given (M14.2). The number is
+    the database's, never request input."""
     request_id = found.request_id if isinstance(found, MaterialRequestLine) else found.pk
-    return reverse("requests:examine", args=[request_id])
+    url = reverse("requests:examine", args=[request_id])
+    return url if line_no is None else f"{url}#{line_anchor(line_no)}"
+
+
+def _line_url(line: MaterialRequestLine) -> str:
+    """The review page at the line an action concerns (Q80)."""
+    return _examine_url(line, line.line_no)
 
 
 # One implementation of the POST answers for every screen (``apps.core.responses``, M8b.3):

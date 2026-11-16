@@ -58,3 +58,62 @@ def test_edits_of_an_assigned_request(browsing: Browsing, viewport: str) -> None
     rows = technician.get_by_test_id("request-lines")
     expect(rows.locator("tr", has_text=FIRST).locator("td").nth(2)).to_contain_text("8 M")
     expect(rows.locator("tr", has_text=SECOND).locator("td").nth(2)).to_contain_text("3 M")
+
+
+# Materials no other journey buys or reviews (the ledgers never meet).
+LINES = {
+    "phone": ("CAB-H07VK-10-AZ", "CAB-H07VK-10-MA", "CAB-H07VK-10-NE"),
+    "desktop": ("CAB-H07VK-1,5-AZ", "CAB-H07VK-1,5-MA", "CAB-H07VK-1,5-NE"),
+}
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_deciding_line_by_line_keeps_the_place(browsing: Browsing, viewport: str) -> None:
+    """M14.2: each decision opens the page at the next pending line, never at its top, and the
+    next Tab reaches that line's quantity; the last one shows the request's new status."""
+    first, second, third = LINES[viewport]
+    technician = browsing.as_("tech-mad", viewport)
+    number = pages.submit_request(technician, "COL-MAD", {first: 6, second: 5, third: 4})
+    engineer = browsing.as_("eng-mad", viewport)
+    pages.open_in_inbox(engineer, number)
+
+    pages.review_line(engineer, first).get_by_test_id("approve-line").click()
+    expect(engineer).to_have_url(re.compile(r"/examine/#line-2$"))
+    next_line = pages.review_line(engineer, second)
+    expect(next_line).to_be_in_viewport()
+    assert engineer.evaluate("window.scrollY") > 0, "the page went back to its top"
+    engineer.keyboard.press("Tab")
+    expect(next_line.locator("input[name=approved_qty]")).to_be_focused()
+    expect(pages.review_line(engineer, first)).to_contain_text("Approved")
+
+    pages.review_line(engineer, second).get_by_test_id("approve-line").click()
+    expect(engineer).to_have_url(re.compile(r"/examine/#line-3$"))
+    expect(pages.review_line(engineer, third)).to_be_in_viewport()
+
+    pages.review_line(engineer, third).get_by_test_id("approve-line").click()
+    expect(engineer).to_have_url(re.compile(r"/examine/$"))
+    expect(engineer.locator("main")).to_contain_text("Approved")
+    expect(engineer.get_by_test_id("decide-bar")).to_have_count(0)
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_approve_all_from_the_top_of_the_page(browsing: Browsing, viewport: str) -> None:
+    """M14.2: the head of the review page asks for confirmation, then approves every line."""
+    first, second, third = LINES[viewport]
+    technician = browsing.as_("tech-mad", viewport)
+    number = pages.submit_request(technician, "COL-MAD", {first: 3, second: 2, third: 1})
+    engineer = browsing.as_("eng-mad", viewport)
+    pages.open_in_inbox(engineer, number)
+    # One decision first: the dialog counts only what still waits.
+    pages.review_line(engineer, first).get_by_test_id("approve-line").click()
+    expect(engineer).to_have_url(re.compile(r"/examine/#line-2$"))
+    engineer.evaluate("window.scrollTo(0, 0)")
+    engineer.get_by_test_id("approve-all-open").click()
+    dialog = engineer.get_by_test_id("approve-all-dialog")
+    expect(dialog).to_contain_text("2 lines wait for a decision")
+    pages.send_dialog(engineer, dialog, "approve-all-confirm")
+    expect(engineer).to_have_url(pages.EXAMINE_URL)
+    expect(engineer.locator("main")).to_contain_text("Approved")
+    expect(engineer.get_by_test_id("approve-all-open")).to_have_count(0)
+    for reference in (first, second, third):
+        expect(pages.review_line(engineer, reference)).to_contain_text("Approved")

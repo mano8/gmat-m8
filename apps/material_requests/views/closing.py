@@ -17,10 +17,11 @@ from apps.access.roles import Capability
 from apps.core.dialogs import ActionDialog
 from apps.material_requests import selectors, services
 from apps.material_requests.forms import RequiredReasonForm, ScheduleForm
-from apps.material_requests.models import MaterialRequest
+from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.views.common import (
     _examine_url,
     _invalid,
+    _line_url,
     _on_line,
     _on_request,
     _perform,
@@ -57,7 +58,7 @@ def _reason_action(request: HttpRequest, target_id: UUID, action: ReasonAction) 
         if action.on_line
         else _on_request(request, target_id, SOURCE)
     )
-    to = _examine_url(target)
+    to = _line_url(target) if isinstance(target, MaterialRequestLine) else _examine_url(target)
     form = RequiredReasonForm(request.POST, auto_id=action.ids(target))
     dialog = action.dialog(ctx, target, form).dialog()
     if not form.is_valid():

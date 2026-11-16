@@ -77,6 +77,11 @@ def go(request: HttpRequest, to: str, *args: Any, **kwargs: Any) -> HttpResponse
         return varies(redirect(url))
     response = HttpResponse(status=204)
     response["HX-Redirect"] = url
+    if "#" in url:
+        # A URL that differs from the page's only by its fragment makes the browser scroll
+        # without loading anything: the page would keep its stale data and miss the flash.
+        # htmx sets the location, then reloads the document (M14.2).
+        response["HX-Refresh"] = "true"
     return varies(response)
 
 

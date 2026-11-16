@@ -7457,3 +7457,18 @@ msgstr "Su unidad de medida, %(unit)s, también está inactiva: el material vuel
 #, python-format
 msgid "Its unit of measure, %(unit)s, is inactive: the material comes back only with its unit. A group administrator can reactivate both from this page, or the unit under Administration → Units of measure."
 msgstr "Su unidad de medida, %(unit)s, está inactiva: el material solo vuelve con su unidad. Un administrador del grupo puede reactivar ambos desde esta página, o la unidad en Administración → Unidades de medida."
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "Approve all"
+msgstr "Aprobar todas"
+
+#: apps/material_requests/views/review_dialogs.py
+#, python-format
+msgid "%(count)s line waits for a decision: it is approved at its requested quantity."
+msgid_plural "%(count)s lines wait for a decision: each is approved at its requested quantity."
+msgstr[0] "%(count)s línea espera una decisión: se aprueba con la cantidad solicitada."
+msgstr[1] "%(count)s líneas esperan una decisión: cada una se aprueba con la cantidad solicitada."
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "The request is then approved."
+msgstr "La solicitud queda entonces aprobada."

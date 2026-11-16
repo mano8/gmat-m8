@@ -38,11 +38,13 @@ from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.views.common import (
     _examine_url,
     _invalid,
+    _line_url,
     _on_line,
     _on_request,
     _perform,
 )
 from apps.material_requests.views.review_dialogs import (
+    approve_all_dialog,
     assign_dialog,
     cancel_dialog,
     close_dialog,
@@ -261,6 +263,19 @@ def _dialog_context(dialogs: list[ActionDialog]) -> dict[str, Any]:
     }
 
 
+def _approve_all_dialog(
+    found: MaterialRequest, access: RowAccess, pending: int
+) -> ActionDialog | None:
+    """The page head's *approve all* (M14.2): offered under the condition of the bottom bar's
+    button, and only while a line waits."""
+    if not access.deciding or not pending:
+        return None
+    form = ApproveAllForm(
+        initial={"seen_version": access.version}, auto_id=request_form_ids("approve_all")
+    )
+    return approve_all_dialog(found, form, pending)
+
+
 @require_safe
 @require_capability(REVIEW)
 def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
@@ -282,14 +297,16 @@ def request_examine(request: HttpRequest, request_id: UUID) -> HttpResponse:
     )
     dialogs = _request_dialogs(ctx, found, reviewers, sourcing=sourcing)
     rows = _review_rows(ctx, found, entries, access)
+    pending = sum(
+        1 for row in rows if row.entry.line.decision == MaterialRequestLine.Decision.PENDING
+    )
     context = {
         "request_obj": found,
         "rows": rows,
         "assignee": selectors.assignee(found),
         **_dialog_context(dialogs),
-        "pending_count": sum(
-            1 for row in rows if row.entry.line.decision == MaterialRequestLine.Decision.PENDING
-        ),
+        "pending_count": pending,
+        "approve_all_dialog": _approve_all_dialog(found, access, pending),
         "can_edit_lines": access.editing,
         "approve_all_form": ApproveAllForm(initial={"seen_version": access.version}),
         "can_decide": selectors.can_decide(ctx, found),
@@ -310,10 +327,10 @@ def line_decide(request: HttpRequest, line_id: UUID) -> HttpResponse:
     """Approve (a quantity up to the requested one) or reject (with a reason) a line."""
     ctx = access_for(request)
     line = _on_line(request, line_id, REVIEW)
-    to = _examine_url(line)
+    here = _line_url(line)
     form = DecisionForm(request.POST)
     if not form.is_valid():
-        return _invalid(request, form, to)
+        return _invalid(request, form, here)
     data = form.cleaned_data
     return _perform(
         request,
@@ -326,7 +343,10 @@ def line_decide(request: HttpRequest, line_id: UUID) -> HttpResponse:
             seen_version=data["seen_version"],
         ),
         _("Line %(line)s decided.") % {"line": line.line_no},
-        to,
+        # The page opens at the line that waits next, never back at its top (Q80); a refusal
+        # returns to the line it concerns.
+        lambda _done: _examine_url(line, selectors.next_pending(ctx, line.request, line.line_no)),
+        failed_to=here,
     )
 
 
@@ -334,15 +354,18 @@ def line_decide(request: HttpRequest, line_id: UUID) -> HttpResponse:
 def request_approve_all(request: HttpRequest, request_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     found = _on_request(request, request_id, REVIEW)
-    form = ApproveAllForm(request.POST)
+    form = ApproveAllForm(request.POST, auto_id=request_form_ids("approve_all"))
+    # The head's dialog asks through htmx; the bottom bar's button posts plainly.
+    dialog = approve_all_dialog(found, form, selectors.pending_count(ctx, found)).dialog()
     if not form.is_valid():
-        return _invalid(request, form, _examine_url(found))
+        return _invalid(request, form, _examine_url(found), dialog=dialog)
     seen = form.cleaned_data["seen_version"]
     return _perform(
         request,
         lambda: services.approve_all(ctx.principal, found.pk, seen_version=seen),
         _("Every pending line is approved."),
         _examine_url(found),
+        dialog=dialog,
     )
 
 
@@ -406,7 +429,7 @@ def request_return(request: HttpRequest, request_id: UUID) -> HttpResponse:
 def line_reduce(request: HttpRequest, line_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     line = _on_line(request, line_id, REVIEW)
-    to = _examine_url(line)
+    to = _line_url(line)
     form = _form_for(ReduceForm, line, "reduce", data=request.POST)
     entry = next(
         (e for e in selectors.lines(ctx, [line.request])[line.request_id] if e.line.pk == line.pk),
@@ -431,7 +454,7 @@ def line_reduce(request: HttpRequest, line_id: UUID) -> HttpResponse:
 def line_sourcing(request: HttpRequest, line_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     line = _on_line(request, line_id, SOURCE)
-    to = _examine_url(line)
+    to = _line_url(line)
     form = SourcingForm(request.POST)
     if not form.is_valid():
         return _invalid(request, form, to)
@@ -453,7 +476,7 @@ def line_link(request: HttpRequest, line_id: UUID) -> HttpResponse:
     line = _on_line(request, line_id, SOURCE)
     if line.material_id is not None:
         messages.error(request, _("This line is already a catalog material."))
-        return redirect(_examine_url(line))
+        return redirect(_line_url(line))
     search = MaterialSearchForm(request.GET or None)
     query = search.cleaned_data["q"].strip() if search.is_valid() else ""
     context = {
@@ -470,7 +493,7 @@ def line_link(request: HttpRequest, line_id: UUID) -> HttpResponse:
 def line_resolve(request: HttpRequest, line_id: UUID) -> HttpResponse:
     ctx = access_for(request)
     line = _on_line(request, line_id, SOURCE)
-    to = _examine_url(line)
+    to = _line_url(line)
     form = ResolveForm(request.POST, ctx=ctx)
     if not form.is_valid():
         return _invalid(request, form, reverse("requests:link", args=[line.pk]))

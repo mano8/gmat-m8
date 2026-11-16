@@ -116,6 +116,11 @@ def open_the_return_dialog(page: Page, documents: Documents) -> None:
     expect(page.get_by_test_id("return-dialog")).to_be_visible()
 
 
+def open_the_approve_all_dialog(page: Page, documents: Documents) -> None:
+    page.get_by_test_id("approve-all-open").click()
+    expect(page.get_by_test_id("approve-all-dialog")).to_be_visible()
+
+
 def nothing(page: Page, documents: Documents) -> None:
     """The page as it is."""
 
@@ -124,6 +129,11 @@ Prepare = Callable[[Page, Documents], None]
 DOCUMENT_SCREENS: dict[str, tuple[str, Callable[[Documents], str], Prepare]] = {
     "review page": ("eng-mad", lambda d: d.pending_request, nothing),
     "review page with the line dialog": ("eng-mad", lambda d: d.pending_request, open_a_dialog),
+    "review page with the approve-all dialog": (
+        "eng-mad",
+        lambda d: d.pending_request,
+        open_the_approve_all_dialog,
+    ),
     "review page with the return dialog": (
         "eng-mad",
         lambda d: d.pending_request,

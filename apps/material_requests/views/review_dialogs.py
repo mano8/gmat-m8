@@ -9,6 +9,7 @@ page with many lines never repeats either.
 from django.forms import Form
 from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 
 from apps.core.dialogs import ActionDialog
 from apps.core.templatetags.ui_tags import quantity
@@ -25,6 +26,30 @@ def line_form_ids(line: MaterialRequestLine, name: str = "") -> str:
 def request_form_ids(name: str) -> str:
     """Field ids unique to one of the request's own dialogs."""
     return f"id_{name}_%s"
+
+
+def approve_all_dialog(found: MaterialRequest, form: Form, pending: int) -> ActionDialog:
+    """*Approve all pending lines*, asked from the page's head (M14.2, Q80): how many wait and
+    at which quantity each is approved. The bottom bar's button stays direct."""
+    return ActionDialog(
+        id="approve-all-dialog",
+        title=_("Approve all pending lines"),
+        icon="check",
+        action=reverse("requests:approve_all", args=[found.pk]),
+        submit=_("Approve all"),
+        form=form,
+        consequences=(
+            ngettext(
+                "%(count)s line waits for a decision: it is approved at its requested quantity.",
+                "%(count)s lines wait for a decision: each is approved at its requested quantity.",
+                pending,
+            )
+            % {"count": pending},
+            _("The request is then approved."),
+        ),
+        testid="approve-all-form",
+        submit_testid="approve-all-confirm",
+    )
 
 
 def assign_dialog(found: MaterialRequest, form: Form) -> ActionDialog:

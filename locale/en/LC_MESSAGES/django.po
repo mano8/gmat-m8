@@ -7273,3 +7273,18 @@ msgstr ""
 #, python-format
 msgid "Its unit of measure, %(unit)s, is inactive: the material comes back only with its unit. A group administrator can reactivate both from this page, or the unit under Administration → Units of measure."
 msgstr ""
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "Approve all"
+msgstr ""
+
+#: apps/material_requests/views/review_dialogs.py
+#, python-format
+msgid "%(count)s line waits for a decision: it is approved at its requested quantity."
+msgid_plural "%(count)s lines wait for a decision: each is approved at its requested quantity."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "The request is then approved."
+msgstr ""
