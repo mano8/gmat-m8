@@ -15,60 +15,60 @@
   {% if error %}<p role="alert" class="errorlist" data-testid="lines-error">{{ error }}</p>{% endif %}
   {% for entry in lines %}
     {% with line=entry.line following=lines|at:forloop.counter previous_index=forloop.counter0|add:"-1" %}
-    {% with previous=lines|at:previous_index %}
-      <div class="border-b border-line py-3 last:border-b-0"
-           data-line="{{ line.line_no }}">
-        <p class="font-medium">{{ line.description }}</p>
-        <p class="mb-2 text-sm text-soft">
-          {% if line.material_id %}{{ line.material.reference }} · {% endif %}{{ line.unit.code }}
-        </p>
-        <div class="flex flex-wrap items-center gap-2">
-          <form method="post"
-                action="{% url 'requests:update_line' line_id=line.pk %}"
-                hx-post="{% url 'requests:update_line' line_id=line.pk %}"
-                hx-target="#draft-lines"
-                hx-swap="outerHTML"
-                hx-trigger="submit, change"
-                hx-sync="this:replace"
-                data-focus-next="{% if following %}qty-{{ following.line.pk }}{% else %}review-link{% endif %}"
-                class="flex items-center gap-1">
-            {% csrf_token %}
-            {# Enter in the field submits through this first button: it sets the typed value. #}
-            <button type="submit" class="sr-only" tabindex="-1">{% translate "Set quantity" %}</button>
-            <button type="submit"
-                    name="step"
-                    value="dec"
-                    id="dec-{{ line.pk }}"
-                    class="btn px-0 w-11"
-                    aria-label="{% translate 'One less' %}">−</button>
-            <input type="text"
-                   id="qty-{{ line.pk }}"
-                   enterkeyhint="{% if following %}next{% else %}done{% endif %}"
-                   name="requested_qty"
-                   value="{{ line.requested_qty|quantity }}"
-                   inputmode="decimal"
-                   autocomplete="off"
-                   aria-label="{% translate 'Quantity' %}"
-                   class="block min-h-11 w-20 rounded-md border border-line-strong bg-raised px-2 py-2 text-center text-base text-ink">
-            <button type="submit"
-                    name="step"
-                    value="inc"
-                    id="inc-{{ line.pk }}"
-                    class="btn px-0 w-11"
-                    aria-label="{% translate 'One more' %}">+</button>
-          </form>
-          <form method="post"
-                action="{% url 'requests:remove_line' line_id=line.pk %}"
-                hx-post="{% url 'requests:remove_line' line_id=line.pk %}"
-                hx-target="#draft-lines"
-                hx-swap="outerHTML"
-                data-focus-next="{% if following %}qty-{{ following.line.pk }}{% elif forloop.first %}id_q{% else %}qty-{{ previous.line.pk }}{% endif %}">
-            {% csrf_token %}
-            <button type="submit" id="remove-{{ line.pk }}" class="btn btn-link">{% translate "Remove" %}</button>
-          </form>
+      {% with previous=lines|at:previous_index %}
+        <div class="border-b border-line py-3 last:border-b-0"
+             data-line="{{ line.line_no }}">
+          <p class="font-medium">{{ line.description }}</p>
+          <p class="mb-2 text-sm text-soft">
+            {% if line.material_id %}{{ line.material.reference }} · {% endif %}{{ line.unit.code }}
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <form method="post"
+                  action="{% url 'requests:update_line' line_id=line.pk %}"
+                  hx-post="{% url 'requests:update_line' line_id=line.pk %}"
+                  hx-target="#draft-lines"
+                  hx-swap="outerHTML"
+                  hx-trigger="submit, change"
+                  hx-sync="this:replace"
+                  data-focus-next="{% if following %}qty-{{ following.line.pk }}{% else %}review-link{% endif %}"
+                  class="flex items-center gap-1">
+              {% csrf_token %}
+              {# Enter in the field submits through this first button: it sets the typed value. #}
+              <button type="submit" class="sr-only" tabindex="-1">{% translate "Set quantity" %}</button>
+              <button type="submit"
+                      name="step"
+                      value="dec"
+                      id="dec-{{ line.pk }}"
+                      class="btn px-0 w-11"
+                      aria-label="{% translate 'One less' %}">−</button>
+              <input type="text"
+                     id="qty-{{ line.pk }}"
+                     enterkeyhint="{% if following %}next{% else %}done{% endif %}"
+                     name="requested_qty"
+                     value="{{ line.requested_qty|quantity }}"
+                     inputmode="decimal"
+                     autocomplete="off"
+                     aria-label="{% translate 'Quantity' %}"
+                     class="block min-h-11 w-20 rounded-md border border-line-strong bg-raised px-2 py-2 text-center text-base text-ink">
+              <button type="submit"
+                      name="step"
+                      value="inc"
+                      id="inc-{{ line.pk }}"
+                      class="btn px-0 w-11"
+                      aria-label="{% translate 'One more' %}">+</button>
+            </form>
+            <form method="post"
+                  action="{% url 'requests:remove_line' line_id=line.pk %}"
+                  hx-post="{% url 'requests:remove_line' line_id=line.pk %}"
+                  hx-target="#draft-lines"
+                  hx-swap="outerHTML"
+                  data-focus-next="{% if following %}qty-{{ following.line.pk }}{% elif forloop.first %}id_q{% else %}qty-{{ previous.line.pk }}{% endif %}">
+              {% csrf_token %}
+              <button type="submit" id="remove-{{ line.pk }}" class="btn btn-link">{% translate "Remove" %}</button>
+            </form>
+          </div>
         </div>
-      </div>
-    {% endwith %}
+      {% endwith %}
     {% endwith %}
   {% empty %}
     <p class="py-2 text-soft">{% translate "No material yet. Pick one above." %}</p>
