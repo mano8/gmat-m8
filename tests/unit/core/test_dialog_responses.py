@@ -101,6 +101,24 @@ class TestGo:
         assert "HX-Refresh" not in go(make_request(htmx=True), "/there/")
         assert go(make_request(), "/there/#line-2")["Location"] == "/there/#line-2"
 
+    @pytest.mark.parametrize(
+        ("current", "refresh"),
+        [
+            ("https://example.test/there/", True),
+            ("https://example.test/there/#line-1", True),
+            ("https://example.test/there/?tab=2", False),
+            ("https://example.test/lines/7/edit/", False),
+        ],
+    )
+    def test_the_reload_is_only_for_the_page_posted_from(self, current: str, refresh: bool) -> None:
+        """From another page (a dialog's form opened as a page of its own), the redirect loads
+        a new document by itself: a reload would replace it with the page left (M14.7)."""
+        request = make_request(htmx=True)
+        request.META["HTTP_HX_CURRENT_URL"] = current
+        response = go(request, "/there/#line-2")
+        assert response["HX-Redirect"] == "/there/#line-2"
+        assert ("HX-Refresh" in response) is refresh
+
     def test_a_url_name_with_its_arguments(self) -> None:
         response = go(make_request(htmx=True), "receiving:detail", receipt_id=UUID(int=1))
         assert response["HX-Redirect"] == f"/receiving/{UUID(int=1)}/"
