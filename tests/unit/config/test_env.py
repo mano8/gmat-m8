@@ -5,6 +5,7 @@ from django.core.exceptions import ImproperlyConfigured
 from config.env import (
     derived_fernet_key,
     env_bool,
+    env_choice,
     env_fernet_keys,
     env_int,
     env_list,
@@ -54,6 +55,35 @@ class TestEnvBool:
     def test_unknown_word_fails_closed(self) -> None:
         with pytest.raises(ImproperlyConfigured):
             env_bool("X", False, environ={"X": "maybe"})
+
+
+ALIASES = {"1": "on", "true": "on", "0": "off", "false": "off"}
+
+
+class TestEnvChoice:
+    @pytest.mark.parametrize(("value", "expected"), [("manual", "manual"), (" ON ", "on")])
+    def test_a_choice_in_any_case(self, value: str, expected: str) -> None:
+        assert env_choice("X", ("off", "manual", "on"), "off", environ={"X": value}) == expected
+
+    @pytest.mark.parametrize(("value", "expected"), [("TRUE", "on"), ("1", "on"), ("0", "off")])
+    def test_an_alias_names_its_choice(self, value: str, expected: str) -> None:
+        found = env_choice("X", ("off", "on"), "off", aliases=ALIASES, environ={"X": value})
+        assert found == expected
+
+    @pytest.mark.parametrize("environ", [{}, {"X": "  "}])
+    def test_missing_is_the_default(self, environ: dict[str, str]) -> None:
+        assert env_choice("X", ("off", "on"), "off", environ=environ) == "off"
+
+    @pytest.mark.parametrize("value", ["maybe", "onn", "yes"])
+    def test_anything_else_fails_closed(self, value: str) -> None:
+        with pytest.raises(ImproperlyConfigured, match="must be one of"):
+            env_choice("X", ("off", "on"), "off", aliases={"1": "on"}, environ={"X": value})
+
+    def test_a_default_or_alias_outside_the_choices_is_a_programming_error(self) -> None:
+        with pytest.raises(ValueError, match="default"):
+            env_choice("X", ("off", "on"), "maybe", environ={})
+        with pytest.raises(ValueError, match="alias"):
+            env_choice("X", ("off", "on"), "off", aliases={"1": "yes"}, environ={})
 
 
 class TestEnvInt:

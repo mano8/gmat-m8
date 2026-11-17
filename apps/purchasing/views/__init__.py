@@ -5,7 +5,9 @@ Reads go through ``apps.purchasing.selectors``; writes through ``apps.purchasing
 from POST-only views (``@mutating``), each on its own URL, with its GET page on another.
 Capabilities: ``po.manage`` (group administrators, material managers) for the worklist,
 the builder and every action; ``po.view`` (also warehouse operators) for the order lists,
-the order page and the printable page. Prices appear only with ``price.view`` (§8.2).
+the order page and the printable page. Prices appear only with ``price.view`` (§8.2). M14.4
+adds the send of an issued order from its page (``order_send``) and its dispatches' status,
+polled while in flight (``dispatch_delivery``).
 """
 
 from apps.purchasing.views.actions import (
@@ -21,9 +23,11 @@ from apps.purchasing.views.actions import (
     order_cancel,
     order_create,
     order_issue,
+    order_send,
     order_update,
 )
 from apps.purchasing.views.pages import (
+    dispatch_delivery,
     order_amendment,
     order_detail,
     order_list,
@@ -36,6 +40,7 @@ __all__ = [
     "allocation_increase",
     "allocation_unallocate",
     "dispatch_confirm",
+    "dispatch_delivery",
     "dispatch_resend",
     "line_close_short",
     "line_remove",
@@ -50,6 +55,7 @@ __all__ = [
     "order_list",
     "order_new",
     "order_print",
+    "order_send",
     "order_update",
     "worklist",
 ]

@@ -6,6 +6,7 @@ The order of the checks is S7's: the capability somewhere (403), the order in sc
 ``po.manage`` on it (403). The services authorize and validate again in their transaction.
 """
 
+from typing import Any
 from uuid import UUID
 
 from django.contrib import messages
@@ -32,9 +33,11 @@ from apps.purchasing.forms import (
     NewOrderForm,
     ReasonForm,
     RequiredReasonForm,
+    SendOrderForm,
 )
 from apps.purchasing.models import PurchaseOrder
 from apps.purchasing.selectors import MANAGE, WorklistRow
+from apps.purchasing.views import dispatch_messages
 from apps.purchasing.views.common import (
     Status,
     _detail_url,
@@ -58,8 +61,15 @@ from apps.purchasing.views.order_dialogs import (
     lower_dialog,
     raise_dialog,
     resend_dialog,
+    send_dialog,
 )
-from apps.purchasing.views.pages import _uuids, amend_form_for, amend_page, new_order_page
+from apps.purchasing.views.pages import (
+    _uuids,
+    amend_form_for,
+    amend_page,
+    new_order_page,
+    send_data,
+)
 
 # The add-lines dialog's form (M8b.4): shown again alone, with its errors, to an htmx POST.
 ADD_LINES_FORM = "purchasing/detail.html#add_lines_form"
@@ -272,6 +282,7 @@ def order_issue(request: HttpRequest, po_id: UUID) -> HttpResponse:
         return conflict(request)
     else:
         messages.success(request, _("Order %(number)s issued.") % {"number": issued.number})
+        dispatch_messages.after_issue(request, issued)
     return redirect(to)
 
 
@@ -290,6 +301,7 @@ def order_cancel(request: HttpRequest, po_id: UUID) -> HttpResponse:
         _("Order cancelled.") if issued else _("Draft discarded."),
         _detail_url(found),
         dialog=make(found, form).dialog(),
+        also=lambda order: dispatch_messages.after_cancel(request, order),
     )
 
 
@@ -349,6 +361,7 @@ def order_amend(request: HttpRequest, po_id: UUID) -> HttpResponse:
         )
     else:
         messages.success(request, _("Order amended: revision %(n)s.") % {"n": amended.revision})
+        dispatch_messages.after_amend(request, amended)
     return redirect(_detail_url(found))
 
 
@@ -384,4 +397,41 @@ def dispatch_resend(request: HttpRequest, dispatch_id: UUID) -> HttpResponse:
         _("The dispatch is queued to be sent again."),
         _detail_url(found),
         dialog=resend_dialog(found, form).dialog(),
+    )
+
+
+@mutating(MANAGE)
+def order_send(request: HttpRequest, po_id: UUID) -> HttpResponse:
+    """Send the issued order to its supplier's current address (M14.4): queued, the worker
+    sends it."""
+    ctx = access_for(request)
+    found = _on_order(request, po_id)
+    to = _detail_url(found)
+    form = SendOrderForm(request.POST, auto_id=fresh("send", 0))
+    dialog = send_dialog(found, form, lambda: send_body_data(request, found)).dialog()
+    if not form.is_valid():
+        return _invalid(request, form, to, dialog=dialog)
+    return _perform(
+        request,
+        lambda: services.send_order(
+            ctx.principal,
+            found.pk,
+            note=form.cleaned_data["note"],
+            idempotency_key=form.cleaned_data["idempotency_key"],
+        ),
+        lambda message: dispatch_messages.sent_text(found, message),
+        to,
+        failed_to=to,
+        dialog=dialog,
+    )
+
+
+def send_body_data(request: HttpRequest, found: PurchaseOrder) -> dict[str, Any]:
+    """The send dialog's body when the form comes back with its errors."""
+    ctx = access_for(request)
+    rows = selectors.lines(ctx, found)
+    return send_data(
+        found,
+        selectors.dispatches(ctx, found),
+        prices=any(row.unit_price is not None for row in rows),
     )

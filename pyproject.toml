@@ -84,6 +84,11 @@ django_settings_module = "config.settings.test"
 module = ["allauth", "allauth.*"]
 follow_untyped_imports = true
 
+# qrcode (allauth's MFA extra) ships no stubs; the setup QR code is drawn through it (M14.6).
+[[tool.mypy.overrides]]
+module = ["qrcode", "qrcode.*"]
+ignore_missing_imports = true
+
 # Playwright and axe belong to the optional `e2e` group, which the type-check job does not install.
 [[tool.mypy.overrides]]
 module = ["playwright", "playwright.*", "axe_playwright_python", "axe_playwright_python.*"]

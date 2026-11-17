@@ -460,6 +460,63 @@ class TestTheStepper:
         assert list(draft.lines.values_list("line_no", flat=True)) == [2]
         assert client.post(reverse("requests:remove_line", args=[first.pk])).status_code == 404
 
+    def test_each_control_has_a_stable_id_and_names_where_enter_goes(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        draft = make_request(lines=3)
+        lines = list(draft.lines.order_by("line_no"))
+        client = client_for(people.tech_mad)
+        page = client.get(reverse("requests:detail", args=[draft.pk])).content.decode()
+        for line in lines:
+            for prefix in ("qty", "dec", "inc", "remove"):
+                assert f'id="{prefix}-{line.pk}"' in page
+        assert 'id="review-link"' in page
+        for line, following in zip(lines, [*lines[1:], None], strict=True):
+            target = f"qty-{following.pk}" if following else "review-link"
+            assert f'action="{reverse("requests:update_line", args=[line.pk])}"' in page
+            assert f'data-focus-next="{target}"' in page
+        # enterkeyhint: "next" on all but the last quantity
+        assert page.count('enterkeyhint="next"') == 2
+        assert page.count('enterkeyhint="done"') == 1
+
+    def test_a_single_line_goes_to_review_and_its_removal_to_the_search(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        draft = make_request(lines=1)
+        page = (
+            client_for(people.tech_mad)
+            .get(reverse("requests:detail", args=[draft.pk]))
+            .content.decode()
+        )
+        assert page.count('data-focus-next="review-link"') == 1
+        assert page.count('data-focus-next="id_q"') == 1
+        assert 'enterkeyhint="done"' in page
+
+    def test_after_a_removal_the_remaining_lines_name_their_targets(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        draft = make_request(lines=3)
+        first, second, third = draft.lines.order_by("line_no")
+        client = client_for(people.tech_mad)
+        client.post(reverse("requests:remove_line", args=[second.pk]), **HTMX)
+        page = client.get(reverse("requests:detail", args=[draft.pk])).content.decode()
+        assert f'data-focus-next="qty-{third.pk}"' in page
+        # the last line's removal falls back to the previous line's quantity
+        removal = f'action="{reverse("requests:remove_line", args=[third.pk])}"'
+        assert removal in page
+        assert f'data-focus-next="qty-{first.pk}"' in page
+
+    def test_a_refused_quantity_answers_with_the_error_marker_the_script_checks(
+        self, people: People, make_request: MakeRequest
+    ) -> None:
+        line = make_request(lines=2).lines.get(line_no=1)
+        response = client_for(people.tech_mad).post(
+            reverse("requests:update_line", args=[line.pk]), {"requested_qty": "0"}, **HTMX
+        )
+        body = response.content.decode()
+        assert 'data-testid="lines-error"' in body
+        assert f'id="qty-{line.pk}"' in body
+
     def test_a_line_of_a_submitted_request_is_not_changed(
         self, people: People, make_request: MakeRequest
     ) -> None:

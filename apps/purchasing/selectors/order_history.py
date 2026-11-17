@@ -4,10 +4,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from django.db.models import F, Q, QuerySet
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
@@ -19,6 +20,12 @@ from apps.material_requests import selectors as request_selectors
 from apps.material_requests.models import MaterialRequest
 from apps.notifications.models import DISPATCH_KINDS, EmailOutbox, Kind
 from apps.notifications.models import Status as Dispatch
+from apps.notifications.selectors import (
+    DELAYED_AFTER,
+    IN_FLIGHT,
+    POLL_EVERY,
+    POLL_EVERY_DELAYED,
+)
 from apps.purchasing.components import TrimReason
 from apps.purchasing.models import PurchaseOrder
 from apps.purchasing.selectors.purchase_orders import MANAGE, VIEW
@@ -79,6 +86,7 @@ ACTION_LABELS = {
     "purchase_order.dispatch_ambiguous": _("Delivery to the supplier uncertain"),
     "purchase_order.dispatch_confirmed": _("Delivery to the supplier confirmed"),
     "purchase_order.dispatch_resent": _("Sent to the supplier again"),
+    "purchase_order.dispatch_sent_by_hand": _("Queued to the supplier from the order page"),
 }
 TRIM_LABELS = {
     TrimReason.EXCESS_COMMITMENT: _("the request line was already committed elsewhere"),
@@ -163,6 +171,26 @@ class DispatchRow:
     def actionable(self) -> bool:
         return self.resendable or self.confirmable
 
+    @property
+    def polling(self) -> bool:
+        """Its status reloads itself while the worker may still change it (M14.4)."""
+        return self.dispatch.status in IN_FLIGHT
+
+    @property
+    def delayed(self) -> bool:
+        """Still queued or sending ``DELAYED_AFTER`` after it became due (as M7c.1), or waiting
+        for a retry after a failed attempt: the worker moves ``not_before`` ahead then, so it
+        is a time to come (a send or a resend is due at once)."""
+        if not self.polling:
+            return False
+        current, due = timezone.now(), self.dispatch.not_before
+        retrying = self.dispatch.attempts > 0 and due > current
+        return retrying or current - due > DELAYED_AFTER
+
+    @property
+    def poll_every(self) -> str:
+        return POLL_EVERY_DELAYED if self.delayed else POLL_EVERY
+
 
 def _dispatches(ctx: AccessContext) -> QuerySet[EmailOutbox]:
     return EmailOutbox.objects.filter(
@@ -177,23 +205,104 @@ def dispatch(ctx: AccessContext, dispatch_id: UUID) -> EmailOutbox:
     return found
 
 
+def _row(of: PurchaseOrder, found: EmailOutbox, siblings: list[EmailOutbox]) -> DispatchRow:
+    """``siblings``: the order's other dispatches, which may make a resend a duplicate."""
+    from apps.purchasing.dispatch import DECIDABLE, refusal, replaced, revision_of
+
+    decidable = found.status in DECIDABLE
+    return DispatchRow(
+        dispatch=found,
+        notice=found.kind == Kind.PO_CANCELLATION,
+        revision=revision_of(found),
+        decidable=decidable,
+        resendable=decidable and refusal(of, found) is None and not replaced(found, siblings),
+    )
+
+
 def dispatches(ctx: AccessContext, of: PurchaseOrder) -> list[DispatchRow]:
     """The order's dispatches, newest first, with what a human may still do with each."""
-    from apps.purchasing.dispatch import DECIDABLE, refusal, revision_of
+    found = list(_dispatches(ctx).filter(source_po=of).order_by("-created_at", "-pk"))
+    return [_row(of, row, found) for row in found]
 
-    rows = []
-    for found in _dispatches(ctx).filter(source_po=of).order_by("-created_at"):
-        decidable = found.status in DECIDABLE
-        rows.append(
-            DispatchRow(
-                dispatch=found,
-                notice=found.kind == Kind.PO_CANCELLATION,
-                revision=revision_of(found),
-                decidable=decidable,
-                resendable=decidable and refusal(of, found) is None,
-            )
+
+def dispatch_row(ctx: AccessContext, dispatch_id: UUID) -> DispatchRow:
+    """One dispatch as the order page's panel shows it (its status polled, M14.4); 404 out of
+    the user's ``po.view`` scope."""
+    found = dispatch(ctx, dispatch_id)
+    siblings = list(
+        _dispatches(ctx).filter(
+            source_po_id=found.source_po_id, kind=found.kind, source_ref=found.source_ref
         )
-    return rows
+    )
+    return _row(cast(PurchaseOrder, found.source_po), found, siblings)
+
+
+# --- what an action did with the supplier's emails (M14.4, Q86) ------------------------------
+
+
+@dataclass(frozen=True)
+class DispatchNotice:
+    """What the order's dispatches say after an action, read from the order as it is.
+
+    ``latest`` is the newest ``PO_ORDER`` of the current revision; ``withdrawn`` the unsent
+    ones the action took back (an amendment: the previous revision's superseded rows; a
+    cancellation: the count its audit event recorded, so a dispatch a human discarded earlier
+    is not counted); ``cancellation`` the notice owed to the supplier.
+    """
+
+    mode: str
+    latest: EmailOutbox | None
+    withdrawn: int
+    cancellation: EmailOutbox | None
+    notice_awaited: bool
+
+
+def _withdrawn(of: PurchaseOrder, rows: list[EmailOutbox]) -> int:
+    from apps.purchasing.dispatch import revision_of
+
+    if of.status == PurchaseOrder.Status.CANCELLED:
+        data = (
+            AuditEvent.objects.filter(
+                object_type=PurchaseOrder._meta.label_lower,
+                object_id=of.pk,
+                action="purchase_order.cancelled",
+            )
+            .order_by("-occurred_at", "-id")
+            .values_list("data", flat=True)
+            .first()
+        )
+        return int((data or {}).get("dispatches_cancelled", 0))
+    return sum(
+        1
+        for row in rows
+        if row.status == Dispatch.SUPERSEDED and revision_of(row) == of.revision - 1
+    )
+
+
+def _notice_follows(of: PurchaseOrder, rows: Iterable[EmailOutbox]) -> bool:
+    """Cancelled while a dispatch was being sent: the notice follows if that one reaches the
+    supplier (it is listed once queued; nothing is owed if the attempt fails)."""
+    found = list(rows)
+    return (
+        of.cancellation_notice_required
+        and not any(row.kind == Kind.PO_CANCELLATION for row in found)
+        and any(row.status == Dispatch.SENDING for row in found)
+    )
+
+
+def dispatch_notice(ctx: AccessContext, of: PurchaseOrder) -> DispatchNotice:
+    """The supplier emails of ``of`` (read again after the action) for the action's message."""
+    from apps.purchasing.dispatch import mode, source_ref
+
+    found = list(_dispatches(ctx).filter(source_po=of).order_by("-created_at", "-pk"))
+    orders = [row for row in found if row.kind == Kind.PO_ORDER]
+    return DispatchNotice(
+        mode=mode(),
+        latest=next((row for row in orders if row.source_ref == source_ref(of)), None),
+        withdrawn=_withdrawn(of, orders),
+        cancellation=next((row for row in found if row.kind == Kind.PO_CANCELLATION), None),
+        notice_awaited=_notice_follows(of, found),
+    )
 
 
 def awaiting_decision(rows: Iterable[DispatchRow]) -> bool:
@@ -201,13 +310,8 @@ def awaiting_decision(rows: Iterable[DispatchRow]) -> bool:
 
 
 def notice_awaited(of: PurchaseOrder, rows: list[DispatchRow]) -> bool:
-    """Cancelled while a dispatch was being sent: the notice follows if that one reaches the
-    supplier (it is listed once queued; nothing is owed if the attempt fails)."""
-    return (
-        of.cancellation_notice_required
-        and not any(row.notice for row in rows)
-        and any(row.dispatch.status == Dispatch.SENDING for row in rows)
-    )
+    """The panel's form of ``_notice_follows``."""
+    return _notice_follows(of, (row.dispatch for row in rows))
 
 
 def can_see_history(ctx: AccessContext, of: PurchaseOrder) -> bool:

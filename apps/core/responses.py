@@ -24,6 +24,7 @@ views' and services' as before; nothing here decides who may do what.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -77,7 +78,26 @@ def go(request: HttpRequest, to: str, *args: Any, **kwargs: Any) -> HttpResponse
         return varies(redirect(url))
     response = HttpResponse(status=204)
     response["HX-Redirect"] = url
+    if _same_document(request, url):
+        # A URL that differs from the page's only by its fragment makes the browser scroll
+        # without loading anything: the page would keep its stale data and miss the flash.
+        # htmx sets the location, then reloads the document (M14.2).
+        response["HX-Refresh"] = "true"
     return varies(response)
+
+
+def _same_document(request: HttpRequest, url: str) -> bool:
+    """``url`` has a fragment and points at the page htmx posted from (``HX-Current-URL``,
+    compared without its fragment). Another page loads by itself: a reload there would
+    replace that navigation with a reload of the page left. Without the header (htmx always
+    sends it), any fragment counts."""
+    if "#" not in url:
+        return False
+    current = request.headers.get("HX-Current-URL")
+    if not current:
+        return True
+    target, here = urlsplit(url), urlsplit(current)
+    return (target.path, target.query) == (here.path, here.query)
 
 
 def form_again(request: HttpRequest, dialog: Dialog) -> HttpResponse:
@@ -148,12 +168,15 @@ def perform[T](
     *,
     failed_to: str = "",
     dialog: Dialog | None = None,
+    also: Callable[[T], None] | None = None,
 ) -> HttpResponse:
     """Run a service call: flash its outcome and go to ``to`` (``failed_to`` if it failed).
 
     ``done`` and ``to`` may be functions of what the call returned; ``failed_to`` is then
     required, the place a refusal goes back to. With ``dialog``, an htmx POST that the
     service refuses gets the form again with the refusal on it (422) instead of the flash.
+    ``also`` runs after the success flash with what the call returned, for the flashes that
+    follow it (what an order's cancellation did with the supplier's emails, M14.4).
     """
     try:
         result = call()
@@ -167,6 +190,8 @@ def perform[T](
     except RetryExhausted:
         return conflict(request)
     messages.success(request, _outcome(done, result))
+    if also is not None:
+        also(result)
     return go(request, _outcome(to, result))
 
 

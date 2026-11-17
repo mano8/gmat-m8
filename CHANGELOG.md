@@ -4,8 +4,24 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+- **Approve all pending lines** at the top of the review page: a button in the page head opens a confirmation that says how many lines wait, each approved at its requested quantity. The button after the lines stays as it was.
+- An **administration overview** for group administrators (*Administration › Overview*, `/dashboard/administration/`): the organisation's panels (companies and branches, people per branch, requests submitted per branch) with the same period selector as the home page.
+- **Send to the supplier** on an issued purchase order's page, beside *Printable page*: a dialog shows the supplier's current address, the revision and its latest email, and queues the order as issued (its prices included when any are recorded) for the mail worker. It is offered to buyers while `PO_DISPATCH` is `manual` or `on`, refused while the revision is already on its way, and a repeat gets its own `Message-ID` so the supplier's mailbox keeps it.
+- After issuing, amending, sending or cancelling an order, the page says what happened to the supplier's emails: what was queued and to which address, what was withdrawn, whether a cancellation notice is owed, or that nothing was emailed and why. The issue bar and the amendment page say beforehand where the order will go. The *Sent to the supplier* panel refreshes each email's status while it is queued or being sent.
+
+### Changed
+
+- Entering a request's quantities: Enter saves a quantity and moves on to the next one, its text selected so typing replaces it, and the last one leads to *Review and submit*. Tab, the − / + buttons and a refused quantity keep the focus where it was, and removing a line leaves it on a neighbouring line instead of the top of the page.
+- Reviewing a request: after a decision the page opens at the next line still waiting, and every other action on a line (sourcing, reduce, close short, reopen, link to the catalog, edit) returns to that line instead of the top of the page.
+- The home page keeps the day-to-day work: the organisation's panels moved to the administration overview, so a group administrator's home shows no organisation panel. Nobody loses a panel (each needs the administration capability the overview needs). *Supplier emails to check* stays on home.
+- The left menu opens with the chosen entry in view: when the menu is longer than the window, it scrolls (the menu only, never the page) so the current entry is visible; the phone's *More* sheet does the same. Nothing is stored in the browser.
+- `PO_DISPATCH` takes three values: `off` (print only), `manual` (the send button only) and `on` (also emailed at each issue and amendment, as before). Absent means `off`; `true`/`false` and the other former words keep their meaning; anything else stops the application at start-up. The `app.env` templates now say `manual`. **Upgrade note:** an existing `app.env` keeps its value (`off` unless you changed it): set `PO_DISPATCH=manual` to offer the button.
+
 ### Fixed
 
+- The authenticator setup page draws its QR code dark on a white background, quiet zone included, so it is readable in the dark theme too (it was black on the dark page); the code no longer needs the light theme or the typed secret.
 - The VPS runbook installed cosign v2.5.0, which does not find the signatures of a release (signed with cosign 3), so the first deploy stopped at its signature check. It now installs v3.0.6 and says why an older version fails.
 
 ## [0.1.0] - 2026-11-14

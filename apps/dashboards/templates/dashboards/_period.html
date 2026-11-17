@@ -1,0 +1,14 @@
+{% load i18n %}
+{% comment %}The period selector of a board with charts. Context: draws_charts, periods, period.{% endcomment %}
+{% if draws_charts %}
+  <nav class="seg"
+       aria-label="{% translate 'Period' %}"
+       data-testid="period">
+    {% for weeks in periods %}
+      <a href="?weeks={{ weeks }}"
+         {% if weeks == period.weeks %}aria-current="true"{% endif %}>
+        {% blocktranslate %}{{ weeks }} weeks{% endblocktranslate %}
+      </a>
+    {% endfor %}
+  </nav>
+{% endif %}

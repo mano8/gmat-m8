@@ -20,6 +20,9 @@
              href="{{ handover_url }}?request={{ request_obj.pk }}">{% translate "Hand material over" %}</a>
         {% endcan %}
       {% endif %}
+      {% if approve_all_dialog %}
+        {% include "components/dialog_button.html" with dialog=approve_all_dialog.id label=approve_all_dialog.title icon="check" variant="primary" testid=approve_all_dialog.open_testid %}
+      {% endif %}
       {% if menu_items %}
         {% include "components/menu.html" with id="request-menu" label=_("More actions") items=menu_items %}
       {% endif %}
@@ -118,7 +121,9 @@
     <div data-testid="review-lines">
       {% for row in rows %}
         {% with entry=row.entry line=row.entry.line %}
-          <article class="@container card mb-3"
+          <article class="@container card mb-3 scroll-mt-20"
+                   id="line-{{ line.line_no }}"
+                   tabindex="-1"
                    data-line="{{ line.line_no }}"
                    data-testid="review-line">
             <div class="flex flex-wrap items-start justify-between gap-2">
@@ -319,6 +324,9 @@
   {% for d in dialogs %}
     {% include "components/action_dialog.html" with d=d %}
   {% endfor %}
+  {% if approve_all_dialog %}
+    {% include "components/action_dialog.html" with d=approve_all_dialog %}
+  {% endif %}
   {% if can_edit_lines %}
     {# One dialog for every line: each "Change the line" loads that line's form into it. #}
     {% include "components/dialog.html" with id="line-dialog" title=_("Change a line") size="lg" testid="line-dialog" %}

@@ -50,7 +50,7 @@ OrderStatus = PurchaseOrder.Status
 
 @pytest.fixture
 def dispatch_on(settings: Any) -> None:
-    settings.PO_DISPATCH = True
+    settings.PO_DISPATCH = "on"
 
 
 @pytest.fixture
@@ -245,7 +245,7 @@ class TestAmend:
         self, issued: PurchaseOrder, mm: SessionPrincipal, settings: Any
     ) -> None:
         """Turning the switch off stops new dispatches; queued ones still go out."""
-        settings.PO_DISPATCH = False
+        settings.PO_DISPATCH = "off"
         services.amend(mm, issued.pk, reason="Later", header=services.HeaderAmendment(notes="x"))
         assert [message.status for message in dispatches(issued)] == [Status.QUEUED]
         event = AuditEvent.objects.get(action="purchase_order.amended")
@@ -276,7 +276,7 @@ class TestCancel:
         outcome: Outcome,
     ) -> None:
         sent = ended(system, outcome)
-        settings.PO_DISPATCH = False  # the notice is owed whatever the switch says
+        settings.PO_DISPATCH = "off"  # the notice is owed whatever the switch says
         order = services.cancel(mm, issued.pk, reason="Not needed")
         assert order.cancellation_notice_required is True
         (notice,) = notices(issued)
@@ -539,6 +539,8 @@ class TestDecision:
     def test_a_quarantined_dispatch_is_confirmed_resent_or_discarded(
         self, issued: PurchaseOrder, mm: SessionPrincipal
     ) -> None:
+        # A restore holds back what was in flight, the issue's own email included.
+        EmailOutbox.objects.filter(source_po=issued).update(status=Status.QUARANTINED)
         row = make_dispatch(issued, Status.QUARANTINED)
         assert reload(services.confirm_dispatch(mm, row.pk)).status == Status.SENT
         row = make_dispatch(issued, Status.QUARANTINED)

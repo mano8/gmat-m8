@@ -4,11 +4,12 @@
   Parameters: label; variant ("primary", "secondary", "ghost", "danger", "link" or empty, which
   is secondary); size ("sm" or empty for the 44 px default); icon (a Lucide name, drawn before the
   label); icon_only (true hides the label visually, it stays the accessible name); type ("submit"
-  or "button", default "button"); href (renders a link instead); block (true for full width).
+  or "button", default "button"); href (renders a link instead); block (true for full width); html_id (the element's id).
   A submit button shows a spinner while htmx sends its form.
 {% endcomment %}
 {% if href %}
   <a href="{{ href }}"
+     {% if html_id %} id="{{ html_id }}"{% endif %}
      class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'secondary' %} btn-secondary{% elif variant == 'ghost' %} btn-ghost{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if size == 'sm' %} btn-sm{% endif %}{% if icon_only %} btn-icon{% endif %}{% if block %} btn-block{% endif %}">
     {% if icon %}
       {% icon icon classes="size-5" %}
@@ -17,6 +18,7 @@
   </a>
 {% else %}
   <button type="{{ type|default:'button' }}"
+          {% if html_id %} id="{{ html_id }}"{% endif %}
           class="btn{% if variant == 'primary' %} btn-primary{% elif variant == 'secondary' %} btn-secondary{% elif variant == 'ghost' %} btn-ghost{% elif variant == 'danger' %} btn-danger{% elif variant == 'link' %} btn-link{% endif %}{% if size == 'sm' %} btn-sm{% endif %}{% if icon_only %} btn-icon{% endif %}{% if block %} btn-block{% endif %}">
     {% if icon %}
       {% icon icon classes="size-5" %}

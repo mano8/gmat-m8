@@ -13,7 +13,10 @@ The purchasing app's own ``DispatchSource`` is registered (``apps.purchasing.app
 - the same with an amendment (M8.1): a claimed revision is never superseded, and a claim
   that waited for the amendment never sends the revision it superseded;
 - the abandoned-attempt sweep racing the attempt's own late outcome (M8.1): the message
-  ends with the outcome and the cancellation notice is queued once, whichever wins.
+  ends with the outcome and the cancellation notice is queued once, whichever wins;
+- a send from the order's page (M14.4): two at once queue one; with a cancel, either the
+  send is withdrawn unsent or refused, never a cancelled order sent without its notice; with
+  an amendment, the send is superseded or sends the new revision.
 """
 
 import time
@@ -24,6 +27,7 @@ from typing import Any
 
 import pytest
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.core.mail.backends.smtp import EmailBackend as SMTPBackend
 from django.db import transaction
 from django.db.models.functions import Now
@@ -63,7 +67,7 @@ HEAD_START = 0.2  # seconds before the second one starts
 @pytest.fixture
 def issue(org: Org, people: People, settings: Any) -> Callable[[], PurchaseOrder]:
     """An issued order of A-MAD, queued to the sentinel supplier as ``issue`` queues it."""
-    settings.PO_DISPATCH = True
+    settings.PO_DISPATCH = "on"
 
     def make() -> PurchaseOrder:
         order = orders.order(
@@ -397,3 +401,102 @@ def test_the_abandoned_attempt_sweep_racing_its_late_outcome(
     assert (attempt.outcome, attempt.abandoned) == (Outcome.SENT, False)
     assert dispatch_of(order).status == Status.SENT
     assert dispatch_of(order, Kind.PO_CANCELLATION).status == Status.QUEUED
+
+
+# --- a send from the order's page (M14.4) -----------------------------------------------
+
+
+@pytest.fixture
+def by_hand(org: Org, people: People, settings: Any) -> Callable[[], PurchaseOrder]:
+    """An issued order with a line, under ``manual``: nothing queued until a buyer sends it."""
+    settings.PO_DISPATCH = "manual"
+
+    def make() -> PurchaseOrder:
+        order = orders.order(
+            org,
+            status="ISSUED",
+            issued_by=people.mm_mad,
+            supplier_snapshot={"name": org.supplier.name, "email": org.supplier.email},
+        )
+        unit, _ = UnitOfMeasure.objects.get_or_create(
+            code="M", defaults={"name": "m", "decimals": 2}
+        )
+        material = Material.objects.create(reference="CAB-25", name="Cable 2,5", unit=unit)
+        orders.line(order, material, "10")
+        return order
+
+    return make
+
+
+def send_order(people: People, order: PurchaseOrder) -> EmailOutbox:
+    return services.send_order(principal_for(people.mm_mad), order.pk, idempotency_key=None)
+
+
+@pytest.fixture
+def slow_send() -> Iterator[None]:
+    """The send holds the order ``FOR UPDATE`` (and its rows) for ``HOLD``."""
+    unsubscribe = events.subscribe("purchase_order.dispatch_queued", lambda event: time.sleep(HOLD))
+    yield
+    unsubscribe()
+
+
+def test_two_sends_at_once_queue_one(by_hand: Callable[[], PurchaseOrder], people: People) -> None:
+    order = by_hand()
+    results = run_concurrently(2, lambda index: send_order(people, order))
+    sent = [result for result in results if isinstance(result, EmailOutbox)]
+    refused = [result for result in results if isinstance(result, ValidationError)]
+    assert (len(sent), len(refused)) == (1, 1)
+    assert refused[0].code == "already_queued"
+    assert dispatch_of(order).pk == sent[0].pk
+
+
+def test_a_cancel_waits_for_a_send_and_withdraws_it(
+    by_hand: Callable[[], PurchaseOrder], people: People, slow_send: None
+) -> None:
+    order = by_hand()
+    sent, cancelled = second_starts_later(
+        lambda: send_order(people, order),
+        lambda: services.cancel(principal_for(people.mm_mad), order.pk, reason="Stop"),
+    )
+    assert isinstance(sent, EmailOutbox) and isinstance(cancelled, PurchaseOrder)
+    assert dispatch_of(order).status == Status.CANCELLED  # never sent
+    assert cancelled.cancellation_notice_required is False
+    assert claim_next(SystemPrincipal()) is None
+
+
+def test_a_send_waits_for_a_cancel_and_is_refused(
+    by_hand: Callable[[], PurchaseOrder], people: People, slow_cancel: None
+) -> None:
+    order = by_hand()
+    cancelled, sent = second_starts_later(
+        lambda: services.cancel(principal_for(people.mm_mad), order.pk, reason="Stop"),
+        lambda: send_order(people, order),
+    )
+    assert isinstance(cancelled, PurchaseOrder)
+    assert isinstance(sent, ValidationError) and sent.code == "not_issued"
+    assert not EmailOutbox.objects.filter(source_po=order).exists()
+
+
+def test_an_amendment_waits_for_a_send_and_supersedes_it(
+    by_hand: Callable[[], PurchaseOrder], people: People, slow_send: None
+) -> None:
+    order = by_hand()
+    sent, amended = second_starts_later(
+        lambda: send_order(people, order), lambda: amend(people, order)
+    )
+    assert isinstance(sent, EmailOutbox) and isinstance(amended, PurchaseOrder)
+    assert EmailOutbox.objects.get(pk=sent.pk).status == Status.SUPERSEDED
+    assert amended.revision == 1
+    assert claim_next(SystemPrincipal()) is None
+
+
+def test_a_send_waits_for_an_amendment_and_sends_the_new_revision(
+    by_hand: Callable[[], PurchaseOrder], people: People, slow_amend: None
+) -> None:
+    order = by_hand()
+    amended, sent = second_starts_later(
+        lambda: amend(people, order), lambda: send_order(people, order)
+    )
+    assert isinstance(amended, PurchaseOrder)
+    assert isinstance(sent, EmailOutbox) and sent.source_ref == f"PO:{order.pk}:rev1"
+    assert sent.message_id.startswith(f"<po-{order.pk}-rev1@")

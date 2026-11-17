@@ -863,6 +863,10 @@ def _panel_url(key: str) -> Callable[[World], str]:
     return lambda world: reverse("dashboard:panel", kwargs={"key": key})
 
 
+def _administration_url(query: str) -> Callable[[World], str]:
+    return lambda world: reverse("dashboard:administration") + query
+
+
 def dashboard_routes() -> tuple[Route, ...]:
     panels = tuple(
         Route(
@@ -1182,6 +1186,11 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
         ),
     ),
     "dashboard:panel": dashboard_routes(),
+    # M14.3 (Q81): the organization's overview, ``org.manage`` only; it renders placeholders.
+    "dashboard:administration": (
+        Route(org_page()),
+        Route(org_page(), position="invalid period", path=_administration_url("?weeks=abc")),
+    ),
     # The key figures (M8b.5): every signed-in session, each tile through its own scope.
     "dashboard:tiles": (
         Route(
@@ -1931,6 +1940,40 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             order_action(),
             path=purchase_url("purchasing:resend_dispatch", "dispatch"),
             note="queued again, or refused once confirmed",
+        ),
+    ),
+    # M14.4: send an issued order from its page; a dispatch's status, polled while in flight.
+    "purchasing:send_order": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:send_order", "purchaseorder"),
+            note="no form key: refused with a flash, nothing is queued",
+        ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:send_order", "purchaseorder"),
+            headers=HTMX,
+            allowed=SUPPLIER_SENTINELS,
+            note="no form key from the dialog: the form again with the supplier's address",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, PO_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("purchasing:send_order"),
+        ),
+    ),
+    "purchasing:dispatch_delivery": (
+        Route(
+            order_read(),
+            path=purchase_url("purchasing:dispatch_delivery", "dispatch"),
+            allowed=SUPPLIER_SENTINELS,
+            note="the status, attempts and address the panel shows; never the message",
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, PO_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("purchasing:dispatch_delivery"),
         ),
     ),
     # Receiving (M6.3): receipt.view reads receipts at a warehouse (branch scope) or at a

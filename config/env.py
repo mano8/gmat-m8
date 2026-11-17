@@ -7,7 +7,7 @@ A missing required value, an unparsable value or a too-short required string rai
 import base64
 import hashlib
 import os
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
@@ -83,6 +83,37 @@ def env_bool(name: str, default: bool, *, environ: Mapping[str, str] | None = No
         return False
     raise ImproperlyConfigured(
         f"Environment variable {name} must be one of {sorted(_TRUE | _FALSE)}"
+    )
+
+
+def env_choice(
+    name: str,
+    choices: Iterable[str],
+    default: str,
+    *,
+    aliases: Mapping[str, str] | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> str:
+    """Return one of ``choices`` (case-insensitive); ``aliases`` map former spellings to one.
+
+    A value that is neither a choice nor an alias is an error, so a typo never starts.
+    """
+    allowed = frozenset(choices)
+    if default not in allowed:
+        raise ValueError(f"The default {default!r} is not one of the choices of {name}")
+    known = {alias.lower(): value for alias, value in (aliases or {}).items()}
+    if not set(known.values()) <= allowed:
+        raise ValueError(f"An alias of {name} names an unknown choice")
+    value = _raw(name, environ)
+    if value is None:
+        return default
+    lowered = value.lower()
+    if lowered in allowed:
+        return lowered
+    if lowered in known:
+        return known[lowered]
+    raise ImproperlyConfigured(
+        f"Environment variable {name} must be one of {sorted(allowed | set(known))}"
     )
 
 

@@ -2,10 +2,11 @@
 
 One flow, made once per run through the screens (as the other journeys do): a request that is
 still waiting for its review, a second one approved and sourced for purchase, the order bought for
-it and the receiving form of that order; and, as the technician who reaches the worksite only
-through the project (M9.3), that project's page, its expected deliveries, the form at its
-worksite and a receipt of 1 posted there. The materials are used by no other journey, so the
-ledgers never meet.
+it and the receiving form of that order; a draft order for the same request's second line, left
+unissued so its issue bar says where the order will go (M14.4); a draft request with two lines,
+the request entry (M14.1); and, as the technician who reaches the worksite only through the
+project (M9.3), that project's page, its expected deliveries, the form at its worksite and a
+receipt of 1 posted there. The materials are used by no other journey, so the ledgers never meet.
 """
 
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ from tests.e2e.conftest import Browsing
 
 PENDING_MATERIAL = "CAB-H07VK-16-GR"
 BOUGHT_MATERIAL = "CAB-H07VK-16-AZ"
+DRAFT_ORDER_MATERIAL = "CAB-H07VK-16-MA"
+ENTRY_MATERIALS = {"CAB-H07VK-1,5-AZ": 2, "CAB-H07VK-1,5-GR": 5}
 SUPPLIER = "Suministros Eléctricos Levante SL"
 SHIP_TO = "A · Alfa Madrid · Almacén Madrid"
 
@@ -29,6 +32,8 @@ class Documents:
     request_status: str  # the requester's page of the pending request
     order: str  # the issued order (the material manager)
     order_number: str
+    draft_order: str  # a draft order with its issue bar (the material manager)
+    draft_request: str  # a draft request with two lines (the technician)
     receive: str  # the receiving form of that order (the warehouse operator)
     site_project: str  # COL-MAD's page, with "Receive materials" (the technician)
     site_expected: str  # COL-MAD's expected deliveries (the technician)
@@ -43,8 +48,15 @@ def build(browsing: Browsing) -> Documents:
     )
     request_status = technician.url
     bought = pages.submit_request(
-        technician, "COL-MAD", {BOUGHT_MATERIAL: 8}, reviewer="Elena Navarro"
+        technician,
+        "COL-MAD",
+        {BOUGHT_MATERIAL: 8, DRAFT_ORDER_MATERIAL: 3},
+        reviewer="Elena Navarro",
     )
+    pages.start_draft(technician, "COL-MAD")
+    for reference, quantity in ENTRY_MATERIALS.items():
+        pages.add_material(technician, reference, quantity)
+    draft_request = technician.url
 
     engineer = browsing.as_("eng-mad", "desktop")
     pages.open_in_inbox(engineer, pending)
@@ -53,11 +65,15 @@ def build(browsing: Browsing) -> Documents:
     bought_request = engineer.url
 
     manager = browsing.as_("mm-mad", "desktop")
-    pages.source_by_purchase(manager, bought, [BOUGHT_MATERIAL])
+    pages.source_by_purchase(manager, bought, [BOUGHT_MATERIAL, DRAFT_ORDER_MATERIAL])
     order_number = pages.order_from_worklist(
         manager, bought, [BOUGHT_MATERIAL], supplier=SUPPLIER, ship_to=SHIP_TO
     )
     order = manager.url
+    pages.draft_from_worklist(
+        manager, bought, [DRAFT_ORDER_MATERIAL], supplier=SUPPLIER, ship_to=SHIP_TO
+    )
+    draft_order = manager.url
 
     technician.goto("/projects/")
     technician.get_by_role("link", name="COL-MAD", exact=True).click()
@@ -82,6 +98,8 @@ def build(browsing: Browsing) -> Documents:
         request_status=request_status,
         order=order,
         order_number=order_number,
+        draft_order=draft_order,
+        draft_request=draft_request,
         receive=warehouse.url,
         site_project=site_project,
         site_expected=site_expected,

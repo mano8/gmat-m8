@@ -7457,3 +7457,162 @@ msgstr "Su unidad de medida, %(unit)s, también está inactiva: el material vuel
 #, python-format
 msgid "Its unit of measure, %(unit)s, is inactive: the material comes back only with its unit. A group administrator can reactivate both from this page, or the unit under Administration → Units of measure."
 msgstr "Su unidad de medida, %(unit)s, está inactiva: el material solo vuelve con su unidad. Un administrador del grupo puede reactivar ambos desde esta página, o la unidad en Administración → Unidades de medida."
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "Approve all"
+msgstr "Aprobar todas"
+
+#: apps/material_requests/views/review_dialogs.py
+#, python-format
+msgid "%(count)s line waits for a decision: it is approved at its requested quantity."
+msgid_plural "%(count)s lines wait for a decision: each is approved at its requested quantity."
+msgstr[0] "%(count)s línea espera una decisión: se aprueba con la cantidad solicitada."
+msgstr[1] "%(count)s líneas esperan una decisión: cada una se aprueba con la cantidad solicitada."
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "The request is then approved."
+msgstr "La solicitud queda entonces aprobada."
+
+#: apps/core/navigation.py
+msgid "Overview"
+msgstr "Resumen"
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "Administration overview"
+msgstr "Resumen de la administración"
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "The companies, branches and people of the organization."
+msgstr "Las empresas, sucursales y personas de la organización."
+
+#: apps/purchasing/forms.py
+msgid "For the order's history; the supplier does not see it."
+msgstr "Para el historial del pedido; el proveedor no lo ve."
+
+#: apps/purchasing/selectors/order_history.py
+msgid "Queued to the supplier from the order page"
+msgstr "En cola para el proveedor desde la página del pedido"
+
+#: apps/purchasing/services/dispatches.py
+msgid "Orders are not emailed to suppliers on this installation: print it."
+msgstr "En esta instalación los pedidos no se envían por correo a los proveedores: imprímalo."
+
+#: apps/purchasing/services/dispatches.py
+msgid "Only an issued order is sent to the supplier."
+msgstr "Solo se envía al proveedor un pedido emitido."
+
+#: apps/purchasing/services/dispatches.py
+msgid "The supplier has no email address: add it to the supplier, or print the order."
+msgstr "El proveedor no tiene dirección de correo: añádala al proveedor o imprima el pedido."
+
+#: apps/purchasing/services/dispatches.py
+msgid "This revision is already on its way to the supplier: wait for its status."
+msgstr "Esta revisión ya va camino del proveedor: espere a su estado."
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+#, python-format
+msgid "Saving emails the new revision to %(address)s, the address the order was issued to."
+msgstr "Al guardar, la nueva revisión se envía por correo a %(address)s, la dirección a la que se emitió el pedido."
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+#, python-format
+msgid "Issuing emails the order to %(address)s."
+msgstr "Al emitirlo, el pedido se envía por correo a %(address)s."
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "The order was issued without a supplier email address: the new revision is not emailed."
+msgstr "El pedido se emitió sin dirección de correo del proveedor: la nueva revisión no se envía por correo."
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "The supplier has no email address: issuing emails nothing. Print the order and send it."
+msgstr "El proveedor no tiene dirección de correo: al emitir no se envía nada. Imprima el pedido y envíelo."
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "Saving emails nothing: send the new revision from the order's page."
+msgstr "Al guardar no se envía nada por correo: envíe la nueva revisión desde la página del pedido."
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "Issuing emails nothing: once issued, send the order to the supplier from this page."
+msgstr "Al emitir no se envía nada por correo: una vez emitido, envíe el pedido al proveedor desde esta página."
+
+#: apps/purchasing/templates/purchasing/dispatches.html
+msgid "Not sent by email yet."
+msgstr "Aún no enviado por correo."
+
+#: apps/purchasing/templates/purchasing/dispatches.html
+msgid "The supplier has no email address, so the order cannot be sent from here. Print it and send it."
+msgstr "El proveedor no tiene dirección de correo, así que el pedido no puede enviarse desde aquí. Imprímalo y envíelo."
+
+#: apps/purchasing/templates/purchasing/dispatches.html
+msgid "Add the address on the supplier's page"
+msgstr "Añada la dirección en la página del proveedor"
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "Already sent"
+msgstr "Ya enviado"
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "Not emailed yet."
+msgstr "Aún no enviado por correo."
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "The prices recorded on the order are included."
+msgstr "Se incluyen los precios registrados en el pedido."
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "Queued to be emailed to %(address)s."
+msgstr "En cola para enviarse por correo a %(address)s."
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "The email to %(address)s is %(status)s: see Sent to the supplier."
+msgstr "El correo a %(address)s está en estado «%(status)s»: vea Enviado al proveedor."
+
+#: apps/purchasing/views/dispatch_messages.py
+msgid "Not emailed to the supplier: use Send to the supplier to email it."
+msgstr "No enviado al proveedor por correo: use Enviar al proveedor para enviarlo."
+
+#: apps/purchasing/views/dispatch_messages.py
+msgid "Not emailed to the supplier: it had no email address when the order was issued. Print the order and send it."
+msgstr "No enviado al proveedor por correo: no tenía dirección de correo cuando se emitió el pedido. Imprima el pedido y envíelo."
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "A cancellation notice is queued to be emailed to %(address)s."
+msgstr "Un aviso de anulación está en cola para enviarse por correo a %(address)s."
+
+#: apps/purchasing/views/dispatch_messages.py
+msgid "The order is being emailed to the supplier right now: if it arrives, a cancellation notice follows."
+msgstr "El pedido se está enviando ahora mismo al proveedor: si llega, le seguirá un aviso de anulación."
+
+#: apps/purchasing/views/order_dialogs.py
+msgid "Send to the supplier"
+msgstr "Enviar al proveedor"
+
+#: apps/purchasing/views/order_dialogs.py
+msgid "The order as issued is queued to be emailed to the address below."
+msgstr "El pedido tal como se emitió se pone en cola para enviarse por correo a la dirección de abajo."
+
+#: apps/purchasing/views/order_dialogs.py
+msgid "Its status shows under Sent to the supplier once the mail worker sends it."
+msgstr "Su estado aparece en Enviado al proveedor cuando el proceso de correo lo envía."
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "An email to the supplier, not sent yet, was withdrawn."
+msgid_plural "%(count)s emails to the supplier, not sent yet, were withdrawn."
+msgstr[0] "Se retiró un correo al proveedor que aún no se había enviado."
+msgstr[1] "Se retiraron %(count)s correos al proveedor que aún no se habían enviado."
+
+#: apps/purchasing/services/dispatches.py
+msgid "Another email of this revision is on its way or was sent after this one: send the order from its page to send it again."
+msgstr "Otro correo de esta revisión está en camino o se envió después de este: envíe el pedido desde su página para enviarlo de nuevo."
+
+#: apps/purchasing/templates/purchasing/dispatch_status.html
+msgid "Reload the page to decide what happens to this email."
+msgstr "Recargue la página para decidir qué hacer con este correo."
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "This revision is already on its way to the supplier: wait until its status above has changed before sending it again."
+msgstr "Esta revisión ya está en camino al proveedor: espere a que su estado de arriba cambie antes de enviarla de nuevo."

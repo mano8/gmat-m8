@@ -19,6 +19,7 @@ from tests.e2e import pages
 from tests.e2e.conftest import ROOT, Browsing
 from tests.e2e.documents import PENDING_MATERIAL, Documents
 from tests.e2e.test_home_charts import settled
+from tests.e2e.test_mfa_setup import open_setup
 from tests.e2e.test_phone_layout import SCREENS
 
 BLOCKING = {"serious", "critical"}
@@ -32,6 +33,9 @@ OPTIONS = {
     },
 }
 AUDITED = {**SCREENS, "eng-mad": ["/", "/requests/inbox/", "/purchasing/orders/"]}
+
+# The pages that draw charts: axe waits for their panels (M14.3: the administration overview too).
+CHART_PAGES = ("/", "/dashboard/administration/")
 
 REPORT: list[str] = []
 
@@ -102,7 +106,7 @@ def test_the_home_pages_and_the_lists(browsing: Browsing, person: str, viewport:
     for path in AUDITED[person]:
         page.goto(path)
         expect(page.locator("main h1").first).to_be_visible()
-        found += audit_schemes(page, f"{person} {path} {viewport}", charts=path == "/")
+        found += audit_schemes(page, f"{person} {path} {viewport}", charts=path in CHART_PAGES)
     assert not found, "\n".join(found)
 
 
@@ -116,6 +120,25 @@ def open_the_return_dialog(page: Page, documents: Documents) -> None:
     expect(page.get_by_test_id("return-dialog")).to_be_visible()
 
 
+def open_the_approve_all_dialog(page: Page, documents: Documents) -> None:
+    page.get_by_test_id("approve-all-open").click()
+    expect(page.get_by_test_id("approve-all-dialog")).to_be_visible()
+
+
+def open_the_send_dialog(page: Page, documents: Documents) -> None:
+    """M14.4: *Send to the supplier* (the stack runs with ``PO_DISPATCH=manual``)."""
+    page.get_by_test_id("send-open").click()
+    expect(page.get_by_test_id("send-dialog")).to_be_visible()
+
+
+def the_issue_bar(page: Page, documents: Documents) -> None:
+    """M14.4: a draft order's issue bar says, before issuing, whether the order will be emailed
+    (``manual``: from its page once issued; ``on``: to the supplier's address; ``off``: nothing)."""
+    bar = page.get_by_test_id("issue-bar")
+    expect(bar.get_by_test_id("issue-form")).to_be_visible()
+    bar.scroll_into_view_if_needed()
+
+
 def nothing(page: Page, documents: Documents) -> None:
     """The page as it is."""
 
@@ -124,6 +147,11 @@ Prepare = Callable[[Page, Documents], None]
 DOCUMENT_SCREENS: dict[str, tuple[str, Callable[[Documents], str], Prepare]] = {
     "review page": ("eng-mad", lambda d: d.pending_request, nothing),
     "review page with the line dialog": ("eng-mad", lambda d: d.pending_request, open_a_dialog),
+    "review page with the approve-all dialog": (
+        "eng-mad",
+        lambda d: d.pending_request,
+        open_the_approve_all_dialog,
+    ),
     "review page with the return dialog": (
         "eng-mad",
         lambda d: d.pending_request,
@@ -132,6 +160,10 @@ DOCUMENT_SCREENS: dict[str, tuple[str, Callable[[Documents], str], Prepare]] = {
     "sourced request": ("eng-mad", lambda d: d.bought_request, nothing),
     "request status": ("tech-mad", lambda d: d.request_status, nothing),
     "order": ("mm-mad", lambda d: d.order, nothing),
+    "order with the send dialog": ("mm-mad", lambda d: d.order, open_the_send_dialog),
+    "draft order with the issue bar": ("mm-mad", lambda d: d.draft_order, the_issue_bar),
+    # M14.1: the request entry, a draft with its lines and their quantities.
+    "request entry": ("tech-mad", lambda d: d.draft_request, nothing),
     "receive form": ("wo-mad", lambda d: d.receive, nothing),
     # M9.3: what a project receiver works with (the technician, through the project only).
     "project page with Receive materials": ("tech-mad", lambda d: d.site_project, nothing),
@@ -166,3 +198,12 @@ def test_the_chart_library_loads_only_where_a_chart_is_drawn(browsing: Browsing)
     page.goto("/")
     settled(page)
     assert [u for u in seen if "chart.umd" in u], "the home page does not load the chart library"
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_the_authenticator_setup_page(browsing: Browsing, viewport: str) -> None:
+    """M14.6: the setup page with its QR code, in both schemes (the dark one is the fix)."""
+    page = open_setup(browsing, viewport)
+    expect(page.locator("main h1").first).to_be_visible()
+    found = audit_schemes(page, f"authenticator setup {viewport}")
+    assert not found, "\n".join(found)

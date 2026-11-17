@@ -11,6 +11,7 @@ from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e.conftest import Browsing
 from tests.e2e.documents import PENDING_MATERIAL, Documents
+from tests.e2e.test_mfa_setup import open_setup
 
 FOCUS = """() => {
   const el = document.activeElement;
@@ -139,6 +140,19 @@ def test_each_kind_of_dialog_by_keyboard(
     expect(opener).to_be_focused()
     assert_focus_is_visible(page)
 
+    # A confirmation opened from the page's head (M14.2): a button, then the dialog's own stops.
+    approve_all = page.get_by_test_id("approve-all-open")
+    focus_by_keyboard(page, approve_all)
+    assert_focus_is_visible(page)
+    page.keyboard.press("Enter")
+    asking = page.get_by_test_id("approve-all-dialog")
+    expect(asking).to_be_visible()
+    stays_in_the_dialog(page, "dialog")
+    page.keyboard.press("Escape")
+    expect(asking).to_be_hidden()
+    expect(approve_all).to_be_focused()
+    assert_focus_is_visible(page)
+
     # A destructive confirmation, opened from a menu item: the way out has the focus.
     menu_button = page.locator("[popovertarget=request-menu]")
     focus_by_keyboard(page, menu_button)
@@ -157,6 +171,39 @@ def test_each_kind_of_dialog_by_keyboard(
     page.keyboard.press("Escape")
     expect(confirm).to_be_hidden()
     expect(menu_button).to_be_focused()
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_the_send_dialog_by_keyboard(
+    browsing: Browsing, documents: Documents, viewport: str
+) -> None:
+    """M14.4: *Send to the supplier* in the order's head, opened and left by keyboard."""
+    page = browsing.as_("mm-mad", viewport)
+    page.goto(documents.order)
+    expect(page.locator("main h1").first).to_be_visible()
+    opener = page.get_by_test_id("send-open")
+    focus_by_keyboard(page, opener)
+    assert_focus_is_visible(page)
+    page.keyboard.press("Enter")
+    dialog = page.get_by_test_id("send-dialog")
+    expect(dialog).to_be_visible()
+    expect(dialog.get_by_test_id("send-address")).to_be_visible()
+    stays_in_the_dialog(page, "dialog")
+    page.keyboard.press("Escape")
+    expect(dialog).to_be_hidden()
+    expect(opener).to_be_focused()
+    assert_focus_is_visible(page)
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_the_authenticator_setup_page_by_keyboard(browsing: Browsing, viewport: str) -> None:
+    """M14.6: in the dark scheme, the walk reaches the code field and the button that activates
+    the authenticator, each with a visible focus, in the document's order."""
+    page = open_setup(browsing, viewport)
+    page.emulate_media(color_scheme="dark", reduced_motion="reduce")
+    names = [str(s["name"]) for s in walk_the_tab_order(page) if s["region"] == "main"]
+    assert any(name.startswith("input#code") for name in names), names
+    assert any(name.startswith("button") for name in names), names
 
 
 def stays_in_the_dialog(page: Page, selector: str, presses: int = 14) -> None:

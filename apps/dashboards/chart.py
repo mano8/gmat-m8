@@ -20,6 +20,7 @@ from django.utils.functional import Promise
 
 from apps.access.context import AccessContext
 from apps.core.stats import Calendar
+from apps.dashboards.boards import Board
 from apps.dashboards.period import Period
 
 BAR, LINE, HBAR, METERS = "bar", "line", "hbar", "meters"
@@ -119,3 +120,4 @@ class ChartPanel:
     query: str = ""
     wide: bool = False  # spans both columns of the charts grid on a wide screen
     kind: str = "chart"
+    board: Board = Board.HOME

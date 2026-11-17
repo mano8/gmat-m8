@@ -366,6 +366,19 @@ class DispatchNoteForm(forms.Form):
     note = forms.CharField(label=_("Note"), required=False, max_length=500)
 
 
+class SendOrderForm(IdempotentForm):
+    """Sending an issued order to its supplier from its page (M14.4): an optional note."""
+
+    operation = "purchase_order.send"
+
+    note = forms.CharField(
+        label=_("Note"),
+        required=False,
+        max_length=500,
+        help_text=_("For the order's history; the supplier does not see it."),
+    )
+
+
 # --- the amendment of an issued order -----------------------------------------------------------
 
 

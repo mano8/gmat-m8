@@ -4,7 +4,7 @@ How mail leaves gmat-m8, what its states mean, and what a human does when a mess
 
 ## How it works, in one paragraph
 
-A request never talks to SMTP. Business code writes an `EmailOutbox` row inside its transaction, and the **worker** container is the only sender: it claims a row, re-checks that the recipient is still allowed, records an attempt **before** any network I/O, sends through the relay in `app.env`, and records the outcome. Security mail (invitations, email changes, password resets) is sealed with `OUTBOX_ENCRYPTION_KEYS` and wiped as soon as it is sent, or after an hour. Supplier purchase orders are mailed only when `PO_DISPATCH=on`.
+A request never talks to SMTP. Business code writes an `EmailOutbox` row inside its transaction, and the **worker** container is the only sender: it claims a row, re-checks that the recipient is still allowed, records an attempt **before** any network I/O, sends through the relay in `app.env`, and records the outcome. Security mail (invitations, email changes, password resets) is sealed with `OUTBOX_ENCRYPTION_KEYS` and wiped as soon as it is sent, or after an hour. Supplier purchase orders are mailed only when `PO_DISPATCH` is `manual` (a buyer sends an issued order from its page) or `on` (also at each issue and amendment); see [Supplier dispatches](#supplier-dispatches).
 
 The account mail that is not an answer to something someone asked for: notices that a password or a second factor changed, and that an administrator reset an account's factors. They are sealed and wiped like a reset link, and a person who did not do what one says should tell you straight away ([user-admin.md](user-admin.md#sessions-inactivity-and-notices)).
 
@@ -57,7 +57,13 @@ When the relay comes back, queued messages go on their own. Messages whose time 
 
 ## Supplier dispatches
 
-Only when `PO_DISPATCH=on`. A dispatch (`PO_ORDER`) carries the order as it was issued or amended; recipients and content are frozen from the order's snapshots. The **order page** has a dispatch panel for a `po.manage` holder.
+`PO_DISPATCH` in `app.env` decides (ADR-0010 Q7):
+
+- `off`: nothing is emailed to suppliers; the order is printed (*Printable page*). An upgraded installation keeps this value until you change it.
+- `manual` (the template's value for new installations): a buyer opens an **issued** order and uses **Send to the supplier**, beside *Printable page*. The dialog shows the address it goes to: the supplier's **current** address, so fix a wrong address on the supplier's page first. Issuing and amending send nothing. A second send of the same revision waits until the first has ended (sent, failed or ambiguous), and gets its own `Message-ID` so the supplier's mailbox does not drop it as a duplicate.
+- `on`: issuing and each amendment also queue the order, to the address it was issued to; the button is there too.
+
+After each action the page says what was queued and to which address, what was withdrawn (an unsent earlier revision, an unsent order cancelled) and whether a cancellation notice is owed; *queued* means the worker has not sent it yet. The **Sent to the supplier** panel on the order page shows each dispatch's status and refreshes it while it is queued or being sent. Before you switch to `manual` or `on`, send one order to a test supplier whose address is your own and check it arrives once. A dispatch (`PO_ORDER`) carries the order as it was issued or amended; its content is frozen from the order's snapshots. The panel's decisions (below) are for a `po.manage` holder.
 
 ### `AMBIGUOUS`
 
@@ -71,7 +77,7 @@ Every decision is audited on the order with your note.
 
 ### `FAILED`
 
-The worker already tried up to 5 times with growing pauses, so this is a lasting problem: a relay that refuses, a rejected supplier address. Fix the cause (see [When mail is not leaving](#when-mail-is-not-leaving)) and **Send again** on the order page. The address is frozen from the order's snapshot, so sending again reuses it; if the address itself is wrong, send the printable order page (`orders/<id>/print/`) to the supplier by hand, and say so in the order's notes.
+The worker already tried up to 5 times with growing pauses, so this is a lasting problem: a relay that refuses, a rejected supplier address. Fix the cause (see [When mail is not leaving](#when-mail-is-not-leaving)) and **Send again** on the order page. *Send again* reuses the address that dispatch was queued to. If the address itself is wrong, correct it on the supplier's page, then use **Send to the supplier** on the order's page (under `manual` or `on`): it goes to the supplier's current address, and while that email is on its way or once it is sent, the failed dispatch is no longer offered for *Send again*, so the supplier gets the revision once. For a cancellation notice, or under `off`, send the printable order page (`orders/<id>/print/`) to the supplier by hand, and say so in the order's notes.
 
 ### Cancellation notices
 

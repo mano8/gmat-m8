@@ -19,7 +19,8 @@ wrapper, in the order of CLAUDE.md "Writes":
 
 Supplier dispatches (M5.3, ``dispatches``): a human confirms or resends a dispatch the
 worker left ``AMBIGUOUS`` or ``FAILED``, or a restore left ``QUARANTINED`` (which can also be
-discarded); the order at L4, then its dispatch rows at L4b.
+discarded); a buyer sends an issued order from its page (``send_order``, M14.4); the order
+at L4, then its dispatch rows at L4b.
 
 Capabilities (plan §3.4): ``po.manage`` for every write (group administrators and material
 managers); ``price.view`` for prices. Prices are optional (Q10). A draft changes freely and
@@ -31,6 +32,7 @@ from apps.purchasing.services.dispatches import (
     confirm_dispatch,
     discard_dispatch,
     resend_dispatch,
+    send_order,
 )
 from apps.purchasing.services.drafts import (
     add_request_lines,
@@ -69,6 +71,7 @@ __all__ = [
     "issue",
     "remove_line",
     "resend_dispatch",
+    "send_order",
     "unallocate",
     "update_line",
     "update_order",

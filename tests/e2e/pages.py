@@ -7,17 +7,47 @@ the application assigned). Texts are the English ones: the browser contexts ask 
 
 import re
 from collections.abc import Callable
+from pathlib import Path
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, Page, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 REQUEST_NUMBER = re.compile(r"SOL-[A-Z]+-[A-Z]+-\d{4}-\d{5}")
+# The review page, with or without the line it opens at (M14.2).
+EXAMINE_URL = re.compile(r"/examine/(#line-\d+)?$")
 
 
 def line_of(page: Page, reference: str) -> Locator:
     """The draft line for a catalog reference."""
     return page.locator("#draft-lines [data-line]", has_text=reference)
+
+
+def lines_ready(page: Page) -> None:
+    """Wait until htmx has taken over every form of the draft's lines. A line just swapped in is
+    visible before htmx processes it (its settle step); a key pressed in between submits the
+    form natively, a full page load that loses the focus (seen on CI's faster runner, M14.7)."""
+    page.wait_for_function(
+        """() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')
+            && [...document.querySelectorAll('#draft-lines form[hx-post]')].every(
+                (form) => form['htmx-internal-data'] && form['htmx-internal-data'].initHash)"""
+    )
+
+
+def whole_page_screenshot(page: Page, path: Path) -> None:
+    """The whole page as one long screen: the viewport is made as tall as the page for the shot.
+    Playwright's ``full_page`` stitches the page under a viewport of the device's height, so a
+    fixed bar (the phone's menu) is drawn at the first screen's bottom, mid-picture, and a sticky
+    one (*Review and submit*) is pushed against the top of its section, over its heading."""
+    size = page.viewport_size
+    assert size is not None
+    height = int(page.evaluate("document.documentElement.scrollHeight"))
+    page.set_viewport_size({"width": size["width"], "height": max(height, size["height"])})
+    try:
+        page.evaluate("new Promise((done) => requestAnimationFrame(() => done(null)))")
+        page.screenshot(path=path)
+    finally:
+        page.set_viewport_size(size)
 
 
 def filter_list(page: Page, selector: str, value: str) -> None:
@@ -98,14 +128,14 @@ def open_in_inbox(page: Page, number: str, status: str = "") -> None:
     page.goto("/requests/inbox/" + (f"?status={status}" if status else ""))
     row = page.locator("[data-testid=inbox-row]", has_text=number)
     row.get_by_role("link").first.click()
-    page.wait_for_url("**/examine/")
+    page.wait_for_url(EXAMINE_URL)
     expect(page.get_by_test_id("examine-number")).to_have_text(number)
 
 
 def approve_all(page: Page, number: str) -> None:
     open_in_inbox(page, number)
     page.get_by_test_id("approve-all").click()
-    page.wait_for_url("**/examine/")
+    page.wait_for_url(EXAMINE_URL)
     expect(page.locator("main")).to_contain_text("Approved")
     expect(page.get_by_test_id("approve-all")).to_have_count(0)
 
@@ -121,7 +151,7 @@ def source_by_purchase(page: Page, number: str, references: list[str]) -> None:
         form = review_line(page, reference).get_by_test_id("sourcing-form")
         form.locator("select").select_option(label="Purchase")
         form.get_by_role("button", name="Save sourcing").click()
-        page.wait_for_url("**/examine/")
+        page.wait_for_url(EXAMINE_URL)
         expect(review_line(page, reference)).to_contain_text("Purchase")
 
 
@@ -134,6 +164,15 @@ def order_from_worklist(
     unit_price: str = "1.25",
 ) -> str:
     """Tick the request's lines on the worklist, make the draft order, price it and issue it."""
+    draft_from_worklist(page, number, references, supplier, ship_to)
+    issue_order(page, unit_price)
+    return str(page.locator("h1").inner_text()).strip()
+
+
+def draft_from_worklist(
+    page: Page, number: str, references: list[str], supplier: str, ship_to: str
+) -> None:
+    """Tick the request's lines on the worklist and make the draft order (left on its page)."""
     page.goto("/purchasing/")
     for reference in references:
         group = page.get_by_test_id("worklist-material").filter(has_text=reference)
@@ -147,8 +186,6 @@ def order_from_worklist(
     page.get_by_test_id("new-order-form").get_by_role("button", name="Create the draft").click()
     page.wait_for_url(re.compile(r"/purchasing/orders/[0-9a-f-]{36}/$"))
     expect(page.locator("h1")).to_have_text("Draft order")
-    issue_order(page, unit_price)
-    return str(page.locator("h1").inner_text()).strip()
 
 
 def issue_order(page: Page, unit_price: str = "1.25") -> None:
@@ -257,9 +294,21 @@ def open_line_dialog(page: Page, reference: str) -> Locator:
 
 
 def send_dialog(page: Page, dialog: Locator, button: str) -> None:
-    """Send a dialog's form that will be accepted: the whole page navigates (``HX-Redirect``)."""
-    with page.expect_navigation():
-        dialog.get_by_test_id(button).click()
+    """Send a dialog's form that will be accepted: the whole page is loaded again (``HX-Redirect``,
+    and ``HX-Refresh`` when the address names a line of the page). A marker on the document tells
+    when it is the new one: a fragment alone is a navigation that loads nothing."""
+    page.evaluate("window.__beforeDialog = true")
+    dialog.get_by_test_id(button).click()
+    # Not ``wait_for_function``: it evaluates a string inside the page, which the CSP refuses.
+    for _ in range(150):
+        try:
+            if page.evaluate("window.__beforeDialog === undefined"):
+                break
+        except PlaywrightError:  # the document is being replaced under the call
+            pass
+        page.wait_for_timeout(100)
+    else:
+        raise AssertionError("the page was not loaded again after the dialog was sent")
     expect(dialog).to_be_hidden()
 
 
@@ -273,7 +322,7 @@ def change_line(
     form.locator("input[name=requested_qty]").fill(quantity)
     form.locator("[name=reason]").fill(reason)
     send_dialog(page, dialog, "save-and-approve" if approve else "save-edit")
-    expect(page).to_have_url(re.compile(r"/examine/$"))
+    expect(page).to_have_url(EXAMINE_URL)
 
 
 def invite(

@@ -28,6 +28,35 @@
     });
   });
 
+  // The left menu (and the phone's More sheet) scrolls on its own: after a page loads, or the sheet
+  // opens, the current entry is brought into view by moving the container's scroll, never the
+  // page's (no scrollIntoView, no smooth scrolling). Nothing is stored; a page with no current
+  // entry, or a container that does not scroll, is left alone.
+  function showCurrentEntry(container) {
+    var current = container && container.querySelector('[aria-current="page"]');
+    if (!current || container.scrollHeight <= container.clientHeight) {
+      return;
+    }
+    var box = container.getBoundingClientRect();
+    var entry = current.getBoundingClientRect();
+    if (entry.top >= box.top && entry.bottom <= box.bottom) {
+      return;
+    }
+    var wanted = container.scrollTop + (entry.top - box.top) - (box.height - entry.height) / 2;
+    container.scrollTop = Math.max(0, Math.min(wanted, container.scrollHeight - container.clientHeight));
+  }
+
+  showCurrentEntry(document.getElementById("app-menu"));
+  document.addEventListener(
+    "toggle",
+    function (event) {
+      if (event.newState === "open" && event.target.id === "more-menu") {
+        showCurrentEntry(event.target);
+      }
+    },
+    true
+  );
+
   // Success messages fade after a few seconds.
   window.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-autohide]").forEach(function (node) {
@@ -283,6 +312,44 @@
     var hidden = button.getAttribute("aria-expanded") === "false";
     button.value = hidden ? "shown" : "hidden";
     button.setAttribute("aria-label", button.getAttribute(hidden ? "data-label-show" : "data-label-hide"));
+  });
+
+  // Request entry: Enter in a quantity (or Remove) moves the focus on to the control the server
+  // named in data-focus-next, once the answer is in and carries no error. A stepper button or the
+  // change of a Tab is named "step" or is not a submit, so the focus stays where htmx put it back.
+  var focusNext = null;
+  var focusBack = "";
+  document.addEventListener(
+    "submit",
+    function (event) {
+      var named = event.target.getAttribute && event.target.getAttribute("data-focus-next");
+      var stepper = event.submitter && event.submitter.name === "step";
+      focusNext = named && !stepper ? named : null;
+      focusBack = document.activeElement && document.activeElement.id;
+    },
+    true
+  );
+  document.addEventListener("htmx:afterSettle", function (event) {
+    var swapped = event.detail.target;
+    if (!swapped || swapped.id !== "draft-lines") {
+      return;
+    }
+    var wanted = focusNext;
+    var back = focusBack;
+    focusNext = null;
+    focusBack = "";
+    // outerHTML: the event names the replaced element, so the answer is read from the page
+    if (wanted && document.querySelector("#draft-lines [data-testid=lines-error]")) {
+      wanted = back; // a refused quantity: the focus stays on its field
+    }
+    var next = wanted && document.getElementById(wanted);
+    if (!next) {
+      return;
+    }
+    next.focus();
+    if (next.select && next.type === "text") {
+      next.select();
+    }
   });
 
   // The theme switch: System, Light or Dark takes effect without a reload. The server writes the

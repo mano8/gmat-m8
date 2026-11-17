@@ -55,7 +55,7 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.production.yml'
 - [ ] The delivery badge on the invitation goes from queued to sent.
 - [ ] `touch flags/worker.paused` holds the mail back, and removing the flag sends it ([email.md](email.md)).
 - [ ] Business notifications arrive (a submitted request reaches its reviewers, an approval reaches the requester), and a person who opted out of them on their notifications page gets none.
-- [ ] Supplier dispatch stays off (`PO_DISPATCH=off`) unless you decide to try it with a supplier who agreed; then follow [email.md](email.md#supplier-dispatches).
+- [ ] Supplier dispatch: set `PO_DISPATCH=manual` in `app.env` (an upgrade keeps `off`), give a test supplier your own address, issue an order, use **Send to the supplier** on its page, read the message naming the address, watch the panel turn to *Sent* and check the mail arrives once; then buyers send to suppliers who agreed ([email.md](email.md#supplier-dispatches)).
 
 ## 4. Setting up the organization
 
@@ -76,6 +76,17 @@ Each person does their own part on their own device; you watch, and note what wa
 - [ ] Files are attached to a request and a receipt (a photo from a phone, a PDF). An antivirus test file is refused by the scanner: a small PDF that carries the standard EICAR string in a stream, built as `INFECTED_PDF` in `tests/live/test_attachments.py` (the bare string is refused earlier, for its type, which proves nothing about the scanner). The request's history then shows `attachment.malware_refused`.
 - [ ] The dashboards, the lists with their filters and pages, the CSV exports and the audit history show what was done.
 - [ ] The screens work in Spanish, and in English and French for anyone who switches; in the light and the dark theme.
+
+### What changed for the pilot's users with the first round of feedback
+
+Issues [#64](https://github.com/mano8/gmat-m8/issues/64)–[#69](https://github.com/mano8/gmat-m8/issues/69). Tell the people concerned after the deploy, then check each change with them once:
+
+- [ ] **Technicians and site managers:** on a draft request, Enter after a quantity moves to the next one, and the last Enter leads to *Review and submit*.
+- [ ] **Reviewers:** *Approve all pending lines* is at the top of the review page (it asks for confirmation); after approving or rejecting one line, the page opens at the next line still waiting.
+- [ ] **Group administrators:** the organisation's panels (companies and branches, people per branch, requests per branch) left the home page for *Administration › Overview*; the home page keeps the work to do.
+- [ ] **Buyers:** with `PO_DISPATCH=manual` (section 3), issuing emails nothing: **Send to the supplier** on the issued order's page shows the address and queues the order; the message after each action says what was queued and to which address, and the *Sent to the supplier* panel turns to *Sent* without a reload.
+- [ ] **Everyone:** the left menu (and the phone's *More* sheet) opens with the current page's entry in view.
+- [ ] **Privileged people enrolling a second factor:** the QR code reads dark on white in the dark theme too; scan it with the phone's authenticator app without switching theme.
 
 ## 6. Access, seen from the people who should not see
 

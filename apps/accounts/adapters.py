@@ -5,6 +5,7 @@ redemption below runs as the password-reset ``TokenPrincipal`` of plan §3.6.
 """
 
 from functools import lru_cache
+from io import BytesIO
 from typing import TYPE_CHECKING, Any, cast
 
 from allauth.account.adapter import DefaultAccountAdapter
@@ -124,6 +125,22 @@ class MFAAdapter(DefaultMFAAdapter):
 
     def decrypt(self, encrypted_text: str) -> str:
         return self._fernet().decrypt(encrypted_text.encode("ascii")).decode("utf-8")
+
+    def build_totp_svg(self, url: str) -> str:
+        """The setup QR code as dark modules on a white background (M14.6).
+
+        allauth draws it with ``SvgPathImage``, which has no background: shown as an image
+        in the dark theme its black modules sit on the dark page and the quiet zone is gone.
+        ``SvgPathFillImage`` is the same path plus a white rectangle over the whole image,
+        quiet zone included, so it scans the same in both themes. Colours are never inverted
+        (many scanners refuse light on dark).
+        """
+        import qrcode
+        from qrcode.image.svg import SvgPathFillImage
+
+        buffer = BytesIO()
+        qrcode.make(url, image_factory=SvgPathFillImage).save(buffer)
+        return buffer.getvalue().decode("utf8")
 
     def is_under_newest_key(self, encrypted_text: str) -> bool:
         keys = tuple(settings.MFA_ENCRYPTION_KEYS)

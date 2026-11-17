@@ -1,0 +1,28 @@
+{% load i18n %}
+{% comment %}
+  Where an issue or an amendment will email the order (M14.4, Q86), said before the action.
+  Parameters: mode (PO_DISPATCH: "off", "manual", "on"), address (where "on" sends: the
+  supplier's address at issue, the address the order was issued to at amendment), amend (True on
+  the amendment page). Nothing under "off".
+{% endcomment %}
+{% if mode == "on" %}
+  <p class="text-sm text-soft" data-testid="dispatch-before">
+    {% if address and amend %}
+      {% blocktranslate %}Saving emails the new revision to {{ address }}, the address the order was issued to.{% endblocktranslate %}
+    {% elif address %}
+      {% blocktranslate %}Issuing emails the order to {{ address }}.{% endblocktranslate %}
+    {% elif amend %}
+      {% translate "The order was issued without a supplier email address: the new revision is not emailed." %}
+    {% else %}
+      {% translate "The supplier has no email address: issuing emails nothing. Print the order and send it." %}
+    {% endif %}
+  </p>
+{% elif mode == "manual" %}
+  <p class="text-sm text-soft" data-testid="dispatch-before">
+    {% if amend %}
+      {% translate "Saving emails nothing: send the new revision from the order's page." %}
+    {% else %}
+      {% translate "Issuing emails nothing: once issued, send the order to the supplier from this page." %}
+    {% endif %}
+  </p>
+{% endif %}

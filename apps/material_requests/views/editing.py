@@ -45,6 +45,7 @@ from apps.material_requests.services import LineEdit
 from apps.material_requests.views.common import (
     _examine_url,
     _invalid,
+    _line_url,
     _on_line,
     _on_request,
     _perform,
@@ -194,7 +195,7 @@ def line_edit(request: HttpRequest, line_id: UUID) -> HttpResponse:
     """The dialog that changes a line: material, description, unit or quantity, a reason."""
     line = _on_line(request, line_id, EDIT)
     if not _editable(request, line.request, line):
-        return go(request, _examine_url(line))
+        return go(request, _line_url(line))
     return _dialog(request, Target(line.request, line))
 
 
@@ -220,7 +221,7 @@ def line_apply_edit(request: HttpRequest, line_id: UUID) -> HttpResponse:
         return idempotency_failure(request, exc)
     if done is not None:
         messages.success(request, _("Line %(line)s changed.") % {"line": line.line_no})
-        return go(request, _examine_url(line))
+        return go(request, _line_url(line))
     edit = LineEdit(
         reason=data["reason"],
         changes=form.changes(),
@@ -233,7 +234,7 @@ def line_apply_edit(request: HttpRequest, line_id: UUID) -> HttpResponse:
             ctx.principal, line.pk, edit, idempotency_key=data["idempotency_key"]
         ),
         _("Line %(line)s changed.") % {"line": line.line_no},
-        _examine_url(line),
+        _line_url(line),
         failed_to=dialog_page,
         dialog=again,
     )
@@ -288,7 +289,7 @@ def line_remove_reviewed(request: HttpRequest, line_id: UUID) -> HttpResponse:
     form = LineRemoveForm(request.POST, auto_id=line_form_ids(line, "remove"))
     dialog = remove_line_dialog(line, form, line.request.status).dialog()
     if not form.is_valid():
-        return _invalid(request, form, _examine_url(line), dialog=dialog)
+        return _invalid(request, form, _line_url(line), dialog=dialog)
     data = form.cleaned_data
     return _perform(
         request,
@@ -300,6 +301,6 @@ def line_remove_reviewed(request: HttpRequest, line_id: UUID) -> HttpResponse:
             idempotency_key=data["idempotency_key"],
         ),
         _("Line %(line)s removed.") % {"line": line.line_no},
-        _examine_url(line),
+        _line_url(line),
         dialog=dialog,
     )

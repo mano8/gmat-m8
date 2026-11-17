@@ -1,0 +1,35 @@
+{% load i18n %}
+{% comment %}The charts and the task panels of a board, each a placeholder that loads its own
+fragment. Context: charts, panels, period.{% endcomment %}
+{% if charts %}
+  <div class="charts-grid mb-4" data-testid="charts">
+    {% for panel in charts %}
+      <section class="card chart-card{% if panel.wide %} chart-wide{% endif %}"
+               data-testid="panel-{{ panel.key }}"
+               aria-busy="true"
+               hx-get="{% url 'dashboard:panel' key=panel.key %}?weeks={{ period.weeks }}"
+               hx-trigger="load"
+               hx-swap="outerHTML">
+        <h2 class="card-title">{{ panel.title }}</h2>
+        {% include "components/skeleton.html" %}
+      </section>
+    {% endfor %}
+  </div>
+{% endif %}
+{% if panels %}
+  <div class="grid gap-3 md:grid-cols-2" data-testid="dashboard">
+    {% for panel in panels %}
+      <section class="card"
+               data-testid="panel-{{ panel.key }}"
+               aria-busy="true"
+               hx-get="{% url 'dashboard:panel' key=panel.key %}"
+               hx-trigger="load"
+               hx-swap="outerHTML">
+        <h2 class="card-title">{{ panel.title }}</h2>
+        {% include "components/skeleton.html" %}
+      </section>
+    {% endfor %}
+  </div>
+{% elif not charts %}
+  {% include "components/empty_state.html" with title=_("Nothing here yet") text=_("Your requests and tasks will appear here once the first features are switched on.") %}
+{% endif %}

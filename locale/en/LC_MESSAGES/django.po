@@ -7273,3 +7273,162 @@ msgstr ""
 #, python-format
 msgid "Its unit of measure, %(unit)s, is inactive: the material comes back only with its unit. A group administrator can reactivate both from this page, or the unit under Administration → Units of measure."
 msgstr ""
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "Approve all"
+msgstr ""
+
+#: apps/material_requests/views/review_dialogs.py
+#, python-format
+msgid "%(count)s line waits for a decision: it is approved at its requested quantity."
+msgid_plural "%(count)s lines wait for a decision: each is approved at its requested quantity."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/material_requests/views/review_dialogs.py
+msgid "The request is then approved."
+msgstr ""
+
+#: apps/core/navigation.py
+msgid "Overview"
+msgstr ""
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "Administration overview"
+msgstr ""
+
+#: apps/dashboards/templates/dashboards/administration.html
+msgid "The companies, branches and people of the organization."
+msgstr ""
+
+#: apps/purchasing/forms.py
+msgid "For the order's history; the supplier does not see it."
+msgstr ""
+
+#: apps/purchasing/selectors/order_history.py
+msgid "Queued to the supplier from the order page"
+msgstr ""
+
+#: apps/purchasing/services/dispatches.py
+msgid "Orders are not emailed to suppliers on this installation: print it."
+msgstr ""
+
+#: apps/purchasing/services/dispatches.py
+msgid "Only an issued order is sent to the supplier."
+msgstr ""
+
+#: apps/purchasing/services/dispatches.py
+msgid "The supplier has no email address: add it to the supplier, or print the order."
+msgstr ""
+
+#: apps/purchasing/services/dispatches.py
+msgid "This revision is already on its way to the supplier: wait for its status."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+#, python-format
+msgid "Saving emails the new revision to %(address)s, the address the order was issued to."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+#, python-format
+msgid "Issuing emails the order to %(address)s."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "The order was issued without a supplier email address: the new revision is not emailed."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "The supplier has no email address: issuing emails nothing. Print the order and send it."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "Saving emails nothing: send the new revision from the order's page."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_before.html
+msgid "Issuing emails nothing: once issued, send the order to the supplier from this page."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html
+msgid "Not sent by email yet."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html
+msgid "The supplier has no email address, so the order cannot be sent from here. Print it and send it."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatches.html
+msgid "Add the address on the supplier's page"
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "Already sent"
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "Not emailed yet."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "The prices recorded on the order are included."
+msgstr ""
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "Queued to be emailed to %(address)s."
+msgstr ""
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "The email to %(address)s is %(status)s: see Sent to the supplier."
+msgstr ""
+
+#: apps/purchasing/views/dispatch_messages.py
+msgid "Not emailed to the supplier: use Send to the supplier to email it."
+msgstr ""
+
+#: apps/purchasing/views/dispatch_messages.py
+msgid "Not emailed to the supplier: it had no email address when the order was issued. Print the order and send it."
+msgstr ""
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "A cancellation notice is queued to be emailed to %(address)s."
+msgstr ""
+
+#: apps/purchasing/views/dispatch_messages.py
+msgid "The order is being emailed to the supplier right now: if it arrives, a cancellation notice follows."
+msgstr ""
+
+#: apps/purchasing/views/order_dialogs.py
+msgid "Send to the supplier"
+msgstr ""
+
+#: apps/purchasing/views/order_dialogs.py
+msgid "The order as issued is queued to be emailed to the address below."
+msgstr ""
+
+#: apps/purchasing/views/order_dialogs.py
+msgid "Its status shows under Sent to the supplier once the mail worker sends it."
+msgstr ""
+
+#: apps/purchasing/views/dispatch_messages.py
+#, python-format
+msgid "An email to the supplier, not sent yet, was withdrawn."
+msgid_plural "%(count)s emails to the supplier, not sent yet, were withdrawn."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/purchasing/services/dispatches.py
+msgid "Another email of this revision is on its way or was sent after this one: send the order from its page to send it again."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_status.html
+msgid "Reload the page to decide what happens to this email."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "This revision is already on its way to the supplier: wait until its status above has changed before sending it again."
+msgstr ""

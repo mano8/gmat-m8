@@ -15,7 +15,9 @@ The **purchase worklist** (§4.5) is for ``po.manage`` holders:
 - ``stale_drafts``: drafts older than 14 days still hold their reservations (Q24).
 
 An order's **supplier dispatches** (M5.3) reach ``po.view`` holders on it (they all hold
-``supplier.view``); confirming or resending one is for ``po.manage``.
+``supplier.view``); confirming, resending or sending one from the order page is for
+``po.manage``. ``dispatch_notice`` reads them again after an action, for its message
+(M14.4).
 """
 
 from apps.purchasing.selectors.order_history import (
@@ -24,12 +26,15 @@ from apps.purchasing.selectors.order_history import (
     NEEDS_ATTENTION,
     NOTICE_PENDING,
     TRIM_LABELS,
+    DispatchNotice,
     DispatchRow,
     HistoryEntry,
     RequestTrim,
     awaiting_decision,
     can_see_history,
     dispatch,
+    dispatch_notice,
+    dispatch_row,
     dispatches,
     dispatches_needing_attention,
     history,
@@ -124,6 +129,7 @@ __all__ = [
     "WORKLIST_SCOPE",
     "WORKLIST_STRETCH",
     "AllocationRow",
+    "DispatchNotice",
     "DispatchRow",
     "HistoryEntry",
     "LineRow",
@@ -147,6 +153,8 @@ __all__ = [
     "can_see_history",
     "candidates",
     "dispatch",
+    "dispatch_notice",
+    "dispatch_row",
     "dispatches",
     "dispatches_needing_attention",
     "drafts",

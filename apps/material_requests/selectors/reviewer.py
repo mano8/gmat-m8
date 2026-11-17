@@ -4,7 +4,19 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 from uuid import UUID
 
-from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, QuerySet, Value, When
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    Min,
+    OuterRef,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -16,7 +28,7 @@ from apps.catalog import selectors as catalog_selectors
 from apps.catalog.models import Material
 from apps.material_requests import ledger, reviewers
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
-from apps.material_requests.selectors.requester import Status, can_edit
+from apps.material_requests.selectors.requester import VIEW, Status, can_edit
 from apps.projects.models import Project
 
 INBOX_SORTS = {
@@ -89,6 +101,28 @@ def inbox(
 
 
 # --- reviewer assignment (M7b.2) -------------------------------------------------------
+
+
+def _pending_lines(ctx: AccessContext, of: MaterialRequest) -> QuerySet[MaterialRequestLine]:
+    return MaterialRequestLine.objects.visible_to(ctx, VIEW).filter(
+        request=of, decision=MaterialRequestLine.Decision.PENDING
+    )
+
+
+def pending_count(ctx: AccessContext, of: MaterialRequest) -> int:
+    """How many lines of the request wait for a decision (what *approve all* would approve)."""
+    return _pending_lines(ctx, of).count()
+
+
+def next_pending(ctx: AccessContext, of: MaterialRequest, after_line_no: int) -> int | None:
+    """The line the review page opens at after a decision (M14.2, Q80): the next pending line
+    after ``after_line_no`` in line order, else the first pending one before it, else ``None``
+    (nothing waits: the top of the page shows the new status). One query."""
+    found = _pending_lines(ctx, of).aggregate(
+        after=Min("line_no", filter=Q(line_no__gt=after_line_no)), first=Min("line_no")
+    )
+    chosen = found["after"] if found["after"] is not None else found["first"]
+    return None if chosen is None else int(chosen)
 
 
 def can_assign(ctx: AccessContext, of: MaterialRequest) -> bool:

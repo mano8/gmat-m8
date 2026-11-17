@@ -138,7 +138,13 @@ def test_a_unit_in_use_says_so_and_stays_active(browsing: Browsing, viewport: st
 
 
 @pytest.mark.parametrize(
-    "path", ["/org/structure/companies/", "/org/warehouses/", "/catalog/units/"]
+    "path",
+    [
+        "/dashboard/administration/",
+        "/org/structure/companies/",
+        "/org/warehouses/",
+        "/catalog/units/",
+    ],
 )
 def test_the_tab_order_of_the_lists(browsing: Browsing, path: str) -> None:
     page = browsing.as_("admin", "desktop")
@@ -153,7 +159,7 @@ def test_the_administration_menu_is_the_group_administrators_only(browsing: Brow
     admin.goto("/")
     group = admin.locator("#app-menu [data-nav-group=administration]")
     expect(group).to_be_visible()
-    for name in ("Companies", "Branches", "Warehouses", "Units of measure"):
+    for name in ("Overview", "People", "Companies", "Branches", "Warehouses", "Units of measure"):
         expect(group.get_by_role("link", name=name)).to_be_visible()
     technician = browsing.as_("tech-mad", "desktop")
     technician.goto("/requests/")

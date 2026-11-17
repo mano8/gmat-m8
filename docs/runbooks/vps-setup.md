@@ -174,7 +174,7 @@ Then fill it in (the application refuses to start on a missing, weak or placehol
 | `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` | `gmat.example.org` and `https://gmat.example.org`, exactly as users type them |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `DJANGO_DEFAULT_FROM_EMAIL` | the relay's host, `587`, its user, and the From address |
 | `OUTBOUND_EMAIL` | `on` (the template default). Set `off` to keep a stack silent while you test |
-| `PO_DISPATCH` | `off` at first: purchase orders are printed, not emailed to suppliers (ADR-0010 Q7). Turn on only when suppliers have agreed to receive them |
+| `PO_DISPATCH` | `manual` (the template): buyers send an issued order to its supplier from the order's page; `off` prints only; `on` also emails at each issue and amendment (ADR-0010 Q7). An upgrade keeps the value you have: set `manual` by hand to offer the button, and send one order to your own address first ([email.md](email.md#supplier-dispatches)) |
 | `DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_INCLUDE_SUBDOMAINS`, `DJANGO_HSTS_PRELOAD` | leave `0`, `false`, `false` for the first deploy; [turn them on](#turning-on-hsts) once the domain is proven. `web` logs a warning at every start until then |
 | `DJANGO_SESSION_IDLE_SECONDS`, `DJANGO_PRIVILEGED_SESSION_IDLE_SECONDS` | how long a session may stay idle: the template's 2 hours and 30 minutes, unless you have a reason |
 

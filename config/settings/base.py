@@ -6,7 +6,7 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 
-from config.env import env_bool, env_int, env_str
+from config.env import env_bool, env_choice, env_int, env_str
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -250,10 +250,17 @@ DEFAULT_FROM_EMAIL = env_str("DJANGO_DEFAULT_FROM_EMAIL", "gmat-m8 <no-reply@loc
 PUBLIC_BASE_URL = "http://localhost:8000"
 # Off unless switched on: with it off the worker never claims or opens an SMTP connection.
 OUTBOUND_EMAIL = env_bool("OUTBOUND_EMAIL", False)
-# Supplier dispatch (M5.3, Q7): with it on, issuing or amending an order queues it by email to
-# the supplier's address as issued. ADR-0010 keeps the MVP on the printable page, so it is off
-# unless switched on. Cancellation notices for orders already sent are queued either way.
-PO_DISPATCH = env_bool("PO_DISPATCH", False)
+# Supplier dispatch (M5.3, M14.4; ADR-0010 Q7): ``off`` prints only; ``manual`` offers *Send to
+# the supplier* on an issued order (its supplier's current address), nothing at issue or
+# amendment; ``on`` also queues each issue and amendment to the address as issued. Absent is
+# ``off`` (fail safe); the former boolean words keep their meaning; anything else refuses to
+# start. Cancellation notices for orders the supplier may have are queued whatever it says.
+PO_DISPATCH = env_choice(
+    "PO_DISPATCH",
+    ("off", "manual", "on"),
+    "off",
+    aliases=dict.fromkeys(("1", "true", "yes"), "on") | dict.fromkeys(("0", "false", "no"), "off"),
+)
 # Seconds per SMTP socket operation (the plan's EMAIL_TIMEOUT; Django reserves that name).
 OUTBOX_SMTP_TIMEOUT = 10
 OUTBOX_SEND_DEADLINE = 60  # seconds per message, every stage included (SIGALRM)

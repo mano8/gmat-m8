@@ -4,11 +4,18 @@ An order's ``PO_ORDER`` / ``PO_CANCELLATION`` outbox rows are locked after the o
 L4b) by every path, so a cancellation, an amendment and a worker claim never deadlock
 (F55). Their content is frozen from the order's snapshots when they are queued.
 
-- ``queue_order``: at issue and at each amendment, with ``PO_DISPATCH`` on (ADR-0010 keeps
-  the MVP on the printable page). The still-``QUEUED`` ``PO_ORDER`` rows of older revisions
-  become ``SUPERSEDED``; a row already ``SENDING``, ``SENT`` or ``AMBIGUOUS`` is never
-  changed. The new row has ``source_ref = PO:{id}:rev{n}`` and a ``Message-ID`` stable per
-  revision, so the supplier can deduplicate.
+- ``mode()``: ``PO_DISPATCH`` as a ``DispatchMode`` (M14.4, ADR-0010 Q7): ``off`` prints
+  only, ``manual`` sends only from the order's page (``services.send_order``), ``on`` also
+  queues at issue and at each amendment.
+- ``queue_order``: at issue and at each amendment. Under ``manual`` and ``on`` the
+  still-``QUEUED`` ``PO_ORDER`` rows of older revisions become ``SUPERSEDED`` (a row already
+  ``SENDING``, ``SENT`` or ``AMBIGUOUS`` is never changed); only ``on`` queues the new
+  revision, to the address as issued.
+- ``queue_revision``: the one way a ``PO_ORDER`` row is made, by ``queue_order`` and by a
+  send from the order's page: ``source_ref = PO:{id}:rev{n}``, the content rendered from the
+  snapshots, and a ``Message-ID`` stable per revision for its first dispatch, so the supplier
+  can deduplicate; a repeat of a revision gets a fresh one (some mailboxes silently drop a
+  message whose ID they already hold, Q83).
 - ``cancel_dispatches``: every ``QUEUED`` ``PO_ORDER`` becomes ``CANCELLED`` (nothing unsent
   goes out); if the supplier may have one (``SENT``, ``AMBIGUOUS``, or queued again by a
   human after an ambiguous attempt) the ``PO_CANCELLATION`` notice is queued at once; if one
@@ -23,7 +30,8 @@ L4b) by every path, so a cancellation, an amendment and a worker claim never dea
 """
 
 import re
-from collections.abc import Callable
+import secrets
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -50,6 +58,7 @@ from apps.notifications.models import (
     Status,
 )
 from apps.notifications.outbox import queue_dispatch, sender_domain
+from apps.notifications.selectors import IN_FLIGHT
 from apps.purchasing.ledger import book_for_order_lines
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.selectors import final_qty, line_total
@@ -66,11 +75,25 @@ CONFIRMABLE = frozenset({Status.AMBIGUOUS, Status.QUARANTINED})
 SOURCE_REF = re.compile(r"PO:(?P<po>[0-9a-f-]{36}):rev(?P<revision>\d+)")
 
 
+class DispatchMode(StrEnum):
+    """``PO_DISPATCH`` (ADR-0010 Q7, amended by Q82)."""
+
+    OFF = "off"  # the printable page only
+    MANUAL = "manual"  # sent only from the order's page, by a buyer
+    ON = "on"  # queued at issue and amendment, and from the order's page
+
+
+def mode() -> DispatchMode:
+    """The installation's dispatch mode (``config/env.py`` refuses any other value)."""
+    return DispatchMode(settings.PO_DISPATCH)
+
+
 class Queued(StrEnum):
     """What ``queue_order`` did, for the audit trail of the issue or amendment."""
 
     QUEUED = "queued"
     OFF = "off"  # PO_DISPATCH is off: the printable page only (Q7)
+    MANUAL = "manual"  # PO_DISPATCH is manual: a buyer sends it from the order's page
     NO_ADDRESS = "no_address"  # the supplier had no email address when the order was issued
 
 
@@ -160,14 +183,28 @@ def subject_for(order: PurchaseOrder, kind: str) -> str:
 # --- queueing ---------------------------------------------------------------------------
 
 
-def queue_order(order: PurchaseOrder) -> Queued:
-    """Queue this revision of an issued order; supersede older queued revisions.
+def queue_revision(order: PurchaseOrder, address: str, *, repeat: bool = False) -> EmailOutbox:
+    """Queue the order's current revision to ``address``, rendered from its snapshots.
 
-    The caller holds the order ``FOR UPDATE`` (L4) and its dispatch rows (L4b).
+    ``repeat``: the revision was dispatched before, so this message gets its own
+    ``Message-ID`` (Q83). The caller holds the order ``FOR UPDATE`` (L4) and its dispatch
+    rows (L4b).
     """
-    if not settings.PO_DISPATCH:
-        return Queued.OFF
-    address = (order.supplier_snapshot or {}).get("email", "")
+    suffix = f"rev{order.revision}"
+    if repeat:
+        suffix = f"{suffix}-{secrets.token_hex(8)}"
+    return queue_dispatch(
+        kind=Kind.PO_ORDER,
+        po_id=order.pk,
+        address=address,
+        source_ref=source_ref(order),
+        message_id=_message_id(order, suffix),
+        **_render(order, "order", Kind.PO_ORDER),
+    )
+
+
+def _supersede_older(order: PurchaseOrder) -> None:
+    """The order's still-queued ``PO_ORDER`` rows of older revisions never go out."""
     superseded = (
         EmailOutbox.objects.filter(source_po=order, kind=Kind.PO_ORDER, status=Status.QUEUED)
         .exclude(source_ref=source_ref(order))
@@ -175,16 +212,23 @@ def queue_order(order: PurchaseOrder) -> Queued:
     )
     if superseded:
         events.publish("purchase_order.dispatch_superseded", po_id=order.pk, count=superseded)
+
+
+def queue_order(order: PurchaseOrder) -> Queued:
+    """At issue or amendment: supersede older queued revisions; under ``on``, queue this one.
+
+    The caller holds the order ``FOR UPDATE`` (L4) and its dispatch rows (L4b).
+    """
+    current = mode()
+    if current == DispatchMode.OFF:
+        return Queued.OFF
+    _supersede_older(order)
+    if current == DispatchMode.MANUAL:
+        return Queued.MANUAL
+    address = (order.supplier_snapshot or {}).get("email", "")
     if not address:
         return Queued.NO_ADDRESS
-    queue_dispatch(
-        kind=Kind.PO_ORDER,
-        po_id=order.pk,
-        address=address,
-        source_ref=source_ref(order),
-        message_id=_message_id(order, f"rev{order.revision}"),
-        **_render(order, "order", Kind.PO_ORDER),
-    )
+    queue_revision(order, address)
     return Queued.QUEUED
 
 
@@ -272,6 +316,24 @@ def refusal(order: PurchaseOrder, message: EmailOutbox) -> Status | None:
     if revision_of(message) != order.revision:
         return Status.SUPERSEDED
     return None
+
+
+def replaced(message: EmailOutbox, siblings: Iterable[EmailOutbox]) -> bool:
+    """Another email of ``message``'s revision is on its way, or one queued after it was sent
+    (M14.4): sending ``message`` again would email the supplier the same revision twice. A send
+    from the order's page is the way to send it again then."""
+    if message.kind != Kind.PO_ORDER:
+        return False
+    return any(
+        other.pk != message.pk
+        and other.kind == Kind.PO_ORDER
+        and other.source_ref == message.source_ref
+        and (
+            other.status in IN_FLIGHT
+            or (other.status == Status.SENT and other.created_at > message.created_at)
+        )
+        for other in siblings
+    )
 
 
 ATTEMPT_ACTIONS = {

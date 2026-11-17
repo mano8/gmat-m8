@@ -9,6 +9,7 @@ from django.utils import timezone, translation
 
 from apps.access.context import AccessContext
 from apps.dashboards import panels
+from apps.dashboards.boards import Board
 from apps.handovers import selectors as handover_selectors
 from apps.material_requests import services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
@@ -33,8 +34,11 @@ def english() -> Iterator[None]:
         yield
 
 
-def keys(ctx: AccessContext) -> set[str]:
-    return {panel.key for panel in panels.visible(ctx)}
+ORGANIZATION = {"overview", "branch-people", "branch-requests"}
+
+
+def keys(ctx: AccessContext, board: Board = Board.HOME) -> set[str]:
+    return {panel.key for panel in panels.visible(ctx, board)}
 
 
 class TestRegistry:
@@ -86,8 +90,40 @@ class TestRegistry:
         assert {"decisions", "inbox-age", "orders-receipts", "handover-projects"} <= found
         assert not {"overview", "branch-requests", "branch-people"} & found
 
-    def test_a_group_administrator_gets_every_panel(self, people: People) -> None:
-        assert keys(AccessContext.for_user(people.group_admin)) == set(panels.BY_KEY)
+    def test_a_group_administrators_home_keeps_the_day_to_day_work(self, people: People) -> None:
+        """M14.3 (Q81): the three organization panels moved to the administration overview;
+        *Supplier emails to check* stays on home."""
+        ctx = AccessContext.for_user(people.group_admin)
+        assert keys(ctx) == set(panels.BY_KEY) - ORGANIZATION
+        assert "dispatches" in keys(ctx)
+        assert keys(ctx, Board.ADMINISTRATION) == ORGANIZATION
+
+    def test_the_three_organization_panels_are_never_on_anyones_home(self, people: People) -> None:
+        for user in (people.group_admin, people.mm_mad, people.engineer, people.tech_mad):
+            assert not ORGANIZATION & keys(AccessContext.for_user(user))
+        assert {
+            panel.key for panel in panels.PANELS if panel.board is Board.ADMINISTRATION
+        } == ORGANIZATION
+
+    def test_dispatches_stay_on_home_for_who_sees_them_today(
+        self, people: People, ctx: AccessContext
+    ) -> None:
+        assert "dispatches" in keys(ctx)  # a material manager
+        assert "dispatches" in keys(AccessContext.for_user(people.group_admin))
+
+    def test_only_a_group_administrator_reaches_the_administration_board(
+        self, people: People, ctx: AccessContext
+    ) -> None:
+        for user in (people.mm_mad, people.engineer, people.tech_mad, people.wo_mad):
+            assert keys(AccessContext.for_user(user), Board.ADMINISTRATION) == set()
+        assert keys(ctx, Board.ADMINISTRATION) == set()
+
+    def test_every_administration_panel_needs_the_boards_capability(self) -> None:
+        """Whoever could see one on home opens the board, so a panel never vanishes for someone:
+        each reads with ``org.manage``, the capability the board itself requires."""
+        for panel in panels.PANELS:
+            if panel.board is Board.ADMINISTRATION:
+                assert panels.capabilities(panel)[0] == "org.manage", panel.key
 
     def test_nobody_gets_nothing(self, people: People) -> None:
         assert panels.visible(AccessContext.for_user(people.nobody)) == []
