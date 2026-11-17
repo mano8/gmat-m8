@@ -28,6 +28,35 @@
     });
   });
 
+  // The left menu (and the phone's More sheet) scrolls on its own: after a page loads, or the sheet
+  // opens, the current entry is brought into view by moving the container's scroll, never the
+  // page's (no scrollIntoView, no smooth scrolling). Nothing is stored; a page with no current
+  // entry, or a container that does not scroll, is left alone.
+  function showCurrentEntry(container) {
+    var current = container && container.querySelector('[aria-current="page"]');
+    if (!current || container.scrollHeight <= container.clientHeight) {
+      return;
+    }
+    var box = container.getBoundingClientRect();
+    var entry = current.getBoundingClientRect();
+    if (entry.top >= box.top && entry.bottom <= box.bottom) {
+      return;
+    }
+    var wanted = container.scrollTop + (entry.top - box.top) - (box.height - entry.height) / 2;
+    container.scrollTop = Math.max(0, Math.min(wanted, container.scrollHeight - container.clientHeight));
+  }
+
+  showCurrentEntry(document.getElementById("app-menu"));
+  document.addEventListener(
+    "toggle",
+    function (event) {
+      if (event.newState === "open" && event.target.id === "more-menu") {
+        showCurrentEntry(event.target);
+      }
+    },
+    true
+  );
+
   // Success messages fade after a few seconds.
   window.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-autohide]").forEach(function (node) {
