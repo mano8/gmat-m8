@@ -15,7 +15,7 @@ It fits a single company with one office as well as a group of companies with se
 
 ![A request on a phone: its facts and its lines as a card](docs/screenshots/request-on-a-phone.webp)
 
-> **Status:** not released yet. The features below are built and tested, and the first version is being prepared. No image has been published so far, so for now you run it from this repository.
+> **Status:** in a pilot. A first organisation uses it for real, and each round of corrections it asks for is a new 0.x release; v1.0.0 follows the pilot. Every release publishes signed images with its notes on the [Releases](https://github.com/mano8/gmat-m8/releases) page, and [CHANGELOG.md](CHANGELOG.md) lists every change.
 
 ## How it works
 

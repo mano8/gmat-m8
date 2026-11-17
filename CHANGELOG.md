@@ -4,6 +4,16 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-17
+
+The pilot's first round of feedback on v0.1.0 ([#64](https://github.com/mano8/gmat-m8/issues/64)–[#69](https://github.com/mano8/gmat-m8/issues/69)): quicker request entry and review, an administration overview, purchase orders sent to the supplier from their page, a left menu that keeps its place, and a QR code that reads in the dark theme. The checks to run with the pilot's users after the upgrade are in [docs/runbooks/pilot.md](https://github.com/mano8/gmat-m8/blob/v0.2.0/docs/runbooks/pilot.md).
+
+No migration: the database is unchanged.
+
+Old code works on the new schema: v0.2.0 adds no migration, so v0.1.0 runs on the same database. Before `rollback-images`, set `PO_DISPATCH` in `app.env` back to `off` or `on`: v0.1.0 refuses to start with `manual`.
+
+**Upgrade:** an existing `app.env` keeps its `PO_DISPATCH` value (`off` unless you changed it). Set `PO_DISPATCH=manual` to offer *Send to the supplier*, then send one order to a supplier whose address is your own and check it arrives once ([email.md](https://github.com/mano8/gmat-m8/blob/v0.2.0/docs/runbooks/email.md#supplier-dispatches)).
+
 ### Added
 
 - **Approve all pending lines** at the top of the review page: a button in the page head opens a confirmation that says how many lines wait, each approved at its requested quantity. The button after the lines stays as it was.
