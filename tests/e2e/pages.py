@@ -136,6 +136,15 @@ def order_from_worklist(
     unit_price: str = "1.25",
 ) -> str:
     """Tick the request's lines on the worklist, make the draft order, price it and issue it."""
+    draft_from_worklist(page, number, references, supplier, ship_to)
+    issue_order(page, unit_price)
+    return str(page.locator("h1").inner_text()).strip()
+
+
+def draft_from_worklist(
+    page: Page, number: str, references: list[str], supplier: str, ship_to: str
+) -> None:
+    """Tick the request's lines on the worklist and make the draft order (left on its page)."""
     page.goto("/purchasing/")
     for reference in references:
         group = page.get_by_test_id("worklist-material").filter(has_text=reference)
@@ -149,8 +158,6 @@ def order_from_worklist(
     page.get_by_test_id("new-order-form").get_by_role("button", name="Create the draft").click()
     page.wait_for_url(re.compile(r"/purchasing/orders/[0-9a-f-]{36}/$"))
     expect(page.locator("h1")).to_have_text("Draft order")
-    issue_order(page, unit_price)
-    return str(page.locator("h1").inner_text()).strip()
 
 
 def issue_order(page: Page, unit_price: str = "1.25") -> None:

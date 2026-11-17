@@ -2,7 +2,10 @@
 so the menu's own scroll starts at 0 and the current entry can lie below its fold. The script
 scrolls the menu, never the page, and writes nothing to the browser's storage."""
 
+import contextlib
+
 from playwright.sync_api import Page, ViewportSize, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from tests.e2e.conftest import Browsing
 
@@ -28,6 +31,21 @@ def inside(page: Page, container: str, entry: str) -> bool:
             [container, entry],
         )
     )
+
+
+def settle_inside(page: Page, container: str, entry: str) -> None:
+    """Wait (at most 2 s) until ``entry``'s box is inside ``container``'s; returns either way,
+    so the assertion that follows says what went wrong."""
+    with contextlib.suppress(PlaywrightTimeoutError):
+        page.wait_for_function(
+            """([container, entry]) => {
+                const c = document.querySelector(container).getBoundingClientRect();
+                const e = document.querySelector(entry).getBoundingClientRect();
+                return e.top >= c.top - 1 && e.bottom <= c.bottom + 1;
+            }""",
+            arg=[container, entry],
+            timeout=2_000,
+        )
 
 
 def storage_is_untouched(page: Page) -> bool:
@@ -81,5 +99,8 @@ def test_the_more_sheet_opens_on_the_current_entry(browsing: Browsing) -> None:
     expect(sheet).to_be_visible()
     current = '#more-menu [aria-current="page"]'
     if page.locator(current).count():
+        # The sheet scrolls on its ``toggle`` event, which the browser fires after the sheet is
+        # shown: wait for it (seen on a fresh stack, M14.7) instead of reading the boxes at once.
+        settle_inside(page, "#more-menu", current)
         assert inside(page, "#more-menu", current)
     assert storage_is_untouched(page)

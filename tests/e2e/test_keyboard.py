@@ -11,6 +11,7 @@ from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e.conftest import Browsing
 from tests.e2e.documents import PENDING_MATERIAL, Documents
+from tests.e2e.test_mfa_setup import open_setup
 
 FOCUS = """() => {
   const el = document.activeElement;
@@ -192,6 +193,17 @@ def test_the_send_dialog_by_keyboard(
     expect(dialog).to_be_hidden()
     expect(opener).to_be_focused()
     assert_focus_is_visible(page)
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_the_authenticator_setup_page_by_keyboard(browsing: Browsing, viewport: str) -> None:
+    """M14.6: in the dark scheme, the walk reaches the code field and the button that activates
+    the authenticator, each with a visible focus, in the document's order."""
+    page = open_setup(browsing, viewport)
+    page.emulate_media(color_scheme="dark", reduced_motion="reduce")
+    names = [str(s["name"]) for s in walk_the_tab_order(page) if s["region"] == "main"]
+    assert any(name.startswith("input#code") for name in names), names
+    assert any(name.startswith("button") for name in names), names
 
 
 def stays_in_the_dialog(page: Page, selector: str, presses: int = 14) -> None:

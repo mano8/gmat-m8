@@ -1,14 +1,15 @@
 """The authenticator setup page draws its QR code dark on white in the dark theme too (M14.6)."""
 
 import io
+import math
 import os
+from typing import Literal
 
 import pytest
 from PIL import Image
 from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e.conftest import ROOT, Browsing
-from tests.e2e.test_accessibility import SCHEMES
 
 pytestmark = pytest.mark.e2e
 
@@ -16,6 +17,8 @@ pytestmark = pytest.mark.e2e
 # and the other tests' sign-ins are untouched.
 PERSON = "tech-mad"
 WHITE = (255, 255, 255)
+# test_accessibility audits this page and imports ``open_setup``: its own SCHEMES would be circular.
+SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
 
 
 def open_setup(browsing: Browsing, viewport: str) -> Page:
@@ -31,6 +34,18 @@ def qr_code(page: Page) -> Locator:
     return page.locator("main img[src^='data:image/svg+xml']").first
 
 
+def inside_of(page: Page, image: Locator) -> bytes:
+    """A screenshot of the whole CSS pixels inside the image's box. The box is fractional
+    (185.2 px), and an element's screenshot rounds it outwards, so its edges would be the page
+    beside the image (more than one pixel on a phone's denser screen)."""
+    box = image.bounding_box()
+    assert box is not None
+    left, top = math.ceil(box["x"]), math.ceil(box["y"])
+    right, bottom = math.floor(box["x"] + box["width"]), math.floor(box["y"] + box["height"])
+    clip = {"x": left, "y": top, "width": right - left, "height": bottom - top}
+    return page.screenshot(clip=clip)  # type: ignore[arg-type]
+
+
 @pytest.mark.parametrize("viewport", ["phone", "desktop"])
 def test_qr_code_is_dark_on_white_in_both_themes(browsing: Browsing, viewport: str) -> None:
     page = open_setup(browsing, viewport)
@@ -38,8 +53,8 @@ def test_qr_code_is_dark_on_white_in_both_themes(browsing: Browsing, viewport: s
         page.emulate_media(color_scheme=scheme, reduced_motion="reduce")
         image = qr_code(page)
         expect(image).to_be_visible()
-        picture = Image.open(io.BytesIO(image.screenshot())).convert("RGB")
-        # The corner is the quiet zone: white whatever the page behind it.
+        picture = Image.open(io.BytesIO(inside_of(page, image))).convert("RGB")
+        # The corners are the quiet zone: white whatever the page behind it.
         assert picture.getpixel((0, 0)) == WHITE, scheme
         assert picture.getpixel((picture.width - 1, picture.height - 1)) == WHITE, scheme
         # The modules themselves are dark: the code has black pixels, not only white ones.

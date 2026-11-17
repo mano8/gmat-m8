@@ -15,7 +15,7 @@ from playwright.sync_api import Page, expect
 from tests.e2e import pages
 from tests.e2e.conftest import ROOT, Browsing
 from tests.e2e.documents import PENDING_MATERIAL, Documents
-from tests.e2e.test_accessibility import SCHEMES
+from tests.e2e.test_accessibility import CHART_PAGES, SCHEMES
 from tests.e2e.test_home_charts import settled
 
 pytestmark = pytest.mark.skipif(
@@ -35,6 +35,22 @@ def line_dialog(page: Page, documents: Documents) -> None:
     page.evaluate("document.querySelector('dialog[open]').getAnimations().map((a) => a.finish())")
 
 
+def finish_animations(page: Page) -> None:
+    page.evaluate("document.querySelector('dialog[open]').getAnimations().map((a) => a.finish())")
+
+
+def approve_all_dialog(page: Page, documents: Documents) -> None:
+    page.get_by_test_id("approve-all-open").click()
+    expect(page.get_by_test_id("approve-all-dialog")).to_be_visible()
+    finish_animations(page)
+
+
+def send_dialog(page: Page, documents: Documents) -> None:
+    page.get_by_test_id("send-open").click()
+    expect(page.get_by_test_id("send-dialog")).to_be_visible()
+    finish_animations(page)
+
+
 Open = Callable[[Page, Documents], None]
 SCREENS: dict[str, tuple[str, Callable[[Documents], str], Open]] = {
     "dashboard": ("admin", lambda d: "/", nothing),
@@ -51,6 +67,14 @@ SCREENS: dict[str, tuple[str, Callable[[Documents], str], Open]] = {
     "site-receive-form": ("tech-mad", lambda d: d.site_receive, nothing),
     "site-receipt": ("tech-mad", lambda d: d.site_receipt, nothing),
     "people": ("admin", lambda d: "/org/people/", nothing),
+    # M14: the request entry, approve all from the head, the administration overview, the send
+    # dialog and the issue bar's notice; the left menu on a page far down (the menu, in view).
+    "request-entry": ("tech-mad", lambda d: d.draft_request, nothing),
+    "review-approve-all": ("eng-mad", lambda d: d.pending_request, approve_all_dialog),
+    "administration": ("admin", lambda d: "/dashboard/administration/", nothing),
+    "order-send-dialog": ("mm-mad", lambda d: d.order, send_dialog),
+    "draft-order": ("mm-mad", lambda d: d.draft_order, nothing),
+    "menu-current-entry": ("admin", lambda d: "/catalog/units/", nothing),
 }
 
 
@@ -66,8 +90,8 @@ def test_save_the_screen(
         page.emulate_media(color_scheme=scheme, reduced_motion="reduce")
         page.goto(url(documents))
         expect(page.locator("main h1").first).to_be_visible()
-        if url(documents) == "/":
-            settled(page)  # the home page loads its panels and charts after it opens
+        if url(documents) in CHART_PAGES:
+            settled(page)  # the dashboards load their panels and charts after they open
         prepare(page, documents)
         page.wait_for_load_state("networkidle")
         page.screenshot(path=FOLDER / f"{name}-{WIDTHS[viewport]}-{scheme}.png", full_page=True)
