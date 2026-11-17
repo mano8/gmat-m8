@@ -15,6 +15,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- The authenticator setup page draws its QR code dark on a white background, quiet zone included, so it is readable in the dark theme too (it was black on the dark page); the code no longer needs the light theme or the typed secret.
 - The VPS runbook installed cosign v2.5.0, which does not find the signatures of a release (signed with cosign 3), so the first deploy stopped at its signature check. It now installs v3.0.6 and says why an older version fails.
 
 ## [0.1.0] - 2026-11-14

@@ -83,6 +83,17 @@ class TestSecretsAtRest:
         assert DefaultMFAAdapter().encrypt(secret) == secret
         assert secret in raw_authenticator_data(totp_authenticator(user))
 
+    def test_setup_qr_code_is_dark_on_white(self) -> None:
+        """M14.6: a white background covers the image, quiet zone included, path unchanged."""
+        url = "otpauth://totp/gmat:someone?secret=ABCDEF&issuer=gmat"
+        drawn = MFAAdapter().build_totp_svg(url)
+        default = DefaultMFAAdapter().build_totp_svg(url)
+        background = '<rect fill="white" x="0" y="0" width="100%" height="100%" />'
+        assert background in drawn
+        assert background not in default
+        assert drawn.replace(background, "") == default
+        assert drawn.index(background) < drawn.index("<path")
+
     def test_totp_secret_never_reaches_the_database_in_plaintext(
         self, make_user: Callable[..., User]
     ) -> None:
