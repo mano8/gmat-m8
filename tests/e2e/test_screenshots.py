@@ -94,7 +94,11 @@ def test_save_the_screen(
             settled(page)  # the dashboards load their panels and charts after they open
         prepare(page, documents)
         page.wait_for_load_state("networkidle")
-        page.screenshot(path=FOLDER / f"{name}-{WIDTHS[viewport]}-{scheme}.png", full_page=True)
+        path = FOLDER / f"{name}-{WIDTHS[viewport]}-{scheme}.png"
+        if prepare is nothing:
+            pages.whole_page_screenshot(page, path)
+        else:
+            page.screenshot(path=path)  # a dialog: the screen it opens over
 
 
 def test_save_the_sign_in_page(browsing: Browsing) -> None:

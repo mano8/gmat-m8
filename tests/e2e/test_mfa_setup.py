@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 from playwright.sync_api import Locator, Page, expect
 
+from tests.e2e import pages
 from tests.e2e.conftest import ROOT, Browsing
 
 pytestmark = pytest.mark.e2e
@@ -65,4 +66,4 @@ def test_qr_code_is_dark_on_white_in_both_themes(browsing: Browsing, viewport: s
             folder = ROOT / "test-results" / "screens"
             folder.mkdir(parents=True, exist_ok=True)
             width = 360 if viewport == "phone" else 1280
-            page.screenshot(path=folder / f"mfa-setup-{width}-{scheme}.png", full_page=True)
+            pages.whole_page_screenshot(page, folder / f"mfa-setup-{width}-{scheme}.png")
