@@ -17,6 +17,7 @@ def _draft_with_lines(page: Page) -> list[str]:
         page.fill("#id_q", reference)
         page.click(f"button[data-material='{reference}']")
         expect(pages.line_of(page, reference)).to_be_visible()
+    pages.lines_ready(page)
     return [
         pages.line_of(page, reference).locator("input[name=requested_qty]").get_attribute("id")
         or ""

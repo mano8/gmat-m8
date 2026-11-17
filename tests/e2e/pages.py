@@ -7,6 +7,7 @@ the application assigned). Texts are the English ones: the browser contexts ask 
 
 import re
 from collections.abc import Callable
+from pathlib import Path
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, Page, expect
@@ -20,6 +21,33 @@ EXAMINE_URL = re.compile(r"/examine/(#line-\d+)?$")
 def line_of(page: Page, reference: str) -> Locator:
     """The draft line for a catalog reference."""
     return page.locator("#draft-lines [data-line]", has_text=reference)
+
+
+def lines_ready(page: Page) -> None:
+    """Wait until htmx has taken over every form of the draft's lines. A line just swapped in is
+    visible before htmx processes it (its settle step); a key pressed in between submits the
+    form natively, a full page load that loses the focus (seen on CI's faster runner, M14.7)."""
+    page.wait_for_function(
+        """() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')
+            && [...document.querySelectorAll('#draft-lines form[hx-post]')].every(
+                (form) => form['htmx-internal-data'] && form['htmx-internal-data'].initHash)"""
+    )
+
+
+def whole_page_screenshot(page: Page, path: Path) -> None:
+    """The whole page as one long screen: the viewport is made as tall as the page for the shot.
+    Playwright's ``full_page`` stitches the page under a viewport of the device's height, so a
+    fixed bar (the phone's menu) is drawn at the first screen's bottom, mid-picture, and a sticky
+    one (*Review and submit*) is pushed against the top of its section, over its heading."""
+    size = page.viewport_size
+    assert size is not None
+    height = int(page.evaluate("document.documentElement.scrollHeight"))
+    page.set_viewport_size({"width": size["width"], "height": max(height, size["height"])})
+    try:
+        page.evaluate("new Promise((done) => requestAnimationFrame(() => done(null)))")
+        page.screenshot(path=path)
+    finally:
+        page.set_viewport_size(size)
 
 
 def filter_list(page: Page, selector: str, value: str) -> None:
