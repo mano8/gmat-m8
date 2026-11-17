@@ -1,7 +1,9 @@
 {% load i18n %}
 {% comment %}
   One supplier dispatch's status on the order page (M14.4): what it is, its state, the address,
-  the attempts and when it was sent. Parameter: row (a selectors.DispatchRow). While the
+  the attempts and when it was sent. Parameters: row (a selectors.DispatchRow); decide_on (the
+  polled fragment only: the order, when the dispatch ended in a state its manager decides on,
+  whose buttons only a reload of the page draws). While the
   dispatch is queued or being sent it reloads itself from purchasing:dispatch_delivery (every
   5 s, every 60 s once delayed), as M7c.1's delivery badges; the fragment it gets back carries
   no trigger once the state is final, and a redirect or an error stops the polling (app.js,
@@ -29,4 +31,10 @@
     <p class="text-sm text-soft" data-testid="dispatch-delayed">{% translate "Still not sent. Tell the operator." %}</p>
   {% endif %}
   {% if row.dispatch.last_error %}<p class="text-sm text-soft">{{ row.dispatch.last_error }}</p>{% endif %}
+  {% if decide_on %}
+    <p class="text-sm" data-testid="dispatch-reload">
+      <a class="underline"
+         href="{% url 'purchasing:detail' po_id=decide_on.pk %}">{% translate "Reload the page to decide what happens to this email." %}</a>
+    </p>
+  {% endif %}
 </div>

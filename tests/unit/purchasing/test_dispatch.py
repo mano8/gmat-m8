@@ -539,6 +539,8 @@ class TestDecision:
     def test_a_quarantined_dispatch_is_confirmed_resent_or_discarded(
         self, issued: PurchaseOrder, mm: SessionPrincipal
     ) -> None:
+        # A restore holds back what was in flight, the issue's own email included.
+        EmailOutbox.objects.filter(source_po=issued).update(status=Status.QUARANTINED)
         row = make_dispatch(issued, Status.QUARANTINED)
         assert reload(services.confirm_dispatch(mm, row.pk)).status == Status.SENT
         row = make_dispatch(issued, Status.QUARANTINED)

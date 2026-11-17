@@ -8,7 +8,9 @@ checks with the supplier, then:
 - ``confirm_dispatch``: the supplier has it: ``AMBIGUOUS`` or ``QUARANTINED`` → ``SENT``;
 - ``resend_dispatch``: send it again, a new attempt: ``AMBIGUOUS``, ``FAILED`` or
   ``QUARANTINED`` → ``QUEUED``, only while it may still be sent (a ``PO_ORDER`` of the current
-  revision of an issued order, a ``PO_CANCELLATION`` of a cancelled one);
+  revision of an issued order, a ``PO_CANCELLATION`` of a cancelled one) and no other email of
+  the revision is on its way or went out after it (``replaced``: the supplier would get the
+  revision twice);
 - ``discard_dispatch``: it must not go out: ``QUARANTINED`` → ``CANCELLED``.
 
 A buyer also sends an issued order from its page (M14.4, ``send_order``; ADR-0010 Q7 as
@@ -36,6 +38,7 @@ from apps.core.idempotency import execute_once
 from apps.core.locking import LockLevel, LockOrder, transactional
 from apps.notifications.models import DISPATCH_KINDS, EmailOutbox, Kind
 from apps.notifications.models import Status as Dispatch
+from apps.notifications.selectors import IN_FLIGHT
 from apps.purchasing.dispatch import (
     CONFIRMABLE,
     DECIDABLE,
@@ -44,13 +47,12 @@ from apps.purchasing.dispatch import (
     mode,
     queue_revision,
     refusal,
+    replaced,
     revision_of,
     source_ref,
 )
 from apps.purchasing.models import PurchaseOrder
 from apps.purchasing.services.common import _authorize, _order, _record
-
-IN_FLIGHT = (Dispatch.QUEUED, Dispatch.SENDING)
 
 
 def _lock(
@@ -108,6 +110,14 @@ def resend_dispatch(principal: Principal, dispatch_id: UUID, *, note: str = "") 
         raise ValidationError(
             _("The order has changed since: this dispatch is no longer sent."),
             code="not_eligible",
+        )
+    if replaced(message, _revision_dispatches(order)):
+        raise ValidationError(
+            _(
+                "Another email of this revision is on its way or was sent after this one: "
+                "send the order from its page to send it again."
+            ),
+            code="replaced",
         )
     message.status = Dispatch.QUEUED
     message.not_before = Now()

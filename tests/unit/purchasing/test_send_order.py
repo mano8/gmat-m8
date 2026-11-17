@@ -362,3 +362,52 @@ class TestAfterwards:
             False,
             [],
         )
+
+
+# --- a resend never emails the revision twice (M14.7, R3) -----------------------------------------
+
+
+class TestResendAfterASend:
+    @pytest.mark.parametrize("old", [Status.FAILED, Status.AMBIGUOUS, Status.QUARANTINED])
+    def test_refused_while_a_send_of_the_revision_is_on_its_way(
+        self, issued: PurchaseOrder, mm: SessionPrincipal, old: Status
+    ) -> None:
+        earlier = make_dispatch(issued, old)
+        send(mm, issued)
+        with pytest.raises(ValidationError) as exc:
+            services.resend_dispatch(mm, earlier.pk)
+        assert error_codes(exc) == {"replaced"}
+        assert EmailOutbox.objects.get(pk=earlier.pk).status == old
+
+    def test_refused_once_a_later_one_was_sent(
+        self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal
+    ) -> None:
+        earlier = make_dispatch(issued, Status.AMBIGUOUS)
+        send(mm, issued)
+        record_outcome(system, claim(system).attempt_id, Outcome.SENT)
+        with pytest.raises(ValidationError) as exc:
+            services.resend_dispatch(mm, earlier.pk)
+        assert error_codes(exc) == {"replaced"}
+
+    def test_allowed_when_only_an_earlier_one_was_sent(
+        self, issued: PurchaseOrder, mm: SessionPrincipal, system: SystemPrincipal
+    ) -> None:
+        """Sent once, then sent again by hand with an uncertain outcome: the repeat may go."""
+        send(mm, issued)
+        record_outcome(system, claim(system).attempt_id, Outcome.SENT)
+        repeat = send(mm, issued)
+        record_outcome(system, claim(system).attempt_id, Outcome.AMBIGUOUS)
+        assert services.resend_dispatch(mm, repeat.pk).status == Status.QUEUED
+
+    def test_another_revisions_email_does_not_count(
+        self, issued: PurchaseOrder, mm: SessionPrincipal
+    ) -> None:
+        earlier = make_dispatch(issued, Status.FAILED)
+        make_dispatch(issued, Status.SENT, revision=issued.revision + 1)
+        assert services.resend_dispatch(mm, earlier.pk).status == Status.QUEUED
+
+    def test_a_cancellation_notice_is_never_replaced(
+        self, issued: PurchaseOrder, mm: SessionPrincipal
+    ) -> None:
+        notice = make_dispatch(issued, Status.FAILED, kind=Kind.PO_CANCELLATION)
+        assert not dispatch.replaced(notice, [make_dispatch(issued, Status.QUEUED)])

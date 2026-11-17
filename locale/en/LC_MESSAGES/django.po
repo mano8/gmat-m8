@@ -7420,3 +7420,15 @@ msgid "An email to the supplier, not sent yet, was withdrawn."
 msgid_plural "%(count)s emails to the supplier, not sent yet, were withdrawn."
 msgstr[0] ""
 msgstr[1] ""
+
+#: apps/purchasing/services/dispatches.py
+msgid "Another email of this revision is on its way or was sent after this one: send the order from its page to send it again."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/dispatch_status.html
+msgid "Reload the page to decide what happens to this email."
+msgstr ""
+
+#: apps/purchasing/templates/purchasing/send_body.html
+msgid "This revision is already on its way to the supplier: wait until its status above has changed before sending it again."
+msgstr ""

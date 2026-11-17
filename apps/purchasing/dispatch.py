@@ -31,7 +31,7 @@ L4b) by every path, so a cancellation, an amendment and a worker claim never dea
 
 import re
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -58,6 +58,7 @@ from apps.notifications.models import (
     Status,
 )
 from apps.notifications.outbox import queue_dispatch, sender_domain
+from apps.notifications.selectors import IN_FLIGHT
 from apps.purchasing.ledger import book_for_order_lines
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from apps.purchasing.selectors import final_qty, line_total
@@ -315,6 +316,24 @@ def refusal(order: PurchaseOrder, message: EmailOutbox) -> Status | None:
     if revision_of(message) != order.revision:
         return Status.SUPERSEDED
     return None
+
+
+def replaced(message: EmailOutbox, siblings: Iterable[EmailOutbox]) -> bool:
+    """Another email of ``message``'s revision is on its way, or one queued after it was sent
+    (M14.4): sending ``message`` again would email the supplier the same revision twice. A send
+    from the order's page is the way to send it again then."""
+    if message.kind != Kind.PO_ORDER:
+        return False
+    return any(
+        other.pk != message.pk
+        and other.kind == Kind.PO_ORDER
+        and other.source_ref == message.source_ref
+        and (
+            other.status in IN_FLIGHT
+            or (other.status == Status.SENT and other.created_at > message.created_at)
+        )
+        for other in siblings
+    )
 
 
 ATTEMPT_ACTIONS = {

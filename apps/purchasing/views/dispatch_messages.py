@@ -16,13 +16,11 @@ from django.utils.translation import ngettext
 
 from apps.access.middleware import access_for
 from apps.notifications.models import EmailOutbox
-from apps.notifications.models import Status as Dispatch
+from apps.notifications.selectors import IN_FLIGHT
 from apps.purchasing import selectors
 from apps.purchasing.dispatch import DispatchMode
 from apps.purchasing.models import PurchaseOrder
 from apps.purchasing.selectors import DispatchNotice
-
-IN_FLIGHT = frozenset({Dispatch.QUEUED, Dispatch.SENDING})
 
 
 def _notice(request: HttpRequest, order: PurchaseOrder) -> DispatchNotice:

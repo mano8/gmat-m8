@@ -29,6 +29,11 @@
     </dd>
   </div>
 </dl>
+{% if data.latest.polling %}
+  <p class="text-sm" data-testid="send-in-flight">
+    {% translate "This revision is already on its way to the supplier: wait until its status above has changed before sending it again." %}
+  </p>
+{% endif %}
 {% if data.prices %}
   <p class="text-sm text-soft"
      data-testid="send-prices">{% translate "The prices recorded on the order are included." %}</p>

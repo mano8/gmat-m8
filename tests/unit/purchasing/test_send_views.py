@@ -220,8 +220,7 @@ class TestSend:
         send(manager, issued, key)
         sent_by_worker()
         assert messages_of(send(manager, issued, key)) == [
-            f"{issued.number}: The email to {org.supplier.email} is sent: see Sent to the "
-            "supplier."
+            f"{issued.number}: The email to {org.supplier.email} is sent: see Sent to the supplier."
         ]
 
     def test_from_the_dialog(self, manager: Client, people: People, issued: PurchaseOrder) -> None:
@@ -436,3 +435,68 @@ class TestDelivery:
 
     def test_is_passive(self) -> None:
         assert getattr(views.dispatch_delivery, "session_passive", False)
+
+
+# --- what R3 asked for (M14.7) ----------------------------------------------------------------
+
+
+class TestReviewFollowUps:
+    def fragment(self, client: Client, message: EmailOutbox) -> str:
+        url = reverse("purchasing:dispatch_delivery", args=[message.pk])
+        return str(client.get(url).content.decode())
+
+    def test_the_dialog_says_when_the_revision_is_already_on_its_way(
+        self, manager: Client, mm: SessionPrincipal, issued: PurchaseOrder
+    ) -> None:
+        dialog = page(manager, "detail", issued.pk).split('data-testid="send-form"', 1)[1]
+        assert 'data-testid="send-in-flight"' not in dialog
+        services.send_order(mm, issued.pk, idempotency_key=None)
+        dialog = page(manager, "detail", issued.pk).split('data-testid="send-form"', 1)[1]
+        assert 'data-testid="send-in-flight"' in dialog
+        sent_by_worker()
+        dialog = page(manager, "detail", issued.pk).split('data-testid="send-form"', 1)[1]
+        assert 'data-testid="send-in-flight"' not in dialog
+
+    def test_a_poll_that_ends_in_a_decision_leads_its_manager_back_to_the_page(
+        self, manager: Client, people: People, mm: SessionPrincipal, issued: PurchaseOrder
+    ) -> None:
+        message = services.send_order(mm, issued.pk, idempotency_key=None)
+        assert 'data-testid="dispatch-reload"' not in self.fragment(manager, message)
+        sent_by_worker(Outcome.AMBIGUOUS)
+        html = self.fragment(manager, message)
+        assert 'data-testid="dispatch-reload"' in html and "hx-get" not in html
+        assert reverse("purchasing:detail", args=[issued.pk]) in html
+        # The warehouse operator reads the status; the decision is not theirs.
+        reader = self.fragment(client_for(people.wo_mad), message)
+        assert 'data-state="ambiguous"' in reader and 'data-testid="dispatch-reload"' not in reader
+
+    def test_a_retry_after_a_failed_attempt_counts_as_delayed(
+        self, manager: Client, mm: SessionPrincipal, issued: PurchaseOrder
+    ) -> None:
+        message = services.send_order(mm, issued.pk, idempotency_key=None)
+        EmailOutbox.objects.filter(pk=message.pk).update(
+            attempts=1, not_before=message.created_at + timedelta(minutes=30)
+        )
+        html = self.fragment(manager, message)
+        assert 'data-state="delayed"' in html and 'hx-trigger="every 60s"' in html
+        # Sent again by a human: due at once, not delayed although it had an attempt.
+        EmailOutbox.objects.filter(pk=message.pk).update(not_before=message.created_at)
+        assert 'data-state="queued"' in self.fragment(manager, message)
+
+    def test_a_cancel_counts_only_what_it_withdrew(
+        self, manager: Client, mm: SessionPrincipal, issued: PurchaseOrder
+    ) -> None:
+        """A dispatch a human discarded after a restore is CANCELLED too: not by the cancel."""
+        make_dispatch(issued, MailStatus.CANCELLED)  # discarded earlier
+        said = messages_of(post(manager, "cancel", issued.pk, data={"reason": "Stop"}))
+        assert said == ["Order cancelled."]
+
+    def test_no_send_again_once_another_email_of_the_revision_is_on_its_way(
+        self, manager: Client, mm: SessionPrincipal, issued: PurchaseOrder
+    ) -> None:
+        failed = make_dispatch(issued, MailStatus.FAILED)
+        assert 'data-testid="dispatch-resend-open"' in page(manager, "detail", issued.pk)
+        services.send_order(mm, issued.pk, idempotency_key=None)
+        html = page(manager, "detail", issued.pk)
+        assert 'data-testid="dispatch-resend-open"' not in html
+        assert str(failed.pk) in html  # still listed, with its status

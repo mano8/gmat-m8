@@ -371,8 +371,17 @@ def send_data(found: PurchaseOrder, rows: list[DispatchRow], *, prices: bool) ->
 def dispatch_delivery(request: HttpRequest, dispatch_id: UUID) -> HttpResponse:
     """One dispatch's status on the order page, polled while it is queued or being sent
     (M14.4, as M7c.1's badges): what the panel shows the same user, never the message."""
-    row = selectors.dispatch_row(access_for(request), dispatch_id)
-    return render(request, "purchasing/dispatch_status.html", {"row": row})
+    ctx = access_for(request)
+    row = selectors.dispatch_row(ctx, dispatch_id)
+    order = row.dispatch.source_po
+    # It ended in a state a buyer decides on: the panel's buttons are drawn with the page, so
+    # the fragment says to reload it (the poll itself never reloads: it is passive).
+    decide = row.actionable and selectors.can_manage(ctx, order)
+    return render(
+        request,
+        "purchasing/dispatch_status.html",
+        {"row": row, "decide_on": order if decide else None},
+    )
 
 
 def _dispatch_row(row: Any) -> tuple[Any, ActionDialog, ActionDialog]:
