@@ -21,7 +21,7 @@ It fits a single company with one office as well as a group of companies with se
 
 1. **Request.** Choose materials from the catalog for a project, or describe one that is not in it. Set the priority and the date you need them by, then submit.
 2. **Review.** A reviewer approves or rejects each line, corrects it, or sends the request back for changes. The original stays on record, so the requester sees what was changed.
-3. **Purchase.** A worklist shows what is left to buy, grouped by material. Build purchase orders per supplier, then issue, print and, if you turn it on, email them. An issued order changes only through a recorded amendment.
+3. **Purchase.** A worklist shows what is left to buy, grouped by material. Build purchase orders per supplier, then issue and print them; if you turn it on, email them to the supplier with a button on the order's page, or at every issue. An issued order changes only through a recorded amendment.
 4. **Receive.** Record a delivery from a phone, at a warehouse or on the worksite (anyone who works on the project can receive there): what was accepted, what was rejected, any incident or surplus, and a photo of the delivery note.
 5. **Hand over.** Hand materials from the warehouse to the people on the project. Goods received on site are handed over in the same step.
 6. **Follow up.** For every line, see how much was approved, ordered, received and delivered. Dashboards, CSV exports and a full audit trail cover the rest.
@@ -43,7 +43,7 @@ A person can hold several roles, each limited to its own branch or projects. Gro
 ## What you get
 
 - **Quantities that add up.** What was received, delivered or is still pending is worked out from the documents and never stored, so it cannot drift. A delivery above what was ordered is recorded as surplus.
-- **Made for the worksite.** The screens are designed for a phone first and work on a desktop too, in a light or a dark theme, in Spanish, English and French. Forms that act on a document open in a sheet on top of it, and the home page shows what needs you now, with charts beside their data. Accessibility is tested in a browser on every screen: see [ACCESSIBILITY.md](ACCESSIBILITY.md).
+- **Made for the worksite.** The screens are designed for a phone first and work on a desktop too, in a light or a dark theme, in Spanish, English and French. Forms that act on a document open in a sheet on top of it, and the home page shows what needs you now, with charts beside their data; group administrators have an overview of the organisation of their own. Accessibility is tested in a browser on every screen: see [ACCESSIBILITY.md](ACCESSIBILITY.md).
 - **Records you can trust.** Posted receipts and handovers are never edited: they are voided with a reason and entered again. The audit trail is append-only.
 - **Administration in the app.** Companies, joint ventures, branches, warehouses, units of measure and people are set up and changed on screens of their own, and a change that decides who can see what first shows who it affects. There is no need for the Django admin, which is off by default and read-only when you turn it on.
 - **Your existing data.** Import the catalog, suppliers and projects from CSV or Excel files, using the [templates](docs/import-templates/README.md). A file with any error writes nothing.
