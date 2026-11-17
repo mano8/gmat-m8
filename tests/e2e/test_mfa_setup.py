@@ -3,7 +3,7 @@
 import io
 import math
 import os
-from typing import Literal
+from typing import Any, Literal, cast
 
 import pytest
 from PIL import Image
@@ -43,7 +43,9 @@ def inside_of(page: Page, image: Locator) -> bytes:
     left, top = math.ceil(box["x"]), math.ceil(box["y"])
     right, bottom = math.floor(box["x"] + box["width"]), math.floor(box["y"] + box["height"])
     clip = {"x": left, "y": top, "width": right - left, "height": bottom - top}
-    return page.screenshot(clip=clip)  # type: ignore[arg-type]
+    # ``cast``: Playwright's ``FloatRect`` locally, ``Any`` where the e2e group is not installed.
+    shot: bytes = page.screenshot(clip=cast(Any, clip))
+    return shot
 
 
 @pytest.mark.parametrize("viewport", ["phone", "desktop"])
