@@ -26,6 +26,7 @@ def _draft_with_lines(page: Page) -> list[str]:
 
 
 def _enter(page: Page, field_id: str, value: str) -> None:
+    pages.lines_ready(page)  # the lines an earlier answer swapped in are htmx's again
     page.fill(f"#{field_id}", value)
     page.press(f"#{field_id}", "Enter")
 
@@ -57,7 +58,7 @@ def test_tab_and_a_refused_quantity_keep_the_focus(browsing: Browsing, viewport:
     with page.expect_response(lambda r: "/update/" in r.url and r.request.method == "POST"):
         page.press(f"#{first}", "Tab")
     expect(page.locator(f"#{first}")).to_have_value("7")
-    page.wait_for_load_state("networkidle")
+    pages.lines_ready(page)  # the swap has settled: htmx put the focus back by then
     assert page.evaluate("document.activeElement.id") != "", "the focus fell back to the page"
 
     _enter(page, second, "0")
