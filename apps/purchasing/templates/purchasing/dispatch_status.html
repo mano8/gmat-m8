@@ -1,0 +1,32 @@
+{% load i18n %}
+{% comment %}
+  One supplier dispatch's status on the order page (M14.4): what it is, its state, the address,
+  the attempts and when it was sent. Parameter: row (a selectors.DispatchRow). While the
+  dispatch is queued or being sent it reloads itself from purchasing:dispatch_delivery (every
+  5 s, every 60 s once delayed), as M7c.1's delivery badges; the fragment it gets back carries
+  no trigger once the state is final, and a redirect or an error stops the polling (app.js,
+  data-poll). Never the message itself.
+{% endcomment %}
+<div id="dispatch-state-{{ row.dispatch.pk }}"
+     data-testid="dispatch-state"
+     data-state="{% if row.delayed %}delayed{% else %}{{ row.dispatch.status|lower }}{% endif %}"
+     {% if row.polling %}hx-get="{% url 'purchasing:dispatch_delivery' dispatch_id=row.dispatch.pk %}" hx-trigger="every {{ row.poll_every }}" hx-swap="outerHTML" data-poll{% endif %}>
+  <p class="flex flex-wrap items-center gap-2">
+    <span class="font-medium">
+      {% if row.notice %}
+        {% translate "Cancellation notice" %}
+      {% else %}
+        {% translate "Revision" %} {{ row.revision }}
+      {% endif %}
+    </span>
+    <span class="chip" data-testid="dispatch-status">{{ row.dispatch.get_status_display }}</span>
+  </p>
+  <p class="text-sm text-soft">
+    {{ row.dispatch.recipient_address }} · {% blocktranslate count attempts=row.dispatch.attempts %}{{ attempts }} attempt{% plural %}{{ attempts }} attempts{% endblocktranslate %}
+    {% if row.dispatch.sent_at %}· {{ row.dispatch.sent_at|date:"SHORT_DATETIME_FORMAT" }}{% endif %}
+  </p>
+  {% if row.delayed %}
+    <p class="text-sm text-soft" data-testid="dispatch-delayed">{% translate "Still not sent. Tell the operator." %}</p>
+  {% endif %}
+  {% if row.dispatch.last_error %}<p class="text-sm text-soft">{{ row.dispatch.last_error }}</p>{% endif %}
+</div>

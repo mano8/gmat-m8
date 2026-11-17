@@ -1,8 +1,11 @@
-{% load i18n %}
+{% load i18n access %}
 {% comment %}
   The order's supplier dispatches (M5.3): status, attempts and, for po.manage, the decision
-  on a dispatch the worker left uncertain or failed. Parameters: order, dispatches (rows with
-  their dialogs for the decision), managing, dispatch_on, awaiting_decision, notice_awaited.
+  on a dispatch the worker left uncertain or failed; each status reloads itself while queued or
+  being sent (M14.4, dispatch_status.html). Parameters: order, dispatches (rows with their
+  dialogs for the decision), managing, dispatch_mode, dispatch_on, awaiting_decision,
+  notice_awaited, send_blocked (an issued order the user could send, but its supplier has no
+  email address: said here, with the supplier's page for supplier.manage holders).
 {% endcomment %}
 <section class="mb-4"
          aria-label="{% translate 'Sent to the supplier' %}"
@@ -23,21 +26,7 @@
       {% for row, resend, confirm in dispatches %}
         <li class="border-b border-line py-2 last:border-b-0"
             data-testid="dispatch">
-          <p class="flex flex-wrap items-center gap-2">
-            <span class="font-medium">
-              {% if row.notice %}
-                {% translate "Cancellation notice" %}
-              {% else %}
-                {% translate "Revision" %} {{ row.revision }}
-              {% endif %}
-            </span>
-            <span class="chip" data-testid="dispatch-status">{{ row.dispatch.get_status_display }}</span>
-          </p>
-          <p class="text-sm text-soft">
-            {{ row.dispatch.recipient_address }} · {% blocktranslate count attempts=row.dispatch.attempts %}{{ attempts }} attempt{% plural %}{{ attempts }} attempts{% endblocktranslate %}
-            {% if row.dispatch.sent_at %}· {{ row.dispatch.sent_at|date:"SHORT_DATETIME_FORMAT" }}{% endif %}
-          </p>
-          {% if row.dispatch.last_error %}<p class="text-sm text-soft">{{ row.dispatch.last_error }}</p>{% endif %}
+          {% include "purchasing/dispatch_status.html" %}
           {% if managing and row.actionable %}
             <div class="mt-2 flex flex-wrap gap-2">
               {% if row.resendable %}
@@ -57,9 +46,21 @@
         </li>
       {% endfor %}
     </ol>
-  {% elif dispatch_on %}
-    <p class="card text-sm text-soft">
+  {% elif dispatch_mode == "on" and not order.supplier_snapshot.email %}
+    <p class="card text-sm text-soft" data-testid="dispatch-empty">
       {% translate "Not sent by email (the supplier had no email address when the order was issued). Print the order and send it." %}
+    </p>
+  {% elif dispatch_on %}
+    <p class="card text-sm text-soft" data-testid="dispatch-empty">{% translate "Not sent by email yet." %}</p>
+  {% endif %}
+  {% if send_blocked %}
+    <p class="card mt-2 text-sm" data-testid="dispatch-no-address">
+      {% translate "The supplier has no email address, so the order cannot be sent from here. Print it and send it." %}
+      {% can "supplier.manage" order.supplier %}
+        <a class="underline"
+           href="{% url 'suppliers:detail' supplier_id=order.supplier.pk %}"
+           data-testid="dispatch-supplier-link">{% translate "Add the address on the supplier's page" %}</a>
+      {% endcan %}
     </p>
   {% endif %}
 </section>

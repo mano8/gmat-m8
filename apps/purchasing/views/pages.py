@@ -13,7 +13,6 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from django.conf import settings
 from django.contrib import messages
 from django.forms import Form
 from django.http import HttpRequest, HttpResponse
@@ -23,9 +22,11 @@ from django.views.decorators.http import require_safe
 
 from apps.access.middleware import access_for
 from apps.access.mixins import require_capability
+from apps.accounts.sessions import session_passive
 from apps.core.dialogs import ActionDialog
 from apps.core.listing import cursor_page, paginate, render_list
 from apps.purchasing import selectors
+from apps.purchasing.dispatch import DispatchMode, mode
 from apps.purchasing.forms import (
     AllocationEntry,
     AmendForm,
@@ -39,10 +40,11 @@ from apps.purchasing.forms import (
     OrdersFilterForm,
     ReasonForm,
     RequiredReasonForm,
+    SendOrderForm,
     WorklistFilterForm,
 )
 from apps.purchasing.models import PurchaseOrder
-from apps.purchasing.selectors import MANAGE, VIEW, AllocationRow, LineRow
+from apps.purchasing.selectors import MANAGE, VIEW, AllocationRow, DispatchRow, LineRow
 from apps.purchasing.views.common import Status, _detail_url, _on_order
 from apps.purchasing.views.order_dialogs import (
     allocation_form,
@@ -57,6 +59,7 @@ from apps.purchasing.views.order_dialogs import (
     lower_dialog,
     raise_dialog,
     resend_dialog,
+    send_dialog,
 )
 
 
@@ -302,7 +305,9 @@ def order_detail(request: HttpRequest, po_id: UUID) -> HttpResponse:
             for key in ("header_dialog", "discard_dialog", "cancel_dialog")
             if key in context
         ]
-    context |= _dispatch_panel(ctx, found)
+    context |= _dispatch_panel(
+        ctx, found, managing, prices=any(row.unit_price is not None for row in rows)
+    )
     return render(request, "purchasing/detail.html", context)
 
 
@@ -324,15 +329,50 @@ def _manager_tools(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
     return {}
 
 
-def _dispatch_panel(ctx: Any, found: PurchaseOrder) -> dict[str, Any]:
-    """The order's supplier dispatches, each with its dialogs for the decision (M5.3)."""
+def _dispatch_panel(
+    ctx: Any, found: PurchaseOrder, managing: bool, *, prices: bool
+) -> dict[str, Any]:
+    """The order's supplier dispatches, each with its dialogs for the decision (M5.3), and
+    the send dialog of an issued order under ``manual`` or ``on`` (M14.4)."""
     dispatches = selectors.dispatches(ctx, found)
-    return {
+    current = mode()
+    panel: dict[str, Any] = {
         "dispatches": [_dispatch_row(row) for row in dispatches],
-        "dispatch_on": settings.PO_DISPATCH,
+        "dispatch_mode": current,
+        "dispatch_on": current != DispatchMode.OFF,
         "awaiting_decision": selectors.awaiting_decision(dispatches),
         "notice_awaited": selectors.notice_awaited(found, dispatches),
+        "supplier_address": found.supplier.email,
     }
+    sendable = managing and found.status == Status.ISSUED and current != DispatchMode.OFF
+    panel["send_blocked"] = sendable and not found.supplier.email
+    if sendable and found.supplier.email:
+        form = SendOrderForm(actor_id=ctx.user_id, auto_id=fresh("send", 0))
+        panel["send_dialog"] = send_dialog(
+            found, form, lambda: send_data(found, dispatches, prices=prices)
+        )
+    return panel
+
+
+def send_data(found: PurchaseOrder, rows: list[DispatchRow], *, prices: bool) -> dict[str, Any]:
+    """What the send dialog says: where, which revision, its latest email, the prices."""
+    latest = next((row for row in rows if not row.notice and row.revision == found.revision), None)
+    return {
+        "address": found.supplier.email,
+        "revision": found.revision,
+        "latest": latest,
+        "prices": prices,
+    }
+
+
+@session_passive
+@require_safe
+@require_capability(VIEW)
+def dispatch_delivery(request: HttpRequest, dispatch_id: UUID) -> HttpResponse:
+    """One dispatch's status on the order page, polled while it is queued or being sent
+    (M14.4, as M7c.1's badges): what the panel shows the same user, never the message."""
+    row = selectors.dispatch_row(access_for(request), dispatch_id)
+    return render(request, "purchasing/dispatch_status.html", {"row": row})
 
 
 def _dispatch_row(row: Any) -> tuple[Any, ActionDialog, ActionDialog]:
@@ -378,6 +418,7 @@ def amend_page(
         "prices": form.prices,
         "entries": entries,
         "no_candidates": None if entries else selectors.no_candidates(ctx, found),
+        "dispatch_mode": mode(),
     }
     return render(request, "purchasing/amend.html", context, status=status)
 

@@ -1942,6 +1942,40 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             note="queued again, or refused once confirmed",
         ),
     ),
+    # M14.4: send an issued order from its page; a dispatch's status, polled while in flight.
+    "purchasing:send_order": (
+        Route(
+            order_action(),
+            path=purchase_url("purchasing:send_order", "purchaseorder"),
+            note="no form key: refused with a flash, nothing is queued",
+        ),
+        Route(
+            order_action(UNPROCESSABLE),
+            position="htmx",
+            path=purchase_url("purchasing:send_order", "purchaseorder"),
+            headers=HTMX,
+            allowed=SUPPLIER_SENTINELS,
+            note="no form key from the dialog: the form again with the supplier's address",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, PO_MANAGERS)),
+            position="unknown",
+            path=_unknown_url("purchasing:send_order"),
+        ),
+    ),
+    "purchasing:dispatch_delivery": (
+        Route(
+            order_read(),
+            path=purchase_url("purchasing:dispatch_delivery", "dispatch"),
+            allowed=SUPPLIER_SENTINELS,
+            note="the status, attempts and address the panel shows; never the message",
+        ),
+        Route(
+            app_page(**_each(NOT_FOUND, PO_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("purchasing:dispatch_delivery"),
+        ),
+    ),
     # Receiving (M6.3): receipt.view reads receipts at a warehouse (branch scope) or at a
     # worksite (its project: the site manager too); receipt.post receives; receipt.void is the
     # manager's. The site manager's pages hold the supplier's name and nothing else of the order.

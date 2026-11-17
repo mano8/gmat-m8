@@ -17,6 +17,7 @@ urlpatterns = [
     path("orders/<uuid:po_id>/issue/", views.order_issue, name="issue"),
     path("orders/<uuid:po_id>/cancel/", views.order_cancel, name="cancel"),
     path("orders/<uuid:po_id>/amend/", views.order_amend, name="amend"),
+    path("orders/<uuid:po_id>/send/", views.order_send, name="send_order"),
     path("lines/<uuid:line_id>/update/", views.line_update, name="update_line"),
     path("lines/<uuid:line_id>/remove/", views.line_remove, name="remove_line"),
     path("lines/<uuid:line_id>/close-short/", views.line_close_short, name="close_line"),
@@ -27,6 +28,11 @@ urlpatterns = [
     ),
     path("dispatches/<uuid:dispatch_id>/confirm/", views.dispatch_confirm, name="confirm_dispatch"),
     path("dispatches/<uuid:dispatch_id>/resend/", views.dispatch_resend, name="resend_dispatch"),
+    path(
+        "dispatches/<uuid:dispatch_id>/delivery/",
+        views.dispatch_delivery,
+        name="dispatch_delivery",
+    ),
     path(
         "allocations/<uuid:allocation_id>/unallocate/",
         views.allocation_unallocate,

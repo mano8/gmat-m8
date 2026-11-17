@@ -57,7 +57,13 @@ When the relay comes back, queued messages go on their own. Messages whose time 
 
 ## Supplier dispatches
 
-Only when `PO_DISPATCH=on`. A dispatch (`PO_ORDER`) carries the order as it was issued or amended; recipients and content are frozen from the order's snapshots. The **order page** has a dispatch panel for a `po.manage` holder.
+`PO_DISPATCH` in `app.env` decides (ADR-0010 Q7):
+
+- `off`: nothing is emailed to suppliers; the order is printed (*Printable page*). An upgraded installation keeps this value until you change it.
+- `manual` (the template's value for new installations): a buyer opens an **issued** order and uses **Send to the supplier**, beside *Printable page*. The dialog shows the address it goes to: the supplier's **current** address, so fix a wrong address on the supplier's page first. Issuing and amending send nothing. A second send of the same revision waits until the first has ended (sent, failed or ambiguous), and gets its own `Message-ID` so the supplier's mailbox does not drop it as a duplicate.
+- `on`: issuing and each amendment also queue the order, to the address it was issued to; the button is there too.
+
+After each action the page says what was queued and to which address, what was withdrawn (an unsent earlier revision, an unsent order cancelled) and whether a cancellation notice is owed; *queued* means the worker has not sent it yet. The **Sent to the supplier** panel on the order page shows each dispatch's status and refreshes it while it is queued or being sent. Before you switch to `manual` or `on`, send one order to a test supplier whose address is your own and check it arrives once. A dispatch (`PO_ORDER`) carries the order as it was issued or amended; its content is frozen from the order's snapshots. The panel's decisions (below) are for a `po.manage` holder.
 
 ### `AMBIGUOUS`
 

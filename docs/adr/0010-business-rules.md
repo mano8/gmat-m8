@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
-- **Governs:** `apps/access/roles.py`, `apps/material_requests/transitions.py`, `apps/purchasing/transitions.py`, `apps/purchasing/dispatch.py`
+- **Governs:** `apps/access/roles.py`, `apps/material_requests/transitions.py`, `apps/purchasing/transitions.py`, `apps/purchasing/dispatch.py`, `apps/purchasing/services/dispatches.py`
 
 ## Context
 
@@ -26,7 +26,7 @@ The plan lists open business questions (Q1-Q29). The maintainer answered the blo
 | # | Question | Assumption |
 | --- | --- | --- |
 | Q3 | Warehouses per branch | 0..n `WAREHOUSE` locations per branch, one default |
-| Q7 | Send purchase orders from the app | No in the MVP: a printable purchase-order page. The email dispatch of step M5.3 exists behind `PO_DISPATCH` (off by default; maintainer's choice, 2026-11-01) and sends no PDF; switching it on is the decision this row still awaits |
+| Q7 | Send purchase orders from the app | **Decided (maintainer, 2026-11-16, after the pilot's first orders; amended 2026-11-16 by Q82, Q83 and Q86, M14.4): sending from the app is wanted, from the order's page.** `PO_DISPATCH` has three values: `off` (the printable page only, no button), `manual` (a buyer sends an issued order from its page, *Send to the supplier*; nothing is sent at issue or amendment) and `on` (also queued at each issue and amendment, as M5.3). Absent means `off` (fail safe); an unknown value refuses to start; the former boolean words keep their meaning (`1`/`true`/`yes`/`on` → `on`, `0`/`false`/`no`/`off` → `off`). New installations' `app.env` templates say `manual`; `init.sh` never changes an existing value. A send by hand goes to the supplier's **current** address (shown in the dialog before sending, recorded on the dispatch and in the audit), with the content still frozen from the order's issue snapshots (prices recorded on the order included), for `ISSUED` orders only, refused while a dispatch of the current revision is queued or being sent; a repeat of a revision already dispatched gets its own `Message-ID`, the first keeps the stable one. Issue and amendment under `on` still use the address the order was issued to. Under `manual` and `on`, every action that queues, withdraws or owes a supplier email says so after the call (*queued*, never *sent*), naming the address, and the order page's dispatch status refreshes itself while in flight. The cancellation notice stays owed whatever the value. No PDF |
 | Q8 | Photos and attachments | Recommended; optional step M6.4 |
 | Q9 | Who confirms a direct-to-site receipt | Material manager or warehouse operator, or the project's site manager through the expected-deliveries view. **Amended by [ADR-0028](0028-project-receiving-for-every-role.md) (Q44):** every business role receives at the worksite of a project in its membership's scope, whoever requested the goods |
 | Q10 | Prices and discounts | Optional unit price and discount, visible only with `price.view` |

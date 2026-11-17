@@ -172,6 +172,28 @@ def test_each_kind_of_dialog_by_keyboard(
     expect(menu_button).to_be_focused()
 
 
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_the_send_dialog_by_keyboard(
+    browsing: Browsing, documents: Documents, viewport: str
+) -> None:
+    """M14.4: *Send to the supplier* in the order's head, opened and left by keyboard."""
+    page = browsing.as_("mm-mad", viewport)
+    page.goto(documents.order)
+    expect(page.locator("main h1").first).to_be_visible()
+    opener = page.get_by_test_id("send-open")
+    focus_by_keyboard(page, opener)
+    assert_focus_is_visible(page)
+    page.keyboard.press("Enter")
+    dialog = page.get_by_test_id("send-dialog")
+    expect(dialog).to_be_visible()
+    expect(dialog.get_by_test_id("send-address")).to_be_visible()
+    stays_in_the_dialog(page, "dialog")
+    page.keyboard.press("Escape")
+    expect(dialog).to_be_hidden()
+    expect(opener).to_be_focused()
+    assert_focus_is_visible(page)
+
+
 def stays_in_the_dialog(page: Page, selector: str, presses: int = 14) -> None:
     """Tab and Shift+Tab never reach the page behind a modal dialog (the focus wraps inside it,
     or to the browser's own controls, where the document has none)."""

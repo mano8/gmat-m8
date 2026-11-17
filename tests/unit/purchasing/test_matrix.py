@@ -5,7 +5,8 @@ Every operation, called directly as every actor of the shared fixture, on orders
 material manager. Actors who see the order (``po.view``) without it get 403
 (``AccessDenied``): the warehouse operator, and a deactivated account before any scope;
 everyone else gets 404 (``NotInScope``). The screens of M5.2 add their URL rows to
-``tests/access/test_acceptance_matrix.py``; M5.3 adds the decisions on a dispatch.
+``tests/access/test_acceptance_matrix.py``; M5.3 adds the decisions on a dispatch, M14.4 the
+send of an issued order from its page (under ``PO_DISPATCH`` ``manual``) and the engineer.
 """
 
 from collections.abc import Callable
@@ -116,9 +117,10 @@ OPERATIONS: dict[str, Operation] = {
     ),
     "confirm_dispatch": lambda p, s, org: services.confirm_dispatch(p, s.dispatch.pk),
     "resend_dispatch": lambda p, s, org: services.resend_dispatch(p, s.dispatch.pk),
+    "send_order": lambda p, s, org: services.send_order(p, s.issued.pk, idempotency_key=None),
 }
 
-ALLOWED = {"group_admin", "mm_mad"}
+ALLOWED = {"group_admin", "mm_mad", "engineer"}
 # Sees A-MAD's orders (po.view) without po.manage, or is refused before any scope: 403.
 DENIED = {"wo_mad", "deactivated"}
 ACTORS = [
@@ -126,6 +128,7 @@ ACTORS = [
     "operator",
     "mm_mad",
     "mm_sev",
+    "engineer",
     "wo_mad",
     "tech_mad",
     "site_manager",
@@ -157,6 +160,12 @@ def snapshot(state: State) -> tuple[object, ...]:
     )
 
 
+@pytest.fixture(autouse=True)
+def _sent_by_hand(settings: Any) -> None:
+    """``send_order`` needs ``PO_DISPATCH`` ``manual`` or ``on`` (M14.4)."""
+    settings.PO_DISPATCH = "manual"
+
+
 @pytest.fixture
 def state(org: Org, people: People, make_line: MakeLine, cable: Material) -> State:
     return build(org, people, make_line, cable, sevilla=False)
@@ -181,7 +190,7 @@ def test_matrix(state: State, org: Org, people: People, operation: str, actor: s
 def test_privileged_buyers_need_session_mfa(
     org: Org, people: People, make_line: MakeLine, cable: Material, operation: str
 ) -> None:
-    for user in (people.group_admin, people.mm_mad):
+    for user in (people.group_admin, people.mm_mad, people.engineer):
         state = build(org, people, make_line, cable, sevilla=False)
         with pytest.raises(MFARequired):
             OPERATIONS[operation](principal_for(user, mfa_at=None), state, org)

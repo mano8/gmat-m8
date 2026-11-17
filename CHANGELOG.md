@@ -4,6 +4,15 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+- **Send to the supplier** on an issued purchase order's page, beside *Printable page*: a dialog shows the supplier's current address, the revision and its latest email, and queues the order as issued (its prices included when any are recorded) for the mail worker. It is offered to buyers while `PO_DISPATCH` is `manual` or `on`, refused while the revision is already on its way, and a repeat gets its own `Message-ID` so the supplier's mailbox keeps it.
+- After issuing, amending, sending or cancelling an order, the page says what happened to the supplier's emails: what was queued and to which address, what was withdrawn, whether a cancellation notice is owed, or that nothing was emailed and why. The issue bar and the amendment page say beforehand where the order will go. The *Sent to the supplier* panel refreshes each email's status while it is queued or being sent.
+
+### Changed
+
+- `PO_DISPATCH` takes three values: `off` (print only), `manual` (the send button only) and `on` (also emailed at each issue and amendment, as before). Absent means `off`; `true`/`false` and the other former words keep their meaning; anything else stops the application at start-up. The `app.env` templates now say `manual`. **Upgrade note:** an existing `app.env` keeps its value (`off` unless you changed it): set `PO_DISPATCH=manual` to offer the button.
+
 ### Fixed
 
 - The VPS runbook installed cosign v2.5.0, which does not find the signatures of a release (signed with cosign 3), so the first deploy stopped at its signature check. It now installs v3.0.6 and says why an older version fails.

@@ -31,6 +31,7 @@ from apps.accounts.sessions import (
 )
 from apps.organizations import views as org_views
 from apps.organizations.models import Branch
+from apps.purchasing import views as purchasing_views
 from tests.support import PASSWORD, grant, password_login
 
 pytestmark = pytest.mark.django_db
@@ -237,6 +238,7 @@ class TestSessionGuard:
     def test_the_delivery_polls_are_marked_passive(self) -> None:
         for name in ("invitation_delivery", "email_change_delivery"):
             assert getattr(getattr(org_views, name), "session_passive", False), name
+        assert getattr(purchasing_views.dispatch_delivery, "session_passive", False)  # M14.4
 
     @pytest.mark.usefixtures("activity_is_written")
     def test_activity_without_a_client_address_only_notes_the_time(

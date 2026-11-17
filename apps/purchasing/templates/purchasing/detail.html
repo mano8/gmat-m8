@@ -24,6 +24,9 @@
         {% url 'purchasing:print' po_id=order.pk as print_url %}
         {% include "components/button.html" with href=print_url label=_("Printable page") icon="printer" variant="secondary" %}
       {% endif %}
+      {% if send_dialog %}
+        {% include "components/dialog_button.html" with dialog=send_dialog.id label=send_dialog.opener_label icon="send" variant="secondary" testid=send_dialog.open_testid %}
+      {% endif %}
       {% if order.status == "ISSUED" %}
         {% can "receipt.post" order %}
           {% url 'receiving:receive' po_id=order.pk as receive_url %}
@@ -146,6 +149,7 @@
           {% csrf_token %}
           {{ issue_form.idempotency_key }}
           {{ issue_form.confirm.as_field_group }}
+          {% include "purchasing/dispatch_before.html" with mode=dispatch_mode address=supplier_address amend=False %}
           {% include "components/button.html" with type="submit" label=_("Issue the order") icon="send" variant="primary" block=True %}
         </form>
       {% else %}
@@ -162,6 +166,9 @@
   {% endif %}
   {% if cancel_dialog %}
     {% include "components/action_dialog.html" with d=cancel_dialog %}
+  {% endif %}
+  {% if send_dialog %}
+    {% include "components/action_dialog.html" with d=send_dialog %}
   {% endif %}
   {% if managing and order.status == "DRAFT" and items_form.rows %}
     {% include "components/dialog.html" with id="add-lines-dialog" title=_("Add request lines to buy") size="lg" content="purchasing/detail.html#add_lines_form" testid="add-lines-dialog" %}

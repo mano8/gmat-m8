@@ -51,6 +51,7 @@ def load_prod(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
             "DJANGO_HSTS_PRELOAD",
             "DJANGO_ADMIN_URL_PATH",
             "DJANGO_ADMIN_ENABLED",
+            "PO_DISPATCH",
         ]
         for name in unset:
             monkeypatch.delenv(name, raising=False)
@@ -82,6 +83,28 @@ def test_good_production_environment_loads(load_prod) -> None:  # type: ignore[n
     # Nothing leaves without OUTBOUND_EMAIL=on.
     assert settings.OUTBOUND_EMAIL is False
     assert settings.MAILERS["outbound"]["BACKEND"] == "django.core.mail.backends.smtp.EmailBackend"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, "off"),
+        ("off", "off"),
+        ("manual", "manual"),
+        ("Manual", "manual"),
+        ("on", "on"),
+        ("true", "on"),
+        ("1", "on"),
+        ("yes", "on"),
+        ("false", "off"),
+        ("0", "off"),
+        ("no", "off"),
+    ],
+)
+def test_supplier_dispatch_has_three_values(load_prod, value, expected) -> None:  # type: ignore[no-untyped-def]
+    """``PO_DISPATCH`` (M14.4, ADR-0010 Q7): absent is ``off``; the former words keep their
+    meaning."""
+    assert expected == load_prod(PO_DISPATCH=value).PO_DISPATCH
 
 
 def test_outbound_email_needs_an_smtp_host(load_prod) -> None:  # type: ignore[no-untyped-def]
@@ -210,6 +233,8 @@ def test_health_endpoints_are_exempt_from_the_https_redirect(load_prod) -> None:
         {"OUTBOX_ENCRYPTION_KEYS": MFA_KEY},
         {"OUTBOX_ENCRYPTION_KEYS": f"{OUTBOX_KEY},{OLD_MFA_KEY}"},
         {"OUTBOUND_EMAIL": "maybe"},
+        {"PO_DISPATCH": "maybe"},
+        {"PO_DISPATCH": "auto"},
         {"OUTBOUND_EMAIL": "on", "EMAIL_PORT": "0"},
         {"DJANGO_ADMIN_URL_PATH": "ad/min"},
         {"DJANGO_ADMIN_URL_PATH": "/admin"},

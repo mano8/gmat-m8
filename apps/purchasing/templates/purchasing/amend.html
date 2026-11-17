@@ -76,6 +76,9 @@
     {% else %}
       {% include "purchasing/no_candidates.html" with hint=no_candidates draft=False %}
     {% endif %}
+    <div class="mb-3">
+      {% include "purchasing/dispatch_before.html" with mode=dispatch_mode address=order.supplier_snapshot.email amend=True %}
+    </div>
     <div class="flex flex-wrap gap-3">
       {% include "components/button.html" with type="submit" label=_("Save the amendment") variant="primary" %}
       {% url 'purchasing:detail' po_id=order.pk as back_url %}

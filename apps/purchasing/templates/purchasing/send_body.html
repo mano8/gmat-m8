@@ -1,0 +1,35 @@
+{% load i18n %}
+{% comment %}
+  The body of the send dialog (M14.4, Q83): where the order goes (the supplier's current
+  address), which revision, the latest email of that revision and whether prices go with it.
+  Parameter: data (pages.send_data: address, revision, latest (a DispatchRow or None), prices).
+{% endcomment %}
+<dl class="facts" data-testid="send-details">
+  <div>
+    <dt>{% translate "Email address" %}</dt>
+    <dd data-testid="send-address">
+      {{ data.address }}
+    </dd>
+  </div>
+  <div>
+    <dt>{% translate "Revision" %}</dt>
+    <dd>
+      {{ data.revision }}
+    </dd>
+  </div>
+  <div class="col-span-full">
+    <dt>{% translate "Already sent" %}</dt>
+    <dd data-testid="send-latest">
+      {% if data.latest %}
+        {{ data.latest.dispatch.get_status_display }} · {{ data.latest.dispatch.recipient_address }}
+        · {{ data.latest.dispatch.sent_at|default:data.latest.dispatch.created_at|date:"SHORT_DATETIME_FORMAT" }}
+      {% else %}
+        {% translate "Not emailed yet." %}
+      {% endif %}
+    </dd>
+  </div>
+</dl>
+{% if data.prices %}
+  <p class="text-sm text-soft"
+     data-testid="send-prices">{% translate "The prices recorded on the order are included." %}</p>
+{% endif %}

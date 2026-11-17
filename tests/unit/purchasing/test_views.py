@@ -938,7 +938,7 @@ class TestDispatches:
     ) -> None:
         order = buy((make_line("10"), "10"))
         assert 'data-testid="order-dispatches"' not in page(manager, "detail", order.pk)
-        settings.PO_DISPATCH = True
+        settings.PO_DISPATCH = "on"
         assert "Not sent by email" in page(manager, "detail", order.pk)
 
     def test_a_cancellation_notice_owed_is_listed(

@@ -124,6 +124,12 @@ def open_the_approve_all_dialog(page: Page, documents: Documents) -> None:
     expect(page.get_by_test_id("approve-all-dialog")).to_be_visible()
 
 
+def open_the_send_dialog(page: Page, documents: Documents) -> None:
+    """M14.4: *Send to the supplier* (the stack runs with ``PO_DISPATCH=manual``)."""
+    page.get_by_test_id("send-open").click()
+    expect(page.get_by_test_id("send-dialog")).to_be_visible()
+
+
 def nothing(page: Page, documents: Documents) -> None:
     """The page as it is."""
 
@@ -145,6 +151,7 @@ DOCUMENT_SCREENS: dict[str, tuple[str, Callable[[Documents], str], Prepare]] = {
     "sourced request": ("eng-mad", lambda d: d.bought_request, nothing),
     "request status": ("tech-mad", lambda d: d.request_status, nothing),
     "order": ("mm-mad", lambda d: d.order, nothing),
+    "order with the send dialog": ("mm-mad", lambda d: d.order, open_the_send_dialog),
     "receive form": ("wo-mad", lambda d: d.receive, nothing),
     # M9.3: what a project receiver works with (the technician, through the project only).
     "project page with Receive materials": ("tech-mad", lambda d: d.site_project, nothing),

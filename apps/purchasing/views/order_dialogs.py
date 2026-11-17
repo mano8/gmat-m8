@@ -194,3 +194,29 @@ def allocation_form(allocation: PurchaseAllocation, *, raising: bool, **kwargs: 
     )
     form.fields["qty"].label = _("Raise to") if raising else _("Lower to (0 removes it)")
     return form
+
+
+# The body of the send dialog: the address, the revision and its latest email (M14.4).
+SEND_BODY = "purchasing/send_body.html"
+
+
+def send_dialog(order: PurchaseOrder, form: Form, data: Any = None) -> ActionDialog:
+    """Send the issued order to its supplier's current address (``data``: what the body shows,
+    a function called only when the dialog is drawn)."""
+    return ActionDialog(
+        id="send-dialog",
+        title=_("Send to the supplier"),
+        description=order.number or "",
+        icon="send",
+        action=reverse("purchasing:send_order", args=[order.pk]),
+        submit=_("Send to the supplier"),
+        form=form,
+        consequences=(
+            _("The order as issued is queued to be emailed to the address below."),
+            _("Its status shows under Sent to the supplier once the mail worker sends it."),
+        ),
+        body=SEND_BODY,
+        data=data,
+        testid="send-form",
+        submit_testid="send-submit",
+    )

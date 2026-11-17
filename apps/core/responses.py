@@ -153,12 +153,15 @@ def perform[T](
     *,
     failed_to: str = "",
     dialog: Dialog | None = None,
+    also: Callable[[T], None] | None = None,
 ) -> HttpResponse:
     """Run a service call: flash its outcome and go to ``to`` (``failed_to`` if it failed).
 
     ``done`` and ``to`` may be functions of what the call returned; ``failed_to`` is then
     required, the place a refusal goes back to. With ``dialog``, an htmx POST that the
     service refuses gets the form again with the refusal on it (422) instead of the flash.
+    ``also`` runs after the success flash with what the call returned, for the flashes that
+    follow it (what an order's cancellation did with the supplier's emails, M14.4).
     """
     try:
         result = call()
@@ -172,6 +175,8 @@ def perform[T](
     except RetryExhausted:
         return conflict(request)
     messages.success(request, _outcome(done, result))
+    if also is not None:
+        also(result)
     return go(request, _outcome(to, result))
 
 

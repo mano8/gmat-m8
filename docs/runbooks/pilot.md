@@ -55,7 +55,7 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.production.yml'
 - [ ] The delivery badge on the invitation goes from queued to sent.
 - [ ] `touch flags/worker.paused` holds the mail back, and removing the flag sends it ([email.md](email.md)).
 - [ ] Business notifications arrive (a submitted request reaches its reviewers, an approval reaches the requester), and a person who opted out of them on their notifications page gets none.
-- [ ] Supplier dispatch stays off (`PO_DISPATCH=off`) unless you decide to try it with a supplier who agreed; then follow [email.md](email.md#supplier-dispatches).
+- [ ] Supplier dispatch: set `PO_DISPATCH=manual` in `app.env` (an upgrade keeps `off`), give a test supplier your own address, issue an order, use **Send to the supplier** on its page, read the message naming the address, watch the panel turn to *Sent* and check the mail arrives once; then buyers send to suppliers who agreed ([email.md](email.md#supplier-dispatches)).
 
 ## 4. Setting up the organization
 

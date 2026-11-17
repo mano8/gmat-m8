@@ -11,30 +11,46 @@ checks with the supplier, then:
   revision of an issued order, a ``PO_CANCELLATION`` of a cancelled one);
 - ``discard_dispatch``: it must not go out: ``QUARANTINED`` → ``CANCELLED``.
 
-Both need ``po.manage`` on the order, lock it ``FOR UPDATE`` (L4) and then its dispatch
-rows (L4b), as cancel and amend do, and are audited on the order.
+A buyer also sends an issued order from its page (M14.4, ``send_order``; ADR-0010 Q7 as
+amended by Q82/Q83): under ``PO_DISPATCH`` ``manual`` or ``on``, the current revision is
+queued to the supplier's **current** address, once at a time (refused while one of this
+revision is queued or being sent), with a fresh ``Message-ID`` when the revision went out
+before.
+
+Each needs ``po.manage`` on the order, locks it ``FOR UPDATE`` (L4) and then its dispatch
+rows (L4b), as cancel and amend do, and is audited on the order.
 """
 
 from typing import cast
 from uuid import UUID
 
 from django.core.exceptions import ValidationError
+from django.db.models import QuerySet
 from django.db.models.functions import Now
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.principals import Principal
+from apps.audit.recorder import record
+from apps.core import events
+from apps.core.idempotency import execute_once
 from apps.core.locking import LockLevel, LockOrder, transactional
-from apps.notifications.models import DISPATCH_KINDS, EmailOutbox
+from apps.notifications.models import DISPATCH_KINDS, EmailOutbox, Kind
 from apps.notifications.models import Status as Dispatch
 from apps.purchasing.dispatch import (
     CONFIRMABLE,
     DECIDABLE,
+    DispatchMode,
     lock_dispatches,
+    mode,
+    queue_revision,
     refusal,
     revision_of,
+    source_ref,
 )
 from apps.purchasing.models import PurchaseOrder
 from apps.purchasing.services.common import _authorize, _order, _record
+
+IN_FLIGHT = (Dispatch.QUEUED, Dispatch.SENDING)
 
 
 def _lock(
@@ -111,3 +127,85 @@ def discard_dispatch(principal: Principal, dispatch_id: UUID, *, note: str = "")
     message.save(update_fields=["status", "updated_at"])
     _audit(principal, "purchase_order.dispatch_discarded", order, message, note)
     return message
+
+
+# --- a send from the order's page (M14.4) ---------------------------------------------------
+
+
+def _revision_dispatches(order: PurchaseOrder) -> QuerySet[EmailOutbox]:
+    return EmailOutbox.objects.filter(
+        source_po=order, kind=Kind.PO_ORDER, source_ref=source_ref(order)
+    )
+
+
+def _sendable_to(order: PurchaseOrder) -> str:
+    """The supplier's current address, once the order may be sent from its page (Q83)."""
+    if mode() == DispatchMode.OFF:
+        raise ValidationError(
+            _("Orders are not emailed to suppliers on this installation: print it."),
+            code="dispatch_off",
+        )
+    if order.status != PurchaseOrder.Status.ISSUED:
+        raise ValidationError(_("Only an issued order is sent to the supplier."), code="not_issued")
+    address = order.supplier.email.strip()
+    if not address:
+        raise ValidationError(
+            _("The supplier has no email address: add it to the supplier, or print the order."),
+            code="no_address",
+        )
+    if _revision_dispatches(order).filter(status__in=IN_FLIGHT).exists():
+        raise ValidationError(
+            _("This revision is already on its way to the supplier: wait for its status."),
+            code="already_queued",
+        )
+    return address
+
+
+@transactional
+def send_order(
+    principal: Principal, po_id: UUID, *, note: str = "", idempotency_key: str | None
+) -> EmailOutbox:
+    """Queue the issued order's current revision to its supplier's current address.
+
+    §4.7: ``po.manage`` on the order, the idempotency record, the order ``FOR UPDATE`` (L4),
+    its dispatch rows (L4b), then the checks under those locks; a refusal writes nothing. A
+    double tap (the same key) returns the row the first one queued.
+    """
+    note = note.strip()
+    locks = LockOrder()
+    order = _order(po_id)
+    _authorize(principal, order, locks)
+
+    def execute() -> EmailOutbox:
+        locks.lock(LockLevel.PO_HEADERS, PurchaseOrder, [order.pk])
+        lock_dispatches(order.pk)(locks)
+        locked = PurchaseOrder.objects.select_related("supplier").get(pk=order.pk)
+        address = _sendable_to(locked)
+        repeat = _revision_dispatches(locked).exists()
+        message = queue_revision(locked, address, repeat=repeat)
+        record(
+            principal.audit_identity,
+            "purchase_order.dispatch_sent_by_hand",
+            obj=locked,
+            branch_id=locked.branch_id,
+            data={
+                "number": locked.number,
+                "dispatch_id": message.pk,
+                "kind": message.kind,
+                "revision": locked.revision,
+                "address": address,
+                "note": note,
+                "repeat": repeat,
+            },
+        )
+        events.publish("purchase_order.dispatch_queued", po_id=locked.pk, dispatch_id=message.pk)
+        return message
+
+    return execute_once(
+        actor_id=principal.user_id,
+        key=idempotency_key,
+        operation="purchase_order.send",
+        payload={"po_id": po_id, "note": note},
+        execute=execute,
+        replay=lambda _type, pk: EmailOutbox.objects.get(pk=pk),
+    )
