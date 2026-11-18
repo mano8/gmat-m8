@@ -89,7 +89,8 @@ def set_notice_default(
 
     A person's own setting (``set_person_notices``) and their own refusal of business email
     (``set_email_opt_out``) are never changed by it. The row is created by the first decision (no
-    row meant *on*); a decision that changes nothing writes and audits nothing. The person
+    row meant *on*, so deciding *on* first only records who decided); a decision that changes
+    nothing is not audited and publishes nothing. The person
     concerned is told nothing (Q89).
     """
     kind = _known(Notice, notice, "notice")
@@ -103,6 +104,8 @@ def set_notice_default(
         if not created and row.enabled == enabled:
             return row
         before = True if created else row.enabled
+        if before == enabled:  # the first decision says what no row already meant
+            return row
         if not created:
             row.enabled, row.changed_by = enabled, actor
             row.changed_at = db_now()
@@ -157,6 +160,10 @@ def _lock_person(principal: Principal, user_id: UUID) -> tuple[User, User]:
     if person is None:
         raise NotInScope(Capability.ORG_MANAGE)
     require_may_manage_account(actor, person)
+    if not person.is_active or person.offboarded_at is not None:
+        raise ValidationError(
+            _("This person has left: their email notifications are not changed."), code="left"
+        )
     return actor, person
 
 

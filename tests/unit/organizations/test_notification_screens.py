@@ -17,12 +17,13 @@ from django.utils.html import escape
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.core.idempotency import issue_key
-from apps.notifications import resolution
+from apps.notifications import resolution, services
 from apps.notifications.kinds import NOTICES, Channel, Mode, Notice
 from apps.notifications.models import NoticeDefault, NoticeSetting, NotificationPreference
 from apps.notifications.services import NOTICE_DEFAULT_OPERATION, PERSON_NOTICES_OPERATION
 from tests.org import People
 from tests.org import client_for as signed_in
+from tests.support import principal_for
 
 pytestmark = pytest.mark.django_db
 
@@ -170,6 +171,9 @@ class TestTheSettingForEveryone:
         assert response.status_code == 422
         assert b'data-testid="notice-request-edited-form"' in response.content
         assert not NoticeDefault.objects.exists()
+        # The notice is on, so the dialog that comes back still offers to turn it off.
+        assert "Turn off</button>" in response.content.decode()
+        assert "Turn on</button>" not in response.content.decode()
 
     def test_an_unknown_email_is_a_404_and_a_get_a_405(self, people: People) -> None:
         client = client_for(people.group_admin)
@@ -262,6 +266,29 @@ class TestThePersonsPage:
         client.post(person_url(tech), data)
         assert not NoticeSetting.objects.filter(user=tech).exists()
         assert AuditEvent.objects.filter(action="notification.person_changed").count() == 2
+
+    def test_a_save_changes_only_what_the_dialog_changed(self, people: People) -> None:
+        """Another administrator's change made after the dialog was drawn is not undone."""
+        tech, admin = people.tech_mad, people.group_admin
+        client = client_for(admin)
+        html = html_of(client, reverse("org:person", args=[tech.pk]))
+        assert 'name="seen_REQUEST_APPROVED"' in html
+        # Someone else sets one notice while this dialog is open.
+        services.set_person_notices(
+            principal_for(people.group_admin), tech.pk, {Notice.REQUEST_APPROVED: Mode.NEVER}
+        )
+        data = {
+            "idempotency_key": key_of(html, "id_notices_idempotency_key"),
+            "REQUEST_EDITED": "ALWAYS",
+        }
+        for notice in Notice:
+            data[f"seen_{notice.value}"] = ""
+            data.setdefault(notice.value, "")
+        assert client.post(person_url(tech), data, headers=HTMX).status_code == 204
+        assert dict(NoticeSetting.objects.filter(user=tech).values_list("notice", "mode")) == {
+            "REQUEST_APPROVED": "NEVER",
+            "REQUEST_EDITED": "ALWAYS",
+        }
 
     def test_an_unknown_choice_comes_back_in_the_dialog(self, people: People) -> None:
         client = client_for(people.group_admin)

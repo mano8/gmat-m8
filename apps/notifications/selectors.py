@@ -12,6 +12,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
+from apps.access.policy import is_staff_account
 from apps.access.roles import Capability
 from apps.accounts.models import User
 from apps.notifications import resolution
@@ -253,7 +254,7 @@ def person_notices(
 ) -> list[PersonNotice]:
     """Every notice for ``person`` (``org.manage``; a staff account's settings are not shown:
     nobody changes them)."""
-    if not ctx.has(Capability.ORG_MANAGE):
+    if not ctx.has(Capability.ORG_MANAGE) or is_staff_account(person):
         return []
     return _person_notices(person, channel)
 

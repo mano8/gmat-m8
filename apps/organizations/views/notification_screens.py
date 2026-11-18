@@ -72,6 +72,13 @@ def _known(value: str) -> Notice:
         raise Http404("Unknown email") from None
 
 
+def _is_off_now(ctx: AccessContext, notice: Notice) -> bool:
+    """Whether ``notice`` is off for everyone now: what an invalid form's dialog must offer."""
+    return any(
+        not state.enabled for state in selectors.notice_states(ctx) if state.spec.notice == notice
+    )
+
+
 @require_safe
 @require_capability(ORG)
 def notifications(request: HttpRequest) -> HttpResponse:
@@ -94,7 +101,7 @@ def notification_default(request: HttpRequest, notice: str) -> HttpResponse:
     ctx = access_for(request)
     kind = _known(notice)
     form = NoticeDefaultForm(request.POST, auto_id=_default_ids(kind))
-    turn_on = form.is_on() if form.is_valid() else True
+    turn_on = form.is_on() if form.is_valid() else _is_off_now(ctx, kind)
     dialog = notice_default_dialog(kind, form, turn_on=turn_on).dialog()
     to = reverse("org:notifications")
     if not form.is_valid():

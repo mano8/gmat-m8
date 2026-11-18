@@ -99,12 +99,15 @@ class TestSetNoticeDefault:
         assert events_of("notification.default_changed")[1].data["before"] is False
         assert NoticeDefault.objects.count() == 1
 
-    def test_the_first_decision_creates_the_row_even_when_it_says_on(self, people: People) -> None:
+    def test_the_first_decision_saying_on_records_who_decided_but_audits_nothing(
+        self, people: People
+    ) -> None:
+        # No row already meant on: nothing changed, so no audit event is made.
         services.set_notice_default(
             principal_for(people.group_admin), "REQUEST_EDITED", enabled=True
         )
         assert NoticeDefault.objects.get().enabled is True
-        assert events_of("notification.default_changed")[0].data["after"] is True
+        assert not events_of("notification.default_changed")
 
     def test_the_same_decision_again_writes_nothing(self, people: People) -> None:
         principal = principal_for(people.group_admin)
@@ -341,6 +344,13 @@ class TestSetPersonNotices:
         with pytest.raises(AccessDenied):
             self.set(people.group_admin, people.operator, {Notice.REQUEST_APPROVED: Mode.NEVER})
         assert not NoticeSetting.objects.exists()
+
+    def test_a_person_who_left_is_refused(self, people: People) -> None:
+        with pytest.raises(ValidationError) as refused:
+            self.set(people.group_admin, people.deactivated, {Notice.REQUEST_APPROVED: Mode.NEVER})
+        assert error_codes(refused.value) == {"left"}
+        assert not NoticeSetting.objects.exists()
+        assert not events_of("notification.person_changed")
 
     def test_a_superuser_may_not_either_without_org_manage(self, people: People) -> None:
         with pytest.raises(AccessDenied):

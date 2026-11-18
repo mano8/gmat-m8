@@ -43,16 +43,30 @@ class PersonNoticesForm(IdempotentForm):
             self.fields[notice.value] = forms.ChoiceField(
                 label=spec.label, required=False, choices=self.CHOICES
             )
+            # What the dialog showed, posted back: a save changes only what the administrator
+            # changed, so another administrator's change made since is not undone.
+            self.fields[self.seen_name(notice)] = forms.ChoiceField(
+                required=False, choices=self.CHOICES, widget=forms.HiddenInput
+            )
+
+    @staticmethod
+    def seen_name(notice: Notice) -> str:
+        return f"seen_{notice.value}"
 
     @classmethod
     def initial_for(cls, modes: dict[Notice, Mode | None]) -> dict[str, str]:
         """The form's initial values from the person's own settings (``None``: follow)."""
-        return {notice.value: mode.value if mode else FOLLOW for notice, mode in modes.items()}
+        shown = {notice.value: mode.value if mode else FOLLOW for notice, mode in modes.items()}
+        return shown | {f"seen_{key}": value for key, value in shown.items()}
 
     def modes(self) -> dict[Notice, Mode | None]:
-        """What the form says for every notice, ready for ``set_person_notices``."""
+        """What the administrator changed, ready for ``set_person_notices``: a notice whose choice
+        equals what the dialog showed is left out. A post without what was shown (no script, a
+        script of one's own) names every notice."""
         chosen = self.cleaned_data
         return {
             notice: Mode(chosen[notice.value]) if chosen.get(notice.value) else None
             for notice in NOTICES
+            if self.seen_name(notice) not in self.data
+            or chosen.get(notice.value) != chosen.get(self.seen_name(notice))
         }

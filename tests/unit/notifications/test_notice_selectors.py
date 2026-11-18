@@ -110,6 +110,10 @@ class TestPersonNotices:
         ctx = AccessContext.for_user(getattr(people, actor))
         assert selectors.person_notices(ctx, people.tech_mad) == []
 
+    def test_a_staff_account_is_never_shown(self, people: People) -> None:
+        ctx = AccessContext.for_user(people.group_admin)
+        assert selectors.person_notices(ctx, people.operator) == []
+
 
 class TestOwnNotices:
     def test_anyone_reads_their_own(self, people: People) -> None:
