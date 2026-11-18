@@ -96,6 +96,18 @@ urlpatterns = [
     path("people/<uuid:user_id>/employer/", views.set_employer, name="set_employer"),
     path("people/<uuid:user_id>/offboard/", views.offboard, name="offboard"),
     path("people/<uuid:user_id>/email/", views.request_email_change, name="request_email_change"),
+    # M15.3: which business emails are sent, for everyone and for one person (Q87-Q89).
+    path("notifications/", views.notifications, name="notifications"),
+    path(
+        "notifications/<slug:notice>/",
+        views.notification_default,
+        name="notification_default",
+    ),
+    path(
+        "people/<uuid:user_id>/notifications/",
+        views.person_notifications,
+        name="person_notifications",
+    ),
     # M10.4: inline dialogs of the person's page (inventory §3.4).
     path("people/<uuid:user_id>/name/", views.rename_person, name="rename_person"),
     path("people/<uuid:user_id>/mfa-reset/", views.reset_mfa, name="reset_mfa"),

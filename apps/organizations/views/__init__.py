@@ -3,7 +3,8 @@
 - ``people_screens`` (M2.6): people, memberships, offboarding, email changes, invitations;
 - ``account_actions`` (M10.4): a person's full name and a lost second factor;
 - ``company_screens`` (M10.2): companies and the members of a joint venture;
-- ``branch_screens`` (M10.2): branches, their managing branch, self-approval and activity.
+- ``branch_screens`` (M10.2): branches, their managing branch, self-approval and activity;
+- ``notification_screens`` (M15.3): which business emails are sent, for everyone and per person.
 
 Reads go through the selectors; writes through the services, from POST-only views on their
 own URLs.
@@ -37,6 +38,11 @@ from apps.organizations.views.company_screens import (
     reactivate_company,
     update_company,
     update_venture_member,
+)
+from apps.organizations.views.notification_screens import (
+    notification_default,
+    notifications,
+    person_notifications,
 )
 from apps.organizations.views.people_screens import (
     create_invitation,
@@ -85,9 +91,12 @@ __all__ = [
     "new_branch",
     "new_company",
     "new_invitation",
+    "notification_default",
+    "notifications",
     "offboard",
     "people",
     "person",
+    "person_notifications",
     "preview_branch_manager",
     "reactivate_branch",
     "reactivate_company",

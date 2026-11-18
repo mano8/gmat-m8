@@ -140,6 +140,43 @@ class TestResolution:
             set_default(NOTICE, default, admin)
         assert (person.pk in resolution.wanted([person.pk], NOTICE)) is expected
 
+    @pytest.mark.parametrize(
+        ("opt_out", "mode", "default", "expected"),
+        TABLE,
+        ids=[f"optout={o}-mode={m}-default={d}" for o, m, d, _ in TABLE],
+    )
+    def test_decisions_say_the_same_with_the_level_that_decided(
+        self,
+        people: People,
+        opt_out: bool,
+        mode: Mode | None,
+        default: bool | None,
+        expected: bool,
+    ) -> None:
+        """The screens' reading (M15.3) never differs from the rule queueing and the claim apply."""
+        person, admin = people.mm_mad, people.group_admin
+        if opt_out:
+            refuse(person)
+        if mode is not None:
+            set_mode(person, NOTICE, mode, admin)
+        if default is not None:
+            set_default(NOTICE, default, admin)
+        decided = resolution.decisions(person.pk)
+        assert set(decided) == set(Notice)
+        found = decided[NOTICE]
+        assert found.wanted is expected is (person.pk in resolution.wanted([person.pk], NOTICE))
+        assert found.mode == mode
+        level = (
+            resolution.Reason.OPTED_OUT
+            if opt_out
+            else resolution.Reason.PERSON
+            if mode is not None
+            else resolution.Reason.EVERYONE
+        )
+        assert found.reason == level
+        # A notice nobody touched keeps following the setting for everyone, which is on.
+        assert decided[Notice.REQUEST_EDITED].wanted is not opt_out
+
     def test_settings_of_another_notice_or_person_do_not_count(self, people: People) -> None:
         admin, person, other = people.group_admin, people.mm_mad, people.engineer
         set_default(Notice.REQUEST_APPROVED, False, admin)

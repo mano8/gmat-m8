@@ -328,6 +328,10 @@ def _person_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.people.tech_mad.pk])
 
 
+def _notice_url(notice: str) -> Callable[[World], str]:
+    return lambda world: reverse("org:notification_default", args=[notice])
+
+
 def _org_url(name: str, attr: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[getattr(world.org, attr).pk])
 
@@ -2401,6 +2405,42 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
             org_action(UNPROCESSABLE),
             position="htmx",
             path=_person_url("org:reset_mfa"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+    ),
+    # M15.3: which business emails are sent. Group administrators only; a person's settings are
+    # shown to nobody else (the person sees their own on ``notifications:settings``).
+    "org:notifications": (Route(org_page()),),
+    "org:notification_default": (
+        Route(
+            org_action(),
+            path=_notice_url("REQUEST_APPROVED"),
+            note="no value from the form: nothing changes",
+        ),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_notice_url("REQUEST_APPROVED"),
+            headers=HTMX,
+            note="an empty form from the dialog: the form again with its errors",
+        ),
+        Route(
+            app_action(group_admin=NOT_FOUND),
+            position="unknown email",
+            path=_notice_url("NOT_AN_EMAIL"),
+        ),
+    ),
+    "org:person_notifications": (
+        Route(
+            org_action(),
+            path=_person_url("org:person_notifications"),
+            note="no key: nothing changes",
+        ),
+        Route(
+            org_action(UNPROCESSABLE),
+            position="htmx",
+            path=_person_url("org:person_notifications"),
             headers=HTMX,
             note="an empty form from the dialog: the form again with its errors",
         ),

@@ -141,6 +141,7 @@ def test_a_unit_in_use_says_so_and_stays_active(browsing: Browsing, viewport: st
     "path",
     [
         "/dashboard/administration/",
+        "/org/notifications/",
         "/org/structure/companies/",
         "/org/warehouses/",
         "/catalog/units/",
@@ -159,10 +160,74 @@ def test_the_administration_menu_is_the_group_administrators_only(browsing: Brow
     admin.goto("/")
     group = admin.locator("#app-menu [data-nav-group=administration]")
     expect(group).to_be_visible()
-    for name in ("Overview", "People", "Companies", "Branches", "Warehouses", "Units of measure"):
+    for name in (
+        "Overview",
+        "People",
+        "Email notifications",
+        "Companies",
+        "Branches",
+        "Warehouses",
+        "Units of measure",
+    ):
         expect(group.get_by_role("link", name=name)).to_be_visible()
     technician = browsing.as_("tech-mad", "desktop")
     technician.goto("/requests/")
     expect(technician.locator("#app-menu [data-nav-group=administration]")).to_have_count(0)
     response = technician.goto("/org/structure/companies/")
     assert response is not None and response.status == 403
+
+
+# --- the email notification screens (M15.3) -------------------------------------------------
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_the_notifications_page_and_its_dialog(browsing: Browsing, viewport: str) -> None:
+    """Every email with its state; the dialog of one fits the screen, passes axe, keeps the
+    keyboard inside and closes with Escape; the page itself fits a phone and passes axe."""
+    page = browsing.as_("admin", viewport)
+    page.goto("/org/notifications/")
+    rows = page.get_by_test_id("notice-row")
+    expect(rows).to_have_count(6)
+    if viewport == "phone":
+        assert overflow(page) <= 0
+    found = audit_schemes(page, f"email notifications {viewport}")
+    assert not found, "\n".join(found)
+    opener = page.get_by_test_id("notice-request-to-review-open")
+    focus_by_keyboard(page, opener)
+    assert_focus_is_visible(page)
+    page.keyboard.press("Enter")
+    dialog = page.get_by_test_id("notice-request-to-review-dialog")
+    expect(dialog.get_by_test_id("notice-request-to-review-form")).to_be_visible()
+    expect(dialog.get_by_test_id("consequences")).to_be_visible()
+    fits(page, dialog, viewport)
+    found = audit_schemes(page, f"email notification dialog {viewport}")
+    assert not found, "\n".join(found)
+    stays_in_the_dialog(page, "dialog", presses=8)
+    closes_with_escape(page, dialog, opener)
+    assert_focus_is_visible(page)
+
+
+@pytest.mark.parametrize("viewport", ["phone", "desktop"])
+def test_a_persons_notifications_dialog(browsing: Browsing, viewport: str) -> None:
+    """The person's page lists every email with its state; the dialog that changes them fits,
+    passes axe and is left by keyboard, nothing saved."""
+    page = browsing.as_("admin", viewport)
+    page.goto("/org/people/?q=tech-mad")
+    page.get_by_role("link", name="tech-mad@demo.example").click()
+    section = page.get_by_test_id("person-notices")
+    expect(section.get_by_test_id("notice-state")).to_have_count(6)
+    if viewport == "phone":
+        assert overflow(page) <= 0
+    found = audit_schemes(page, f"person notifications {viewport}")
+    assert not found, "\n".join(found)
+    opener = page.get_by_test_id("notices-open")
+    focus_by_keyboard(page, opener)
+    page.keyboard.press("Enter")
+    dialog = page.get_by_test_id("notices-dialog")
+    expect(dialog.get_by_test_id("notices-form")).to_be_visible()
+    expect(dialog.get_by_role("combobox")).to_have_count(6)
+    fits(page, dialog, viewport)
+    found = audit_schemes(page, f"person notifications dialog {viewport}")
+    assert not found, "\n".join(found)
+    stays_in_the_dialog(page, "dialog", presses=10)
+    closes_with_escape(page, dialog, opener)

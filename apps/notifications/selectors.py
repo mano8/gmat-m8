@@ -6,20 +6,26 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from django.db.models import Count, OuterRef, QuerySet, Subquery
+from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
 from django.utils.functional import Promise
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.context import AccessContext
 from apps.access.roles import Capability
+from apps.accounts.models import User
+from apps.notifications import resolution
+from apps.notifications.kinds import NOTICES, Channel, Mode, NoticeSpec
 from apps.notifications.models import (
     DISPATCH_KINDS,
     EmailOutbox,
     Kind,
+    NoticeDefault,
+    NoticeSetting,
     NotificationPreference,
     Status,
 )
+from apps.notifications.resolution import Reason
 
 # The security mail whose status a group administrator may see: the objects they manage
 # (``eligibility_object_type`` of the invitation and of the email change).
@@ -172,3 +178,88 @@ def quarantined_dispatches() -> QuerySet[EmailOutbox]:
         .select_related("source_po")
         .order_by("created_at", "pk")
     )
+
+
+# --- the business notices' settings (M15.3, Q87-Q89) ---------------------------------------
+
+
+@dataclass(frozen=True)
+class NoticeState:
+    """A notice as the administration page shows it: its state for everyone and how many
+    people (active accounts) have a setting of their own, split by what it says."""
+
+    spec: NoticeSpec
+    enabled: bool
+    always: int
+    never: int
+
+    @property
+    def own(self) -> int:
+        return self.always + self.never
+
+
+def notice_states(ctx: AccessContext, channel: Channel = Channel.EMAIL) -> list[NoticeState]:
+    """Every notice in the registry's order with its setting for everyone and the people who
+    have their own (``org.manage`` only; nothing for anyone else)."""
+    if not ctx.has(Capability.ORG_MANAGE):
+        return []
+    defaults = dict(NoticeDefault.objects.filter(channel=channel).values_list("notice", "enabled"))
+    counts = {
+        row["notice"]: (row["always"], row["never"])
+        for row in NoticeSetting.objects.filter(
+            channel=channel, user__is_active=True, user__offboarded_at__isnull=True
+        )
+        .values("notice")
+        .annotate(
+            always=Count("pk", filter=Q(mode=Mode.ALWAYS)),
+            never=Count("pk", filter=Q(mode=Mode.NEVER)),
+        )
+    }
+    return [
+        NoticeState(spec, defaults.get(notice, True), *counts.get(notice, (0, 0)))
+        for notice, spec in NOTICES.items()
+    ]
+
+
+@dataclass(frozen=True)
+class PersonNotice:
+    """One notice for one person: what applies, which level decided, and whether their current
+    roles receive it at all (the notice is queued only for who holds its capability)."""
+
+    spec: NoticeSpec
+    wanted: bool
+    reason: Reason
+    mode: Mode | None
+    receivable: bool
+
+
+def _person_notices(person: User, channel: Channel) -> list[PersonNotice]:
+    held = AccessContext.for_user(person)
+    decided = resolution.decisions(person.pk, channel)
+    return [
+        PersonNotice(
+            spec,
+            decided[notice].wanted,
+            decided[notice].reason,
+            decided[notice].mode,
+            held.has(spec.capability),
+        )
+        for notice, spec in NOTICES.items()
+    ]
+
+
+def person_notices(
+    ctx: AccessContext, person: User, channel: Channel = Channel.EMAIL
+) -> list[PersonNotice]:
+    """Every notice for ``person`` (``org.manage``; a staff account's settings are not shown:
+    nobody changes them)."""
+    if not ctx.has(Capability.ORG_MANAGE):
+        return []
+    return _person_notices(person, channel)
+
+
+def own_notices(ctx: AccessContext, channel: Channel = Channel.EMAIL) -> list[PersonNotice]:
+    """Every notice for the signed-in user: their own state, nobody else's."""
+    if ctx.user is None:
+        return []
+    return _person_notices(ctx.user, channel)

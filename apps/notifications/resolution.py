@@ -17,6 +17,8 @@ its object) is ``eligibility``'s question, not this module's.
 """
 
 from collections.abc import Iterable
+from dataclasses import dataclass
+from enum import StrEnum
 from uuid import UUID
 
 from django.db.models import BooleanField, Exists, OuterRef, Q, QuerySet, Subquery, Value
@@ -65,3 +67,44 @@ def wanted(
         return set()
     found = filter_wanted(User.objects.filter(pk__in=ids), notice, channel)
     return set(found.values_list("pk", flat=True))
+
+
+class Reason(StrEnum):
+    """Which level decided a person's state for a notice."""
+
+    OPTED_OUT = "opted_out"  # the person turned business email off
+    PERSON = "person"  # an administrator set this notice for the person
+    EVERYONE = "everyone"  # the setting for everyone, or none yet (on)
+
+
+@dataclass(frozen=True)
+class Decision:
+    """One person's state for one notice: ``mode`` is their own setting (``None``: follow the
+    setting for everyone), ``wanted`` what the three levels give, ``reason`` the level."""
+
+    wanted: bool
+    reason: Reason
+    mode: Mode | None
+
+
+def decisions(user_id: UUID, channel: Channel = Channel.EMAIL) -> dict[Notice, Decision]:
+    """What ``wanted`` decides for ``user_id``, for every notice, and why (three queries).
+
+    For the screens that show a person their state (M15.3); the same rule as ``wanted``, which
+    a test keeps equal.
+    """
+    refused = NotificationPreference.objects.filter(user_id=user_id, email_opt_out=True).exists()
+    modes = dict(
+        NoticeSetting.objects.filter(user_id=user_id, channel=channel).values_list("notice", "mode")
+    )
+    defaults = dict(NoticeDefault.objects.filter(channel=channel).values_list("notice", "enabled"))
+    found: dict[Notice, Decision] = {}
+    for notice in Notice:
+        mode = Mode(modes[notice]) if notice in modes else None
+        if refused:
+            found[notice] = Decision(False, Reason.OPTED_OUT, mode)
+        elif mode is not None:
+            found[notice] = Decision(mode == Mode.ALWAYS, Reason.PERSON, mode)
+        else:
+            found[notice] = Decision(defaults.get(notice, True), Reason.EVERYONE, None)
+    return found

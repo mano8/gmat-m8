@@ -29,4 +29,13 @@
       {% include "components/button.html" with type="submit" label=_("Save") variant="primary" %}
     </div>
   </form>
+  <section class="card mt-4 max-w-2xl"
+           aria-labelledby="notices-title"
+           data-testid="own-notices">
+    <h2 id="notices-title" class="card-title">{% translate "What applies to you" %}</h2>
+    <p class="mb-2 text-sm text-soft">
+      {% translate "Each business email, and why you do or do not receive it. Administrators can change the setting for everyone and, for you, each email; your own choice above to receive none comes first. Security emails and supplier orders are never optional." %}
+    </p>
+    {% include "notifications/states.html" with items=notices own=True %}
+  </section>
 {% endblock content %}

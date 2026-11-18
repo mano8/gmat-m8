@@ -7774,3 +7774,201 @@ msgstr "réglage d'avis d'une personne"
 #: apps/notifications/models.py
 msgid "notice settings for a person"
 msgstr "réglages d'avis d'une personne"
+
+#: apps/core/navigation.py
+#: apps/organizations/templates/organizations/notifications.html
+#: apps/organizations/templates/organizations/person.html
+msgid "Email notifications"
+msgstr "Notifications par e-mail"
+
+#: apps/notifications/services/preferences.py
+msgid "Unknown choice."
+msgstr "Choix inconnu."
+
+#: apps/notifications/templates/notifications/settings.html
+msgid "What applies to you"
+msgstr "Ce qui s'applique à vous"
+
+#: apps/notifications/templates/notifications/settings.html
+msgid ""
+"Each business email, and why you do or do not receive it. Administrators can"
+" change the setting for everyone and, for you, each email; your own choice "
+"above to receive none comes first. Security emails and supplier orders are "
+"never optional."
+msgstr ""
+"Chaque e-mail de gestion et pourquoi vous le recevez ou non. Les "
+"administrateurs peuvent modifier le réglage pour tous et, pour vous, chaque "
+"e-mail ; votre propre choix ci-dessus de n'en recevoir aucun passe en "
+"premier. Les e-mails de sécurité et les commandes aux fournisseurs ne sont "
+"jamais facultatifs."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "You turned business email off."
+msgstr "Vous avez désactivé les e-mails de gestion."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "The person turned business email off themselves."
+msgstr "La personne a elle-même désactivé les e-mails de gestion."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "An administrator set this email to always reach you."
+msgstr "Un administrateur a fixé que cet e-mail vous parvienne toujours."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Set for this person: always sent."
+msgstr "Fixé pour cette personne : toujours envoyé."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "An administrator set this email never to reach you."
+msgstr "Un administrateur a fixé que cet e-mail ne vous parvienne jamais."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Set for this person: never sent."
+msgstr "Fixé pour cette personne : jamais envoyé."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Follows the setting for everyone."
+msgstr "Suit le réglage pour tous."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Your current roles do not receive it."
+msgstr "Vos rôles actuels ne le reçoivent pas."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Their current roles do not receive it."
+msgstr "Ses rôles actuels ne le reçoivent pas."
+
+#: apps/notifications/templates/notifications/states.html
+#: apps/organizations/templates/organizations/notifications.html
+msgctxt "notice state"
+msgid "Sent"
+msgstr "Envoyé"
+
+#: apps/notifications/templates/notifications/states.html
+#: apps/organizations/templates/organizations/notifications.html
+msgctxt "notice state"
+msgid "Not sent"
+msgstr "Non envoyé"
+
+#: apps/organizations/notice_dialogs.py
+msgid "People who have their own setting for this email keep it."
+msgstr ""
+"Les personnes qui ont leur propre réglage pour cet e-mail le conservent."
+
+#: apps/organizations/notice_dialogs.py
+msgid "People who turned business email off never receive it."
+msgstr ""
+"Les personnes qui ont désactivé les e-mails de gestion ne le reçoivent "
+"jamais."
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn on for everyone"
+msgstr "Activer pour tous"
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn on"
+msgstr "Activer"
+
+#: apps/organizations/notice_dialogs.py
+msgid "This email is sent again to everyone who receives it."
+msgstr "Cet e-mail est de nouveau envoyé à tous ceux qui le reçoivent."
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn off for everyone"
+msgstr "Désactiver pour tous"
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn off"
+msgstr "Désactiver"
+
+#: apps/organizations/notice_dialogs.py
+msgid ""
+"This email is no longer sent to anyone who has no setting of their own."
+msgstr "Cet e-mail n'est plus envoyé aux personnes sans réglage propre."
+
+#: apps/organizations/notice_dialogs.py
+msgid "A message already queued and not yet sent follows the change."
+msgstr "Un message déjà en file et pas encore envoyé suit le changement."
+
+#: apps/organizations/notice_dialogs.py
+msgid "Change email notifications"
+msgstr "Modifier les notifications par e-mail"
+
+#: apps/organizations/notice_dialogs.py
+msgid ""
+"Always and never beat the setting for everyone. Someone who turned business "
+"email off themselves receives none of them, whatever is set here. The person"
+" is not told."
+msgstr ""
+"« Toujours » et « jamais » l'emportent sur le réglage pour tous. Qui a "
+"désactivé lui-même les e-mails de gestion n'en reçoit aucun, quoi qu'on fixe"
+" ici. La personne n'est pas prévenue."
+
+#: apps/organizations/notice_forms.py
+msgid "Follow the setting for everyone"
+msgstr "Suivre le réglage pour tous"
+
+#: apps/organizations/notice_forms.py
+msgid "Always send"
+msgstr "Toujours envoyer"
+
+#: apps/organizations/notice_forms.py
+msgid "Never send"
+msgstr "Ne jamais envoyer"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid ""
+"Choose which business emails the application sends. A person's own setting, "
+"on their page, and their own choice of no business email come before what is"
+" set here. Security emails (invitations, email changes, password and second-"
+"factor notices) and supplier orders are never optional."
+msgstr ""
+"Choisissez quels e-mails de gestion l'application envoie. Le réglage propre "
+"à une personne, sur sa page, et son propre choix de ne recevoir aucun e-mail"
+" de gestion passent avant ce qui est fixé ici. Les e-mails de sécurité "
+"(invitations, changements d'e-mail, avis de mot de passe et de second "
+"facteur) et les commandes aux fournisseurs ne sont jamais facultatifs."
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "Business emails"
+msgstr "E-mails de gestion"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "For everyone"
+msgstr "Pour tous"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "Own settings"
+msgstr "Réglages propres"
+
+#: apps/organizations/templates/organizations/notifications.html
+#, python-format
+msgid "%(n)s person (%(always)s always, %(never)s never)"
+msgid_plural "%(n)s people (%(always)s always, %(never)s never)"
+msgstr[0] "%(n)s personne (%(always)s toujours, %(never)s jamais)"
+msgstr[1] "%(n)s personnes (%(always)s toujours, %(never)s jamais)"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "To make an exception for one person, open their page under People."
+msgstr ""
+"Pour faire une exception pour une personne, ouvrez sa page dans Personnes."
+
+#: apps/organizations/templates/organizations/person.html
+msgid ""
+"Business emails about requests and deliveries. Security emails and supplier "
+"orders are never optional."
+msgstr ""
+"E-mails de gestion sur les demandes et les livraisons. Les e-mails de "
+"sécurité et les commandes aux fournisseurs ne sont jamais facultatifs."
+
+#: apps/organizations/views/notification_screens.py
+msgid "Sent to everyone again."
+msgstr "De nouveau envoyé à tous."
+
+#: apps/organizations/views/notification_screens.py
+msgid "No longer sent to everyone."
+msgstr "N'est plus envoyé à tous."
+
+#: apps/organizations/views/notification_screens.py
+msgid "Email notifications saved."
+msgstr "Notifications par e-mail enregistrées."

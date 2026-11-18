@@ -8,6 +8,7 @@ write, when a message is queued and again at its claim.
 """
 
 from collections.abc import Mapping
+from typing import cast
 from uuid import UUID
 
 from django.core.exceptions import ValidationError
@@ -130,7 +131,9 @@ def set_notice_default(
     )
 
 
-def _clean_modes(modes: Mapping[Notice | str, Mode | str | None]) -> dict[Notice, Mode | None]:
+def _clean_modes(
+    modes: Mapping[Notice, Mode | None] | Mapping[str, str | None],
+) -> dict[Notice, Mode | None]:
     """``modes`` as members: a notice each, ``None`` (follow the setting for everyone) or a mode."""
     return {
         _known(Notice, notice, "modes"): None if mode in (None, "") else _known(Mode, mode, "modes")
@@ -167,8 +170,7 @@ def _write_mode(
 ) -> None:
     """Make the person's row for ``notice`` say ``mode`` (``None``: no row)."""
     if mode is None:
-        assert row is not None  # a person with no row and no mode differs from nothing
-        row.delete()
+        cast(NoticeSetting, row).delete()  # no row and no mode would not differ
     elif row is not None:
         row.mode, row.set_by, row.set_at = mode, actor, db_now()
         row.save(update_fields=["mode", "set_by", "set_at", "updated_at"])
@@ -201,7 +203,7 @@ def _apply_modes(
 def set_person_notices(
     principal: Principal,
     user_id: UUID,
-    modes: Mapping[Notice | str, Mode | str | None],
+    modes: Mapping[Notice, Mode | None] | Mapping[str, str | None],
     *,
     channel: Channel | str = Channel.EMAIL,
     idempotency_key: str | None = None,

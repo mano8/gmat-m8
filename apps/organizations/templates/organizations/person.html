@@ -181,6 +181,23 @@
       {% endif %}
     </section>
   {% endif %}
+  {% if notices %}
+    <section class="card mb-4"
+             id="notices"
+             aria-labelledby="notices-title"
+             data-testid="person-notices">
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="notices-title" class="card-title mb-0">{% translate "Email notifications" %}</h2>
+        {% if notices_dialog %}
+          {% include "components/dialog_button.html" with dialog=notices_dialog.id label=notices_dialog.title variant="secondary" icon="mail" testid="notices-open" %}
+        {% endif %}
+      </div>
+      <p class="mb-2 text-sm text-soft">
+        {% translate "Business emails about requests and deliveries. Security emails and supplier orders are never optional." %}
+      </p>
+      {% include "notifications/states.html" with items=notices own=False %}
+    </section>
+  {% endif %}
   {% active_filter_count invitation_filters as invitation_filter_count %}
   {% if invitations.rows or invitation_filter_count %}
     <section class="card mb-4"
@@ -228,6 +245,9 @@
   {% endif %}
   {% if mfa_reset_dialog %}
     {% include "components/action_dialog.html" with d=mfa_reset_dialog %}
+  {% endif %}
+  {% if notices_dialog %}
+    {% include "components/action_dialog.html" with d=notices_dialog %}
   {% endif %}
   {% if email_revoke_dialog and manageable and employer_editable and person.is_active %}
     {% include "components/action_dialog.html" with d=email_revoke_dialog %}
