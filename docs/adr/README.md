@@ -34,3 +34,4 @@ Each ADR names the files it governs (`- **Governs:**`). A pull request that touc
 - [ADR-0028](0028-project-receiving-for-every-role.md): Every business role receives at the worksites of its projects
 - [ADR-0029](0029-people-by-name-addresses-to-managers.md): People are shown by name; an address only where managing them needs it
 - [ADR-0030](0030-administration-in-the-app.md): Administration happens in the app; the Django admin is optional and read-only
+- [ADR-0031](0031-business-email-notices-set-by-administrators.md): Business email notifications: settings for everyone and per person, by group administrators
