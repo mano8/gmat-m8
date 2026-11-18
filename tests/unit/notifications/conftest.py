@@ -11,6 +11,7 @@ from apps.access.roles import Capability, Role
 from apps.accounts.models import User
 from apps.notifications.dispatch import register_dispatch_source
 from apps.notifications.eligibility import ACCOUNT_ACTIVE
+from apps.notifications.kinds import Notice
 from apps.notifications.models import EmailOutbox, Kind
 from apps.notifications.outbox import queue_dispatch, queue_notification, queue_security_email
 from apps.projects.models import Project
@@ -69,6 +70,7 @@ def outsider(org: Org, member: Callable[..., User]) -> User:
 def notification(org: Org) -> Callable[..., EmailOutbox]:
     def make(*users: User, obj: Project | None = None, **extra: Any) -> EmailOutbox:
         values: dict[str, Any] = {
+            "notice": Notice.REQUEST_TO_REVIEW,
             "recipients": [user.pk for user in users],
             "capability": Capability.PROJECT_VIEW,
             "obj": org.hospital if obj is None else obj,

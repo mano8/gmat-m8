@@ -5,8 +5,9 @@ exactly when the change that causes it commits, and its content is frozen there.
 authorize nothing themselves: the service that calls them has already run
 ``authorize_in_txn`` for its own operation (as for ``audit.record``). Only the worker sends.
 
-- ``queue_notification``: recipients as user ids plus an eligibility rule (a capability on
-  an object), split into messages of at most ``MAX_RECIPIENTS`` BCC recipients;
+- ``queue_notification``: a business notice (``kinds.Notice``, M15) for the recipients who
+  want it (``resolution``), as user ids plus an eligibility rule (a capability on an
+  object), split into messages of at most ``MAX_RECIPIENTS`` BCC recipients;
 - ``queue_security_email``: one address, a named rule on its target, the bodies sealed;
   expires after ``OUTBOX_SENSITIVE_TTL``. allauth's mail arrives here through
   ``apps.notifications.backends.OutboxEmailBackend``;
@@ -31,8 +32,9 @@ from django.db.models.functions import Now
 
 from apps.access.roles import Capability
 from apps.core.db import db_now
-from apps.notifications import eligibility
+from apps.notifications import eligibility, resolution
 from apps.notifications.crypto import seal
+from apps.notifications.kinds import Notice
 from apps.notifications.models import DISPATCH_KINDS, MAX_RECIPIENTS, EmailOutbox, Kind, Status
 
 
@@ -57,6 +59,7 @@ def sender_domain(from_email: str) -> str | None:
 
 def queue_notification(
     *,
+    notice: Notice,
     recipients: Iterable[UUID],
     capability: str,
     obj: Model | None,
@@ -65,12 +68,16 @@ def queue_notification(
     html_body: str = "",
     source_ref: str = "",
 ) -> list[EmailOutbox]:
-    """Queue one notification per ``MAX_RECIPIENTS`` recipients; return the messages.
+    """Queue ``notice`` for the recipients who want it, ``MAX_RECIPIENTS`` per message.
 
-    Each recipient must still be active and hold ``capability`` on ``obj`` when the worker
-    claims the message; ``obj`` must be a scoped model (it has ``visible_to``).
+    The recipients who do not want it (``resolution``, M15) are left out, and nobody left
+    means no message. Each recipient must still want the notice, be active and hold
+    ``capability`` on ``obj`` when the worker claims the message; ``obj`` must be a scoped
+    model (it has ``visible_to``).
     """
     _require_transaction(DEFAULT_DB_ALIAS)
+    if notice not in set(Notice):
+        raise ValueError(f"Unknown notice {notice!r}")
     if capability not in set(Capability):
         raise ValueError(f"Unknown capability {capability!r}")
     object_type, object_id = "", None
@@ -78,10 +85,11 @@ def queue_notification(
         if not eligibility.is_scoped(type(obj)):
             raise TypeError(f"{type(obj).__name__} has no scoped queryset (visible_to)")
         object_type, object_id = eligibility.object_reference(obj)
-    user_ids = sorted(set(recipients))
+    user_ids = sorted(resolution.wanted(recipients, notice))
     return [
         EmailOutbox.objects.create(
             kind=Kind.NOTIFICATION,
+            notice=notice,
             recipient_users=user_ids[start : start + MAX_RECIPIENTS],
             eligibility_rule=capability,
             eligibility_object_type=object_type,

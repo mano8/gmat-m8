@@ -7616,3 +7616,123 @@ msgstr "Recargue la página para decidir qué hacer con este correo."
 #: apps/purchasing/templates/purchasing/send_body.html
 msgid "This revision is already on its way to the supplier: wait until its status above has changed before sending it again."
 msgstr "Esta revisión ya está en camino al proveedor: espere a que su estado de arriba cambie antes de enviarla de nuevo."
+
+#: apps/notifications/kinds.py
+msgid "A request to review"
+msgstr "Una solicitud pendiente de revisión"
+
+#: apps/notifications/kinds.py
+msgid "A request assigned to me"
+msgstr "Una solicitud asignada a mí"
+
+#: apps/notifications/kinds.py
+msgid "My request approved"
+msgstr "Mi solicitud aprobada"
+
+#: apps/notifications/kinds.py
+msgid "My request rejected"
+msgstr "Mi solicitud rechazada"
+
+#: apps/notifications/kinds.py
+msgid "My request changed by a reviewer"
+msgstr "Mi solicitud modificada por un revisor"
+
+#: apps/notifications/kinds.py
+msgid "Goods handed over or received on site"
+msgstr "Material entregado o recibido en obra"
+
+#: apps/notifications/kinds.py
+msgid "Always"
+msgstr "Siempre"
+
+#: apps/notifications/kinds.py
+msgid "Never"
+msgstr "Nunca"
+
+#: apps/notifications/kinds.py
+msgid "Everyone who can review the request, except its author and its assigned reviewer"
+msgstr "Quienes pueden revisar la solicitud, salvo su autor y su revisor asignado"
+
+#: apps/notifications/kinds.py
+msgid "Each request submitted"
+msgstr "Cada solicitud enviada"
+
+#: apps/notifications/kinds.py
+msgid "The reviewer the request is assigned to"
+msgstr "El revisor al que se asigna la solicitud"
+
+#: apps/notifications/kinds.py
+msgid "At submit when a reviewer is chosen, and at each reassignment"
+msgstr "Al enviar, si se elige un revisor, y en cada reasignación"
+
+#: apps/notifications/kinds.py
+msgid "The requester"
+msgstr "El solicitante"
+
+#: apps/notifications/kinds.py
+msgid "Each approval"
+msgstr "Cada aprobación"
+
+#: apps/notifications/kinds.py
+msgid "Each rejection"
+msgstr "Cada rechazo"
+
+#: apps/notifications/kinds.py
+msgid "A reviewer's edits, grouped over 10 minutes"
+msgstr "Los cambios de un revisor, agrupados durante 10 minutos"
+
+#: apps/notifications/kinds.py
+msgid "The requester of each request served"
+msgstr "El solicitante de cada solicitud atendida"
+
+#: apps/notifications/kinds.py
+msgid "Each handover, and each receipt on site"
+msgstr "Cada entrega y cada recepción en obra"
+
+#: apps/notifications/models.py
+msgid "notice"
+msgstr "aviso"
+
+#: apps/notifications/models.py
+msgid "channel"
+msgstr "canal"
+
+#: apps/notifications/models.py
+msgid "sent to everyone"
+msgstr "enviado a todos"
+
+#: apps/notifications/models.py
+msgid "changed by"
+msgstr "cambiado por"
+
+#: apps/notifications/models.py
+msgid "changed at"
+msgstr "cambiado el"
+
+#: apps/notifications/models.py
+msgid "notice setting for everyone"
+msgstr "ajuste de aviso para todos"
+
+#: apps/notifications/models.py
+msgid "notice settings for everyone"
+msgstr "ajustes de aviso para todos"
+
+#: apps/notifications/models.py
+msgid "setting"
+msgstr "ajuste"
+
+#: apps/notifications/models.py
+msgid "set by"
+msgstr "fijado por"
+
+#: apps/notifications/models.py
+msgid "set at"
+msgstr "fijado el"
+
+#: apps/notifications/models.py
+msgid "notice setting for a person"
+msgstr "ajuste de aviso de una persona"
+
+#: apps/notifications/models.py
+msgid "notice settings for a person"
+msgstr "ajustes de aviso de una persona"

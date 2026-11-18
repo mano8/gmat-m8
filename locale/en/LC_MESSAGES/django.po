@@ -7432,3 +7432,123 @@ msgstr ""
 #: apps/purchasing/templates/purchasing/send_body.html
 msgid "This revision is already on its way to the supplier: wait until its status above has changed before sending it again."
 msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "A request to review"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "A request assigned to me"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "My request approved"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "My request rejected"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "My request changed by a reviewer"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Goods handed over or received on site"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Always"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Never"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Everyone who can review the request, except its author and its assigned reviewer"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Each request submitted"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "The reviewer the request is assigned to"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "At submit when a reviewer is chosen, and at each reassignment"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "The requester"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Each approval"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Each rejection"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "A reviewer's edits, grouped over 10 minutes"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "The requester of each request served"
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "Each handover, and each receipt on site"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "notice"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "channel"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "sent to everyone"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "changed by"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "changed at"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "notice setting for everyone"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "notice settings for everyone"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "setting"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "set by"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "set at"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "notice setting for a person"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "notice settings for a person"
+msgstr ""

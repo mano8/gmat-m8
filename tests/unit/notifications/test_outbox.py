@@ -17,6 +17,7 @@ from apps.accounts.models import User
 from apps.notifications import crypto
 from apps.notifications.backends import OutboxEmailBackend, UnsupportedMessage
 from apps.notifications.eligibility import ACCOUNT_ACTIVE
+from apps.notifications.kinds import Notice
 from apps.notifications.models import MAX_RECIPIENTS, EmailOutbox, Kind, Status
 from apps.notifications.outbox import (
     OutboxOutsideTransaction,
@@ -90,6 +91,7 @@ class TestNotification:
         ids = [user.pk for user in users]
         with transaction.atomic():
             messages = queue_notification(
+                notice=Notice.REQUEST_TO_REVIEW,
                 recipients=[*ids, ids[0]],
                 capability=Capability.PROJECT_VIEW,
                 obj=org.hospital,
@@ -107,6 +109,7 @@ class TestNotification:
         with transaction.atomic():
             assert (
                 queue_notification(
+                    notice=Notice.REQUEST_TO_REVIEW,
                     recipients=[],
                     capability=Capability.PROJECT_VIEW,
                     obj=None,
@@ -128,6 +131,7 @@ class TestNotification:
         self, account: User, kwargs: dict[str, Any], error: type[Exception]
     ) -> None:
         values: dict[str, Any] = {
+            "notice": Notice.REQUEST_TO_REVIEW,
             "recipients": [account.pk],
             "capability": Capability.PROJECT_VIEW,
             "obj": None,
@@ -145,6 +149,7 @@ class TestNotification:
     ) -> None:
         with pytest.raises(OutboxOutsideTransaction):
             queue_notification(
+                notice=Notice.REQUEST_TO_REVIEW,
                 recipients=[account.pk],
                 capability=Capability.PROJECT_VIEW,
                 obj=org.hospital,
@@ -159,6 +164,7 @@ class TestNotification:
     def test_a_rolled_back_change_sends_nothing(self, account: User, org: Org) -> None:
         with pytest.raises(RuntimeError), transaction.atomic():
             queue_notification(
+                notice=Notice.REQUEST_TO_REVIEW,
                 recipients=[account.pk],
                 capability=Capability.PROJECT_VIEW,
                 obj=org.hospital,

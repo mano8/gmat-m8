@@ -18,6 +18,7 @@ from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.core.ids import new_id
 from apps.notifications import services
+from apps.notifications.kinds import Notice
 from apps.notifications.models import EmailOutbox, Kind, Status
 from apps.notifications.outbox import queue_notification
 from apps.organizations.models import Membership
@@ -266,6 +267,7 @@ class TestOutboxQuarantine:
     def held(self, operator: User, org: Org, people: People) -> dict[str, EmailOutbox]:
         order = build_sentinel_order(org, people).order
         [notification] = queue_notification(
+            notice=Notice.REQUEST_TO_REVIEW,
             recipients=[people.tech_mad.pk],
             capability="catalog.view",
             obj=None,
