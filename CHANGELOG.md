@@ -4,6 +4,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+- **Group administrators choose which business emails are sent** ([#70](https://github.com/mano8/gmat-m8/issues/70)). *Administration › Email notifications* lists the six business emails (a request to review, a request assigned to me, my request approved, my request rejected, my request changed by a reviewer, goods handed over or received on site) with who receives each, when, and whether it is sent; one dialog per email turns it off or on for everyone. A person's page has an *Email notifications* section and a dialog to set each email to *always*, *never* or *follow the setting for everyone*, which also lets a group administrator silence *A request to review* for themselves. The person's own *no business email* choice still comes first and is never overridden; each person sees what applies to them, read-only, on their *Notifications* page. The setting is applied when a message is queued and again when the worker claims it, so a change reaches messages still waiting. Security emails (invitations, email changes, password and second-factor notices) and supplier orders are never optional. Every change is audited with its before and after, and nobody is told of it. All six emails stay on until an administrator decides, so nothing changes by itself.
+
+**Migration:** `notifications.0006` adds two tables (`NoticeDefault`, `NoticeSetting`) and a blank `notice` column on queued messages (database default, reversible). It only adds, so the previous release runs on the new schema; v0.2.0 queues messages without a notice, which follow the person's own choice alone.
+
 ## [0.2.0] - 2026-11-17
 
 The pilot's first round of feedback on v0.1.0 ([#64](https://github.com/mano8/gmat-m8/issues/64)–[#69](https://github.com/mano8/gmat-m8/issues/69)): quicker request entry and review, an administration overview, purchase orders sent to the supplier from their page, a left menu that keeps its place, and a QR code that reads in the dark theme. The checks to run with the pilot's users after the upgrade are in [docs/runbooks/pilot.md](https://github.com/mano8/gmat-m8/blob/v0.2.0/docs/runbooks/pilot.md).

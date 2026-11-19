@@ -2,20 +2,25 @@
 
 The subscribers run inside the transaction of the service that publishes the event
 (``apps.core.events``), so a message exists exactly when the change commits and a rolled-back
-change leaves none. Each one queues at most one message per request, with the recipients'
-ids and a capability on the request (``request.review`` for reviewers, ``request.view``
-for the requester) that the worker checks again at the claim.
+change leaves none. Each one queues at most one message per request and notice, with the
+recipients' ids, the business notice it is (``kinds.Notice``, M15: queued only for who wants
+it, ``resolution``) and the notice's capability on the request (``request.review`` for
+reviewers, ``request.view`` for the requester), all of which the worker checks again at the
+claim.
 
-- ``request.submitted``: the users who can review the request, except its author; its
-  assigned reviewer (M7b.2) gets a message of their own instead;
-- ``request.reviewer_assigned``: the new assignee, unless they assigned it to themselves;
-- ``request.approved`` / ``request.rejected``: the requester, with their own decisions;
-- ``request.edited``: the requester, when a reviewer edits their submitted or approved
-  request (M7b.3), unless they edited it themselves. One message per batch of edits: it
-  is held back ``EDIT_BATCH`` and says only that the request changed, so the edits made
-  while it waits are covered by it (``outbox.waiting``) and none is queued for them;
-- ``handover.posted``: the requester of each request served, with their own lines only
-  (a ``DIRECT_RECEIPT`` handover is the receipt of goods on site).
+- ``request.submitted``: ``REQUEST_TO_REVIEW`` to the users who can review the request,
+  except its author; its assigned reviewer (M7b.2) gets ``REQUEST_ASSIGNED`` instead;
+- ``request.reviewer_assigned``: ``REQUEST_ASSIGNED`` to the new assignee, unless they
+  assigned it to themselves;
+- ``request.approved`` / ``request.rejected``: ``REQUEST_APPROVED`` / ``REQUEST_REJECTED``
+  to the requester, with their own decisions;
+- ``request.edited``: ``REQUEST_EDITED`` to the requester, when a reviewer edits their
+  submitted or approved request (M7b.3), unless they edited it themselves. One message per
+  batch of edits: it is held back ``EDIT_BATCH`` and says only that the request changed, so
+  the edits made while it waits are covered by it (``outbox.waiting``) and none is queued
+  for them;
+- ``handover.posted``: ``REQUEST_HANDED_OVER`` to the requester of each request served,
+  with their own lines only (a ``DIRECT_RECEIPT`` handover is the receipt of goods on site).
 
 Bodies are rendered in the installation's language and carry nothing beyond what the
 recipient may already see on the request: no prices, suppliers, orders or other requests.
@@ -31,7 +36,6 @@ from django.urls import reverse
 from django.utils import translation
 from django.utils.translation import gettext as _
 
-from apps.access.roles import Capability
 from apps.accounts.models import User
 from apps.core.db import db_now
 from apps.core.events import Event
@@ -39,6 +43,7 @@ from apps.handovers.models import Handover
 from apps.material_requests import reviewers
 from apps.material_requests.models import MaterialRequest
 from apps.notifications import outbox, recipients
+from apps.notifications.kinds import NOTICES, Notice
 from apps.notifications.models import EmailOutbox
 from apps.notifications.outbox import queue_notification
 
@@ -52,21 +57,23 @@ def _absolute(path: str) -> str:
 
 def _queue(
     users: list[User],
-    capability: Capability,
+    notice: Notice,
     request: MaterialRequest,
     template: str,
     subject: str,
     source_ref: str,
     context: dict[str, Any],
 ) -> list[EmailOutbox]:
-    """Render ``template`` in the installation's language and queue it for ``users``."""
+    """Render ``template`` in the installation's language and queue it as ``notice`` for
+    the ``users`` who want it."""
     if not users:
         return []
     with translation.override(settings.LANGUAGE_CODE):
         context = {"request_obj": request, **context}
         return queue_notification(
+            notice=notice,
             recipients=[user.pk for user in users],
-            capability=capability,
+            capability=NOTICES[notice].capability,
             obj=request,
             subject=f"{settings.ACCOUNT_EMAIL_SUBJECT_PREFIX}{subject}",
             body=render_to_string(f"notifications/email/{template}.txt", context),
@@ -87,8 +94,8 @@ def on_request_submitted(event: Event) -> None:
         link = _absolute(reverse("requests:examine", args=[request.pk]))
     excluded = {request.requested_by_id} | ({assigned.pk} if assigned is not None else set())
     _queue(
-        recipients.holders(Capability.REQUEST_REVIEW, request, exclude=excluded),
-        Capability.REQUEST_REVIEW,
+        recipients.holders(NOTICES[Notice.REQUEST_TO_REVIEW].capability, request, exclude=excluded),
+        Notice.REQUEST_TO_REVIEW,
         request,
         "request_submitted",
         subject,
@@ -118,8 +125,8 @@ def _assigned(
         subject = _("Request %(number)s assigned to you") % {"number": request.number}
         link = _absolute(reverse("requests:examine", args=[request.pk]))
     _queue(
-        recipients.user_with(Capability.REQUEST_REVIEW, request, reviewer),
-        Capability.REQUEST_REVIEW,
+        recipients.user_with(NOTICES[Notice.REQUEST_ASSIGNED].capability, request, reviewer),
+        Notice.REQUEST_ASSIGNED,
         request,
         "request_assigned",
         subject,
@@ -137,9 +144,10 @@ def on_request_decided(event: Event) -> None:
         ) % {"number": request.number}
         link = _absolute(reverse("requests:detail", args=[request.pk]))
     lines = request.lines.select_related("material", "unit").order_by("line_no")
+    notice = Notice.REQUEST_APPROVED if approved else Notice.REQUEST_REJECTED
     _queue(
-        recipients.user_with(Capability.REQUEST_VIEW, request, request.requested_by),
-        Capability.REQUEST_VIEW,
+        recipients.user_with(NOTICES[notice].capability, request, request.requested_by),
+        notice,
         request,
         "request_decided",
         subject,
@@ -159,8 +167,10 @@ def on_request_edited(event: Event) -> None:
         subject = _("Request %(number)s changed by a reviewer") % {"number": request.number}
         link = _absolute(reverse("requests:detail", args=[request.pk]))
     messages = _queue(
-        recipients.user_with(Capability.REQUEST_VIEW, request, request.requested_by),
-        Capability.REQUEST_VIEW,
+        recipients.user_with(
+            NOTICES[Notice.REQUEST_EDITED].capability, request, request.requested_by
+        ),
+        Notice.REQUEST_EDITED,
         request,
         "request_edited",
         subject,
@@ -196,8 +206,10 @@ def _handed_over(handover: Handover, request: MaterialRequest, lines: list[Any])
         ) % {"number": request.number}
         link = _absolute(reverse("requests:detail", args=[request.pk]))
     _queue(
-        recipients.user_with(Capability.REQUEST_VIEW, request, request.requested_by),
-        Capability.REQUEST_VIEW,
+        recipients.user_with(
+            NOTICES[Notice.REQUEST_HANDED_OVER].capability, request, request.requested_by
+        ),
+        Notice.REQUEST_HANDED_OVER,
         request,
         "request_handed_over",
         subject,

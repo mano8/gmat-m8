@@ -22,6 +22,7 @@ from apps.access.roles import Role
 from apps.accounts.models import EmailChangeRequest, Invitation, User
 from apps.audit.models import AuditEvent
 from apps.core.ids import new_id
+from apps.notifications.kinds import Notice
 from apps.notifications.models import EmailAttempt, EmailOutbox, Kind, Outcome, Status
 from apps.notifications.outbox import queue_notification, queue_security_email
 from apps.organizations.models import Branch, Company, Membership
@@ -257,6 +258,7 @@ class TestOutbox:
         self, principal: SessionPrincipal, people: People
     ) -> None:
         [message] = queue_notification(
+            notice=Notice.REQUEST_TO_REVIEW,
             recipients=[people.tech_mad.pk],
             capability="catalog.view",
             obj=None,

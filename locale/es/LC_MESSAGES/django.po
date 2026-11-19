@@ -7616,3 +7616,316 @@ msgstr "Recargue la página para decidir qué hacer con este correo."
 #: apps/purchasing/templates/purchasing/send_body.html
 msgid "This revision is already on its way to the supplier: wait until its status above has changed before sending it again."
 msgstr "Esta revisión ya está en camino al proveedor: espere a que su estado de arriba cambie antes de enviarla de nuevo."
+
+#: apps/notifications/kinds.py
+msgid "A request to review"
+msgstr "Una solicitud pendiente de revisión"
+
+#: apps/notifications/kinds.py
+msgid "A request assigned to me"
+msgstr "Una solicitud asignada a mí"
+
+#: apps/notifications/kinds.py
+msgid "My request approved"
+msgstr "Mi solicitud aprobada"
+
+#: apps/notifications/kinds.py
+msgid "My request rejected"
+msgstr "Mi solicitud rechazada"
+
+#: apps/notifications/kinds.py
+msgid "My request changed by a reviewer"
+msgstr "Mi solicitud modificada por un revisor"
+
+#: apps/notifications/kinds.py
+msgid "Goods handed over or received on site"
+msgstr "Material entregado o recibido en obra"
+
+#: apps/notifications/kinds.py
+msgid "Always"
+msgstr "Siempre"
+
+#: apps/notifications/kinds.py
+msgid "Never"
+msgstr "Nunca"
+
+#: apps/notifications/kinds.py
+msgid "Everyone who can review the request, except its author and its assigned reviewer"
+msgstr "Quienes pueden revisar la solicitud, salvo su autor y su revisor asignado"
+
+#: apps/notifications/kinds.py
+msgid "Each request submitted"
+msgstr "Cada solicitud enviada"
+
+#: apps/notifications/kinds.py
+msgid "The reviewer the request is assigned to"
+msgstr "El revisor al que se asigna la solicitud"
+
+#: apps/notifications/kinds.py
+msgid "At submit when a reviewer is chosen, and at each reassignment"
+msgstr "Al enviar, si se elige un revisor, y en cada reasignación"
+
+#: apps/notifications/kinds.py
+msgid "The requester"
+msgstr "El solicitante"
+
+#: apps/notifications/kinds.py
+msgid "Each approval"
+msgstr "Cada aprobación"
+
+#: apps/notifications/kinds.py
+msgid "Each rejection"
+msgstr "Cada rechazo"
+
+#: apps/notifications/kinds.py
+msgid "A reviewer's edits, grouped over 10 minutes"
+msgstr "Los cambios de un revisor, agrupados durante 10 minutos"
+
+#: apps/notifications/kinds.py
+msgid "The requester of each request served"
+msgstr "El solicitante de cada solicitud atendida"
+
+#: apps/notifications/kinds.py
+msgid "Each handover, and each receipt on site"
+msgstr "Cada entrega y cada recepción en obra"
+
+#: apps/notifications/models.py
+msgid "notice"
+msgstr "aviso"
+
+#: apps/notifications/models.py
+msgid "channel"
+msgstr "canal"
+
+#: apps/notifications/models.py
+msgid "sent to everyone"
+msgstr "enviado a todos"
+
+#: apps/notifications/models.py
+msgid "changed by"
+msgstr "cambiado por"
+
+#: apps/notifications/models.py
+msgid "changed at"
+msgstr "cambiado el"
+
+#: apps/notifications/models.py
+msgid "notice setting for everyone"
+msgstr "ajuste de aviso para todos"
+
+#: apps/notifications/models.py
+msgid "notice settings for everyone"
+msgstr "ajustes de aviso para todos"
+
+#: apps/notifications/models.py
+msgid "setting"
+msgstr "ajuste"
+
+#: apps/notifications/models.py
+msgid "set by"
+msgstr "fijado por"
+
+#: apps/notifications/models.py
+msgid "set at"
+msgstr "fijado el"
+
+#: apps/notifications/models.py
+msgid "notice setting for a person"
+msgstr "ajuste de aviso de una persona"
+
+#: apps/notifications/models.py
+msgid "notice settings for a person"
+msgstr "ajustes de aviso de una persona"
+
+#: apps/core/navigation.py
+#: apps/organizations/templates/organizations/notifications.html
+#: apps/organizations/templates/organizations/person.html
+msgid "Email notifications"
+msgstr "Notificaciones por correo"
+
+#: apps/notifications/services/preferences.py
+msgid "Unknown choice."
+msgstr "Opción desconocida."
+
+#: apps/notifications/templates/notifications/settings.html
+msgid "What applies to you"
+msgstr "Lo que se aplica a usted"
+
+#: apps/notifications/templates/notifications/settings.html
+msgid ""
+"Each business email, and why you do or do not receive it. Administrators can"
+" change the setting for everyone and, for you, each email; your own choice "
+"above to receive none comes first. Security emails and supplier orders are "
+"never optional."
+msgstr ""
+"Cada correo de gestión y por qué lo recibe o no. Los administradores pueden "
+"cambiar el ajuste para todos y, para usted, cada correo; su propia elección "
+"de arriba de no recibir ninguno va primero. Los correos de seguridad y los "
+"pedidos a proveedores nunca son opcionales."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "You turned business email off."
+msgstr "Usted desactivó los correos de gestión."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "The person turned business email off themselves."
+msgstr "La persona desactivó por sí misma los correos de gestión."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "An administrator set this email to always reach you."
+msgstr "Un administrador fijó que este correo le llegue siempre."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Set for this person: always sent."
+msgstr "Fijado para esta persona: se envía siempre."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "An administrator set this email never to reach you."
+msgstr "Un administrador fijó que este correo no le llegue nunca."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Set for this person: never sent."
+msgstr "Fijado para esta persona: no se envía nunca."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Follows the setting for everyone."
+msgstr "Sigue el ajuste para todos."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Your current roles do not receive it."
+msgstr "Sus roles actuales no lo reciben."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "Their current roles do not receive it."
+msgstr "Sus roles actuales no lo reciben."
+
+#: apps/notifications/templates/notifications/states.html
+#: apps/organizations/templates/organizations/notifications.html
+msgctxt "notice state"
+msgid "Sent"
+msgstr "Enviado"
+
+#: apps/notifications/templates/notifications/states.html
+#: apps/organizations/templates/organizations/notifications.html
+msgctxt "notice state"
+msgid "Not sent"
+msgstr "No enviado"
+
+#: apps/organizations/notice_dialogs.py
+msgid "People who have their own setting for this email keep it."
+msgstr "Quien tenga un ajuste propio para este correo lo conserva."
+
+#: apps/organizations/notice_dialogs.py
+msgid "People who turned business email off never receive it."
+msgstr "Quien desactivó los correos de gestión nunca lo recibe."
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn on for everyone"
+msgstr "Activar para todos"
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn on"
+msgstr "Activar"
+
+#: apps/organizations/notice_dialogs.py
+msgid "This email is sent again to everyone who receives it."
+msgstr "Este correo se vuelve a enviar a todos los que lo reciben."
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn off for everyone"
+msgstr "Desactivar para todos"
+
+#: apps/organizations/notice_dialogs.py
+msgid "Turn off"
+msgstr "Desactivar"
+
+#: apps/organizations/notice_dialogs.py
+msgid ""
+"This email is no longer sent to anyone who has no setting of their own."
+msgstr "Este correo deja de enviarse a quien no tenga un ajuste propio."
+
+#: apps/organizations/notice_dialogs.py
+msgid "A message already queued and not yet sent follows the change."
+msgstr "Un mensaje ya en cola y aún no enviado sigue el cambio."
+
+#: apps/organizations/notice_dialogs.py
+msgid "Change email notifications"
+msgstr "Cambiar las notificaciones por correo"
+
+#: apps/organizations/notice_dialogs.py
+msgid ""
+"Always and never beat the setting for everyone. Someone who turned business "
+"email off themselves receives none of them, whatever is set here. The person"
+" is not told."
+msgstr ""
+"«Siempre» y «nunca» prevalecen sobre el ajuste para todos. Quien desactivó "
+"por sí mismo los correos de gestión no recibe ninguno, sea lo que sea que se"
+" fije aquí. La persona no es avisada."
+
+#: apps/organizations/notice_forms.py
+msgid "Follow the setting for everyone"
+msgstr "Seguir el ajuste para todos"
+
+#: apps/organizations/notice_forms.py
+msgid "Always send"
+msgstr "Enviar siempre"
+
+#: apps/organizations/notice_forms.py
+msgid "Never send"
+msgstr "No enviar nunca"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid ""
+"Choose which business emails the application sends. A person's own setting, "
+"on their page, and their own choice of no business email come before what is"
+" set here. Security emails (invitations, email changes, password and second-"
+"factor notices) and supplier orders are never optional."
+msgstr ""
+"Elija qué correos de gestión envía la aplicación. El ajuste propio de una "
+"persona, en su página, y su propia elección de no recibir correos de gestión"
+" van antes que lo fijado aquí. Los correos de seguridad (invitaciones, "
+"cambios de correo, avisos de contraseña y segundo factor) y los pedidos a "
+"proveedores nunca son opcionales."
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "Business emails"
+msgstr "Correos de gestión"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "For everyone"
+msgstr "Para todos"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "Own settings"
+msgstr "Ajustes propios"
+
+#: apps/organizations/templates/organizations/notifications.html
+#, python-format
+msgid "%(n)s person (%(always)s always, %(never)s never)"
+msgid_plural "%(n)s people (%(always)s always, %(never)s never)"
+msgstr[0] "%(n)s persona (%(always)s siempre, %(never)s nunca)"
+msgstr[1] "%(n)s personas (%(always)s siempre, %(never)s nunca)"
+
+#: apps/organizations/templates/organizations/notifications.html
+msgid "To make an exception for one person, open their page under People."
+msgstr "Para hacer una excepción con una persona, abra su página en Personas."
+
+#: apps/organizations/templates/organizations/person.html
+msgid ""
+"Business emails about requests and deliveries. Security emails and supplier "
+"orders are never optional."
+msgstr ""
+"Correos de gestión sobre solicitudes y entregas. Los correos de seguridad y "
+"los pedidos a proveedores nunca son opcionales."
+
+#: apps/organizations/views/notification_screens.py
+msgid "Sent to everyone again."
+msgstr "Se vuelve a enviar a todos."
+
+#: apps/organizations/views/notification_screens.py
+msgid "No longer sent to everyone."
+msgstr "Ya no se envía a todos."
+
+#: apps/organizations/views/notification_screens.py
+msgid "Email notifications saved."
+msgstr "Notificaciones por correo guardadas."

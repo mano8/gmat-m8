@@ -187,6 +187,7 @@ from apps.notifications.models import EmailOutbox
 from apps.notifications.outbox import queue_notification
 with transaction.atomic():
     [message] = queue_notification(
+        notice="REQUEST_TO_REVIEW",
         recipients=[User.objects.get(email="tech-mad@demo.example").pk],
         capability="catalog.view",
         obj=None,
@@ -440,6 +441,7 @@ def dispatch(revision):
 stays_queued, sent_after = dispatch(0), dispatch(1)
 with transaction.atomic():
     [notification] = queue_notification(
+        notice="REQUEST_TO_REVIEW",
         recipients=[wo.pk], capability="catalog.view", obj=None, subject="Held", body="Held",
     )
     EmailOutbox.objects.filter(pk=notification.pk).update(not_before=later)

@@ -69,6 +69,7 @@ from apps.organizations.row_dialogs import (
     revoke_email_change_dialog,
 )
 from apps.organizations.views.account_actions import MFA_RESET_IDS, RENAME_IDS
+from apps.organizations.views.notification_screens import person_section
 
 ORG = Capability.ORG_MANAGE
 
@@ -246,6 +247,7 @@ def person(request: HttpRequest, user_id: UUID) -> HttpResponse:
         "offboard_dialog": offboard_dialog(user, ConfirmForm(auto_id=OFFBOARD_IDS)),
         "email_revoke_dialog": _email_revoke(change),
         **_account_dialogs(ctx, user, manageable),
+        **person_section(ctx, user, editable=may_manage_account(request.user, user)),
     }
     return render(request, "organizations/person.html", context)
 

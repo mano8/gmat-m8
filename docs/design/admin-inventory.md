@@ -50,6 +50,8 @@ model: the *Admin today* column records what it allowed when this inventory was 
 | `material_requests.MaterialRequest` | read-only | screen | `requests:start`, `requests:submit`, `requests:examine` and the review actions | |
 | `material_requests.MaterialRequestLine` | read-only | screen | `requests:add_line`, `requests:update_line`, `requests:apply_edit` | |
 | `mfa.Authenticator` | read-only | screen for its owner; the reset a screen since M10.4 | `org:reset_mfa` | Enrolment and removal by the owner at `/accounts/2fa/`; a lost factor is reset on the person's page, `manage reset_mfa` stays for a staff account (§3.4). |
+| `notifications.NoticeDefault` | read-only | screen (M15.3) | `org:notifications`, `org:notification_default` | Whether a business email is sent to everyone (M15, Q87): *Administration › Email notifications* at `/org/notifications/`, one inline dialog per email. `set_notice_default`: `org.manage`, installation-wide as units are, audited `notification.default_changed`. No row means on. |
+| `notifications.NoticeSetting` | read-only | screen (M15.3) | `org:person_notifications` | One person's setting for a business email (always / never; M15, Q87): the inline dialog *Change email notifications* of the person's page, `set_person_notices` (`org.manage`, a staff account refused), audited `notification.person_changed`; the person reads theirs, read-only, at `/account/notifications/`. |
 | `organizations.Branch` | editable (`org.manage`) | screen (M10.2) | `org:create_branch`, `org:update_branch`, `org:set_branch_manager`, `org:set_self_approval`, `org:deactivate_branch`, `org:reactivate_branch` | Incl. `managed_by`, `allow_self_approval`, the default warehouse, activity. |
 | `organizations.Company` | editable (`org.manage`) | screen (M10.2) | `org:create_company`, `org:update_company`, `org:deactivate_company`, `org:reactivate_company` | `create_company` also makes the head-office branch. |
 | `organizations.JointVentureMember` | editable (`org.manage`) | screen (M10.2) | `org:add_venture_member`, `org:update_venture_member` | On the joint venture's page. No removal, in the admin or the services. |
@@ -158,6 +160,16 @@ Built in M10.4 (`apps/organizations/views/account_actions.py`; ADR-0030 points 4
 | --- | --- | --- | --- |
 | `people/<id>/name/` | `org:rename_person` | POST | Inline dialog: the full name (required). A new `accounts.services.rename_user`: `org.manage`, the user row locked, staff and superuser accounts refused (`require_may_manage_account`), audited `user.renamed` with the old and new name. One's own name is allowed: a name is neither authority nor email (ADR-0022 holds). |
 | `people/<id>/mfa-reset/` | `org:reset_mfa` | POST | Inline danger dialog, shown only when the person has a factor, never on one's own page or a staff account's: the consequences, a required reason, a required tick "I checked this person's identity outside the application". `reset_user_mfa` gains a keyword `identity_checked: bool` (refused when false) stored in the audit payload. |
+
+### 3.4a Email notifications (M15.3): `/org/notifications/` and the person's page
+
+Built in M15.3 (`apps/organizations/views/notification_screens.py`; Q87–Q89). Group administrators only; a bounded list (the registry's six emails), outside `apps.core.listing`.
+
+| URL | Name | Method | What |
+| --- | --- | --- | --- |
+| `notifications/` | `org:notifications` | GET | *Administration › Email notifications*: each email with who receives it, when, its state for everyone and how many people have a setting of their own; one inline dialog per email. |
+| `notifications/<email>/` | `org:notification_default` | POST | The dialog's form: the value to set (`on`/`off`, never a toggle). `set_notice_default`. An unknown email is a 404. |
+| `people/<id>/notifications/` | `org:person_notifications` | POST | Inline dialog of the person's page: per email, follow the setting for everyone / always / never. `set_person_notices`; not offered on a staff account or one that left (the service refuses a staff account). |
 
 ### 3.5 Units of measure (M10.3): `/catalog/units/`
 

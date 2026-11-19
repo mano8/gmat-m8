@@ -1,9 +1,10 @@
 """Who may still receive a message: checked by the worker in the claim transaction (plan §5).
 
-- **Notifications**: each recipient must be active, not offboarded, not opted out of
-  business email (M7.1), and still hold the
-  message's capability on its object (anywhere, for a message without an object), evaluated
-  at the database clock of the claim through the recipient's own ``AccessContext``.
+- **Notifications**: each recipient must be active, not offboarded, still want the
+  message's notice (``resolution``: their refusal of business email (M7.1), their own
+  setting, the setting for everyone; M15), and still hold the message's capability on its
+  object (anywhere, for a message without an object), evaluated at the database clock of
+  the claim through the recipient's own ``AccessContext``.
   Addresses come from the current user records.
 - **Security emails**: the message's named rule must still hold for its target. M2.5
   registers ``account.active`` (allauth's mail: the account is active and still has this
@@ -22,7 +23,8 @@ from django.db.models import Model
 from apps.access.context import AccessContext
 from apps.access.scopes import ScopedQuerySet
 from apps.accounts.models import User
-from apps.notifications.models import EmailOutbox, NotificationPreference
+from apps.notifications import resolution
+from apps.notifications.models import EmailOutbox
 
 type SecurityRule = Callable[[EmailOutbox], bool]
 
@@ -70,13 +72,12 @@ def eligible_recipients(message: EmailOutbox) -> list[User]:
         obj = _load(message.eligibility_object_type, message.eligibility_object_id)
         if obj is None or not is_scoped(type(obj)):
             return []
-    users = (
+    users = resolution.filter_wanted(
         User.objects.filter(
             pk__in=message.recipient_users, is_active=True, offboarded_at__isnull=True
-        )
-        .exclude(pk__in=NotificationPreference.objects.filter(email_opt_out=True).values("user_id"))
-        .order_by("pk")
-    )
+        ),
+        message.notice,
+    ).order_by("pk")
     capability = message.eligibility_rule
     eligible = []
     for user in users:

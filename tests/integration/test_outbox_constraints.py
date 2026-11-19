@@ -11,7 +11,16 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.notifications.eligibility import ACCOUNT_ACTIVE
-from apps.notifications.models import MAX_RECIPIENTS, EmailAttempt, EmailOutbox, Kind, Status
+from apps.notifications.kinds import Channel, Mode, Notice
+from apps.notifications.models import (
+    MAX_RECIPIENTS,
+    EmailAttempt,
+    EmailOutbox,
+    Kind,
+    NoticeDefault,
+    NoticeSetting,
+    Status,
+)
 from apps.notifications.outbox import queue_security_email
 from tests import orders as purchase_orders
 from tests.org import Org
@@ -76,6 +85,17 @@ class TestShapePerKind:
                 "eligibility_object_type": "accounts.user",
                 "eligibility_object_id": uuid.uuid4(),
                 "expires_at": timezone.now(),
+            },
+            # Only a business notification names a notice (M15).
+            {
+                "kind": Kind.SECURITY,
+                "sensitive": True,
+                "recipient_address": "x@example.org",
+                "eligibility_rule": ACCOUNT_ACTIVE,
+                "eligibility_object_type": "accounts.user",
+                "eligibility_object_id": uuid.uuid4(),
+                "expires_at": timezone.now(),
+                "notice": Notice.REQUEST_TO_REVIEW,
             },
             {"kind": Kind.PO_ORDER, "recipient_address": "x@example.org"},  # no order
             {"kind": Kind.PO_ORDER, "source_po_id": uuid.uuid4()},  # no address
@@ -178,3 +198,38 @@ class TestAttempts:
         attempt = EmailAttempt.objects.create(message=message, number=1)
         assert str(message) == f"SECURITY {message.pk} (QUEUED)"
         assert str(attempt) == f"attempt 1 of {message.pk}"
+
+
+class TestNoticeSettings:
+    """The settings of the business notices (M15.1): one row per notice and channel, per
+    person for theirs, and a person's mode is ``ALWAYS`` or ``NEVER``."""
+
+    def test_one_setting_for_everyone_per_notice_and_channel(self, user: User) -> None:
+        values = {"notice": Notice.REQUEST_APPROVED, "channel": Channel.EMAIL, "changed_by": user}
+        first = NoticeDefault.objects.create(**values, enabled=False)
+        assert str(first) == "REQUEST_APPROVED/EMAIL: off"
+        assert first.changed_at is not None
+        with pytest.raises(IntegrityError), transaction.atomic():
+            NoticeDefault.objects.create(**values)
+        NoticeDefault.objects.create(**(values | {"notice": Notice.REQUEST_REJECTED}))
+
+    def test_one_setting_per_person_notice_and_channel(
+        self, user: User, make_user: Callable[..., User]
+    ) -> None:
+        values = {"user": user, "notice": Notice.REQUEST_EDITED, "channel": Channel.EMAIL}
+        first = NoticeSetting.objects.create(**values, mode=Mode.NEVER, set_by=user)
+        assert str(first) == f"{user.pk} REQUEST_EDITED/EMAIL: NEVER"
+        with pytest.raises(IntegrityError), transaction.atomic():
+            NoticeSetting.objects.create(**values, mode=Mode.ALWAYS, set_by=user)
+        other = make_user("other@example.org")
+        NoticeSetting.objects.create(**(values | {"user": other}), mode=Mode.ALWAYS, set_by=user)
+
+    def test_a_mode_outside_always_and_never_is_refused(self, user: User) -> None:
+        with pytest.raises(IntegrityError), transaction.atomic():
+            NoticeSetting.objects.create(
+                user=user,
+                notice=Notice.REQUEST_EDITED,
+                channel=Channel.EMAIL,
+                mode="FOLLOW",
+                set_by=user,
+            )

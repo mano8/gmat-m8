@@ -53,7 +53,7 @@ class Mailbox:
             for message in self.messages():
                 if message["ID"] in known:
                     continue
-                if not any(to["Address"] == recipient for to in message.get("To") or []):
+                if recipient not in self.recipients(message):
                     continue
                 full = dict(self._get(f"/message/{message['ID']}"))
                 if containing in full["Text"]:
@@ -61,6 +61,16 @@ class Mailbox:
                     return full
             time.sleep(2)
         raise AssertionError(f"no message to {recipient} reached the mail sink in {timeout:.0f}s")
+
+    @staticmethod
+    def recipients(message: dict[str, Any]) -> set[str]:
+        """Every address a message was sent to. A message to several people carries them in
+        ``Bcc`` (a business notification, ADR-0031), one to a single person in ``To``."""
+        return {
+            person["Address"]
+            for field in ("To", "Cc", "Bcc")
+            for person in message.get(field) or []
+        }
 
     @staticmethod
     def links(message: dict[str, Any]) -> list[str]:

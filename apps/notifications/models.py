@@ -2,8 +2,13 @@
 
 Every email is a row of ``EmailOutbox``, written in the transaction that causes it; only the
 ``worker`` process sends, after committing an ``EmailAttempt`` for the message. The content
-(subject, bodies, recipients, eligibility) is frozen at insert: a trigger
-(``notifications.0002``) refuses any change to it, except wiping a body to the empty string.
+(subject, bodies, recipients, eligibility, notice) is frozen at insert: a trigger
+(``notifications.0002``, ``0006``) refuses any change to it, except wiping a body to the empty
+string.
+
+The settings that decide who receives a business notice (M15, Q87) live here too:
+``NoticeDefault`` (for everyone) and ``NoticeSetting`` (one person); the registry of notices
+is ``apps.notifications.kinds``, the rule ``apps.notifications.resolution``.
 """
 
 from django.contrib.postgres.fields import ArrayField
@@ -13,6 +18,7 @@ from django.db.models.functions import Now
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import BaseModel
+from apps.notifications.kinds import Channel, Mode, Notice
 
 # Fan-out (plan §5): one message per event, at most this many BCC recipients each.
 MAX_RECIPIENTS = 20
@@ -59,7 +65,9 @@ class EmailOutbox(BaseModel):
 
     - ``NOTIFICATION``: ``recipient_users`` (1-20 user ids); ``eligibility_rule`` is a
       capability that each recipient must still hold on the referenced object (or anywhere,
-      without an object) at the database clock of the claim;
+      without an object) at the database clock of the claim; ``notice`` names the business
+      notice (M15), whose settings are applied again at the claim (blank only on a row
+      queued before M15: the recipient's opt-out alone applies);
     - ``SECURITY``: ``recipient_address``; ``eligibility_rule`` names a rule of
       ``apps.notifications.eligibility`` on the referenced target (``account.active``). The
       bodies are sealed with ``OUTBOX_ENCRYPTION_KEYS``, wiped once sent and expired after
@@ -89,6 +97,8 @@ class EmailOutbox(BaseModel):
         related_name="dispatches",
     )
     source_ref = models.CharField(max_length=100, blank=True)
+    # The business notice of a ``NOTIFICATION`` (M15); blank for every other kind.
+    notice = models.CharField(max_length=40, choices=Notice.choices, blank=True, db_default="")
     from_email = models.CharField(max_length=254)
     subject = models.TextField()
     # Sealed (``apps.notifications.crypto``) when ``sensitive``; the empty string once wiped.
@@ -159,6 +169,12 @@ class EmailOutbox(BaseModel):
                 condition=Q(eligibility_object_id__isnull=True, eligibility_object_type="")
                 | (Q(eligibility_object_id__isnull=False) & ~Q(eligibility_object_type="")),
                 name="notifications_outbox_eligibility_object_whole",
+            ),
+            # Only a business notification names a notice (M15): security mail and supplier
+            # dispatches are never subject to a notice's settings.
+            models.CheckConstraint(
+                condition=Q(notice="") | Q(kind=Kind.NOTIFICATION),
+                name="notifications_outbox_notice_only_notification",
             ),
             # One cancellation notice per order: the obligation queues it once (F53).
             models.UniqueConstraint(
@@ -263,3 +279,70 @@ class NotificationPreference(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.user_id}: {'off' if self.email_opt_out else 'on'}"
+
+
+class NoticeDefault(BaseModel):
+    """Whether a business notice is sent on a channel, for everyone (M15, Q87).
+
+    No row means on: nothing changes until a group administrator decides. Installation-wide,
+    as units of measure (ADR-0030); changed only through ``set_notice_default`` (M15.2).
+    """
+
+    notice = models.CharField(_("notice"), max_length=40, choices=Notice.choices)
+    channel = models.CharField(_("channel"), max_length=20, choices=Channel.choices)
+    enabled = models.BooleanField(_("sent to everyone"), default=True)
+    changed_by = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="+", verbose_name=_("changed by")
+    )
+    changed_at = models.DateTimeField(_("changed at"), db_default=Now())
+
+    class Meta:
+        verbose_name = _("notice setting for everyone")
+        verbose_name_plural = _("notice settings for everyone")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notice", "channel"], name="notifications_noticedefault_one_per_channel"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.notice}/{self.channel}: {'on' if self.enabled else 'off'}"
+
+
+class NoticeSetting(BaseModel):
+    """One person's setting for a business notice on a channel (M15, Q87).
+
+    ``ALWAYS`` or ``NEVER``; no row means: follow the setting for everyone. The person's own
+    refusal of business email (``NotificationPreference``) wins over ``ALWAYS``. Set only by
+    a group administrator, through ``set_person_notices`` (M15.2).
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="notice_settings",
+        verbose_name=_("user"),
+    )
+    notice = models.CharField(_("notice"), max_length=40, choices=Notice.choices)
+    channel = models.CharField(_("channel"), max_length=20, choices=Channel.choices)
+    mode = models.CharField(_("setting"), max_length=10, choices=Mode.choices)
+    set_by = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="+", verbose_name=_("set by")
+    )
+    set_at = models.DateTimeField(_("set at"), db_default=Now())
+
+    class Meta:
+        verbose_name = _("notice setting for a person")
+        verbose_name_plural = _("notice settings for a person")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "notice", "channel"],
+                name="notifications_noticesetting_one_per_user",
+            ),
+            models.CheckConstraint(
+                condition=Q(mode__in=Mode.values), name="notifications_noticesetting_mode"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.notice}/{self.channel}: {self.mode}"

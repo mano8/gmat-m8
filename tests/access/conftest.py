@@ -44,7 +44,8 @@ from apps.material_requests.models import (
     MaterialRequestLine,
     MaterialRequestLineRevision,
 )
-from apps.notifications.models import EmailOutbox
+from apps.notifications.kinds import Channel, Mode, Notice
+from apps.notifications.models import EmailOutbox, NoticeDefault, NoticeSetting
 from apps.notifications.models import Status as MailStatus
 from apps.notifications.outbox import queue_security_email
 from apps.organizations.models import Branch, JointVentureMember, Membership
@@ -118,6 +119,22 @@ def _administered_places(world: World) -> None:
     world.objects["spare_unit"] = UnitOfMeasure.objects.create(code="SPARE", name="Spare unit")
 
 
+def _notice_settings(world: World) -> None:
+    """A setting of a business notice for everyone and one for a person (M15.1): both
+    leave the emails as they were (on, and always for the requester who receives it)."""
+    admin = world.people.group_admin
+    world.objects["noticedefault"] = NoticeDefault.objects.create(
+        notice=Notice.REQUEST_APPROVED, channel=Channel.EMAIL, enabled=True, changed_by=admin
+    )
+    world.objects["noticesetting"] = NoticeSetting.objects.create(
+        user=world.people.tech_mad,
+        notice=Notice.REQUEST_APPROVED,
+        channel=Channel.EMAIL,
+        mode=Mode.ALWAYS,
+        set_by=admin,
+    )
+
+
 def _admin_rows(world: World) -> None:
     """One row of each model the admin lists, for its object URLs."""
     people, org = world.people, world.org
@@ -141,6 +158,7 @@ def _admin_rows(world: World) -> None:
     unit = UnitOfMeasure.objects.get(code="UD")
     world.objects["unitofmeasure"] = unit
     _administered_places(world)
+    _notice_settings(world)
     world.objects["materialcategory"] = MaterialCategory.objects.create(name="Cables")
     world.objects["material"] = Material.objects.create(
         reference="CAB-25",

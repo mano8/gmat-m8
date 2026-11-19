@@ -21,6 +21,7 @@ from apps.material_requests import services
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
 from apps.material_requests.services import LineEdit
 from apps.notifications import eligibility, notices, outbox
+from apps.notifications.kinds import Notice
 from apps.notifications.models import EmailOutbox, Kind, NotificationPreference, Status
 from apps.notifications.services import Claim, claim_next
 from apps.organizations.models import Membership
@@ -140,6 +141,7 @@ class TestOutboxBatching:
         with transaction.atomic():
             assert not outbox.waiting("request.edited:x")
             (message,) = outbox.queue_notification(
+                notice=Notice.REQUEST_EDITED,
                 recipients=[people.tech_mad.pk],
                 capability=Capability.REQUEST_VIEW,
                 obj=approved,

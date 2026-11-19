@@ -106,6 +106,16 @@ Check the person's identity **out of band** (call a number you already had, not 
 
 People → the person → **Change the name**. The application shows people by name everywhere (an older account without one shows "—"), so correct a misspelt name or name an older account here. You may correct your own. Each change is audited (`user.renamed`, the old and the new name). A staff or superuser account's name is not changed from the app.
 
+## Which business emails are sent
+
+The application emails people about requests: a request to review, a request assigned to someone, an approval, a rejection, a reviewer's edits and goods handed over or received on site. Group administrators decide what is sent, on two levels, and each person's own choice comes first:
+
+1. **Everyone.** Administration → **Email notifications** lists the six emails with who receives each, when, whether it is sent and how many people have a setting of their own. **Turn off for everyone** (or **Turn on**) opens a dialog that says what it changes. All six are on until someone decides, so nothing changes by itself. A message already queued and not yet sent follows the change; one the worker has already claimed still leaves.
+2. **One person.** People → the person → **Email notifications** shows each email, whether the person receives it and why (the setting for everyone, set for this person, or the person turned business email off). **Change email notifications** sets each one to *follow the setting for everyone*, *always* or *never*. Use *never* for a group administrator flooded by *A request to review*: you may set your own. The person is not told, and sees what applies to them, read-only, on their own **Notifications** page. A staff or superuser account's settings are not changed from the app.
+3. **The person's own choice.** Someone who turned off business email on their Notifications page receives none of them, whatever an administrator set: *always* does not override it.
+
+Never optional, whatever is set: security email (invitations, email changes, password and second-factor notices, resets) and supplier purchase orders. Every change is audited (`notification.default_changed`, `notification.person_changed`, with the setting before and after) and the audit viewer shows who made it. A setting is business data: a restore brings back what the backup holds, and nothing needs confirming afterwards.
+
 ## Sessions, inactivity and notices
 
 - **Inactivity.** A session ends after 30 minutes idle on a privileged account and 2 hours on the others, on top of the 12-hour and 14-day limits. Change them in `app.env` (`DJANGO_PRIVILEGED_SESSION_IDLE_SECONDS`, `DJANGO_SESSION_IDLE_SECONDS`, at least 300). A status poll on a page left open does not count as activity. A person who complains of being signed out often: that is this; look at the security log's `session_ended` lines, which give the reason (`idle`, `lifetime`, `epoch`).
@@ -189,6 +199,7 @@ If the old key may have **leaked**, moving secrets to a new key is not enough: a
 | New address | People → the person → Change email |
 | Lost phone | People → the person → Reset the second factor (a staff account: `manage reset_mfa`) |
 | A person's name | People → the person → Change the name |
+| Which business emails are sent | Administration → Email notifications (everyone); People → the person → Email notifications (one person) |
 | Retiring an MFA key | `manage reencrypt_mfa` |
 | A person's own sessions | Sessions, in their own menu |
 | After a restore | `manage confirm_account` |

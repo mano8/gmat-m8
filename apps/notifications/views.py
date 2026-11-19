@@ -1,7 +1,8 @@
-"""The signed-in user's notification settings (M7.1).
+"""The signed-in user's notification settings (M7.1, M15.3).
 
 The page reads through ``selectors``; the save is its own POST-only URL that calls the
-service, which authorizes again. Every signed-in member may change their own choice.
+service, which authorizes again. Every signed-in member may change their own choice; what an
+administrator set for them (M15.3) is shown beside it, read-only.
 """
 
 from django.http import HttpRequest, HttpResponse
@@ -21,7 +22,11 @@ SELF = Capability.CATALOG_VIEW
 @require_safe
 @require_capability(SELF)
 def settings_page(request: HttpRequest) -> HttpResponse:
-    context = {"email_opt_out": selectors.email_opt_out(access_for(request))}
+    ctx = access_for(request)
+    context = {
+        "email_opt_out": selectors.email_opt_out(ctx),
+        "notices": selectors.own_notices(ctx),
+    }
     return render(request, "notifications/settings.html", context)
 
 

@@ -26,6 +26,7 @@ from apps.notifications.services import (
     Claim,
     Settled,
     claim_next,
+    claims,
     reconcile_abandoned,
     record_outcome,
     run_housekeeping,
@@ -222,9 +223,9 @@ class TestClaim:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         security_mail()
-        real_due = services._due
+        real_due = claims._due
         calls = iter([real_due, EmailOutbox.objects.none])
-        monkeypatch.setattr(services, "_due", lambda: next(calls)())
+        monkeypatch.setattr(claims, "_due", lambda: next(calls)())
         assert claim_next(system) is None
 
     def test_retries_keep_the_message_id(
@@ -344,7 +345,7 @@ class TestOutcome:
         message = security_mail()
         claimed = claim(system)
         # The expiry is frozen content; let the hour pass instead.
-        monkeypatch.setattr(services, "_expired", lambda message: True)
+        monkeypatch.setattr(claims, "_expired", lambda message: True)
         record_outcome(system, claimed.attempt_id, Outcome.FAILED, error="SMTP 451 at RCPT")
         message = reload(message)
         assert (message.status, message.body) == (Status.FAILED, "")
@@ -352,10 +353,10 @@ class TestOutcome:
     def test_expiry_is_read_at_the_database_clock(
         self, security_mail: Callable[..., EmailOutbox], dispatch: Callable[..., EmailOutbox]
     ) -> None:
-        assert services._expired(security_mail()) is False
-        assert services._expired(dispatch()) is False
+        assert claims._expired(security_mail()) is False
+        assert claims._expired(dispatch()) is False
         with override_settings(OUTBOX_SENSITIVE_TTL=0):
-            assert services._expired(security_mail()) is True
+            assert claims._expired(security_mail()) is True
 
     def test_dispatch_outcomes_reach_the_source(
         self,
@@ -459,7 +460,7 @@ class TestOutcome:
 
     def test_lock_message_of_a_missing_row(self) -> None:
         with transaction.atomic():
-            assert services._lock_message(LockOrder(), uuid.uuid7()) is None
+            assert claims._lock_message(LockOrder(), uuid.uuid7()) is None
 
 
 class TestAbandoned:
@@ -504,7 +505,7 @@ class TestAbandoned:
         message = security_mail()
         claimed = claim(system)
         age(claimed.attempt_id, 91)
-        monkeypatch.setattr(services, "_abandon_in_txn", lambda *args: False)
+        monkeypatch.setattr(claims, "_abandon_in_txn", lambda *args: False)
         assert reconcile_abandoned(system).abandoned == 0
         assert reload(message).status == Status.SENDING
 
@@ -515,12 +516,12 @@ class TestAbandoned:
         claimed = claim(system)
         with transaction.atomic():
             # Missing row, wrong attempt, attempt too young.
-            assert not services._abandon(system, uuid.uuid7(), claimed.attempt_id)
-            assert not services._abandon(system, message.pk, uuid.uuid7())
-            assert not services._abandon(system, message.pk, claimed.attempt_id)
+            assert not claims._abandon(system, uuid.uuid7(), claimed.attempt_id)
+            assert not claims._abandon(system, message.pk, uuid.uuid7())
+            assert not claims._abandon(system, message.pk, claimed.attempt_id)
         record_outcome(system, claimed.attempt_id, Outcome.SENT)
         with transaction.atomic():
-            assert not services._abandon(system, message.pk, claimed.attempt_id)
+            assert not claims._abandon(system, message.pk, claimed.attempt_id)
 
 
 class TestHousekeeping:
@@ -553,7 +554,7 @@ class TestHousekeeping:
             authorized.append(capability)
             return real(principal, capability, **kwargs)
 
-        monkeypatch.setattr("apps.notifications.services.authorize_in_txn", spy)
+        monkeypatch.setattr("apps.notifications.services.claims.authorize_in_txn", spy)
         done = run_housekeeping(system)
         assert done == {
             "idempotency": 1,

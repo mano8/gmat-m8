@@ -12,6 +12,7 @@ SCREENS = {
         "/",
         "/dashboard/administration/",
         "/org/people/",
+        "/org/notifications/",
         "/org/invitations/",
         "/org/structure/companies/",
         "/org/structure/branches/",
