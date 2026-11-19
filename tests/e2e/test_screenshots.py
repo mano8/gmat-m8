@@ -64,6 +64,7 @@ def follow(prefix: str) -> Callable[[Page, Documents], None]:
 
 
 Open = Callable[[Page, Documents], None]
+DIALOGS: tuple[Open, ...] = (line_dialog, approve_all_dialog, send_dialog)
 SCREENS: dict[str, tuple[str, Callable[[Documents], str], Open]] = {
     "dashboard": ("admin", lambda d: "/", nothing),
     "dashboard-requester": ("tech-mad", lambda d: "/", nothing),
@@ -108,14 +109,8 @@ SCREENS: dict[str, tuple[str, Callable[[Documents], str], Open]] = {
     "branch": ("admin", lambda d: "/org/structure/branches/", follow("/org/structure/branches/")),
     "person": ("admin", lambda d: "/org/people/", follow("/org/people/")),
 }
-WHOLE_PAGE = {
-    nothing,
-    *(
-        spec[2]
-        for spec in SCREENS.values()
-        if spec[2] not in (line_dialog, approve_all_dialog, send_dialog)
-    ),
-}
+# The screens drawn whole; the dialog ones above are a viewport (the page they open over).
+WHOLE_PAGE = {nothing, *(spec[2] for spec in SCREENS.values() if spec[2] not in DIALOGS)}
 
 
 @pytest.mark.parametrize("viewport", ["phone", "desktop"])

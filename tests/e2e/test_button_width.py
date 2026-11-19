@@ -5,24 +5,40 @@ inside every ``{% block %}``, so each button drawn with a page filled its row.""
 from typing import cast
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e.conftest import Browsing
 from tests.e2e.documents import Documents
 
-# Wide enough for the longest label of a page head, far below a desktop's content width.
-NARROW = 360
 
-
-def head_actions(page: Page) -> list[tuple[float, float]]:
-    """The (width, top) of every button in the page head's actions."""
+def head_actions(page: Page) -> list[dict[str, float]]:
+    """The width and top of every button in the page head's actions, with the head's width."""
     expect(page.locator("main .page-head .page-head-actions .btn").first).to_be_visible()
     return cast(
-        list[tuple[float, float]],
+        list[dict[str, float]],
         page.evaluate(
-            """() => [...document.querySelectorAll('main .page-head .page-head-actions .btn')]
-            .filter((b) => b.getBoundingClientRect().width > 0)
-            .map((b) => [b.getBoundingClientRect().width, b.getBoundingClientRect().top])"""
+            """() => {
+              const head = document.querySelector('main .page-head').getBoundingClientRect();
+              return [...document.querySelectorAll('main .page-head .page-head-actions .btn')]
+                .map((b) => b.getBoundingClientRect())
+                .filter((r) => r.width > 0)
+                .map((r) => ({width: r.width, top: r.top, height: r.height, head: head.width}));
+            }"""
+        ),
+    )
+
+
+def fills_its_row(page: Page, button: Locator) -> bool:
+    """The button is as wide as the content box of the element it sits in."""
+    return cast(
+        bool,
+        button.evaluate(
+            """(b) => {
+              const cs = getComputedStyle(b.parentElement);
+              const inner = b.parentElement.clientWidth
+                - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+              return b.classList.contains('btn-block') && Math.abs(b.offsetWidth - inner) <= 2;
+            }"""
         ),
     )
 
@@ -45,9 +61,11 @@ def test_page_actions_keep_their_own_width_on_a_desktop(
     page = browsing.as_(person, "desktop")
     page.goto(url(documents))
     buttons = head_actions(page)
-    assert all(width <= NARROW for width, _ in buttons), buttons
-    # Side by side: one row, not a stack of bars.
-    assert max(top for _, top in buttons) - min(top for _, top in buttons) < 8, buttons
+    # Each as wide as its label, far from the head's width, and on one row: not a stack of bars.
+    assert all(b["width"] < b["head"] / 2 for b in buttons), buttons
+    assert (
+        max(b["top"] for b in buttons) - min(b["top"] for b in buttons) < buttons[0]["height"] / 2
+    )
 
 
 def test_the_main_action_of_a_phone_form_still_fills_the_row(
@@ -57,16 +75,10 @@ def test_the_main_action_of_a_phone_form_still_fills_the_row(
     warehouse.goto(documents.receive)
     post = warehouse.get_by_role("button", name="Post the receipt")
     expect(post).to_be_visible()
-    box = post.bounding_box()
-    bar = warehouse.get_by_test_id("receipt-bar").bounding_box()
-    assert box is not None and bar is not None
-    assert box["width"] > bar["width"] * 0.9, (box, bar)
+    assert fills_its_row(warehouse, post)
 
     manager = browsing.as_("mm-mad", "phone")
     manager.goto(documents.draft_order)
     issue = manager.get_by_role("button", name="Issue the order")
     expect(issue).to_be_visible()
-    box = issue.bounding_box()
-    bar = manager.get_by_test_id("issue-bar").bounding_box()
-    assert box is not None and bar is not None
-    assert box["width"] > bar["width"] * 0.9, (box, bar)
+    assert fills_its_row(manager, issue)
