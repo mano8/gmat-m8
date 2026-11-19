@@ -92,7 +92,7 @@
             action="{% url 'requests:withdraw' request_id=request_obj.pk %}">
         {% csrf_token %}
         <p class="mb-2 text-sm text-soft">{% translate "Withdraw the request to change it. You can send it again afterwards." %}</p>
-        {% include "components/button.html" with label=_("Withdraw") type="submit" block=True %}
+        {% include "components/button.html" with label=_("Withdraw") type="submit" full_width=True %}
       </form>
     {% endif %}
     {% if request_obj.status != "DRAFT" %}

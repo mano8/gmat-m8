@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+from django.template import Context, Template
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.utils import translation
@@ -45,6 +46,29 @@ class TestButton:
     def test_a_plain_button_has_no_variant_class(self) -> None:
         html = component("button", label="Go")
         assert 'class="btn"' in html
+
+    def test_full_width_only_when_asked_inside_a_block(self) -> None:
+        """Django sets `block` inside every `{% block %}`; the parameter must not share it (#72)."""
+        template = Template(
+            "{% block page %}"
+            '{% include "components/button.html" with label="Go" %}'
+            '{% include "components/button.html" with label="Wide" full_width=True %}'
+            "{% endblock %}"
+        )
+        html = template.render(Context())
+        assert html.count("btn-block") == 1
+        assert html.index("btn-block") > html.index("Go")
+
+    def test_a_button_is_the_same_inside_and_outside_a_block(self) -> None:
+        inside = Template(
+            '{% block page %}{% include "components/button.html" with label="Go" %}{% endblock %}'
+        ).render(Context())
+        assert "btn-block" not in inside
+        assert inside.strip() == component("button", label="Go").strip()
+
+    def test_full_width_adds_the_class(self) -> None:
+        assert "btn-block" in component("button", label="Go", full_width=True)
+        assert "btn-block" in component("button", label="Go", href="/x/", full_width=True)
 
 
 class TestStatusChip:

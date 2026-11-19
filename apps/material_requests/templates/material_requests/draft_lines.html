@@ -83,7 +83,7 @@
     <div class="sticky bottom-16 -mx-4 mt-3 bg-raised/95 px-4 py-2 sm:-mx-6 sm:px-6 md:bottom-0">
       {% url 'requests:review' request_id=request_obj.pk as review_url %}
       {% blocktranslate asvar review_label count counter=lines|length %}Review and submit: {{ counter }} line{% plural %}Review and submit: {{ counter }} lines{% endblocktranslate %}
-      {% include "components/button.html" with href=review_url label=review_label variant="primary" block=True html_id="review-link" %}
+      {% include "components/button.html" with href=review_url label=review_label variant="primary" full_width=True html_id="review-link" %}
     </div>
   {% endif %}
 </section>

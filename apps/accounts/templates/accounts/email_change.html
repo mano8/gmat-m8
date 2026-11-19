@@ -14,7 +14,7 @@
     </p>
     <form method="post" action="{% url 'email_change:confirm_submit' %}">
       {% csrf_token %}
-      {% include "components/button.html" with type="submit" label=_("Confirm") variant="primary" block=True %}
+      {% include "components/button.html" with type="submit" label=_("Confirm") variant="primary" full_width=True %}
     </form>
   {% else %}
     <h1 class="mb-2">{% translate "Cancel the email change" %}</h1>
@@ -23,7 +23,7 @@
     </p>
     <form method="post" action="{% url 'email_change:cancel_submit' %}">
       {% csrf_token %}
-      {% include "components/button.html" with type="submit" label=_("Cancel the change") variant="danger" block=True %}
+      {% include "components/button.html" with type="submit" label=_("Cancel the change") variant="danger" full_width=True %}
     </form>
   {% endif %}
 {% endblock content %}

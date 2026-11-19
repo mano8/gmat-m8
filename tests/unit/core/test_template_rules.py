@@ -28,6 +28,16 @@ RAW_COLOUR = re.compile(
     r"""(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(?:-\d{2,3})?(?![\w-])"""
     r"""|\[(?:#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\(|oklch\()"""
 )
+# Django's BlockNode puts its own `block` in the context inside every {% block %}, so a template
+# variable or component parameter of that name is always set there (issue #72). Only the tags
+# {% block %} / {% endblock %} and {{ block.super }} may use the word.
+BLOCK_VARIABLE = re.compile(
+    r"""\{\{[^}]*(?<![\w."'-])block\b(?!\.super)"""
+    r"""|\{%(?!\s*(?:end)?block\b)(?:[^%"']|"[^"]*"|'[^']*')*(?<![\w."'-])block\b(?!\.super)"""
+    r"""|\bblock\s*="""
+)
+RESERVED_PARAMETERS = ("block", "forloop", "request", "user", "perms", "messages", "csrf_token")
+PARAMETERS_LINE = re.compile(r"Parameters?:(.*?)(?:\n\s*\n|\Z)", re.S)
 
 
 def templates() -> Iterator[Path]:
@@ -81,6 +91,24 @@ def test_no_raw_colour() -> None:
     assert lines_matching(RAW_COLOUR) == []
 
 
+def test_no_template_reads_block_as_a_variable() -> None:
+    """A component parameter named like a name Django sets in the context is always on (#72)."""
+    assert lines_matching(BLOCK_VARIABLE) == []
+
+
+def test_no_component_lists_a_reserved_name_as_a_parameter() -> None:
+    offenders = []
+    for path in sorted((ROOT / "templates" / "components").glob("*.html")):
+        header = re.search(r"\{% comment %\}(.*?)\{% endcomment %\}", path.read_text("utf-8"), re.S)
+        if not header:
+            continue
+        for found in PARAMETERS_LINE.findall(header.group(1)):
+            for name in RESERVED_PARAMETERS:
+                if re.search(rf"(?<![\w`.-]){name}(?![\w`.-])\s*(?:\(|;|,|:)", found):
+                    offenders.append(f"{path.name}: {name}")
+    assert offenders == []
+
+
 class TestTheRulesNotice:
     """The patterns do catch what they are written for."""
 
@@ -128,3 +156,30 @@ class TestTheRulesNotice:
     )
     def test_tokens_are_fine(self, line: str) -> None:
         assert not RAW_COLOUR.search(line)
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "{% if block %}x{% endif %}",
+            "{{ block }}",
+            '{% include "components/button.html" with block=True %}',
+            "{% with b=block %}",
+        ],
+    )
+    def test_block_as_a_variable(self, line: str) -> None:
+        assert BLOCK_VARIABLE.search(line)
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "{% block content %}",
+            "{% endblock %}",
+            "{% endblock content %}",
+            "{{ block.super }}",
+            '{% trans "block" %}',
+            '{% icon "x" classes="hidden md:block" %}',
+            "{% if blocked %}",
+        ],
+    )
+    def test_block_tags_and_super_are_fine(self, line: str) -> None:
+        assert not BLOCK_VARIABLE.search(line)

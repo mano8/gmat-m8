@@ -117,7 +117,7 @@
           <p class="action-bar-sum">
             <span>{% blocktranslate count counter=entries|length %}{{ counter }} line{% plural %}{{ counter }} lines{% endblocktranslate %}</span>
           </p>
-          {% include "components/button.html" with type="submit" label=_("Post the receipt") icon="package-check" variant="primary" block=True %}
+          {% include "components/button.html" with type="submit" label=_("Post the receipt") icon="package-check" variant="primary" full_width=True %}
         </div>
       </form>
     {% endif %}

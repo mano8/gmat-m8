@@ -85,7 +85,7 @@
         <p class="action-bar-sum">
           <span>{% blocktranslate count counter=entries|length %}{{ counter }} line to hand over{% plural %}{{ counter }} lines to hand over{% endblocktranslate %}</span>
         </p>
-        {% include "components/button.html" with type="submit" label=_("Hand the material over") icon="hand-helping" variant="primary" block=True %}
+        {% include "components/button.html" with type="submit" label=_("Hand the material over") icon="hand-helping" variant="primary" full_width=True %}
       </div>
     </form>
   {% endif %}

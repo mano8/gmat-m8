@@ -94,7 +94,7 @@
           <button type="button" class="btn btn-primary" aria-busy="true">Busy</button>
         </div>
         <div>
-          {% include "components/button.html" with label="Block, as the main action of a phone form" variant="primary" block=True type="submit" %}
+          {% include "components/button.html" with label="Full width, as the main action of a phone form" variant="primary" full_width=True type="submit" %}
         </div>
       </section>
       <section id="chips" class="grid gap-3" aria-labelledby="h-chips">
@@ -269,7 +269,7 @@
             <p class="action-bar-sum">
               <span>3 lines</span><span>No prices shown</span>
             </p>
-            {% include "components/button.html" with type="button" label="Post the receipt" icon="package-check" variant="primary" block=True %}
+            {% include "components/button.html" with type="button" label="Post the receipt" icon="package-check" variant="primary" full_width=True %}
           </div>
         </div>
       </section>

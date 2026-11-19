@@ -33,7 +33,7 @@
     {% csrf_token %}
     {{ form }}
     <div class="action-bar" data-testid="submit-bar">
-      {% include "components/button.html" with label=_("Submit request") type="submit" icon="send" variant="primary" block=True %}
+      {% include "components/button.html" with label=_("Submit request") type="submit" icon="send" variant="primary" full_width=True %}
     </div>
   </form>
 {% endblock content %}
