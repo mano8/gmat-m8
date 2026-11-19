@@ -8,6 +8,7 @@ person looks at them.
 
 import os
 from collections.abc import Callable
+from typing import cast
 
 import pytest
 from playwright.sync_api import Page, expect
@@ -52,12 +53,21 @@ def send_dialog(page: Page, documents: Documents) -> None:
 
 
 def follow(prefix: str) -> Callable[[Page, Documents], None]:
-    """Open the first row of a list whose link starts with ``prefix``: the page it leads to is
-    the screen (a company, a branch, a person)."""
+    """Open the first row of a list whose link is ``prefix`` and an id (not the "new" button
+    that shares the prefix): the page it leads to is the screen (a company, a branch, a person)."""
 
     def prepare(page: Page, documents: Documents) -> None:
-        page.locator(f"main a[href^='{prefix}']").first.click()
-        page.wait_for_url(f"**{prefix}*/")
+        links = page.locator(f"main a[href^='{prefix}']")
+        href = cast(
+            str,
+            links.evaluate_all(
+                """(links, prefix) => links.map((a) => a.getAttribute('href'))
+                    .find((h) => h.slice(prefix.length).replace('/', '').length > 8)""",
+                prefix,
+            ),
+        )
+        assert href, prefix
+        page.goto(href)
         expect(page.locator("main h1").first).to_be_visible()
 
     return prepare

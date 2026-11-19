@@ -45,7 +45,7 @@ def fills_its_row(page: Page, button: Locator) -> bool:
 
 PAGE_HEADS = {
     "order": ("mm-mad", lambda d: d.order),
-    "order-amendment": ("mm-mad", lambda d: f"{d.order}amendment/"),
+    "worklist": ("mm-mad", lambda d: "/purchasing/"),
     "project": ("admin", lambda d: d.site_project),
     "receipt": ("tech-mad", lambda d: d.site_receipt),
     "requests": ("tech-mad", lambda d: "/requests/"),
