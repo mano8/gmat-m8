@@ -150,7 +150,7 @@
           {{ issue_form.idempotency_key }}
           {{ issue_form.confirm.as_field_group }}
           {% include "purchasing/dispatch_before.html" with mode=dispatch_mode address=supplier_address amend=False %}
-          {% include "components/button.html" with type="submit" label=_("Issue the order") icon="send" variant="primary" block=True %}
+          {% include "components/button.html" with type="submit" label=_("Issue the order") icon="send" variant="primary" full_width=True %}
         </form>
       {% else %}
         <p class="text-soft" data-testid="issue-blocked">{% translate "Add at least one line before issuing." %}</p>

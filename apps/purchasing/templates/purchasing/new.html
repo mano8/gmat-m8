@@ -65,6 +65,6 @@
         {% translate "This draft starts without lines: you add approved request lines on its page. An order that ships to a worksite only takes lines of that worksite's project." %}
       </p>
     {% endif %}
-    {% include "components/button.html" with type="submit" label=_("Create the draft") variant="primary" block=True %}
+    {% include "components/button.html" with type="submit" label=_("Create the draft") variant="primary" full_width=True %}
   </form>
 {% endblock content %}

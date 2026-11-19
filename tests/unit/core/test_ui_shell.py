@@ -182,7 +182,7 @@ class TestComponents:
         link = render_to_string("components/button.html", {"label": "Open", "href": "/x/"})
         assert link.strip().startswith("<a ")
         assert 'href="/x/"' in link
-        block = render_to_string("components/button.html", {"label": "Go", "block": True})
+        block = render_to_string("components/button.html", {"label": "Go", "full_width": True})
         assert "btn-block" in block
         assert 'type="button"' in block
 

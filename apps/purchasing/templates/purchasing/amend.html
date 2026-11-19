@@ -28,16 +28,16 @@
     </section>
     <section class="mb-4" aria-label="{% translate 'Lines' %}">
       <h2 class="mb-2">{% translate "Lines" %}</h2>
-      {% for block in blocks %}
-        {% with line=block.entry.line %}
+      {% for group in blocks %}
+        {% with line=group.entry.line %}
           <article class="card mb-3" data-line="{{ line.line_no }}">
             <p class="font-semibold">{{ line.line_no }}. {{ line.material.reference }} · {{ line.material.name }}</p>
-            {{ block.entry.qty.as_field_group }}
-            {% if block.entry.unit_price %}
-              {{ block.entry.unit_price.as_field_group }}
-              {{ block.entry.discount_pct.as_field_group }}
+            {{ group.entry.qty.as_field_group }}
+            {% if group.entry.unit_price %}
+              {{ group.entry.unit_price.as_field_group }}
+              {{ group.entry.discount_pct.as_field_group }}
             {% endif %}
-            {% for row, entry in block.allocations %}
+            {% for row, entry in group.allocations %}
               <div class="border-t border-line pt-2">
                 <p class="text-sm text-soft">
                   {{ row.request_number }} · {{ row.project_code }} · {% translate "received" %} {{ row.attributed|quantity }}
