@@ -51,6 +51,18 @@ def send_dialog(page: Page, documents: Documents) -> None:
     finish_animations(page)
 
 
+def follow(prefix: str) -> Callable[[Page, Documents], None]:
+    """Open the first row of a list whose link starts with ``prefix``: the page it leads to is
+    the screen (a company, a branch, a person)."""
+
+    def prepare(page: Page, documents: Documents) -> None:
+        page.locator(f"main a[href^='{prefix}']").first.click()
+        page.wait_for_url(f"**{prefix}*/")
+        expect(page.locator("main h1").first).to_be_visible()
+
+    return prepare
+
+
 Open = Callable[[Page, Documents], None]
 SCREENS: dict[str, tuple[str, Callable[[Documents], str], Open]] = {
     "dashboard": ("admin", lambda d: "/", nothing),
@@ -75,6 +87,34 @@ SCREENS: dict[str, tuple[str, Callable[[Documents], str], Open]] = {
     "order-send-dialog": ("mm-mad", lambda d: d.order, send_dialog),
     "draft-order": ("mm-mad", lambda d: d.draft_order, nothing),
     "menu-current-entry": ("admin", lambda d: "/catalog/units/", nothing),
+    # M16: pages whose buttons stopped filling their row (page actions beside the title, a form's
+    # buttons side by side, a card's button as wide as its label).
+    "project-page": ("admin", lambda d: d.site_project, nothing),
+    "order-amendment": ("mm-mad", lambda d: f"{d.order}amendment/", nothing),
+    "request-ledger": (
+        "eng-mad",
+        lambda d: d.pending_request.replace("examine/", "ledger/"),
+        nothing,
+    ),
+    "catalog-new": ("admin", lambda d: "/catalog/new/", nothing),
+    "exports": ("admin", lambda d: "/exports/", nothing),
+    "handovers": ("wo-mad", lambda d: "/handovers/", nothing),
+    "receive-orders": ("wo-mad", lambda d: "/receiving/orders/", nothing),
+    "company": (
+        "admin",
+        lambda d: "/org/structure/companies/",
+        follow("/org/structure/companies/"),
+    ),
+    "branch": ("admin", lambda d: "/org/structure/branches/", follow("/org/structure/branches/")),
+    "person": ("admin", lambda d: "/org/people/", follow("/org/people/")),
+}
+WHOLE_PAGE = {
+    nothing,
+    *(
+        spec[2]
+        for spec in SCREENS.values()
+        if spec[2] not in (line_dialog, approve_all_dialog, send_dialog)
+    ),
 }
 
 
@@ -95,7 +135,7 @@ def test_save_the_screen(
         prepare(page, documents)
         page.wait_for_load_state("networkidle")
         path = FOLDER / f"{name}-{WIDTHS[viewport]}-{scheme}.png"
-        if prepare is nothing:
+        if prepare in WHOLE_PAGE:
             pages.whole_page_screenshot(page, path)
         else:
             page.screenshot(path=path)  # a dialog: the screen it opens over

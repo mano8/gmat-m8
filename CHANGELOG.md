@@ -10,6 +10,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 **Migration:** `notifications.0006` adds two tables (`NoticeDefault`, `NoticeSetting`) and a blank `notice` column on queued messages (database default, reversible). It only adds, so the previous release runs on the new schema; v0.2.0 queues messages without a notice, which follow the person's own choice alone.
 
+### Fixed
+
+- **Buttons keep their own width** ([#72](https://github.com/mano8/gmat-m8/issues/72)). A button drawn with the page filled its whole row, because its component read a parameter called `block` and Django sets that name inside every page block; the same button swapped in alone by htmx kept its own width. Page actions (*Edit*, *Print*, *Receive goods*, *New request* …) now sit side by side on the right of the title and wrap under it on a phone, a form's *Save* and *Cancel* sit side by side, and a button inside a card is as wide as its label. The main action of a phone form (*Post the receipt*, *Submit request*, *Issue the order*, *Hand the material over*, the sign-in and token pages' buttons) still fills the width. The parameter is now `full_width`, and a test refuses a component parameter named after a variable Django sets. Appearance only: no URL, permission or data changes.
+
 ## [0.2.0] - 2026-11-17
 
 The pilot's first round of feedback on v0.1.0 ([#64](https://github.com/mano8/gmat-m8/issues/64)–[#69](https://github.com/mano8/gmat-m8/issues/69)): quicker request entry and review, an administration overview, purchase orders sent to the supplier from their page, a left menu that keeps its place, and a QR code that reads in the dark theme. The checks to run with the pilot's users after the upgrade are in [docs/runbooks/pilot.md](https://github.com/mano8/gmat-m8/blob/v0.2.0/docs/runbooks/pilot.md).
