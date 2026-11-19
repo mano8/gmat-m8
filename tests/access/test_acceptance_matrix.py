@@ -184,7 +184,7 @@ ADMIN_MODELS = {
     "receiving": ("goodsreceipt", "goodsreceiptline", "receiptattribution"),
     "handovers": ("handover", "handoverline"),
     "attachments": ("attachment", "attachmentreservation", "storagequota", "mediadeletion"),
-    "notifications": ("noticedefault", "noticesetting"),
+    "notifications": ("noticedefault", "noticesetting", "noticechoice", "channelswitch"),
 }
 # The admin pages of a model that shows its own sentinels: the supplier's contact details
 # (also in an order's supplier snapshot) and the allocations' quantities. Prices never

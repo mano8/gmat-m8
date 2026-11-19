@@ -11,8 +11,11 @@ it, when, and the capability it is received through (the message's eligibility r
 again by the worker at the claim). A later business notice joins the registry with a key of
 its own; its default is on until an administrator turns it off.
 
-The settings are stored per ``Channel``: email only for now; the planned Telegram bot adds
-its channel to the same registry (Q90).
+The settings are stored per ``Channel`` (M17, Q95): email and in the application. ``CHANNELS``
+is the one place that says which channels the installation offers and what each gives a person
+who never chose (Q96); the resolution, the services and the screens loop over it, so the planned
+Telegram bot adds its channel here, with ``opt_in`` (off until the person turns it on), without
+reshaping a table or a screen.
 """
 
 from collections.abc import Mapping
@@ -37,6 +40,7 @@ class Notice(models.TextChoices):
 
 class Channel(models.TextChoices):
     EMAIL = "EMAIL", _("Email")
+    IN_APP = "IN_APP", _("In the application")
 
 
 class Mode(models.TextChoices):
@@ -111,4 +115,37 @@ NOTICES: Mapping[Notice, NoticeSpec] = _registry(
         Capability.REQUEST_VIEW,
         60,
     ),
+)
+
+
+@dataclass(frozen=True)
+class ChannelSpec:
+    """A channel the installation offers (M17, Q95, Q96).
+
+    ``default``: whether a notice is sent on the channel when no level decided (no setting for
+    everyone, for the person or by the person). ``opt_in``: the person's switch for the channel
+    is off until they turn it on (none yet; the Telegram bot's will be); otherwise it is on
+    until they turn it off.
+    """
+
+    channel: Channel
+    default: bool
+    opt_in: bool
+    order: int
+
+    @property
+    def label(self) -> str:
+        return str(self.channel.label)
+
+
+def _channels(*specs: ChannelSpec) -> Mapping[Channel, ChannelSpec]:
+    ordered = sorted(specs, key=lambda spec: spec.order)
+    if [spec.channel for spec in ordered] != list(Channel):
+        raise ValueError("Every channel needs exactly one entry, in the order of Channel")
+    return MappingProxyType({spec.channel: spec for spec in ordered})
+
+
+CHANNELS: Mapping[Channel, ChannelSpec] = _channels(
+    ChannelSpec(Channel.EMAIL, default=True, opt_in=False, order=10),
+    ChannelSpec(Channel.IN_APP, default=True, opt_in=False, order=20),
 )

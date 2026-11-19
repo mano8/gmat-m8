@@ -2,8 +2,8 @@
 {% comment %}
   What each business email does for one person (M15.3). Parameters: items (the selector's
   PersonNotice list), own (true on the person's own page: "you" instead of "the person").
-  The state, then why: the person's own refusal of business email, a setting an administrator
-  made for them, or the setting for everyone; an email their current roles never receive says so.
+  The state, then why: the person's own refusal of business email, their own choice for the
+  email (M17), a setting an administrator made for them, or the setting for everyone; an email their current roles never receive says so.
 {% endcomment %}
 <ul class="divide-y divide-line" data-testid="notice-states">
   {% for item in items %}
@@ -13,11 +13,17 @@
       <div>
         <p class="font-medium">{{ item.spec.label }}</p>
         <p class="text-sm text-soft">
-          {% if item.reason == "opted_out" %}
+          {% if item.reason == "channel_off" %}
             {% if own %}
               {% translate "You turned business email off." %}
             {% else %}
               {% translate "The person turned business email off themselves." %}
+            {% endif %}
+          {% elif item.reason == "own" %}
+            {% if own %}
+              {% translate "You chose this yourself." %}
+            {% else %}
+              {% translate "The person chose this themselves." %}
             {% endif %}
           {% elif item.reason == "person" %}
             {% if item.mode == "ALWAYS" %}

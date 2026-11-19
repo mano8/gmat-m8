@@ -7972,3 +7972,39 @@ msgstr "N'est plus envoyé à tous."
 #: apps/organizations/views/notification_screens.py
 msgid "Email notifications saved."
 msgstr "Notifications par e-mail enregistrées."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "You chose this yourself."
+msgstr "Vous l'avez choisi vous-même."
+
+#: apps/notifications/templates/notifications/states.html
+msgid "The person chose this themselves."
+msgstr "La personne l'a choisi elle-même."
+
+#: apps/notifications/kinds.py
+msgid "In the application"
+msgstr "Dans l'application"
+
+#: apps/notifications/models.py
+msgid "wanted"
+msgstr "souhaitée"
+
+#: apps/notifications/models.py
+msgid "channel on"
+msgstr "canal activé"
+
+#: apps/notifications/models.py
+msgid "own notice choice"
+msgstr "choix personnel de notification"
+
+#: apps/notifications/models.py
+msgid "own notice choices"
+msgstr "choix personnels de notification"
+
+#: apps/notifications/models.py
+msgid "channel switch"
+msgstr "interrupteur de canal"
+
+#: apps/notifications/models.py
+msgid "channel switches"
+msgstr "interrupteurs de canal"

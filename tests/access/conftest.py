@@ -45,7 +45,13 @@ from apps.material_requests.models import (
     MaterialRequestLineRevision,
 )
 from apps.notifications.kinds import Channel, Mode, Notice
-from apps.notifications.models import EmailOutbox, NoticeDefault, NoticeSetting
+from apps.notifications.models import (
+    ChannelSwitch,
+    EmailOutbox,
+    NoticeChoice,
+    NoticeDefault,
+    NoticeSetting,
+)
 from apps.notifications.models import Status as MailStatus
 from apps.notifications.outbox import queue_security_email
 from apps.organizations.models import Branch, JointVentureMember, Membership
@@ -132,6 +138,16 @@ def _notice_settings(world: World) -> None:
         channel=Channel.EMAIL,
         mode=Mode.ALWAYS,
         set_by=admin,
+    )
+    # The person's own choice and switch (M17.1): they leave everything on as well.
+    world.objects["noticechoice"] = NoticeChoice.objects.create(
+        user=world.people.tech_mad,
+        notice=Notice.REQUEST_APPROVED,
+        channel=Channel.EMAIL,
+        enabled=True,
+    )
+    world.objects["channelswitch"] = ChannelSwitch.objects.create(
+        user=world.people.tech_mad, channel=Channel.IN_APP, enabled=True
     )
 
 

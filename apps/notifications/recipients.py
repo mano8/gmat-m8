@@ -2,9 +2,10 @@
 
 Recipients are chosen when the event is published, in the publisher's transaction, and are
 checked again by the worker at the claim (``eligibility``): a user who lost the capability
-by then receives nothing. Whether they want the message (their refusal of business email,
-their setting and the one for everyone, M15) is decided where it is queued
-(``outbox.queue_notification`` through ``resolution``) and again at the claim.
+by then receives nothing. Whether they want the message (their switch for the channel, their
+own choice, an administrator's setting for them and the one for everyone; Q93) is decided
+where it is queued (``outbox.queue_notification`` through ``resolution``) and again at the
+claim.
 """
 
 from collections.abc import Collection

@@ -100,7 +100,7 @@ class TestPersonNotices:
         NotificationPreference.objects.create(user=people.mm_mad, email_opt_out=True)
         set_mode(people, "mm_mad", Notice.REQUEST_TO_REVIEW, Mode.ALWAYS)
         found = selectors.person_notices(AccessContext.for_user(people.group_admin), people.mm_mad)
-        assert all(not item.wanted and item.reason == Reason.OPTED_OUT for item in found)
+        assert all(not item.wanted and item.reason == Reason.CHANNEL_OFF for item in found)
 
     @pytest.mark.parametrize("actor", ["mm_mad", "engineer", "tech_mad", "partner"])
     def test_another_person_is_read_by_group_administrators_only(

@@ -6,9 +6,12 @@ Every email is a row of ``EmailOutbox``, written in the transaction that causes 
 (``notifications.0002``, ``0006``) refuses any change to it, except wiping a body to the empty
 string.
 
-The settings that decide who receives a business notice (M15, Q87) live here too:
-``NoticeDefault`` (for everyone) and ``NoticeSetting`` (one person); the registry of notices
-is ``apps.notifications.kinds``, the rule ``apps.notifications.resolution``.
+The settings that decide who receives a business notice (M15, Q87; M17, Q93) live here too:
+the person's switch per channel (``NotificationPreference.email_opt_out`` for email,
+``ChannelSwitch`` for the others), the person's own choice (``NoticeChoice``), an
+administrator's setting for the person (``NoticeSetting``) and the setting for everyone
+(``NoticeDefault``); the registries of notices and channels are ``apps.notifications.kinds``,
+the rule ``apps.notifications.resolution``.
 """
 
 from django.contrib.postgres.fields import ArrayField
@@ -262,7 +265,8 @@ class NotificationPreference(BaseModel):
 
     Business notifications (a request to review, a decision, goods handed over) are skipped
     for a user who opted out. Security email and supplier dispatches are never optional. No
-    row means the default: notifications on.
+    row means the default: notifications on. Since M17 this is the person's switch for the
+    email channel; the other channels' switches are ``ChannelSwitch`` rows.
     """
 
     user = models.OneToOneField(
@@ -312,9 +316,9 @@ class NoticeDefault(BaseModel):
 class NoticeSetting(BaseModel):
     """One person's setting for a business notice on a channel (M15, Q87).
 
-    ``ALWAYS`` or ``NEVER``; no row means: follow the setting for everyone. The person's own
-    refusal of business email (``NotificationPreference``) wins over ``ALWAYS``. Set only by
-    a group administrator, through ``set_person_notices`` (M15.2).
+    ``ALWAYS`` or ``NEVER``; no row means: follow the setting for everyone. The person's switch
+    for the channel and their own choice (``NoticeChoice``, M17) win over it. Set only by a
+    group administrator, through ``set_person_notices`` (M15.2).
     """
 
     user = models.ForeignKey(
@@ -346,3 +350,75 @@ class NoticeSetting(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.user_id} {self.notice}/{self.channel}: {self.mode}"
+
+
+class NoticeChoice(BaseModel):
+    """The person's own choice for a business notice on a channel (M17, Q93).
+
+    ``enabled`` on or off; no row means: follow what the administrators set (``NoticeSetting``,
+    then ``NoticeDefault``). Kept apart from the administrator's ``NoticeSetting``, so putting a
+    choice back to *follow* brings the administrator's setting back. Written only by the person,
+    for themselves (M17.2); it wins over both administrators' levels, in both directions, but
+    never over the person's switch for the channel.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="notice_choices",
+        verbose_name=_("user"),
+    )
+    notice = models.CharField(_("notice"), max_length=40, choices=Notice.choices)
+    channel = models.CharField(_("channel"), max_length=20, choices=Channel.choices)
+    enabled = models.BooleanField(_("wanted"))
+    changed_at = models.DateTimeField(_("changed at"), db_default=Now())
+
+    class Meta:
+        verbose_name = _("own notice choice")
+        verbose_name_plural = _("own notice choices")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "notice", "channel"],
+                name="notifications_noticechoice_one_per_user",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.notice}/{self.channel}: {'on' if self.enabled else 'off'}"
+
+
+class ChannelSwitch(BaseModel):
+    """The person's switch for a channel other than email (M17, Q93 level 1).
+
+    Off: nothing of any notice reaches them on that channel. No row means the channel's
+    default (``kinds.CHANNELS``: on, unless the channel is opt-in). Email's switch stays
+    ``NotificationPreference.email_opt_out`` (M7.1), which the previous release reads and
+    writes; a CHECK keeps a second one from being stored here. One row per person and channel,
+    so a later channel adds a value, not a column. Written only by the person (M17.2).
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="channel_switches",
+        verbose_name=_("user"),
+    )
+    channel = models.CharField(_("channel"), max_length=20, choices=Channel.choices)
+    enabled = models.BooleanField(_("channel on"))
+    changed_at = models.DateTimeField(_("changed at"), db_default=Now())
+
+    class Meta:
+        verbose_name = _("channel switch")
+        verbose_name_plural = _("channel switches")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "channel"], name="notifications_channelswitch_one_per_user"
+            ),
+            models.CheckConstraint(
+                condition=~Q(channel=Channel.EMAIL),
+                name="notifications_channelswitch_not_email",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.channel}: {'on' if self.enabled else 'off'}"

@@ -14,9 +14,11 @@ from apps.notifications.eligibility import ACCOUNT_ACTIVE
 from apps.notifications.kinds import Channel, Mode, Notice
 from apps.notifications.models import (
     MAX_RECIPIENTS,
+    ChannelSwitch,
     EmailAttempt,
     EmailOutbox,
     Kind,
+    NoticeChoice,
     NoticeDefault,
     NoticeSetting,
     Status,
@@ -233,3 +235,43 @@ class TestNoticeSettings:
                 mode="FOLLOW",
                 set_by=user,
             )
+
+
+class TestOwnChoices:
+    """The person's own choices and switches (M17.1): one choice per notice and channel, one
+    switch per channel, and never a second email switch next to ``email_opt_out``."""
+
+    def test_one_choice_per_person_notice_and_channel(
+        self, user: User, make_user: Callable[..., User]
+    ) -> None:
+        values = {"user": user, "notice": Notice.REQUEST_EDITED, "channel": Channel.IN_APP}
+        first = NoticeChoice.objects.create(**values, enabled=False)
+        assert str(first) == f"{user.pk} REQUEST_EDITED/IN_APP: off"
+        assert first.changed_at is not None
+        with pytest.raises(IntegrityError), transaction.atomic():
+            NoticeChoice.objects.create(**values, enabled=True)
+        NoticeChoice.objects.create(**(values | {"channel": Channel.EMAIL}), enabled=True)
+        other = make_user("other@example.org")
+        assert str(NoticeChoice.objects.create(**(values | {"user": other}), enabled=True)) == (
+            f"{other.pk} REQUEST_EDITED/IN_APP: on"
+        )
+
+    def test_one_switch_per_person_and_channel(self, user: User) -> None:
+        first = ChannelSwitch.objects.create(user=user, channel=Channel.IN_APP, enabled=False)
+        assert str(first) == f"{user.pk} IN_APP: off"
+        assert first.changed_at is not None
+        with pytest.raises(IntegrityError), transaction.atomic():
+            ChannelSwitch.objects.create(user=user, channel=Channel.IN_APP, enabled=True)
+
+    def test_email_has_no_switch_here(self, user: User) -> None:
+        """Email's switch stays ``NotificationPreference.email_opt_out`` (expand only)."""
+        with pytest.raises(IntegrityError), transaction.atomic():
+            ChannelSwitch.objects.create(user=user, channel=Channel.EMAIL, enabled=False)
+
+    def test_an_account_takes_its_choices_with_it(self, user: User) -> None:
+        NoticeChoice.objects.create(
+            user=user, notice=Notice.REQUEST_EDITED, channel=Channel.EMAIL, enabled=True
+        )
+        ChannelSwitch.objects.create(user=user, channel=Channel.IN_APP, enabled=True)
+        user.delete()
+        assert not NoticeChoice.objects.exists() and not ChannelSwitch.objects.exists()

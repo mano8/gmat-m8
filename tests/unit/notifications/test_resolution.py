@@ -1,8 +1,9 @@
-"""Business notices (M15.1): the registry, who wants a notice, and the outbox that follows it.
+"""Business notices (M15.1, M17.1): the registries, who wants a notice, and the outbox that
+follows it.
 
-The three levels of Q87: the person's refusal of business email wins, then their own
-setting, then the setting for everyone (no row: on). Applied when a message is queued and
-again at the claim.
+The four levels of Q93, per channel: the person's switch for the channel wins, then their own
+choice, then an administrator's setting for them, then the setting for everyone (no row: the
+channel's default). Applied when an email is queued and again at the claim.
 """
 
 from collections.abc import Callable
@@ -17,10 +18,22 @@ from apps.access.principals import SystemPrincipal
 from apps.access.roles import Capability
 from apps.accounts.models import User
 from apps.notifications import eligibility, resolution
-from apps.notifications.kinds import NOTICES, Channel, Mode, Notice, NoticeSpec, _registry
+from apps.notifications.kinds import (
+    CHANNELS,
+    NOTICES,
+    Channel,
+    ChannelSpec,
+    Mode,
+    Notice,
+    NoticeSpec,
+    _channels,
+    _registry,
+)
 from apps.notifications.models import (
+    ChannelSwitch,
     EmailOutbox,
     Kind,
+    NoticeChoice,
     NoticeDefault,
     NoticeSetting,
     NotificationPreference,
@@ -36,20 +49,41 @@ pytestmark = pytest.mark.django_db
 NOTICE = Notice.REQUEST_TO_REVIEW
 
 
-def set_default(notice: Notice, enabled: bool, by: User) -> None:
+def set_default(notice: Notice, enabled: bool, by: User, channel: Channel = Channel.EMAIL) -> None:
     NoticeDefault.objects.update_or_create(
-        notice=notice, channel=Channel.EMAIL, defaults={"enabled": enabled, "changed_by": by}
+        notice=notice, channel=channel, defaults={"enabled": enabled, "changed_by": by}
     )
 
 
-def set_mode(user: User, notice: Notice, mode: Mode, by: User) -> None:
+def set_mode(
+    user: User, notice: Notice, mode: Mode, by: User, channel: Channel = Channel.EMAIL
+) -> None:
     NoticeSetting.objects.update_or_create(
-        user=user, notice=notice, channel=Channel.EMAIL, defaults={"mode": mode, "set_by": by}
+        user=user, notice=notice, channel=channel, defaults={"mode": mode, "set_by": by}
     )
+
+
+def choose(user: User, notice: Notice, enabled: bool, channel: Channel = Channel.EMAIL) -> None:
+    """The person's own choice (M17.1)."""
+    NoticeChoice.objects.update_or_create(
+        user=user, notice=notice, channel=channel, defaults={"enabled": enabled}
+    )
+
+
+def switch(user: User, channel: Channel, enabled: bool) -> None:
+    """The person's switch for ``channel``: email's is their *no business email* (M7.1)."""
+    if channel == Channel.EMAIL:
+        NotificationPreference.objects.update_or_create(
+            user=user, defaults={"email_opt_out": not enabled}
+        )
+    else:
+        ChannelSwitch.objects.update_or_create(
+            user=user, channel=channel, defaults={"enabled": enabled}
+        )
 
 
 def refuse(user: User) -> None:
-    NotificationPreference.objects.update_or_create(user=user, defaults={"email_opt_out": True})
+    switch(user, Channel.EMAIL, False)
 
 
 def a_worker(tmp_path: Path) -> Worker:
@@ -93,8 +127,22 @@ class TestRegistry:
             _registry(*specs, specs[0])
 
     def test_the_channels_and_modes(self) -> None:
-        assert list(Channel) == [Channel.EMAIL]
+        """Email and in the application, both on by default, neither opt-in (Q95, Q96); nothing
+        of the Telegram bot until its plan is done."""
+        assert list(Channel) == [Channel.EMAIL, Channel.IN_APP]
+        assert list(CHANNELS) == list(Channel)
+        for channel, spec in CHANNELS.items():
+            assert spec.channel is channel
+            assert spec.label == str(channel.label)
+            assert (spec.default, spec.opt_in) == (True, False)
         assert set(Mode) == {Mode.ALWAYS, Mode.NEVER}
+
+    def test_a_missing_or_repeated_channel_is_refused(self) -> None:
+        specs = list(CHANNELS.values())
+        with pytest.raises(ValueError, match="exactly one entry"):
+            _channels(*specs[1:])
+        with pytest.raises(ValueError, match="exactly one entry"):
+            _channels(*specs, specs[0])
 
     def test_a_spec_is_frozen(self) -> None:
         spec = NOTICES[NOTICE]
@@ -103,79 +151,144 @@ class TestRegistry:
         assert isinstance(spec, NoticeSpec)
 
 
-# opt-out, the person's setting, the setting for everyone (None: no row) → wanted
+# The channel's switch (False: off), the person's own choice, an administrator's setting for
+# them, the setting for everyone (None: no row), on each channel → wanted (Q93).
 TABLE = [
     (
-        opt_out,
+        channel,
+        on,
+        choice,
         mode,
         default,
-        (not opt_out) and (mode == Mode.ALWAYS or (mode is None and default is not False)),
+        on
+        and (
+            choice
+            if choice is not None
+            else mode == Mode.ALWAYS
+            if mode is not None
+            else default is not False
+        ),
     )
-    for opt_out in (False, True)
+    for channel in Channel
+    for on in (True, False)
+    for choice in (None, True, False)
     for mode in (None, Mode.ALWAYS, Mode.NEVER)
     for default in (None, True, False)
 ]
+TABLE_IDS = [f"{c}-on={o}-choice={ch}-mode={m}-default={d}" for c, o, ch, m, d, _ in TABLE]
+
+
+def arrange(
+    person: User,
+    admin: User,
+    channel: Channel,
+    on: bool,
+    choice: bool | None,
+    mode: Mode | None,
+    default: bool | None,
+) -> None:
+    """The four levels for ``NOTICE`` on ``channel``; the other channel is set the other way
+    round, so a level of one channel that counted on the other would show."""
+    other = next(c for c in Channel if c != channel)
+    switch(person, other, not on)
+    if not on:
+        switch(person, channel, False)
+    if choice is not None:
+        choose(person, NOTICE, choice, channel)
+        choose(person, NOTICE, not choice, other)
+    if mode is not None:
+        set_mode(person, NOTICE, mode, admin, channel)
+    if default is not None:
+        set_default(NOTICE, default, admin, channel)
+        set_default(NOTICE, not default, admin, other)
+
+
+def level(on: bool, choice: bool | None, mode: Mode | None) -> resolution.Reason:
+    if not on:
+        return resolution.Reason.CHANNEL_OFF
+    if choice is not None:
+        return resolution.Reason.OWN
+    return resolution.Reason.PERSON if mode is not None else resolution.Reason.EVERYONE
 
 
 class TestResolution:
     @pytest.mark.parametrize(
-        ("opt_out", "mode", "default", "expected"),
-        TABLE,
-        ids=[f"optout={o}-mode={m}-default={d}" for o, m, d, _ in TABLE],
+        ("channel", "on", "choice", "mode", "default", "expected"), TABLE, ids=TABLE_IDS
     )
-    def test_the_three_levels(
+    def test_the_four_levels_on_every_channel(
         self,
         people: People,
-        opt_out: bool,
+        channel: Channel,
+        on: bool,
+        choice: bool | None,
         mode: Mode | None,
         default: bool | None,
         expected: bool,
     ) -> None:
         person, admin = people.mm_mad, people.group_admin
-        if opt_out:
-            refuse(person)
-        if mode is not None:
-            set_mode(person, NOTICE, mode, admin)
-        if default is not None:
-            set_default(NOTICE, default, admin)
-        assert (person.pk in resolution.wanted([person.pk], NOTICE)) is expected
+        arrange(person, admin, channel, on, choice, mode, default)
+        assert (person.pk in resolution.wanted([person.pk], NOTICE, channel)) is expected
 
     @pytest.mark.parametrize(
-        ("opt_out", "mode", "default", "expected"),
-        TABLE,
-        ids=[f"optout={o}-mode={m}-default={d}" for o, m, d, _ in TABLE],
+        ("channel", "on", "choice", "mode", "default", "expected"), TABLE, ids=TABLE_IDS
     )
     def test_decisions_say_the_same_with_the_level_that_decided(
         self,
         people: People,
-        opt_out: bool,
+        channel: Channel,
+        on: bool,
+        choice: bool | None,
         mode: Mode | None,
         default: bool | None,
         expected: bool,
     ) -> None:
-        """The screens' reading (M15.3) never differs from the rule queueing and the claim apply."""
+        """The screens' reading (M15.3, M17.4) never differs from the rule queueing and the
+        claim apply."""
         person, admin = people.mm_mad, people.group_admin
-        if opt_out:
-            refuse(person)
-        if mode is not None:
-            set_mode(person, NOTICE, mode, admin)
-        if default is not None:
-            set_default(NOTICE, default, admin)
-        decided = resolution.decisions(person.pk)
+        arrange(person, admin, channel, on, choice, mode, default)
+        decided = resolution.decisions(person.pk, channel)
         assert set(decided) == set(Notice)
         found = decided[NOTICE]
-        assert found.wanted is expected is (person.pk in resolution.wanted([person.pk], NOTICE))
-        assert found.mode == mode
-        level = (
-            resolution.Reason.OPTED_OUT
-            if opt_out
-            else resolution.Reason.PERSON
-            if mode is not None
-            else resolution.Reason.EVERYONE
+        wanted = person.pk in resolution.wanted([person.pk], NOTICE, channel)
+        assert found.wanted is expected is wanted
+        assert (found.choice, found.mode) == (choice, mode)
+        assert found.reason == level(on, choice, mode)
+        administrators = mode == Mode.ALWAYS if mode is not None else default is not False
+        assert found.administrators is administrators
+        # A notice nobody touched follows the channel's default, which is on.
+        untouched = decided[Notice.REQUEST_EDITED]
+        assert (untouched.wanted, untouched.administrators) == (on, True)
+
+    def test_an_opt_in_channel_is_off_until_the_person_turns_it_on(
+        self, people: People, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No channel is opt-in yet; the Telegram bot's will be (Q96): its switch is off with no
+        row, and only the person's own *on* opens it."""
+        spec = CHANNELS[Channel.IN_APP]
+        opt_in = ChannelSpec(spec.channel, default=True, opt_in=True, order=spec.order)
+        monkeypatch.setattr(resolution, "CHANNELS", dict(CHANNELS) | {Channel.IN_APP: opt_in})
+        person = people.mm_mad
+        assert resolution.wanted([person.pk], NOTICE, Channel.IN_APP) == set()
+        assert resolution.decisions(person.pk, Channel.IN_APP)[NOTICE].reason == (
+            resolution.Reason.CHANNEL_OFF
         )
-        assert found.reason == level
-        # A notice nobody touched keeps following the setting for everyone, which is on.
-        assert decided[Notice.REQUEST_EDITED].wanted is not opt_out
+        switch(person, Channel.IN_APP, False)
+        assert resolution.wanted([person.pk], NOTICE, Channel.IN_APP) == set()
+        switch(person, Channel.IN_APP, True)
+        assert resolution.wanted([person.pk], NOTICE, Channel.IN_APP) == {person.pk}
+        assert resolution.wanted([person.pk], NOTICE) == {person.pk}  # email is not opt-in
+
+    def test_turned_off_answers_for_every_channel(self, people: People) -> None:
+        ids = [people.mm_mad.pk, people.engineer.pk, people.tech_mad.pk]
+        switch(people.mm_mad, Channel.EMAIL, False)
+        switch(people.engineer, Channel.IN_APP, False)
+        switch(people.tech_mad, Channel.IN_APP, True)
+        for channel, off in (
+            (Channel.EMAIL, {people.mm_mad.pk}),
+            (Channel.IN_APP, {people.engineer.pk}),
+        ):
+            found = User.objects.filter(pk__in=ids).filter(resolution.turned_off(channel))
+            assert set(found.values_list("pk", flat=True)) == off
 
     def test_settings_of_another_notice_or_person_do_not_count(self, people: People) -> None:
         admin, person, other = people.group_admin, people.mm_mad, people.engineer
@@ -198,14 +311,36 @@ class TestResolution:
         with django_assert_num_queries(0):
             assert resolution.wanted([], NOTICE) == set()
 
-    def test_without_a_notice_only_the_refusal_counts(self, people: People) -> None:
+    def test_without_a_notice_only_the_switch_counts(self, people: People) -> None:
         """A message queued before M15: the settings of no notice apply to it."""
         admin, person, other = people.group_admin, people.mm_mad, people.engineer
         for notice in Notice:
             set_default(notice, False, admin)
             set_mode(person, notice, Mode.NEVER, admin)
+            choose(person, notice, False)
         refuse(other)
         assert resolution.wanted([person.pk, other.pk], "") == {person.pk}
+
+    def test_one_query_with_every_level_set(
+        self, people: People, django_assert_num_queries: Any
+    ) -> None:
+        ids = [user.pk for user in people.all().values()]
+        admin = people.group_admin
+        set_default(NOTICE, False, admin, Channel.IN_APP)
+        set_mode(people.engineer, NOTICE, Mode.ALWAYS, admin, Channel.IN_APP)
+        set_mode(people.mm_mad, NOTICE, Mode.NEVER, admin, Channel.IN_APP)
+        choose(people.mm_mad, NOTICE, True, Channel.IN_APP)
+        choose(people.engineer, NOTICE, False, Channel.IN_APP)
+        choose(people.tech_mad, NOTICE, True, Channel.IN_APP)
+        switch(people.tech_mad, Channel.IN_APP, False)
+        with django_assert_num_queries(1):
+            assert resolution.wanted(ids, NOTICE, Channel.IN_APP) == {people.mm_mad.pk}
+
+    def test_decisions_cost_four_queries(
+        self, people: People, django_assert_num_queries: Any
+    ) -> None:
+        with django_assert_num_queries(4):
+            resolution.decisions(people.mm_mad.pk, Channel.IN_APP)
 
     def test_filter_wanted_keeps_the_callers_conditions(self, people: People) -> None:
         users = User.objects.filter(pk__in=[people.mm_mad.pk, people.engineer.pk]).exclude(
@@ -256,6 +391,31 @@ class TestOutboxRow:
         message = notification(people.mm_mad, people.engineer)
         assert message.recipient_users == [people.mm_mad.pk]
 
+    def test_the_persons_own_choice_wins_over_the_administrators_at_queueing(
+        self, people: People, notification: Callable[..., EmailOutbox]
+    ) -> None:
+        """Q93: an own *on* overrides an administrator's *never* and an *off* for everyone; an
+        own *off* overrides *always*; the email switch still wins over an own *on*."""
+        admin, mm, eng, ga = people.group_admin, people.mm_mad, people.engineer, people.group_admin
+        set_default(NOTICE, False, admin)
+        set_mode(mm, NOTICE, Mode.NEVER, admin)
+        choose(mm, NOTICE, True)
+        set_mode(eng, NOTICE, Mode.ALWAYS, admin)
+        choose(eng, NOTICE, False)
+        set_mode(ga, NOTICE, Mode.ALWAYS, admin)
+        choose(ga, NOTICE, True)
+        refuse(ga)
+        message = notification(mm, eng, ga)
+        assert message.recipient_users == [mm.pk]
+
+    def test_an_in_app_choice_changes_nothing_by_email(
+        self, people: People, notification: Callable[..., EmailOutbox]
+    ) -> None:
+        choose(people.mm_mad, NOTICE, False, Channel.IN_APP)
+        switch(people.engineer, Channel.IN_APP, False)
+        message = notification(people.mm_mad, people.engineer)
+        assert sorted(message.recipient_users) == sorted([people.mm_mad.pk, people.engineer.pk])
+
     def test_only_a_notification_may_name_a_notice(self, people: People) -> None:
         with pytest.raises(IntegrityError), transaction.atomic():
             EmailOutbox.objects.create(
@@ -301,6 +461,37 @@ class TestAtTheClaim:
         set_mode(mm, NOTICE, Mode.ALWAYS, admin)
         assert eligibility.eligible_recipients(message) == [mm]
         refuse(mm)  # the person's refusal wins over always
+        assert eligibility.eligible_recipients(message) == []
+
+    def test_the_persons_own_choice_made_after_queueing_is_followed(
+        self, people: People, notification: Callable[..., EmailOutbox], tmp_path: Path
+    ) -> None:
+        """Queued while both wanted it; then one turned it off themselves despite *always*, the
+        other has *never* and turned it on themselves: the claim follows both choices."""
+        admin, mm, eng = people.group_admin, people.mm_mad, people.engineer
+        message = notification(mm, eng)
+        set_mode(mm, NOTICE, Mode.ALWAYS, admin)
+        choose(mm, NOTICE, False)
+        set_mode(eng, NOTICE, Mode.NEVER, admin)
+        set_default(NOTICE, False, admin)
+        assert eligibility.eligible_recipients(message) == []
+        choose(eng, NOTICE, True)
+        assert eligibility.eligible_recipients(message) == [eng]
+        with fake_smtp() as server, override_settings(MAILERS=smtp_mailers(server.port)):
+            assert a_worker(tmp_path).tick() is True
+        (received,) = server.received
+        assert received.recipients == [eng.email]
+        assert EmailOutbox.objects.get(pk=message.pk).status == Status.SENT
+
+    def test_back_to_following_brings_the_administrators_setting_back(
+        self, people: People, notification: Callable[..., EmailOutbox]
+    ) -> None:
+        admin, mm = people.group_admin, people.mm_mad
+        message = notification(mm)
+        set_mode(mm, NOTICE, Mode.NEVER, admin)
+        choose(mm, NOTICE, True)
+        assert eligibility.eligible_recipients(message) == [mm]
+        NoticeChoice.objects.filter(user=mm).delete()
         assert eligibility.eligible_recipients(message) == []
 
     def test_a_row_without_a_notice_follows_the_refusal_only(

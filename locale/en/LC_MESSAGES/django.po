@@ -7731,3 +7731,39 @@ msgstr ""
 #: apps/organizations/views/notification_screens.py
 msgid "Email notifications saved."
 msgstr ""
+
+#: apps/notifications/templates/notifications/states.html
+msgid "You chose this yourself."
+msgstr ""
+
+#: apps/notifications/templates/notifications/states.html
+msgid "The person chose this themselves."
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "In the application"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "wanted"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "channel on"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "own notice choice"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "own notice choices"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "channel switch"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "channel switches"
+msgstr ""
