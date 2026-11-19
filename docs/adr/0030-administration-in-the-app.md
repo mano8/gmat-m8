@@ -1,6 +1,6 @@
 # ADR-0030: Administration happens in the app; the Django admin is optional and read-only
 
-- **Status:** Proposed (the maintainer's decisions of 2026-11-12, Q70–Q72, issue #53; accepted when the pull request of that phase merges)
+- **Status:** Accepted (the maintainer's decisions of 2026-11-12, Q70–Q72, issue #53; implemented in PR #55, merged 2026-11-14; status recorded at the maintainer's review of PR #74, 2026-11-19)
 - **Date:** 2026-11-13
 - **Governs:** `apps/core/admin.py`, `apps/accounts/admin_site.py`, `apps/*/admin.py`, `config/urls.py`, `apps/accounts/management/commands/reset_mfa.py`, `apps/catalog/services.py`, `docs/design/admin-inventory.md`, `apps/organizations/services.py`, `apps/organizations/selectors/preview.py`, `apps/organizations/selectors/structure.py`, `apps/organizations/views/company_screens.py`, `apps/organizations/views/branch_screens.py`, `apps/organizations/structure_dialogs.py`, `apps/catalog/selectors.py`, `apps/catalog/unit_views.py`, `apps/catalog/unit_dialogs.py`, `apps/catalog/unit_usage.py`, `apps/locations/services.py`, `apps/locations/selectors.py`, `apps/locations/views.py`, `apps/locations/dialogs.py`, `apps/locations/forms.py`, `apps/organizations/views/account_actions.py`, `apps/organizations/row_dialogs.py`, `apps/core/checks.py`, `apps/accounts/disabled_commands/management/commands/changepassword.py`, `docker_compose/gmat_m8/.env.example`, `docker_compose/gmat_m8/docker-compose.production.yml`, `tests/access/test_admin_inventory.py`
 

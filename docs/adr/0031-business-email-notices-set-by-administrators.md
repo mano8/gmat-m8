@@ -1,6 +1,6 @@
 # ADR-0031: Business email notifications: settings for everyone and per person, by group administrators
 
-- **Status:** Proposed (the maintainer's requirement of 2026-11-16, issue #70, decisions Q87–Q91; accepted when the pull request of that phase merges)
+- **Status:** Accepted (the maintainer's requirement of 2026-11-16, issue #70, decisions Q87–Q91; implemented in PR #74; status recorded at the maintainer's review of PR #74, 2026-11-19)
 - **Date:** 2026-11-18
 - **Governs:** `apps/notifications/kinds.py`, `apps/notifications/models.py`, `apps/notifications/resolution.py`, `apps/notifications/eligibility.py`, `apps/notifications/recipients.py`, `apps/notifications/notices.py`, `apps/notifications/outbox.py`, `apps/notifications/selectors.py`, `apps/notifications/services/preferences.py`, `apps/notifications/views.py`, `apps/organizations/notice_forms.py`, `apps/organizations/notice_dialogs.py`, `apps/organizations/views/notification_screens.py`, `tests/e2e/test_notification_settings.py`
 
