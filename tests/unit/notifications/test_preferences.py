@@ -13,7 +13,7 @@ from tests.support import principal_for
 
 pytestmark = pytest.mark.django_db
 
-ACTION = "notification_preference.changed"
+ACTION = "notification.own_changed"
 
 
 class TestService:

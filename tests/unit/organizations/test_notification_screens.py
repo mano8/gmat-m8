@@ -275,7 +275,9 @@ class TestThePersonsPage:
         assert 'name="seen_REQUEST_APPROVED"' in html
         # Someone else sets one notice while this dialog is open.
         services.set_person_notices(
-            principal_for(people.group_admin), tech.pk, {Notice.REQUEST_APPROVED: Mode.NEVER}
+            principal_for(people.group_admin),
+            tech.pk,
+            {(Notice.REQUEST_APPROVED, Channel.EMAIL): Mode.NEVER},
         )
         data = {
             "idempotency_key": key_of(html, "id_notices_idempotency_key"),
