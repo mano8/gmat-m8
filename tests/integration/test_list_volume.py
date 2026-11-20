@@ -63,14 +63,29 @@ class World:
 
 @pytest.fixture(scope="module")
 def world(django_db_setup: None, django_db_blocker: Any) -> Iterator[World]:
-    with django_db_blocker.unblock(), transaction.atomic():
-        org = build_org()
-        people = build_people(org)
-        volume = build_volume(org, people)
-        who = ("group_admin", "mm_mad", "tech_mad", "site_manager", "wo_mad")
-        clients = {name: client_for(getattr(people, name)) for name in who}
-        yield World(org, people, volume, clients)
-        transaction.set_rollback(True)
+    with django_db_blocker.unblock():
+        with transaction.atomic():
+            org = build_org()
+            people = build_people(org)
+            volume = build_volume(org, people)
+            who = ("group_admin", "mm_mad", "tech_mad", "site_manager", "wo_mad")
+            clients = {name: client_for(getattr(people, name)) for name in who}
+            yield World(org, people, volume, clients)
+            transaction.set_rollback(True)
+        forget_the_volume_statistics()
+
+
+def forget_the_volume_statistics() -> None:
+    """``ANALYZE`` the tables again once the dataset is rolled back.
+
+    The rollback removes the rows, but not all of what ``build_volume``'s ``ANALYZE`` wrote:
+    PostgreSQL updates a table's row estimate (``pg_class.reltuples``) in place, outside the
+    transaction. Left alone, the tests that follow in the same database plan their queries for
+    the volume's 2,000 handovers on tables that hold a few, and a dashboard panel measured
+    against its budget afterwards takes twice as long.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("ANALYZE")
 
 
 @dataclass(frozen=True)
