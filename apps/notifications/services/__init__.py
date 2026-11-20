@@ -6,7 +6,9 @@
 - ``own``: ``set_own_channels`` and ``set_own_notices``, the signed-in person's own channels and
   choices (M17.2), and ``set_email_opt_out``, the email case of the first (M7.1);
 - ``preferences``: ``set_notice_default`` and ``set_person_notices``, a group administrator's
-  settings per channel (M15.2, M17.2).
+  settings per channel (M15.2, M17.2);
+- ``reading``: ``open_notification`` and ``mark_all_read``, the signed-in person reading their own
+  in-app notifications (M17.3).
 """
 
 from apps.notifications.services.claims import (
@@ -41,6 +43,7 @@ from apps.notifications.services.preferences import (
     set_notice_default,
     set_person_notices,
 )
+from apps.notifications.services.reading import mark_all_read, open_notification
 
 __all__ = [
     "ABANDONED_ERROR",
@@ -59,6 +62,8 @@ __all__ = [
     "abandon_after",
     "claim_next",
     "discard_quarantined_notifications",
+    "mark_all_read",
+    "open_notification",
     "reconcile_abandoned",
     "record_outcome",
     "release_quarantined_notifications",

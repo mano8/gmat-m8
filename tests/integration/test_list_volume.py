@@ -30,11 +30,13 @@ from django.urls import reverse
 from apps.access.context import AccessContext
 from apps.audit.models import AuditEvent
 from apps.catalog.models import Material, UnitOfMeasure
-from apps.core.listing import cursor_page
+from apps.core.listing import cursor_page, paginate
 from apps.dashboards.panels import COUNT_CAP
 from apps.handovers.models import Handover
 from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.notifications import selectors as notification_selectors
+from apps.notifications.models import InAppNotification
 from apps.organizations.models import Branch, Company
 from apps.purchasing import selectors as purchasing_selectors
 from apps.purchasing.models import PurchaseOrder
@@ -387,6 +389,7 @@ def test_the_dataset_has_the_specified_size(world: World) -> None:
         "branches": (Branch.objects.count(), 300),
         "warehouses": (Location.objects.filter(kind="WAREHOUSE").count(), 300),
         "units": (UnitOfMeasure.objects.count(), 120),
+        "in-app notifications": (InAppNotification.objects.count(), 60_000),
     }
     for what, (found, at_least) in counts.items():
         assert found >= at_least, f"{what}: {found} < {at_least}"
@@ -500,3 +503,54 @@ def test_zz_timings(world: World, capsys: pytest.CaptureFixture[str]) -> None:
         for name, found in sorted(TIMINGS.items()):
             last, filtered = found["last"] * 1000, found["filtered"] * 1000
             print(f"  {name:36} last {last:5.0f} ms   filtered {filtered:5.0f} ms")
+
+
+# --- in-app notifications (M17.3): the list and the bell's count, read through the selectors
+# until their screens arrive (M17.4 adds them as ``Screen``s) --------------------------------
+
+
+def _in_app_page(user: Any, per_page: int, page: str) -> tuple[float, int, list[Any]]:
+    """One page of the person's list, drawn as the list draws it: seconds, queries, rows."""
+    request = RequestFactory().get("/", {"per_page": str(per_page), "page": page})
+    with CaptureQueriesContext(connection) as queries:
+        start = time.perf_counter()
+        ctx = AccessContext.for_user(user)
+        listing = paginate(
+            request, notification_selectors.in_app_notifications(ctx), default_per_page=25
+        )
+        rows = [(row.spec.label, row.number, row.notified_at, row.read_at) for row in listing.rows]
+        elapsed = time.perf_counter() - start
+    return elapsed, len(queries), rows
+
+
+@pytest.mark.parametrize("actor", ["tech_mad", "mm_mad"])
+def test_the_in_app_list_does_not_query_per_row(world: World, actor: str) -> None:
+    user = getattr(world.people, actor)
+    _in_app_page(user, 10, "1")  # warm up
+    _, small, rows = _in_app_page(user, 10, "1")
+    _, large, _ = _in_app_page(user, 100, "1")
+    _, last, _ = _in_app_page(user, 100, LAST)
+    assert len(rows) == 10
+    assert small == large == last
+    best = min(_in_app_page(user, 100, LAST)[0] for _ in range(RUNS))
+    assert best <= BUDGET_SECONDS, f"{actor}: {best * 1000:.0f} ms"
+
+
+@pytest.mark.parametrize("actor", ["tech_mad", "mm_mad"])
+def test_the_bell_counts_within_the_budget(world: World, actor: str) -> None:
+    user = getattr(world.people, actor)
+
+    def count() -> tuple[float, int, Any]:
+        with CaptureQueriesContext(connection) as queries:
+            start = time.perf_counter()
+            unread = notification_selectors.unread_count(AccessContext.for_user(user))
+            elapsed = time.perf_counter() - start
+        return elapsed, len(queries), unread
+
+    count()  # warm up
+    runs = [count() for _ in range(RUNS)]
+    unread = runs[-1][2]
+    assert unread.count > 0
+    assert len({queries for _, queries, _ in runs}) == 1
+    best = min(seconds for seconds, _, _ in runs)
+    assert best <= BUDGET_SECONDS, f"{actor}: {best * 1000:.0f} ms"

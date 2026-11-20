@@ -8008,3 +8008,27 @@ msgstr "interrupteur de canal"
 #: apps/notifications/models.py
 msgid "channel switches"
 msgstr "interrupteurs de canal"
+
+#: apps/notifications/models.py
+msgid "in-app notification"
+msgstr "notification dans l'application"
+
+#: apps/notifications/models.py
+msgid "in-app notifications"
+msgstr "notifications dans l'application"
+
+#: apps/notifications/models.py
+msgid "object type"
+msgstr "type d'objet"
+
+#: apps/notifications/models.py
+msgid "object id"
+msgstr "id de l'objet"
+
+#: apps/notifications/models.py
+msgid "notified at"
+msgstr "notifiée le"
+
+#: apps/notifications/models.py
+msgid "read at"
+msgstr "lue le"

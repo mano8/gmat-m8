@@ -1,4 +1,5 @@
-"""Reads of the notification screens (M7.1) and the delivery badges (M7c.1)."""
+"""Reads of the notification screens (M7.1), the delivery badges (M7c.1) and the person's
+in-app notifications (M17.3: the bell's count and the list, through ``in_app.visible``)."""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -15,11 +16,13 @@ from apps.access.context import AccessContext
 from apps.access.policy import is_staff_account
 from apps.access.roles import Capability
 from apps.accounts.models import User
-from apps.notifications import resolution
+from apps.material_requests.models import MaterialRequest
+from apps.notifications import in_app, resolution
 from apps.notifications.kinds import NOTICES, Channel, Mode, NoticeSpec
 from apps.notifications.models import (
     DISPATCH_KINDS,
     EmailOutbox,
+    InAppNotification,
     Kind,
     NoticeDefault,
     NoticeSetting,
@@ -264,3 +267,34 @@ def own_notices(ctx: AccessContext, channel: Channel = Channel.EMAIL) -> list[Pe
     if ctx.user is None:
         return []
     return _person_notices(ctx.user, channel)
+
+
+# --- in-app notifications (M17.3, Q99) -------------------------------------------------------
+
+UNREAD_CAP = 99  # the bell's count stops here and reads "99+" (as a dashboard's, M7d.4)
+
+
+@dataclass(frozen=True)
+class Unread:
+    """The bell's count: the person's unread notifications they may still see, up to the cap."""
+
+    count: int
+    more: bool
+
+    @property
+    def label(self) -> str:
+        return f"{UNREAD_CAP}+" if self.more else str(self.count)
+
+
+def unread_count(ctx: AccessContext) -> Unread:
+    """How many of the person's notifications are unread, counting at most ``UNREAD_CAP + 1`` rows
+    (one ``COUNT`` over a ``LIMIT``ed subquery: the cost of the cap, never of the backlog)."""
+    found = in_app.visible(ctx).filter(read_at__isnull=True).values("pk")[: UNREAD_CAP + 1].count()
+    return Unread(count=min(found, UNREAD_CAP), more=found > UNREAD_CAP)
+
+
+def in_app_notifications(ctx: AccessContext) -> QuerySet[InAppNotification]:
+    """The person's notifications they may still see, newest first, each with the number of its
+    request (``number``), for ``apps.core.listing.paginate``: the database pages it."""
+    number = MaterialRequest.objects.filter(pk=OuterRef("object_id")).values("number")[:1]
+    return in_app.visible(ctx).annotate(number=Subquery(number)).order_by("-notified_at", "-pk")

@@ -9,7 +9,11 @@ class NotificationsConfig(AppConfig):
     def ready(self) -> None:
         from apps.notifications import (
             eligibility,  # noqa: F401 - registers the security rules
+            housekeeping,
             notices,
         )
 
         notices.register()
+        housekeeping.register_task(
+            housekeeping.IN_APP_TASK, housekeeping.purge_in_app_notifications
+        )

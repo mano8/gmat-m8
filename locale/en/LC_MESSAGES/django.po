@@ -7767,3 +7767,27 @@ msgstr ""
 #: apps/notifications/models.py
 msgid "channel switches"
 msgstr ""
+
+#: apps/notifications/models.py
+msgid "in-app notification"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "in-app notifications"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "object type"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "object id"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "notified at"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "read at"
+msgstr ""

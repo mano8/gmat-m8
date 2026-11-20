@@ -7,9 +7,9 @@ Security mail (invitations, email changes, password and second-factor notices, r
 supplier dispatches are not notices: they are never optional.
 
 ``NOTICES`` says, per notice and in the order the screens list them, its name, who receives
-it, when, and the capability it is received through (the message's eligibility rule, checked
-again by the worker at the claim). A later business notice joins the registry with a key of
-its own; its default is on until an administrator turns it off.
+it, when, the page of the request it leads to and the capability it is received through (the
+message's eligibility rule, checked again by the worker at the claim). A later business notice
+joins the registry with a key of its own; its default is on until an administrator turns it off.
 
 The settings are stored per ``Channel`` (M17, Q95): email and in the application. ``CHANNELS``
 is the one place that says which channels the installation offers and what each gives a person
@@ -27,6 +27,11 @@ from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 
 from apps.access.roles import Capability
+
+SUBJECT = "material_requests.materialrequest"
+"""What every business notice is about (``app_label.model``): a material request. The in-app
+notifications store it with the request's id (``InAppNotification``); a notice about another kind
+of object would add its type here and to the in-app selectors."""
 
 
 class Notice(models.TextChoices):
@@ -59,6 +64,7 @@ class NoticeSpec:
     when: Promise
     capability: Capability
     order: int
+    page: str  # the URL name of the object's page the notice leads to (email link, in-app open)
 
     @property
     def label(self) -> str:
@@ -79,6 +85,7 @@ NOTICES: Mapping[Notice, NoticeSpec] = _registry(
         _("Each request submitted"),
         Capability.REQUEST_REVIEW,
         10,
+        page="requests:examine",
     ),
     NoticeSpec(
         Notice.REQUEST_ASSIGNED,
@@ -86,6 +93,7 @@ NOTICES: Mapping[Notice, NoticeSpec] = _registry(
         _("At submit when a reviewer is chosen, and at each reassignment"),
         Capability.REQUEST_REVIEW,
         20,
+        page="requests:examine",
     ),
     NoticeSpec(
         Notice.REQUEST_APPROVED,
@@ -93,6 +101,7 @@ NOTICES: Mapping[Notice, NoticeSpec] = _registry(
         _("Each approval"),
         Capability.REQUEST_VIEW,
         30,
+        page="requests:detail",
     ),
     NoticeSpec(
         Notice.REQUEST_REJECTED,
@@ -100,6 +109,7 @@ NOTICES: Mapping[Notice, NoticeSpec] = _registry(
         _("Each rejection"),
         Capability.REQUEST_VIEW,
         40,
+        page="requests:detail",
     ),
     NoticeSpec(
         Notice.REQUEST_EDITED,
@@ -107,6 +117,7 @@ NOTICES: Mapping[Notice, NoticeSpec] = _registry(
         _("A reviewer's edits, grouped over 10 minutes"),
         Capability.REQUEST_VIEW,
         50,
+        page="requests:detail",
     ),
     NoticeSpec(
         Notice.REQUEST_HANDED_OVER,
@@ -114,6 +125,7 @@ NOTICES: Mapping[Notice, NoticeSpec] = _registry(
         _("Each handover, and each receipt on site"),
         Capability.REQUEST_VIEW,
         60,
+        page="requests:detail",
     ),
 )
 

@@ -21,7 +21,7 @@ from django.db.models.functions import Now
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import BaseModel
-from apps.notifications.kinds import Channel, Mode, Notice
+from apps.notifications.kinds import NOTICES, Channel, Mode, Notice, NoticeSpec
 
 # Fan-out (plan §5): one message per event, at most this many BCC recipients each.
 MAX_RECIPIENTS = 20
@@ -422,3 +422,72 @@ class ChannelSwitch(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.user_id} {self.channel}: {'on' if self.enabled else 'off'}"
+
+
+# The notices whose unread in-app row is refreshed instead of adding another (Q98): a reviewer's
+# edits, as ``notices.EDIT_BATCH`` groups their email.
+GROUPED_IN_APP = (Notice.REQUEST_EDITED,)
+
+
+class InAppNotification(BaseModel):
+    """A business notice shown to one person in the application (M17.3, Q94, Q98, Q99).
+
+    No text is stored: the notice's key, the object it is about (``kinds.SUBJECT`` and its id)
+    and when. The row is drawn when shown, from the registry and from the object as the person
+    may see it then, so a person who lost access to the object neither sees nor counts it
+    (``apps.notifications.in_app.visible``). Written by the business change's transaction
+    (``in_app.notify``) for who wants it on ``Channel.IN_APP``; ``read_at`` is set when the
+    person opens it or marks everything read; the worker's housekeeping purges old rows
+    (``in_app_notifications``), so the table stays small.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="in_app_notifications",
+        verbose_name=_("user"),
+    )
+    notice = models.CharField(_("notice"), max_length=40, choices=Notice.choices)
+    object_type = models.CharField(_("object type"), max_length=100)
+    object_id = models.UUIDField(_("object id"))
+    notified_at = models.DateTimeField(_("notified at"), db_default=Now())
+    read_at = models.DateTimeField(_("read at"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("in-app notification")
+        verbose_name_plural = _("in-app notifications")
+        indexes = [
+            # The bell (unread of one person) and the purge of one person's oldest.
+            models.Index(
+                fields=["user", "read_at", "notified_at"], name="notif_inapp_user_read_idx"
+            ),
+            # The list: one person's, newest first.
+            models.Index(fields=["user", "-notified_at", "-id"], name="notif_inapp_user_list_idx"),
+            # The purge of old unread and old read rows, across people.
+            models.Index(
+                fields=["notified_at"],
+                condition=Q(read_at__isnull=True),
+                name="notif_inapp_unread_age_idx",
+            ),
+            models.Index(
+                fields=["read_at"],
+                condition=Q(read_at__isnull=False),
+                name="notif_inapp_read_age_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "notice", "object_type", "object_id"],
+                condition=Q(read_at__isnull=True, notice__in=GROUPED_IN_APP),
+                name="notifications_inapp_one_unread_grouped",
+            ),
+        ]
+
+    @property
+    def spec(self) -> NoticeSpec:
+        """What the registry says about this row's notice (its label, the page it opens)."""
+        return NOTICES[Notice(self.notice)]
+
+    def __str__(self) -> str:
+        state = "read" if self.read_at else "unread"
+        return f"{self.user_id} {self.notice} {self.object_id}: {state}"

@@ -12,16 +12,31 @@ Built in:
   ``QUEUED`` then becomes ``EXPIRED`` (the user asks again).
 
 Later steps register theirs from ``AppConfig.ready`` (M6.4: expired attachment reservations,
-and the media purge, which runs only while it holds the ``gmat:media-backup`` lock).
+and the media purge, which runs only while it holds the ``gmat:media-backup`` lock; M17.3: the
+purge of in-app notifications, :func:`purge_in_app_notifications`, registered by this app's
+``ready``).
 """
 
+import logging
+import time
 from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.core.cache import caches
-from django.db.models.functions import Now
+from django.db.models import Count, F, QuerySet, Window
+from django.db.models.functions import Now, RowNumber
 
+from apps.core.db import db_now
 from apps.core.idempotency import purge_expired_records
-from apps.notifications.models import EmailOutbox, Status
+from apps.notifications.models import EmailOutbox, InAppNotification, Status
+
+logger = logging.getLogger(__name__)
+
+IN_APP_TASK = "in_app_notifications"
+PURGE_BATCH = 1000  # rows per DELETE: each statement holds its row locks only briefly
+PURGE_BUDGET = 5.0  # seconds of one run; what is left waits for the next run
 
 type Task = Callable[[], int]
 
@@ -59,6 +74,79 @@ def expire_sensitive_bodies() -> int:
     wiped = {"body": "", "html_body": "", "wiped_at": Now()}
     count = expired.filter(status=Status.QUEUED).update(status=Status.EXPIRED, **wiped)
     return count + expired.update(**wiped)
+
+
+# --- in-app notifications (M17.3, Q98) -----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _Budget:
+    clock: Callable[[], float]
+    deadline: float
+
+    def spent(self) -> bool:
+        return self.clock() >= self.deadline
+
+
+def _over_cap() -> QuerySet[InAppNotification]:
+    """The rows of each person beyond their ``IN_APP_MAX_PER_PERSON`` newest, read or not."""
+    cap = int(settings.IN_APP_MAX_PER_PERSON)
+    crowded = (
+        InAppNotification.objects.values("user")
+        .annotate(rows=Count("pk"))
+        .filter(rows__gt=cap)
+        .values("user")
+    )
+    newest_first = (F("notified_at").desc(), F("pk").desc())
+    return (
+        InAppNotification.objects.filter(user__in=crowded)
+        .annotate(rank=Window(RowNumber(), partition_by=F("user"), order_by=newest_first))
+        .filter(rank__gt=cap)
+    )
+
+
+def _purge_rules(now: datetime) -> dict[str, QuerySet[InAppNotification]]:
+    """What goes, by rule, in the order the rules run."""
+    read_before = now - timedelta(days=int(settings.IN_APP_READ_RETENTION))
+    unread_before = now - timedelta(days=int(settings.IN_APP_UNREAD_RETENTION))
+    rows = InAppNotification.objects
+    return {
+        "offboarded": rows.filter(user__offboarded_at__lt=read_before),
+        "read": rows.filter(read_at__lt=read_before),
+        "unread": rows.filter(read_at__isnull=True, notified_at__lt=unread_before),
+        "over_cap": _over_cap(),
+    }
+
+
+def _delete_in_batches(rows: QuerySet[InAppNotification], budget: _Budget) -> int:
+    """``DELETE … WHERE id IN (SELECT … LIMIT n)`` until none is left or the budget is spent."""
+    deleted = 0
+    while not budget.spent():
+        batch, _details = InAppNotification.objects.filter(
+            pk__in=rows.values("pk")[:PURGE_BATCH]
+        ).delete()
+        deleted += batch
+        if batch < PURGE_BATCH:
+            break
+    return deleted
+
+
+def purge_in_app_notifications(clock: Callable[[], float] = time.monotonic) -> int:
+    """Delete the in-app notifications Q98 says go: read ``IN_APP_READ_RETENTION`` days ago,
+    unread for ``IN_APP_UNREAD_RETENTION`` days, beyond a person's ``IN_APP_MAX_PER_PERSON``
+    newest, and every one of a person offboarded ``IN_APP_READ_RETENTION`` days ago.
+
+    In batches of ``PURGE_BATCH`` within ``PURGE_BUDGET`` seconds, so no long lock is held; what
+    is left goes at the next run. Logs the count per rule, never who.
+    """
+    budget = _Budget(clock, clock() + PURGE_BUDGET)
+    counts = {
+        rule: _delete_in_batches(rows, budget) for rule, rows in _purge_rules(db_now()).items()
+    }
+    logger.info(
+        "In-app notifications purged: %s", ", ".join(f"{rule}={n}" for rule, n in counts.items())
+    )
+    return sum(counts.values())
 
 
 register_task("idempotency", purge_expired_records)

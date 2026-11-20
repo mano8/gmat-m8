@@ -1,4 +1,5 @@
-"""Business notifications: what each domain event mails, and to whom (plan §5, M7.1).
+"""Business notifications: what each domain event mails, and to whom (plan §5, M7.1), and
+the same notice in the application (M17.3, ``in_app``) for the same recipients.
 
 The subscribers run inside the transaction of the service that publishes the event
 (``apps.core.events``), so a message exists exactly when the change commits and a rolled-back
@@ -22,6 +23,10 @@ claim.
 - ``handover.posted``: ``REQUEST_HANDED_OVER`` to the requester of each request served,
   with their own lines only (a ``DIRECT_RECEIPT`` handover is the receipt of goods on site).
 
+Each subscriber also writes the notice in the application (``in_app.notify``) for the same
+recipients, kept there by their settings for ``Channel.IN_APP``; a reviewer's edits refresh the
+requester's unread one instead of adding another, whether or not an email waits.
+
 Bodies are rendered in the installation's language and carry nothing beyond what the
 recipient may already see on the request: no prices, suppliers, orders or other requests.
 """
@@ -42,7 +47,7 @@ from apps.core.events import Event
 from apps.handovers.models import Handover
 from apps.material_requests import reviewers
 from apps.material_requests.models import MaterialRequest
-from apps.notifications import outbox, recipients
+from apps.notifications import in_app, outbox, recipients
 from apps.notifications.kinds import NOTICES, Notice
 from apps.notifications.models import EmailOutbox
 from apps.notifications.outbox import queue_notification
@@ -55,6 +60,11 @@ def _absolute(path: str) -> str:
     return f"{str(settings.PUBLIC_BASE_URL).rstrip('/')}{path}"
 
 
+def _link(notice: Notice, request: MaterialRequest) -> str:
+    """The absolute link to the page of ``request`` that ``notice`` leads to."""
+    return _absolute(reverse(NOTICES[notice].page, args=[request.pk]))
+
+
 def _queue(
     users: list[User],
     notice: Notice,
@@ -64,8 +74,23 @@ def _queue(
     source_ref: str,
     context: dict[str, Any],
 ) -> list[EmailOutbox]:
+    """Tell ``users`` about ``notice`` in the application and by email, each where they want
+    it (M17.3)."""
+    in_app.notify(notice, users, request)
+    return _mail(users, notice, request, template, subject, source_ref, context)
+
+
+def _mail(
+    users: list[User],
+    notice: Notice,
+    request: MaterialRequest,
+    template: str,
+    subject: str,
+    source_ref: str,
+    context: dict[str, Any],
+) -> list[EmailOutbox]:
     """Render ``template`` in the installation's language and queue it as ``notice`` for
-    the ``users`` who want it."""
+    the ``users`` who want it by email."""
     if not users:
         return []
     with translation.override(settings.LANGUAGE_CODE):
@@ -91,7 +116,7 @@ def on_request_submitted(event: Event) -> None:
     assigned = reviewers.assignee(request)
     with translation.override(settings.LANGUAGE_CODE):
         subject = _("Request %(number)s to review") % {"number": request.number}
-        link = _absolute(reverse("requests:examine", args=[request.pk]))
+        link = _link(Notice.REQUEST_TO_REVIEW, request)
     excluded = {request.requested_by_id} | ({assigned.pk} if assigned is not None else set())
     _queue(
         recipients.holders(NOTICES[Notice.REQUEST_TO_REVIEW].capability, request, exclude=excluded),
@@ -123,7 +148,7 @@ def _assigned(
     the note of a reassignment."""
     with translation.override(settings.LANGUAGE_CODE):
         subject = _("Request %(number)s assigned to you") % {"number": request.number}
-        link = _absolute(reverse("requests:examine", args=[request.pk]))
+        link = _link(Notice.REQUEST_ASSIGNED, request)
     _queue(
         recipients.user_with(NOTICES[Notice.REQUEST_ASSIGNED].capability, request, reviewer),
         Notice.REQUEST_ASSIGNED,
@@ -138,13 +163,13 @@ def _assigned(
 def on_request_decided(event: Event) -> None:
     request = _request(event.payload["request_id"])
     approved = event.name == "request.approved"
+    notice = Notice.REQUEST_APPROVED if approved else Notice.REQUEST_REJECTED
     with translation.override(settings.LANGUAGE_CODE):
         subject = (
             _("Request %(number)s approved") if approved else _("Request %(number)s rejected")
         ) % {"number": request.number}
-        link = _absolute(reverse("requests:detail", args=[request.pk]))
+        link = _link(notice, request)
     lines = request.lines.select_related("material", "unit").order_by("line_no")
-    notice = Notice.REQUEST_APPROVED if approved else Notice.REQUEST_REJECTED
     _queue(
         recipients.user_with(NOTICES[notice].capability, request, request.requested_by),
         notice,
@@ -160,16 +185,18 @@ def on_request_edited(event: Event) -> None:
     request = _request(event.payload["request_id"])
     if event.payload["editor_id"] == request.requested_by_id:
         return
+    users = recipients.user_with(
+        NOTICES[Notice.REQUEST_EDITED].capability, request, request.requested_by
+    )
+    in_app.notify(Notice.REQUEST_EDITED, users, request)  # refreshes an unread one (Q98)
     source_ref = f"request.edited:{request.pk}"
     if outbox.waiting(source_ref):
-        return  # the notice already queued covers this edit too
+        return  # the email already queued covers this edit too
     with translation.override(settings.LANGUAGE_CODE):
         subject = _("Request %(number)s changed by a reviewer") % {"number": request.number}
-        link = _absolute(reverse("requests:detail", args=[request.pk]))
-    messages = _queue(
-        recipients.user_with(
-            NOTICES[Notice.REQUEST_EDITED].capability, request, request.requested_by
-        ),
+        link = _link(Notice.REQUEST_EDITED, request)
+    messages = _mail(
+        users,
         Notice.REQUEST_EDITED,
         request,
         "request_edited",
@@ -204,7 +231,7 @@ def _handed_over(handover: Handover, request: MaterialRequest, lines: list[Any])
             if on_site
             else _("Request %(number)s: goods handed over")
         ) % {"number": request.number}
-        link = _absolute(reverse("requests:detail", args=[request.pk]))
+        link = _link(Notice.REQUEST_HANDED_OVER, request)
     _queue(
         recipients.user_with(
             NOTICES[Notice.REQUEST_HANDED_OVER].capability, request, request.requested_by
