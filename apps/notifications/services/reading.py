@@ -38,7 +38,7 @@ def open_notification(principal: SessionPrincipal, notification_id: UUID) -> str
     found: InAppNotification | None = rows.first()
     if found is None:
         raise NotInScope(Capability.CATALOG_VIEW)
-    rows.filter(read_at__isnull=True).update(read_at=Now())
+    rows.filter(read_at__isnull=True).update(read_at=Now(), updated_at=Now())
     return reverse(found.spec.page, args=[found.object_id])
 
 
@@ -46,4 +46,4 @@ def open_notification(principal: SessionPrincipal, notification_id: UUID) -> str
 def mark_all_read(principal: SessionPrincipal) -> int:
     """Mark every unread notification the principal may still see read; return how many."""
     unread = in_app.visible(_own(principal)).filter(read_at__isnull=True)
-    return unread.update(read_at=Now())
+    return unread.update(read_at=Now(), updated_at=Now())

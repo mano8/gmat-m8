@@ -463,12 +463,20 @@ def _housekeep_in_txn(principal: SystemPrincipal, name: str, task: Callable[[], 
     return run_in_transaction(lambda: _housekeep(principal, name, task))
 
 
+def _batched(principal: SystemPrincipal, name: str, task: housekeeping.BatchedTask) -> int:
+    """A batched task: each of its steps in its own transaction, authorized again."""
+    return int(task(lambda step: _housekeep_in_txn(principal, name, step)))
+
+
 def run_housekeeping(principal: SystemPrincipal) -> dict[str, int]:
     """Run every registered housekeeping task; return the rows each one touched."""
-    return {
+    done = {
         name: _housekeep_in_txn(principal, name, task)
         for name, task in housekeeping.tasks().items()
     }
+    for name, task in housekeeping.batched_tasks().items():
+        done[name] = _batched(principal, name, task)
+    return done
 
 
 # --- messages a restore held back (plan §9, step 4; Q25) ------------------------------------

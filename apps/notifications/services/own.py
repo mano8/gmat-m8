@@ -12,9 +12,6 @@ with before and after, branchless) and publishes nothing when nothing changed.
 from collections.abc import Mapping
 from typing import Any, cast
 
-from django.core.exceptions import ValidationError
-from django.utils.translation import gettext_lazy as _
-
 from apps.access.authorization import authorize_in_txn
 from apps.access.generations import lock_access_state, lock_users
 from apps.access.principals import SessionPrincipal
@@ -27,7 +24,14 @@ from apps.core.idempotency import execute_once
 from apps.core.locking import LockMode, LockOrder, transactional
 from apps.notifications.kinds import CHANNELS, Channel, Notice
 from apps.notifications.models import ChannelSwitch, NoticeChoice, NotificationPreference
-from apps.notifications.services.common import NoticeKey, by_channel, flat, known, known_key
+from apps.notifications.services.common import (
+    NoticeKey,
+    by_channel,
+    flag,
+    flat,
+    known,
+    known_key,
+)
 
 OWN_CHANNELS_OPERATION = "notice.own_channels_set"
 OWN_NOTICES_OPERATION = "notice.own_notices_set"
@@ -41,13 +45,6 @@ def _lock_own(principal: SessionPrincipal) -> User:
     lock_access_state(locks)
     lock_users(locks, {principal.user_id}, mode=LockMode.NO_KEY_UPDATE)
     return authorize_in_txn(principal, Capability.CATALOG_VIEW, locks=locks)
-
-
-def _flag(value: object, field: str) -> bool:
-    """``value`` when it is a real boolean, otherwise a validation error on ``field``."""
-    if isinstance(value, bool):
-        return value
-    raise ValidationError({field: ValidationError(_("Unknown choice."), code="invalid_choice")})
 
 
 def _email_state(user: User) -> NotificationPreference | None:
@@ -101,9 +98,7 @@ def set_own_channels(
     ``channels`` names only the channels to change. Security email and supplier dispatches are not
     affected. A channel already as asked writes nothing and is not audited.
     """
-    wanted = {
-        known(Channel, key, "channels"): _flag(on, "channels") for key, on in channels.items()
-    }
+    wanted = {known(Channel, key, "channels"): flag(on, "channels") for key, on in channels.items()}
     user = _lock_own(principal)
 
     def execute() -> User:
@@ -131,7 +126,7 @@ def _clean_choices(
     choices: Mapping[tuple[Any, Any], bool | None],
 ) -> dict[NoticeKey, bool | None]:
     return {
-        known_key(key, "choices"): None if on is None else _flag(on, "choices")
+        known_key(key, "choices"): None if on is None else flag(on, "choices")
         for key, on in choices.items()
     }
 

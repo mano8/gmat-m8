@@ -566,7 +566,10 @@ class TestHousekeeping:
             "attachment_media": 0,
             "in_app_notifications": 0,  # this app's ready (M17.3)
         }
-        assert authorized == [f"housekeeping.{name}" for name in done]
+        # One authorization per task; a batched task's every batch is authorized again: the
+        # in-app purge tries one (empty) batch per rule, each in its own transaction.
+        once = [f"housekeeping.{name}" for name in done if name != "in_app_notifications"]
+        assert authorized == once + ["housekeeping.in_app_notifications"] * 4
         assert (reload(queued).status, reload(queued).body) == (Status.EXPIRED, "")
         assert (reload(ambiguous).status, reload(ambiguous).body) == (Status.AMBIGUOUS, "")
         assert reload(sending).body != ""  # left to its outcome
@@ -584,6 +587,37 @@ class TestHousekeeping:
         housekeeping.register_task("idempotency", housekeeping._TASKS["idempotency"])
         with pytest.raises(ValueError, match="already registered"):
             housekeeping.register_task("idempotency", lambda: 0)
+
+    def test_batched_task_names(self) -> None:
+        purge = housekeeping._BATCHED["in_app_notifications"]
+        for name in ("", "a.b"):
+            with pytest.raises(ValueError, match="Invalid"):
+                housekeeping.register_batched_task(name, purge)
+        housekeeping.register_batched_task("in_app_notifications", purge)  # the same: no change
+        for taken in ("in_app_notifications", "idempotency"):  # either registry's name
+            with pytest.raises(ValueError, match="already registered"):
+                housekeeping.register_batched_task(taken, lambda run_step: 0)
+        with pytest.raises(ValueError, match="already registered"):
+            housekeeping.register_task("in_app_notifications", lambda: 0)
+
+    def test_a_batched_task_runs_each_step_authorized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(housekeeping, "_TASKS", {})
+        steps = [lambda: 2, lambda: 3]
+        monkeypatch.setattr(
+            housekeeping, "_BATCHED", {"two": lambda run_step: sum(run_step(s) for s in steps)}
+        )
+        authorized: list[str] = []
+        from apps.access.authorization import authorize_in_txn as real
+
+        def spy(principal: Any, capability: str, **kwargs: Any) -> Any:
+            authorized.append(capability)
+            return real(principal, capability, **kwargs)
+
+        monkeypatch.setattr("apps.notifications.services.claims.authorize_in_txn", spy)
+        assert run_housekeeping(SystemPrincipal()) == {"two": 5}
+        assert authorized == ["housekeeping.two", "housekeeping.two"]
 
     def test_a_cache_without_purge(self) -> None:
         caches = {"default": object()}

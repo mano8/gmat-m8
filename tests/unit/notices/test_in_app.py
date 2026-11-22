@@ -388,6 +388,39 @@ class TestPurge:
         assert housekeeping.purge_in_app_notifications() == 4
         assert left(people.tech_mad) == 10 and left(people.mm_mad) == 0
 
+    def test_the_cap_counts_rows_notified_at_the_same_time(
+        self, people: People, request_: MaterialRequest, settings: Any
+    ) -> None:
+        """Rows written by one transaction share their time: the id decides which go."""
+        settings.IN_APP_MAX_PER_PERSON = 10
+        rows = InAppNotification.objects.bulk_create(
+            InAppNotification(
+                user=people.tech_mad,
+                notice=Notice.REQUEST_HANDED_OVER,
+                object_type=SUBJECT,
+                object_id=request_.pk,
+            )
+            for _ in range(12)
+        )
+        assert len({row.notified_at for row in InAppNotification.objects.all()}) == 1
+        assert housekeeping.purge_in_app_notifications() == 2
+        kept = set(InAppNotification.objects.values_list("pk", flat=True))
+        assert kept == set(sorted(row.pk for row in rows)[2:])  # the two lowest ids went
+
+    def test_each_batch_is_a_step(
+        self, people: People, aged: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(housekeeping, "PURGE_BATCH", 4)
+        aged(people.tech_mad, 10, days=100)
+        steps: list[int] = []
+
+        def run_step(step: Callable[[], int]) -> int:
+            steps.append(done := step())
+            return done
+
+        assert housekeeping.purge_in_app_notifications(run_step) == 10
+        assert steps == [0, 0, 4, 4, 2, 0]  # offboarded, read, unread in three, over the cap
+
     def test_an_offboarded_persons_rows_go_after_30_days(
         self, people: People, aged: Callable[..., Any]
     ) -> None:

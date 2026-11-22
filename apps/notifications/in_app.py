@@ -57,7 +57,7 @@ def notify(notice: Notice, users: Iterable[User], obj: Model) -> int:
     if notice in GROUPED_IN_APP:
         unread = InAppNotification.objects.filter(user_id__in=ids, read_at__isnull=True, **about)
         refreshed = set(unread.select_for_update().values_list("user_id", flat=True))
-        unread.update(notified_at=Now())
+        unread.update(notified_at=Now(), updated_at=Now())
     InAppNotification.objects.bulk_create(
         InAppNotification(user_id=user_id, **about) for user_id in sorted(ids - refreshed, key=str)
     )

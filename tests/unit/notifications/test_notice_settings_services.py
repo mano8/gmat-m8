@@ -10,7 +10,7 @@ nothing differs, and a double tap replays.
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -193,6 +193,16 @@ class TestSetNoticeDefault:
         assert error_codes(exc.value) == {"invalid_choice"}
         assert not NoticeDefault.objects.exists()
 
+    def test_a_value_that_is_not_a_boolean_is_refused(self, people: People) -> None:
+        with pytest.raises(ValidationError) as exc:
+            services.set_notice_default(
+                principal_for(people.group_admin),
+                Notice.REQUEST_APPROVED,
+                enabled=cast(Any, "false"),
+            )
+        assert exc.value.message_dict.keys() == {"enabled"}
+        assert not NoticeDefault.objects.exists()
+
 
 class TestSetNoticeDefaultIdempotency:
     def call(self, actor: User, key: str, *, enabled: bool = False) -> NoticeDefault:
@@ -282,6 +292,16 @@ class TestSetNoticeChannels:
         with pytest.raises(ValidationError) as exc:
             services.set_notice_channels(principal_for(people.group_admin), notice, channels)
         assert exc.value.message_dict.keys() == {field}
+        assert not NoticeDefault.objects.exists()
+
+    def test_a_value_that_is_not_a_boolean_is_refused(self, people: People) -> None:
+        with pytest.raises(ValidationError) as exc:
+            services.set_notice_channels(
+                principal_for(people.group_admin),
+                Notice.REQUEST_APPROVED,
+                cast(Any, {"IN_APP": "false"}),
+            )
+        assert error_codes(exc.value) == {"invalid_choice"}
         assert not NoticeDefault.objects.exists()
 
     @pytest.mark.parametrize("actor", OTHER_ROLES)

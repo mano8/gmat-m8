@@ -14,6 +14,6 @@ class NotificationsConfig(AppConfig):
         )
 
         notices.register()
-        housekeeping.register_task(
+        housekeeping.register_batched_task(
             housekeeping.IN_APP_TASK, housekeeping.purge_in_app_notifications
         )

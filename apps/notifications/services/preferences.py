@@ -28,7 +28,7 @@ from apps.core.idempotency import execute_once
 from apps.core.locking import LockMode, LockOrder, transactional
 from apps.notifications.kinds import CHANNELS, Channel, Mode, Notice
 from apps.notifications.models import NoticeDefault, NoticeSetting
-from apps.notifications.services.common import NoticeKey, by_channel, flat, known, known_key
+from apps.notifications.services.common import NoticeKey, by_channel, flag, flat, known, known_key
 
 # --- what business email is sent: for everyone and for one person (M15.2, Q87, Q89) -----------
 
@@ -89,6 +89,7 @@ def set_notice_default(
     """
     kind = known(Notice, notice, "notice")
     chosen = known(Channel, channel, "channel")
+    enabled = flag(enabled, "enabled")
     actor = authorize_in_txn(principal, Capability.ORG_MANAGE, locks=LockOrder())
     return execute_once(
         actor_id=principal.user_id,
@@ -114,7 +115,7 @@ def set_notice_channels(
     what to change, at least one; each is audited as its own change. Returns the row of the first
     channel named."""
     kind = known(Notice, notice, "notice")
-    wanted = {known(Channel, key, "channels"): on for key, on in channels.items()}
+    wanted = {known(Channel, key, "channels"): flag(on, "channels") for key, on in channels.items()}
     if not wanted:
         raise ValidationError({"channels": ValidationError(_("Nothing to change."), code="empty")})
     actor = authorize_in_txn(principal, Capability.ORG_MANAGE, locks=LockOrder())

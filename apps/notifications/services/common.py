@@ -21,6 +21,13 @@ def known[E: (Notice, Channel, Mode)](kind: type[E], value: str, field: str) -> 
         ) from None
 
 
+def flag(value: object, field: str) -> bool:
+    """``value`` when it is a real boolean, otherwise a validation error on ``field``."""
+    if isinstance(value, bool):
+        return value
+    raise ValidationError({field: ValidationError(_("Unknown choice."), code="invalid_choice")})
+
+
 def known_key(key: tuple[Any, Any], field: str) -> NoticeKey:
     """A ``(notice, channel)`` key as members, or a validation error on ``field``."""
     try:

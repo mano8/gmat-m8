@@ -1,23 +1,29 @@
 """A reviewer's edit refreshing the requester's unread notification while the requester marks
-everything read (M17.3, Q98).
+everything read, or while the worker purges old notifications (M17.3, Q98).
 
 ``in_app.notify`` locks the unread row it refreshes, so a *mark all as read* that arrives
 meanwhile waits and then marks the refreshed row read; a *mark all as read* that commits first
 leaves nothing unread, and the edit then adds a new row. Either way the person ends with the edit
 told or read, never lost, and never two unread rows about one request.
+
+The purge's DELETE that waits on a row the edit refreshes checks its rule again on the refreshed
+row and leaves it; and under the worker each batch of the purge is a transaction of its own.
 """
 
 import time
+from datetime import timedelta
 from typing import Any
 
 import pytest
 from django.db import transaction
+from django.utils import timezone
 
+from apps.access.principals import SystemPrincipal
 from apps.material_requests.models import MaterialRequest
-from apps.notifications import in_app
+from apps.notifications import housekeeping, in_app
 from apps.notifications.kinds import SUBJECT, Notice
 from apps.notifications.models import InAppNotification
-from apps.notifications.services import mark_all_read
+from apps.notifications.services import mark_all_read, run_housekeeping
 from tests.integration.conftest import run_concurrently
 from tests.org import Org, People
 from tests.support import principal_for
@@ -92,3 +98,54 @@ def test_an_edit_after_everything_was_read_adds_a_row(
     rows = list(InAppNotification.objects.order_by("notified_at", "pk"))
     assert len(rows) == 2
     assert [row.read_at is None for row in rows].count(True) == 1
+
+
+def _old(people: People, request: MaterialRequest, count: int = 1) -> list[InAppNotification]:
+    """Unread *changed by a reviewer* rows of the requester, due for the purge (100 days old)."""
+    long_ago = timezone.now() - timedelta(days=100)
+    return InAppNotification.objects.bulk_create(
+        InAppNotification(
+            user=people.tech_mad,
+            notice=Notice.REQUEST_EDITED if index == 0 else Notice.REQUEST_HANDED_OVER,
+            object_type=SUBJECT,
+            object_id=request.pk,
+            notified_at=long_ago - timedelta(seconds=index),
+        )
+        for index in range(count)
+    )
+
+
+def test_the_purge_leaves_a_row_an_edit_refreshed(
+    people: People, request_: MaterialRequest
+) -> None:
+    (row,) = _old(people, request_)
+    results = _run(
+        lambda: _edit(people, request_, HOLD),
+        housekeeping.purge_in_app_notifications,
+    )
+    assert results == [1, 0], results  # the DELETE waited, then saw the row was new again
+    (kept,) = InAppNotification.objects.all()
+    assert kept.pk == row.pk and kept.notified_at > timezone.now() - timedelta(minutes=1)
+    assert kept.updated_at > row.updated_at
+
+
+def test_under_the_worker_each_batch_commits(
+    people: People, request_: MaterialRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failure in the third batch keeps what the first two deleted."""
+    monkeypatch.setattr(housekeeping, "PURGE_BATCH", 2)
+    monkeypatch.setattr(housekeeping, "_TASKS", {})
+    _old(people, request_, 5)
+    real = housekeeping._delete_batch
+    calls: list[int] = []
+
+    def failing(rule: Any) -> int:
+        calls.append(1)
+        if len(calls) == 5:  # offboarded, read, then the unread rule's 2 + 2, then this
+            raise RuntimeError("the database went away")
+        return real(rule)
+
+    monkeypatch.setattr(housekeeping, "_delete_batch", failing)
+    with pytest.raises(RuntimeError):
+        run_housekeeping(SystemPrincipal())
+    assert InAppNotification.objects.count() == 1
