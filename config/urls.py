@@ -12,6 +12,7 @@ urlpatterns = [
     path("accounts/", include("apps.accounts.urls")),
     path("invite/", include("apps.accounts.invitation_urls")),
     path("account/notifications/", include("apps.notifications.urls")),
+    path("notifications/", include("apps.notifications.inbox_urls")),
     path("account/email-change/", include("apps.accounts.email_change_urls")),
     path("account/sessions/", include("apps.accounts.session_urls")),
     path("projects/", include("apps.projects.urls")),

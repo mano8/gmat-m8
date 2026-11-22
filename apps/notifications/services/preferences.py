@@ -26,14 +26,47 @@ from apps.core import events
 from apps.core.db import db_now
 from apps.core.idempotency import execute_once
 from apps.core.locking import LockMode, LockOrder, transactional
-from apps.notifications.kinds import Channel, Mode, Notice
+from apps.notifications.kinds import CHANNELS, Channel, Mode, Notice
 from apps.notifications.models import NoticeDefault, NoticeSetting
 from apps.notifications.services.common import NoticeKey, by_channel, flat, known, known_key
 
 # --- what business email is sent: for everyone and for one person (M15.2, Q87, Q89) -----------
 
 NOTICE_DEFAULT_OPERATION = "notice.default_set"
+NOTICE_CHANNELS_OPERATION = "notice.channels_set"
 PERSON_NOTICES_OPERATION = "notice.person_set"
+
+
+def _decide(
+    principal: Principal, actor: User, kind: Notice, chosen: Channel, enabled: bool
+) -> NoticeDefault:
+    """Make the setting for everyone of ``kind`` on ``chosen`` say ``enabled`` (row locked);
+    audited and published only when it changes what applied."""
+    row, created = NoticeDefault.objects.select_for_update().get_or_create(
+        notice=kind, channel=chosen, defaults={"enabled": enabled, "changed_by": actor}
+    )
+    if not created and row.enabled == enabled:
+        return row
+    before = CHANNELS[chosen].default if created else row.enabled
+    if before == enabled:  # the first decision says what no row already meant
+        return row
+    if not created:
+        row.enabled, row.changed_by = enabled, actor
+        row.changed_at = db_now()
+        row.save(update_fields=["enabled", "changed_by", "changed_at", "updated_at"])
+    record(
+        principal.audit_identity,
+        "notification.default_changed",
+        obj=row,
+        data={
+            "notice": kind.value,
+            "channel": chosen.value,
+            "before": before,
+            "after": enabled,
+        },
+    )
+    events.publish("notification.default_changed", notice=kind.value, enabled=enabled)
+    return row
 
 
 @transactional
@@ -48,48 +81,56 @@ def set_notice_default(
     """Send a business notice to everyone (``True``) or to nobody who has no setting of their own
     (``False``) on ``channel`` (``org.manage``, installation-wide as units are, ADR-0030).
 
-    A person's own setting (``set_person_notices``) and their own refusal of business email
-    (``set_email_opt_out``) are never changed by it. The row is created by the first decision (no
-    row meant *on*, so deciding *on* first only records who decided); a decision that changes
-    nothing is not audited and publishes nothing. The person
-    concerned is told nothing (Q89).
+    A person's own setting (``set_person_notices``) and their own switch and choices
+    (``services.own``) are never changed by it. The row is created by the first decision (no row
+    meant the channel's default, so deciding that first only records who decided); a decision
+    that changes nothing is not audited and publishes nothing. The person concerned is told
+    nothing (Q89).
     """
     kind = known(Notice, notice, "notice")
     chosen = known(Channel, channel, "channel")
     actor = authorize_in_txn(principal, Capability.ORG_MANAGE, locks=LockOrder())
-
-    def execute() -> NoticeDefault:
-        row, created = NoticeDefault.objects.select_for_update().get_or_create(
-            notice=kind, channel=chosen, defaults={"enabled": enabled, "changed_by": actor}
-        )
-        if not created and row.enabled == enabled:
-            return row
-        before = True if created else row.enabled
-        if before == enabled:  # the first decision says what no row already meant
-            return row
-        if not created:
-            row.enabled, row.changed_by = enabled, actor
-            row.changed_at = db_now()
-            row.save(update_fields=["enabled", "changed_by", "changed_at", "updated_at"])
-        record(
-            principal.audit_identity,
-            "notification.default_changed",
-            obj=row,
-            data={
-                "notice": kind.value,
-                "channel": chosen.value,
-                "before": before,
-                "after": enabled,
-            },
-        )
-        events.publish("notification.default_changed", notice=kind.value, enabled=enabled)
-        return row
-
     return execute_once(
         actor_id=principal.user_id,
         key=idempotency_key,
         operation=NOTICE_DEFAULT_OPERATION,
         payload={"notice": kind.value, "channel": chosen.value, "enabled": enabled},
+        execute=lambda: _decide(principal, actor, kind, chosen, enabled),
+        replay=lambda _type, pk: NoticeDefault.objects.get(pk=pk),
+    )
+
+
+@transactional
+def set_notice_channels(
+    principal: Principal,
+    notice: Notice | str,
+    channels: Mapping[Channel, bool] | Mapping[str, bool],
+    *,
+    idempotency_key: str | None = None,
+) -> NoticeDefault:
+    """Send a business notice to everyone or to nobody on each of ``channels`` (``True`` or
+    ``False``), in one transaction: what :func:`set_notice_default` does for one channel, for the
+    several a dialog of the administration page sets at once (M17.4). ``channels`` names only
+    what to change, at least one; each is audited as its own change. Returns the row of the first
+    channel named."""
+    kind = known(Notice, notice, "notice")
+    wanted = {known(Channel, key, "channels"): on for key, on in channels.items()}
+    if not wanted:
+        raise ValidationError({"channels": ValidationError(_("Nothing to change."), code="empty")})
+    actor = authorize_in_txn(principal, Capability.ORG_MANAGE, locks=LockOrder())
+
+    def execute() -> NoticeDefault:
+        rows = [_decide(principal, actor, kind, channel, on) for channel, on in wanted.items()]
+        return rows[0]
+
+    return execute_once(
+        actor_id=principal.user_id,
+        key=idempotency_key,
+        operation=NOTICE_CHANNELS_OPERATION,
+        payload={
+            "notice": kind.value,
+            "channels": {channel.value: on for channel, on in wanted.items()},
+        },
         execute=execute,
         replay=lambda _type, pk: NoticeDefault.objects.get(pk=pk),
     )

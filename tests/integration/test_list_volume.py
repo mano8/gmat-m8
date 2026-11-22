@@ -30,12 +30,11 @@ from django.urls import reverse
 from apps.access.context import AccessContext
 from apps.audit.models import AuditEvent
 from apps.catalog.models import Material, UnitOfMeasure
-from apps.core.listing import cursor_page, paginate
+from apps.core.listing import cursor_page
 from apps.dashboards.panels import COUNT_CAP
 from apps.handovers.models import Handover
 from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
-from apps.notifications import selectors as notification_selectors
 from apps.notifications.models import InAppNotification
 from apps.organizations.models import Branch, Company
 from apps.purchasing import selectors as purchasing_selectors
@@ -332,6 +331,9 @@ SCREENS = (
     ),
     *PANELS,
     *CHARTS,
+    # M17.4: the person's list (a fixed page of 25) and the bell's fragment, polled every minute.
+    Screen("in-app-list", reverse_("inapp:list"), ("tech_mad", "mm_mad"), {}, fixed_size=True),
+    Screen("in-app-bell", reverse_("inapp:bell"), ("tech_mad", "mm_mad"), {}, fixed_size=True),
     Screen(
         "audit-history",
         lambda w: reverse(
@@ -520,52 +522,12 @@ def test_zz_timings(world: World, capsys: pytest.CaptureFixture[str]) -> None:
             print(f"  {name:36} last {last:5.0f} ms   filtered {filtered:5.0f} ms")
 
 
-# --- in-app notifications (M17.3): the list and the bell's count, read through the selectors
-# until their screens arrive (M17.4 adds them as ``Screen``s) --------------------------------
-
-
-def _in_app_page(user: Any, per_page: int, page: str) -> tuple[float, int, list[Any]]:
-    """One page of the person's list, drawn as the list draws it: seconds, queries, rows."""
-    request = RequestFactory().get("/", {"per_page": str(per_page), "page": page})
-    with CaptureQueriesContext(connection) as queries:
-        start = time.perf_counter()
-        ctx = AccessContext.for_user(user)
-        listing = paginate(
-            request, notification_selectors.in_app_notifications(ctx), default_per_page=25
-        )
-        rows = [(row.spec.label, row.number, row.notified_at, row.read_at) for row in listing.rows]
-        elapsed = time.perf_counter() - start
-    return elapsed, len(queries), rows
+# --- in-app notifications (M17.4): the bell's count has rows to count -----------------------
 
 
 @pytest.mark.parametrize("actor", ["tech_mad", "mm_mad"])
-def test_the_in_app_list_does_not_query_per_row(world: World, actor: str) -> None:
-    user = getattr(world.people, actor)
-    _in_app_page(user, 10, "1")  # warm up
-    _, small, rows = _in_app_page(user, 10, "1")
-    _, large, _ = _in_app_page(user, 100, "1")
-    _, last, _ = _in_app_page(user, 100, LAST)
-    assert len(rows) == 10
-    assert small == large == last
-    best = min(_in_app_page(user, 100, LAST)[0] for _ in range(RUNS))
-    assert best <= BUDGET_SECONDS, f"{actor}: {best * 1000:.0f} ms"
-
-
-@pytest.mark.parametrize("actor", ["tech_mad", "mm_mad"])
-def test_the_bell_counts_within_the_budget(world: World, actor: str) -> None:
-    user = getattr(world.people, actor)
-
-    def count() -> tuple[float, int, Any]:
-        with CaptureQueriesContext(connection) as queries:
-            start = time.perf_counter()
-            unread = notification_selectors.unread_count(AccessContext.for_user(user))
-            elapsed = time.perf_counter() - start
-        return elapsed, len(queries), unread
-
-    count()  # warm up
-    runs = [count() for _ in range(RUNS)]
-    unread = runs[-1][2]
-    assert unread.count > 0
-    assert len({queries for _, queries, _ in runs}) == 1
-    best = min(seconds for seconds, _, _ in runs)
-    assert best <= BUDGET_SECONDS, f"{actor}: {best * 1000:.0f} ms"
+def test_the_bell_counts_unread_rows(world: World, actor: str) -> None:
+    """The list and the bell are ``Screen``s above; this keeps them honest: the dataset gives each
+    of them unread rows, so the budget is measured on a count that reads a stretch of the table."""
+    body = world.clients[actor].get(reverse("inapp:bell")).content.decode()
+    assert re.search(r'data-unread="[1-9]\d*"', body)

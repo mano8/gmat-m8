@@ -27,41 +27,42 @@ MATERIALS = ("CAB-H07VK-4-MA", "CAB-H07VK-4-NE")
 
 
 def set_default(page: Page, notice: str, *, turn_on: bool) -> None:
-    """The administration page's dialog of one email: turn it on or off for everyone."""
+    """The administration page's dialog of one email: turn it on or off for everyone (email)."""
     page.goto("/org/notifications/")
     row = page.locator(f"[data-testid=notice-row][data-notice={notice.upper().replace('-', '_')}]")
     page.get_by_test_id(f"notice-{notice}-open").click()
     dialog = page.get_by_test_id(f"notice-{notice}-dialog")
     expect(dialog.get_by_test_id("consequences")).to_be_visible()
+    dialog.locator("select[name=EMAIL]").select_option("on" if turn_on else "off")
     pages.send_dialog(page, dialog, f"notice-{notice}-submit")
     expected = "Sent" if turn_on else "Not sent"
-    expect(row.get_by_test_id("notice-state")).to_have_text(re.compile(expected))
+    email = row.locator("[data-testid=notice-state][data-channel=EMAIL]")
+    expect(email).to_contain_text(re.compile(expected))
 
 
 def set_person(page: Page, account: str, notice: str, mode: str) -> None:
     """A person's page: their own setting for one email (``FOLLOW``, ``ALWAYS`` or ``NEVER``)."""
     page.goto(f"/org/people/?q={account}")
     page.get_by_role("link", name=f"{account}{DOMAIN}").click()
-    page.get_by_test_id("notices-open").click()
-    dialog = page.get_by_test_id("notices-dialog")
-    expect(dialog.get_by_test_id("notices-form")).to_be_visible()
+    page.get_by_test_id("notices-email-open").click()
+    dialog = page.get_by_test_id("notices-email-dialog")
+    expect(dialog.get_by_test_id("notices-email-form")).to_be_visible()
     dialog.locator(f"select[name={notice}]").select_option(value=mode)
-    pages.send_dialog(page, dialog, "notices-submit")
+    pages.send_dialog(page, dialog, "notices-email-submit")
     state = page.get_by_test_id("person-notices").get_by_test_id("notice-state")
     expect(state).to_have_count(6)
 
 
 def set_business_email(page: Page, *, on: bool) -> None:
-    """The person's own switch on ``/account/notifications/``."""
+    """The person's own switch for email, in the dialog of *Where you are told*."""
     page.goto("/account/notifications/")
-    form = page.get_by_test_id("notification-settings")
-    box = form.locator("input[name=business_email]")
-    box.set_checked(on)
-    form.get_by_role("button", name="Save").click()
-    page.wait_for_url("**/account/notifications/")
-    expect(
-        page.get_by_test_id("notification-settings").locator("input[name=business_email]")
-    ).to_be_checked(checked=on)
+    page.get_by_test_id("channels-open").click()
+    dialog = page.get_by_test_id("channels-dialog")
+    expect(dialog.get_by_test_id("channels-form")).to_be_visible()
+    dialog.locator("input[name=EMAIL]").set_checked(on)
+    pages.send_dialog(page, dialog, "channels-submit")
+    state = page.locator("[data-testid=channel][data-channel=EMAIL]")
+    expect(state).to_contain_text("On" if on else "Off")
 
 
 def mails_to(mailbox: Mailbox, account: str, number: str) -> list[str]:
@@ -98,6 +99,7 @@ def test_the_administrator_chooses_what_is_sent(browsing: Browsing, mailbox: Mai
         technician.goto("/account/notifications/")
         own = technician.get_by_test_id("own-notices")
         expect(own).to_contain_text("A request to review")
+        expect(own).to_contain_text("Your current roles do not receive it.")
 
         first = pages.submit_request(technician, "COL-MAD", {MATERIALS[0]: 2})
         message = mailbox.wait_for(f"eng-mad{DOMAIN}", containing=first)

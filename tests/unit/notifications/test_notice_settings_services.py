@@ -232,6 +232,92 @@ class TestSetNoticeDefaultIdempotency:
         assert len(events_of("notification.default_changed")) == 1
 
 
+class TestSetNoticeChannels:
+    """One notification on several channels in one transaction (M17.4)."""
+
+    def test_each_channel_is_written_and_audited_in_one_go(self, people: People) -> None:
+        principal = principal_for(people.group_admin)
+        row = services.set_notice_channels(
+            principal, Notice.REQUEST_APPROVED, {Channel.EMAIL: False, Channel.IN_APP: False}
+        )
+        assert row.channel == Channel.EMAIL
+        assert {(default.channel, default.enabled) for default in NoticeDefault.objects.all()} == {
+            (Channel.EMAIL, False),
+            (Channel.IN_APP, False),
+        }
+        changed = events_of("notification.default_changed")
+        assert {event.data["channel"] for event in changed} == {"EMAIL", "IN_APP"}
+        assert all(
+            event.data["before"] is True and event.data["after"] is False for event in changed
+        )
+
+    def test_only_what_differs_is_written(self, people: People) -> None:
+        principal = principal_for(people.group_admin)
+        services.set_notice_channels(
+            principal, Notice.REQUEST_APPROVED, {"EMAIL": False, "IN_APP": True}
+        )
+        assert [(row.channel, row.enabled) for row in NoticeDefault.objects.all()] == [
+            (Channel.EMAIL, False),
+            (Channel.IN_APP, True),
+        ]  # the first decision saying what no row meant only records who decided
+        assert len(events_of("notification.default_changed")) == 1
+
+    def test_naming_no_channel_is_refused(self, people: People) -> None:
+        with pytest.raises(ValidationError) as exc:
+            services.set_notice_channels(
+                principal_for(people.group_admin), Notice.REQUEST_APPROVED, {}
+            )
+        assert error_codes(exc.value) == {"empty"}
+
+    @pytest.mark.parametrize(
+        ("notice", "channels", "field"),
+        [
+            ("NOT_A_NOTICE", {"EMAIL": False}, "notice"),
+            ("REQUEST_APPROVED", {"TELEGRAM": False}, "channels"),
+        ],
+    )
+    def test_unknown_choices_are_refused(
+        self, people: People, notice: str, channels: dict[str, bool], field: str
+    ) -> None:
+        with pytest.raises(ValidationError) as exc:
+            services.set_notice_channels(principal_for(people.group_admin), notice, channels)
+        assert exc.value.message_dict.keys() == {field}
+        assert not NoticeDefault.objects.exists()
+
+    @pytest.mark.parametrize("actor", OTHER_ROLES)
+    def test_only_org_manage(self, people: People, actor: str) -> None:
+        before = written()
+        with pytest.raises(AccessDenied):
+            services.set_notice_channels(
+                principal_for(getattr(people, actor)), Notice.REQUEST_APPROVED, {"EMAIL": False}
+            )
+        assert written() == before
+
+    def test_a_session_without_mfa_is_refused(self, people: People) -> None:
+        with pytest.raises(MFARequired):
+            services.set_notice_channels(
+                principal_for(people.group_admin, mfa_at=None),
+                Notice.REQUEST_APPROVED,
+                {"EMAIL": False},
+            )
+        assert not NoticeDefault.objects.exists()
+
+    def test_a_double_tap_replays_and_another_payload_conflicts(self, people: People) -> None:
+        principal = principal_for(people.group_admin)
+        key = issue_key(people.group_admin.pk, services.NOTICE_CHANNELS_OPERATION)
+        first = services.set_notice_channels(
+            principal, Notice.REQUEST_EDITED, {"EMAIL": False}, idempotency_key=key
+        )
+        second = services.set_notice_channels(
+            principal, Notice.REQUEST_EDITED, {"EMAIL": False}, idempotency_key=key
+        )
+        assert first.pk == second.pk and len(events_of("notification.default_changed")) == 1
+        with pytest.raises(IdempotencyConflict):
+            services.set_notice_channels(
+                principal, Notice.REQUEST_EDITED, {"EMAIL": True}, idempotency_key=key
+            )
+
+
 class TestSetPersonNotices:
     def set(self, actor: User, person: User, modes: dict[Any, Any], **extra: Any) -> User:
         return services.set_person_notices(principal_for(actor), person.pk, modes, **extra)

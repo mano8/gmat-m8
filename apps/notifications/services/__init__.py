@@ -5,8 +5,8 @@
   ``SystemPrincipal`` or an operator;
 - ``own``: ``set_own_channels`` and ``set_own_notices``, the signed-in person's own channels and
   choices (M17.2), and ``set_email_opt_out``, the email case of the first (M7.1);
-- ``preferences``: ``set_notice_default`` and ``set_person_notices``, a group administrator's
-  settings per channel (M15.2, M17.2);
+- ``preferences``: ``set_notice_default``, ``set_notice_channels`` and ``set_person_notices``, a
+  group administrator's settings per channel (M15.2, M17.2, M17.4);
 - ``reading``: ``open_notification`` and ``mark_all_read``, the signed-in person reading their own
   in-app notifications (M17.3).
 """
@@ -38,8 +38,10 @@ from apps.notifications.services.own import (
     set_own_notices,
 )
 from apps.notifications.services.preferences import (
+    NOTICE_CHANNELS_OPERATION,
     NOTICE_DEFAULT_OPERATION,
     PERSON_NOTICES_OPERATION,
+    set_notice_channels,
     set_notice_default,
     set_person_notices,
 )
@@ -47,6 +49,7 @@ from apps.notifications.services.reading import mark_all_read, open_notification
 
 __all__ = [
     "ABANDONED_ERROR",
+    "NOTICE_CHANNELS_OPERATION",
     "NOTICE_DEFAULT_OPERATION",
     "OUTBOX_SEND",
     "OWN_CHANNELS_OPERATION",
@@ -70,6 +73,7 @@ __all__ = [
     "retry_delay",
     "run_housekeeping",
     "set_email_opt_out",
+    "set_notice_channels",
     "set_notice_default",
     "set_own_channels",
     "set_own_notices",

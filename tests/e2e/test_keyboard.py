@@ -104,6 +104,12 @@ def test_the_tab_order_of_the_shell(browsing: Browsing, person: str, viewport: s
     assert str(stops[0]["name"]).endswith("Skip to content"), stops[0]
     regions = [str(s["region"]) for s in stops[1:]]
     assert "main" in regions
+    # The bell is a stop of the top bar (M17.4), before the account menu.
+    names = [str(s["name"]) for s in stops]
+    assert any("notification-bell" in name for name in names), names
+    bell = next(i for i, name in enumerate(names) if "notification-bell" in name)
+    menu = next(i for i, name in enumerate(names) if "Account menu" in name)
+    assert bell < menu
     # Whatever the viewport draws first (the top bar or the menu), the content comes after the
     # banner and the side menu, in the document's order.
     assert regions.index("main") >= 1

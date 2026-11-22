@@ -1,0 +1,65 @@
+{% extends "layouts/app.html" %}
+{% load i18n ui_tags %}
+{% block head_title %}
+  {% translate "Notifications" %} · gmat-m8
+{% endblock head_title %}
+{% block content %}
+  <header class="page-head" data-testid="page-header">
+    <div class="page-head-main">
+      <h1>{% translate "Notifications" %}</h1>
+      <p class="page-head-sub">
+        {% translate "What happened to your requests, while you were away. Opening one marks it read and leads to the request." %}
+      </p>
+    </div>
+    <div class="page-head-actions">
+      {% if unread.count %}
+        <form method="post"
+              action="{% url 'inapp:read_all' %}"
+              data-testid="read-all-form">
+          {% csrf_token %}
+          {% include "components/button.html" with type="submit" label=_("Mark all as read") variant="secondary" icon="check" %}
+        </form>
+      {% endif %}
+      {% url 'notifications:settings' as settings_url %}
+      {% include "components/button.html" with href=settings_url label=_("My notifications") icon="settings" %}
+    </div>
+  </header>
+  {% partialdef results inline %}
+    <div id="notification-results" data-testid="notifications">
+      {% if listing.rows %}
+        <ul class="card divide-y divide-line p-0" data-testid="notification-list">
+          {% for item in listing.rows %}
+            <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                data-testid="notification"
+                data-notice="{{ item.notice }}"
+                data-state="{% if item.read_at %}read{% else %}unread{% endif %}">
+              <div class="min-w-0">
+                <p class="flex flex-wrap items-center gap-2">
+                  {% if not item.read_at %}
+                    {% translate "New" context "notification state" as new %}
+                    {% chip new "brand" %}
+                  {% endif %}
+                  <span class="{% if not item.read_at %}font-semibold{% else %}font-medium{% endif %}">{{ item.spec.label }}</span>
+                </p>
+                <p class="text-sm text-soft">
+                  <span class="doc-no">{{ item.number }}</span>
+                  ·
+                  <time datetime="{{ item.notified_at|date:'c' }}">{{ item.notified_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+                </p>
+              </div>
+              <form method="post"
+                    action="{% url 'inapp:open' item.pk %}"
+                    data-testid="open-form">
+                {% csrf_token %}
+                {% include "components/button.html" with type="submit" label=_("Open") variant="secondary" size="sm" icon="arrow-right" %}
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+        {% include "components/pagination.html" with listing=listing %}
+      {% else %}
+        {% include "components/empty_state.html" with title=_("No notifications") text=_("Nothing has happened to your requests yet, or you turned notifications in the application off.") icon="bell" %}
+      {% endif %}
+    </div>
+  {% endpartialdef %}
+{% endblock content %}

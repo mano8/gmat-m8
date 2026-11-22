@@ -1,24 +1,25 @@
 {% extends "layouts/app.html" %}
 {% load i18n ui_tags %}
 {% block head_title %}
-  {% translate "Email notifications" %} · gmat-m8
+  {% translate "Notifications" %} · gmat-m8
 {% endblock head_title %}
 {% block content %}
-  {% translate "Email notifications" as page_title %}
-  {% translate "Choose which business emails the application sends. A person's own setting, on their page, and their own choice of no business email come before what is set here. Security emails (invitations, email changes, password and second-factor notices) and supplier orders are never optional." as page_sub %}
+  {% translate "Notifications" as page_title %}
+  {% translate "Choose which business notifications the application sends, on each channel. A person's own choices, made on My notifications, come before what is set here; so does their switch for a channel. Security emails (invitations, email changes, password and second-factor notices) and supplier orders are never optional." as page_sub %}
   {% include "components/page_header.html" with title=page_title subtitle=page_sub %}
   <section class="card mb-4"
            aria-labelledby="notices-title"
            data-testid="notice-defaults">
-    <h2 id="notices-title" class="card-title">{% translate "Business emails" %}</h2>
+    <h2 id="notices-title" class="card-title">{% translate "Business notifications" %}</h2>
     <table class="table-responsive">
       <thead>
         <tr>
-          <th scope="col">{% translate "Email" %}</th>
+          <th scope="col">{% translate "Notification" %}</th>
           <th scope="col">{% translate "Sent to" %}</th>
           <th scope="col">{% translate "When" %}</th>
-          <th scope="col">{% translate "For everyone" %}</th>
-          <th scope="col">{% translate "Own settings" %}</th>
+          {% for channel in channels %}
+            <th scope="col" data-channel="{{ channel.channel.value }}">{{ channel.label }}</th>
+          {% endfor %}
           <th scope="col">
             <span class="sr-only">{% translate "Actions" %}</span>
           </th>
@@ -27,35 +28,38 @@
       <tbody>
         {% for state, dialog in rows %}
           <tr data-testid="notice-row" data-notice="{{ state.spec.notice.value }}">
-            <th scope="row" data-label="{% translate 'Email' %}" class="font-medium">{{ state.spec.label }}</th>
+            <th scope="row"
+                data-label="{% translate 'Notification' %}"
+                class="font-medium">{{ state.spec.label }}</th>
             <td data-label="{% translate 'Sent to' %}">{{ state.spec.recipients }}</td>
             <td data-label="{% translate 'When' %}">{{ state.spec.when }}</td>
-            <td data-label="{% translate 'For everyone' %}"
-                data-testid="notice-state">
-              {% if state.enabled %}
-                {% translate "Sent" context "notice state" as label %}
-                {% chip label "ok" %}
-              {% else %}
-                {% translate "Not sent" context "notice state" as label %}
-                {% chip label "warn" %}
-              {% endif %}
-            </td>
-            <td data-label="{% translate 'Own settings' %}"
-                class="num"
-                data-testid="notice-own">
-              {% if state.own %}
-                {% blocktranslate count n=state.own with always=state.always never=state.never %}{{ n }} person ({{ always }} always, {{ never }} never){% plural %}{{ n }} people ({{ always }} always, {{ never }} never){% endblocktranslate %}
-              {% else %}
-                —
-              {% endif %}
-            </td>
+            {% for cell in state.cells %}
+              <td data-label="{{ cell.label }}"
+                  data-testid="notice-state"
+                  data-channel="{{ cell.channel.value }}">
+                <div>
+                  <p>
+                    {% if cell.enabled %}
+                      {% translate "Sent" context "notice state" as label %}
+                      {% chip label "ok" %}
+                    {% else %}
+                      {% translate "Not sent" context "notice state" as label %}
+                      {% chip label "warn" %}
+                    {% endif %}
+                  </p>
+                  <p class="mt-1 text-sm text-soft" data-testid="notice-own">
+                    {% if cell.own %}
+                      {% blocktranslate count n=cell.own with always=cell.always never=cell.never %}{{ n }} person ({{ always }} always, {{ never }} never){% plural %}{{ n }} people ({{ always }} always, {{ never }} never){% endblocktranslate %}
+                    {% else %}
+                      {% translate "No settings of their own" %}
+                    {% endif %}
+                  </p>
+                </div>
+              </td>
+            {% endfor %}
             <td>
               <div class="flex flex-wrap items-center justify-end gap-2">
-                {% if state.enabled %}
-                  {% include "components/dialog_button.html" with dialog=dialog.id label=dialog.title variant="danger" icon=dialog.icon testid=dialog.open_testid %}
-                {% else %}
-                  {% include "components/dialog_button.html" with dialog=dialog.id label=dialog.title variant="primary" icon=dialog.icon testid=dialog.open_testid %}
-                {% endif %}
+                {% include "components/dialog_button.html" with dialog=dialog.id label=dialog.opener_label variant="secondary" icon=dialog.icon testid=dialog.open_testid %}
               </div>
             </td>
           </tr>

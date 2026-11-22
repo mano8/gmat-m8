@@ -10,7 +10,7 @@ with before and after, branchless) and publishes nothing when nothing changed.
 """
 
 from collections.abc import Mapping
-from typing import cast
+from typing import Any, cast
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
@@ -91,7 +91,7 @@ def _apply_channel(user: User, channel: Channel, enabled: bool) -> dict[str, boo
 @transactional
 def set_own_channels(
     principal: SessionPrincipal,
-    channels: Mapping[Channel | str, bool],
+    channels: Mapping[Channel, bool] | Mapping[str, bool],
     *,
     idempotency_key: str | None = None,
 ) -> User:
@@ -128,7 +128,7 @@ def set_own_channels(
 
 
 def _clean_choices(
-    choices: Mapping[tuple[object, object], bool | None],
+    choices: Mapping[tuple[Any, Any], bool | None],
 ) -> dict[NoticeKey, bool | None]:
     return {
         known_key(key, "choices"): None if on is None else _flag(on, "choices")
@@ -170,7 +170,7 @@ def _write_choice(user: User, key: NoticeKey, row: NoticeChoice | None, on: bool
 @transactional
 def set_own_notices(
     principal: SessionPrincipal,
-    choices: Mapping[tuple[object, object], bool | None],
+    choices: Mapping[tuple[Any, Any], bool | None],
     *,
     idempotency_key: str | None = None,
 ) -> User:

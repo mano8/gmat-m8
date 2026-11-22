@@ -7989,3 +7989,202 @@ msgstr "avisado el"
 #: apps/notifications/models.py
 msgid "read at"
 msgstr "leído el"
+
+#: apps/notifications/views.py
+msgid "Change where you are told"
+msgstr "Cambiar dónde recibe los avisos"
+
+#: apps/notifications/views.py
+msgid "A channel you turn off tells you nothing, whatever you chose below; your choices are kept for when you turn it on again. Account security emails and supplier orders are always sent."
+msgstr "Un canal que desactive no le avisa de nada, elija lo que elija abajo; sus elecciones se conservan para cuando lo vuelva a activar. Los correos de seguridad de la cuenta y los pedidos a proveedores se envían siempre."
+
+#: apps/notifications/views.py
+msgid "Change what you get: %(channel)s"
+msgstr "Cambiar lo que recibe: %(channel)s"
+
+#: apps/notifications/views.py
+msgid "Change: %(channel)s"
+msgstr "Cambiar: %(channel)s"
+
+#: apps/notifications/views.py
+msgid "Your own choice wins over what the administrators set, for you only. Choose “As the administrators set it” to follow them again."
+msgstr "Su elección propia prevalece sobre lo que fijan los administradores, solo para usted. Elija «Como lo fijan los administradores» para volver a seguirlos."
+
+#: apps/notifications/views.py
+msgid "Business notifications by email. Account security emails are always sent."
+msgstr "Notificaciones de negocio por correo. Los correos de seguridad de la cuenta se envían siempre."
+
+#: apps/notifications/views.py
+msgid "Business notifications in the bell and the list, while you are signed in."
+msgstr "Notificaciones de negocio en la campana y en la lista, mientras tenga la sesión abierta."
+
+#: apps/notifications/views.py
+msgid "As the administrators set it"
+msgstr "Como lo fijan los administradores"
+
+#: apps/notifications/views.py
+msgid "Send it to me"
+msgstr "Quiero recibirla"
+
+#: apps/notifications/views.py
+msgid "Do not send it to me"
+msgstr "No quiero recibirla"
+
+#: apps/notifications/views.py
+msgid "As the administrators set it: sent"
+msgstr "Como lo fijan los administradores: se envía"
+
+#: apps/notifications/views.py
+msgid "As the administrators set it: not sent"
+msgstr "Como lo fijan los administradores: no se envía"
+
+#: apps/notifications/views.py
+msgid "%(count)d notification marked as read."
+msgid_plural "%(count)d notifications marked as read."
+msgstr[0] "Se marcó como leída %(count)d notificación."
+msgstr[1] "Se marcaron como leídas %(count)d notificaciones."
+
+#: apps/notifications/views.py
+msgid "Nothing to mark as read."
+msgstr "No hay nada que marcar como leído."
+
+#: apps/notifications/views.py
+msgid "Nothing to change."
+msgstr "No hay nada que cambiar."
+
+#: apps/notifications/views.py
+msgid "This person has left: their email notifications are not changed."
+msgstr "Esta persona se ha ido: sus notificaciones por correo no se modifican."
+
+#: apps/notifications/views.py
+msgid "Notifications, %(shown)s unread"
+msgid_plural "Notifications, %(shown)s unread"
+msgstr[0] "Notificaciones, %(shown)s sin leer"
+msgstr[1] "Notificaciones, %(shown)s sin leer"
+
+#: apps/notifications/views.py
+msgid "What happened to your requests, while you were away. Opening one marks it read and leads to the request."
+msgstr "Lo que ha pasado con sus solicitudes mientras estaba ausente. Al abrir una se marca como leída y se va a la solicitud."
+
+#: apps/notifications/views.py
+msgid "Mark all as read"
+msgstr "Marcar todo como leído"
+
+#: apps/notifications/views.py
+msgid "My notifications"
+msgstr "Mis notificaciones"
+
+#: apps/notifications/views.py
+msgctxt "notification state"
+msgid "New"
+msgstr "Nueva"
+
+#: apps/notifications/views.py
+msgid "No notifications"
+msgstr "Sin notificaciones"
+
+#: apps/notifications/views.py
+msgid "Nothing has happened to your requests yet, or you turned notifications in the application off."
+msgstr "Todavía no ha pasado nada con sus solicitudes, o desactivó las notificaciones en la aplicación."
+
+#: apps/notifications/views.py
+msgid "Choose where you are told about your requests and deliveries, then which notifications you want there. Your own choice comes before what the administrators set."
+msgstr "Elija dónde se le avisa de sus solicitudes y entregas y qué notificaciones quiere recibir allí. Su elección propia va antes que lo que fijan los administradores."
+
+#: apps/notifications/views.py
+msgid "1. Where you are told"
+msgstr "1. Dónde se le avisa"
+
+#: apps/notifications/views.py
+msgctxt "channel state"
+msgid "On"
+msgstr "Activado"
+
+#: apps/notifications/views.py
+msgctxt "channel state"
+msgid "Off"
+msgstr "Desactivado"
+
+#: apps/notifications/views.py
+msgid "Account security emails and supplier orders are always sent: they are not notifications you can turn off."
+msgstr "Los correos de seguridad de la cuenta y los pedidos a proveedores se envían siempre: no son notificaciones que se puedan desactivar."
+
+#: apps/notifications/views.py
+msgid "2. What you are told"
+msgstr "2. Qué se le avisa"
+
+#: apps/notifications/views.py
+msgid "Each notification on each channel, and why you do or do not get it. A column is greyed while its channel is off."
+msgstr "Cada notificación en cada canal, y por qué la recibe o no. Una columna se atenúa mientras su canal está desactivado."
+
+#: apps/notifications/views.py
+msgid "You turned this channel off."
+msgstr "Desactivó este canal."
+
+#: apps/notifications/views.py
+msgid "The person turned this channel off."
+msgstr "La persona desactivó este canal."
+
+#: apps/notifications/views.py
+msgid "It overrides what the administrators set."
+msgstr "Prevalece sobre lo que fijan los administradores."
+
+#: apps/notifications/views.py
+msgid "It overrides what the administrators set for them."
+msgstr "Prevalece sobre lo que fijan los administradores para ella."
+
+#: apps/notifications/views.py
+msgid "An administrator set it to always reach you."
+msgstr "Un administrador fijó que siempre le llegue."
+
+#: apps/notifications/views.py
+msgid "An administrator set it never to reach you."
+msgstr "Un administrador fijó que nunca le llegue."
+
+#: apps/notifications/views.py
+msgid "Change for everyone"
+msgstr "Cambiar para todos"
+
+#: apps/notifications/views.py
+msgid "A notification that is not sent is sent to nobody who has no setting of their own."
+msgstr "Una notificación que no se envía no llega a nadie que no tenga un ajuste propio."
+
+#: apps/notifications/views.py
+msgid "People who have a setting of their own, or chose for themselves, keep it."
+msgstr "Quien tiene un ajuste propio, o eligió por sí mismo, lo conserva."
+
+#: apps/notifications/views.py
+msgid "Change notifications: %(channel)s"
+msgstr "Cambiar notificaciones: %(channel)s"
+
+#: apps/notifications/views.py
+msgid "Always and never beat the setting for everyone, but the person's own choices come first: someone who chose for themselves, or turned this channel off, keeps that. The person is not told."
+msgstr "«Siempre» y «nunca» prevalecen sobre el ajuste para todos, pero las elecciones de la propia persona van primero: quien eligió por sí mismo, o desactivó este canal, lo conserva. No se avisa a la persona."
+
+#: apps/notifications/views.py
+msgid "Choose which business notifications the application sends, on each channel. A person's own choices, made on My notifications, come before what is set here; so does their switch for a channel. Security emails (invitations, email changes, password and second-factor notices) and supplier orders are never optional."
+msgstr "Elija qué notificaciones de negocio envía la aplicación, en cada canal. Las elecciones de cada persona, hechas en Mis notificaciones, van antes que lo fijado aquí; también su interruptor de cada canal. Los correos de seguridad (invitaciones, cambios de correo, avisos de contraseña y de segundo factor) y los pedidos a proveedores nunca son opcionales."
+
+#: apps/notifications/views.py
+msgid "Business notifications"
+msgstr "Notificaciones de negocio"
+
+#: apps/notifications/views.py
+msgid "No settings of their own"
+msgstr "Sin ajustes propios"
+
+#: apps/notifications/views.py
+msgid "Business notifications about requests and deliveries, on each channel. The person's own choices come before the administrators' settings. Security emails and supplier orders are never optional."
+msgstr "Notificaciones de negocio sobre solicitudes y entregas, en cada canal. Las elecciones de la propia persona van antes que los ajustes de los administradores. Los correos de seguridad y los pedidos a proveedores nunca son opcionales."
+
+#: apps/notifications/views.py
+msgid "Nothing changed."
+msgstr "No cambió nada."
+
+#: apps/notifications/views.py
+msgid "Saved."
+msgstr "Guardado."
+
+#: apps/notifications/views.py
+msgid "Notifications saved."
+msgstr "Notificaciones guardadas."

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n access ui_tags nav_tags %}
+{% load i18n access ui_tags nav_tags notice_tags %}
 {% comment %}
   Signed-in shell, mobile first (M8b.2). Phone: a top bar (wordmark, quick action, user menu), the
   content, and a bottom bar of four entries plus More. From md: the left menu of category
@@ -91,6 +91,7 @@
             {% translate "New request" %}
           </a>
         {% endcan %}
+        {% bell %}
         <button type="button"
                 class="btn btn-ghost !rounded-full !px-1.5 md:!pr-3"
                 popovertarget="user-menu"
@@ -162,7 +163,7 @@
         <li>
           <a class="menu-item" href="{% url 'notifications:settings' %}">
             {% icon "bell" classes="size-5" %}
-            {% translate "Notifications" %}
+            {% translate "My notifications" %}
           </a>
         </li>
         <li>

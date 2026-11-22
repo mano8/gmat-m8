@@ -161,3 +161,13 @@ CHANNELS: Mapping[Channel, ChannelSpec] = _channels(
     ChannelSpec(Channel.EMAIL, default=True, opt_in=False, order=10),
     ChannelSpec(Channel.IN_APP, default=True, opt_in=False, order=20),
 )
+
+
+def channel_slug(channel: Channel) -> str:
+    """The channel as a URL segment and an element id (``IN_APP`` becomes ``in-app``)."""
+    return channel.value.lower().replace("_", "-")
+
+
+def channel_from_slug(slug: str) -> Channel | None:
+    """The channel a URL segment names, or ``None`` (an unknown one is a 404 for the view)."""
+    return next((channel for channel in CHANNELS if channel_slug(channel) == slug), None)

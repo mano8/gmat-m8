@@ -44,10 +44,11 @@ from apps.material_requests.models import (
     MaterialRequestLine,
     MaterialRequestLineRevision,
 )
-from apps.notifications.kinds import Channel, Mode, Notice
+from apps.notifications.kinds import SUBJECT, Channel, Mode, Notice
 from apps.notifications.models import (
     ChannelSwitch,
     EmailOutbox,
+    InAppNotification,
     NoticeChoice,
     NoticeDefault,
     NoticeSetting,
@@ -369,6 +370,12 @@ def _admin_rows(world: World) -> None:
     )
     _sev_2_receipt(world)
     _attachments(world)
+    world.objects["notification"] = InAppNotification.objects.create(
+        user=people.tech_mad,
+        notice=Notice.REQUEST_APPROVED,
+        object_type=SUBJECT,
+        object_id=world.objects["materialrequest"].pk,
+    )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)

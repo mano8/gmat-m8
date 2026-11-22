@@ -1,0 +1,18 @@
+{% load i18n ui_tags %}
+{% comment %}
+  The header's bell (M17.4, Q99). Parameter: unread (selectors.Unread, or empty for who may not
+  read notifications: nothing is drawn). A link to the list whose accessible name carries the
+  count; the count is decorative text. It reloads itself every 60 s from the GET-only fragment
+  (data-poll, app.js: a redirect or an error stops the polling). No live region: a poll must
+  not read aloud.
+{% endcomment %}
+{% if unread %}
+  <a id="notification-bell" href="{% url 'inapp:list' %}" class="btn btn-ghost btn-icon relative" {% if unread.count %}aria-label="{% blocktranslate with shown=unread.label count n=unread.count trimmed %}Notifications, {{ shown }} unread{% plural %}Notifications, {{ shown }} unread{% endblocktranslate %}"{% else %}aria-label="{% translate 'Notifications' %}"{% endif %} data-testid="notification-bell" data-unread="{{ unread.count }}" hx-get="{% url 'inapp:bell' %}" hx-trigger="every 60s" hx-swap="outerHTML" data-poll>
+    {% icon "bell" %}
+    {% if unread.count %}
+      <span class="absolute right-0 top-0 grid min-w-5 place-items-center rounded-full bg-brand px-1 text-xs font-semibold tabular-nums text-brand-ink"
+            aria-hidden="true"
+            data-testid="notification-count">{{ unread.label }}</span>
+    {% endif %}
+  </a>
+{% endif %}

@@ -1,65 +1,101 @@
 {% load i18n ui_tags %}
 {% comment %}
-  What each business email does for one person (M15.3). Parameters: items (the selector's
-  PersonNotice list), own (true on the person's own page: "you" instead of "the person").
-  The state, then why: the person's own refusal of business email, their own choice for the
-  email (M17), a setting an administrator made for them, or the setting for everyone; an email their current roles never receive says so.
+  What every business notification does for one person, on every channel (M15.3, M17.4, Q97).
+  Parameters: items (the selector's NoticeRow list), own (true on the person's own page: "you"
+  instead of "the person"). One row per notification, one column per channel; each cell says
+  whether it is sent and which level decided: the person's switch for the channel, their own
+  choice (and where it overrides what the administrators set), an administrator's setting for
+  them, or the setting for everyone. A notification their current roles never receive says so.
+  A column whose channel the person turned off is greyed and marked. At phone width the table
+  becomes one card per notification (table-responsive).
 {% endcomment %}
-<ul class="divide-y divide-line" data-testid="notice-states">
-  {% for item in items %}
-    <li class="grid gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-x-4"
-        data-testid="notice-state"
-        data-notice="{{ item.spec.notice.value }}">
-      <div>
-        <p class="font-medium">{{ item.spec.label }}</p>
-        <p class="text-sm text-soft">
-          {% if item.reason == "channel_off" %}
-            {% if own %}
-              {% translate "You turned business email off." %}
-            {% else %}
-              {% translate "The person turned business email off themselves." %}
-            {% endif %}
-          {% elif item.reason == "own" %}
-            {% if own %}
-              {% translate "You chose this yourself." %}
-            {% else %}
-              {% translate "The person chose this themselves." %}
-            {% endif %}
-          {% elif item.reason == "person" %}
-            {% if item.mode == "ALWAYS" %}
-              {% if own %}
-                {% translate "An administrator set this email to always reach you." %}
-              {% else %}
-                {% translate "Set for this person: always sent." %}
-              {% endif %}
-            {% else %}
-              {% if own %}
-                {% translate "An administrator set this email never to reach you." %}
-              {% else %}
-                {% translate "Set for this person: never sent." %}
-              {% endif %}
-            {% endif %}
-          {% else %}
-            {% translate "Follows the setting for everyone." %}
+<table class="table-responsive" data-testid="notice-states">
+  <thead>
+    <tr>
+      <th scope="col">{% translate "Notification" %}</th>
+      {% for cell in items.0.cells %}
+        <th scope="col" data-channel="{{ cell.channel.value }}">
+          {{ cell.label }}
+          {% if cell.off %}
+            {% translate "Off" context "channel state" as off %}
+            {% chip off "warn" %}
           {% endif %}
+        </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+      <tr data-testid="notice-state" data-notice="{{ item.spec.notice.value }}">
+        <th scope="row"
+            data-label="{% translate 'Notification' %}"
+            class="font-medium">
+          {{ item.spec.label }}
           {% if not item.receivable %}
-            {% if own %}
-              {% translate "Your current roles do not receive it." %}
-            {% else %}
-              {% translate "Their current roles do not receive it." %}
-            {% endif %}
+            <span class="block text-sm font-normal text-soft">
+              {% if own %}
+                {% translate "Your current roles do not receive it." %}
+              {% else %}
+                {% translate "Their current roles do not receive it." %}
+              {% endif %}
+            </span>
           {% endif %}
-        </p>
-      </div>
-      <p>
-        {% if item.wanted %}
-          {% translate "Sent" context "notice state" as state %}
-          {% chip state "ok" %}
-        {% else %}
-          {% translate "Not sent" context "notice state" as state %}
-          {% chip state %}
-        {% endif %}
-      </p>
-    </li>
-  {% endfor %}
-</ul>
+        </th>
+        {% for cell in item.cells %}
+          <td data-label="{{ cell.label }}"
+              data-channel="{{ cell.channel.value }}"
+              {% if cell.off %}class="opacity-60"{% endif %}>
+            <div>
+              <p>
+                {% if cell.wanted %}
+                  {% translate "Sent" context "notice state" as state %}
+                  {% chip state "ok" %}
+                {% else %}
+                  {% translate "Not sent" context "notice state" as state %}
+                  {% chip state %}
+                {% endif %}
+              </p>
+              <p class="mt-1 text-sm text-soft">
+                {% if cell.reason == "channel_off" %}
+                  {% if own %}
+                    {% translate "You turned this channel off." %}
+                  {% else %}
+                    {% translate "The person turned this channel off." %}
+                  {% endif %}
+                {% elif cell.reason == "own" %}
+                  {% if own %}
+                    {% translate "You chose this yourself." %}
+                    {% if cell.overrides %}
+                      {% translate "It overrides what the administrators set." %}
+                    {% endif %}
+                  {% else %}
+                    {% translate "The person chose this themselves." %}
+                    {% if cell.overrides %}
+                      {% translate "It overrides what the administrators set for them." %}
+                    {% endif %}
+                  {% endif %}
+                {% elif cell.reason == "person" %}
+                  {% if cell.mode == "ALWAYS" %}
+                    {% if own %}
+                      {% translate "An administrator set it to always reach you." %}
+                    {% else %}
+                      {% translate "Set for this person: always sent." %}
+                    {% endif %}
+                  {% else %}
+                    {% if own %}
+                      {% translate "An administrator set it never to reach you." %}
+                    {% else %}
+                      {% translate "Set for this person: never sent." %}
+                    {% endif %}
+                  {% endif %}
+                {% else %}
+                  {% translate "Follows the setting for everyone." %}
+                {% endif %}
+              </p>
+            </div>
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
