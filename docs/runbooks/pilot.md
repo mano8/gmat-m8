@@ -54,8 +54,9 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.production.yml'
 - [ ] Changing a password or a second factor sends its owner the security notice.
 - [ ] The delivery badge on the invitation goes from queued to sent.
 - [ ] `touch flags/worker.paused` holds the mail back, and removing the flag sends it ([email.md](email.md)).
-- [ ] Business notifications arrive (a submitted request reaches its reviewers, an approval reaches the requester), and a person who opted out of them on their notifications page gets none.
-- [ ] *Administration → Email notifications*: turn *A request to review* off for everyone, give one reviewer *always* on their page, submit a request: only that reviewer is mailed. Turn it back on afterwards unless the pilot wants it off ([user-admin.md](user-admin.md#which-business-emails-are-sent)).
+- [ ] Business notifications arrive (a submitted request reaches its reviewers, an approval reaches the requester), and a person who turned email off on *My notifications* gets none.
+- [ ] *Administration → Notifications*: turn *A request to review* off by email for everyone, give one reviewer *always* on their page, submit a request: only that reviewer is mailed. Turn it back on afterwards unless the pilot wants it off ([user-admin.md](user-admin.md#which-business-notifications-are-sent)).
+- [ ] *My notifications* and the bell: a requester sets *My request approved* to *do not send it to me* by email; approve one of their requests: no email, the bell in their header shows 1, opening it leads to the request and the count goes back to 0. Put the choice back to *as the administrators set it*. A person's own choice wins over an administrator's *never* or *always* (tell the pilot's users about *My notifications* and the bell).
 - [ ] Supplier dispatch: set `PO_DISPATCH=manual` in `app.env` (an upgrade keeps `off`), give a test supplier your own address, issue an order, use **Send to the supplier** on its page, read the message naming the address, watch the panel turn to *Sent* and check the mail arrives once; then buyers send to suppliers who agreed ([email.md](email.md#supplier-dispatches)).
 
 ## 4. Setting up the organization
