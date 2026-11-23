@@ -174,7 +174,7 @@ Two health endpoints serve the stack's checks: `/healthz/` answers without touch
 
 ## Contributing
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). The architecture rules every change has to respect are in [CLAUDE.md](CLAUDE.md).
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). The architecture rules every change has to respect are in [CLAUDE.md](CLAUDE.md), with the detail of each part in the `CLAUDE.md` of its directory.
 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security policy](SECURITY.md): report vulnerabilities privately, never in a public issue

@@ -19,4 +19,4 @@ Issue #27 asked for filters, page sizes and navigation on every list. The planni
 
 - This replaces the planning notes' Q40: offset paging stays for lists of stored rows, and the cursor is the rule for lists worked out from the ledger, not an exception.
 - A new list gets its `Screen` in the volume test, and a cursor list proves that it gives, page after page, the rows of the eager selector it replaces.
-- `CLAUDE.md` (Conventions, Lists) keeps the working detail for contributors.
+- `CLAUDE.md` (Conventions, Lists) keeps the rules for contributors, and `apps/core/CLAUDE.md` (*Lists in detail*) the working detail: the API, sections and cursors.
