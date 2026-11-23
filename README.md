@@ -30,7 +30,7 @@ It fits a single company with one office as well as a group of companies with se
 
 | Role | What they do | What they see |
 | --- | --- | --- |
-| Group administrator | Runs the organization from the app: companies, branches, warehouses, units of measure, people and their roles, a lost second factor | Everything |
+| Group administrator | Runs the organization from the app: companies, branches, warehouses, units of measure, people and their roles, a lost second factor, which notifications are sent by default | Everything |
 | Material manager | Reviews requests, buys, and manages projects, the catalog and suppliers | Their branch and the branches it manages, prices included |
 | Engineer | The same as a material manager, and ranks above one | The same |
 | Warehouse operator | Receives goods and hands them over | Orders and suppliers, without prices |
@@ -44,6 +44,7 @@ A person can hold several roles, each limited to its own branch or projects. Gro
 
 - **Quantities that add up.** What was received, delivered or is still pending is worked out from the documents and never stored, so it cannot drift. A delivery above what was ordered is recorded as surplus.
 - **Made for the worksite.** The screens are designed for a phone first and work on a desktop too, in a light or a dark theme, in Spanish, English and French. Forms that act on a document open in a sheet on top of it, and the home page shows what needs you now, with charts beside their data; group administrators have an overview of the organisation of their own. Accessibility is tested in a browser on every screen: see [ACCESSIBILITY.md](ACCESSIBILITY.md).
+- **Told what matters, where you want it.** A request to review or assigned to you, your request approved, rejected or changed by a reviewer, goods handed over: each reaches you by email, in the application (a bell with the unread count) or both. Administrators set what is sent by default; each person then chooses for themselves, and their choice wins. Account and security messages are always sent by email.
 - **Records you can trust.** Posted receipts and handovers are never edited: they are voided with a reason and entered again. The audit trail is append-only.
 - **Administration in the app.** Companies, joint ventures, branches, warehouses, units of measure and people are set up and changed on screens of their own, and a change that decides who can see what first shows who it affects. There is no need for the Django admin, which is off by default and read-only when you turn it on.
 - **Your existing data.** Import the catalog, suppliers and projects from CSV or Excel files, using the [templates](docs/import-templates/README.md). A file with any error writes nothing.
@@ -96,6 +97,9 @@ uv run djlint --check templates apps
 uv run python scripts/check_access_rules.py
 uv run python scripts/check_security_floors.py
 uv run python scripts/check_trivyignore.py
+uv run python scripts/check_contrast.py           # the design tokens keep WCAG 2.2 AA in both themes
+uv run python scripts/check_adr_alignment.py check
+uv run --with lizard lizard -C 10 -a 8 -w apps config scripts tests   # function size limits
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest --cov --cov-report=json:coverage.json && uv run python scripts/check_coverage_gates.py
 # or faster, as CI runs it: the tests across your cores, then the time-sensitive ones alone
@@ -107,16 +111,17 @@ Tests run on PostgreSQL only. Coverage stays at 90 % or more overall, and at 100
 
 ### Continuous integration
 
-Every pull request runs these checks from [ci.yaml](.github/workflows/ci.yaml) and `compose-smoke.yaml`:
+Every pull request runs these checks from [ci.yaml](.github/workflows/ci.yaml), `adr.yaml` and `compose-smoke.yaml`:
 
 | Check | What it enforces |
 | --- | --- |
-| `lint` | ruff, djLint, the access rules and banned constructs, `uv lock --check`, security floors, valid and unexpired Trivy exceptions |
+| `lint` | ruff, djLint, the access rules and banned constructs, `uv lock --check`, security floors, valid and unexpired Trivy exceptions, the colour contrast of the design tokens, the ADR records |
 | `typecheck` | mypy (strict, django-stubs) |
 | `security` | bandit (medium and above), pip-audit on the locked set, Trivy filesystem scan (HIGH and CRITICAL, no `--ignore-unfixed`) |
 | `test` | the test suite in four jobs at once on PostgreSQL 18 (`test-shard`), no missing migrations, migrations that reverse; it merges their coverage and applies the gates |
 | `trivy-image` | builds the app and backup images and gates both with Trivy |
 | `secret-scan` | gitleaks over the full history |
+| `adr-alignment` | a change to a file an architecture decision governs names that decision in the pull request's `## ADRs` section |
 | `compose-smoke-gate` | the whole stack, started fresh, against the live test suite, when a change can affect it |
 
 After a green `test`, `coverage-upload` sends the report to Codecov and Codacy. It is not required: a pull request from a fork has no token for either, skips them and still passes.
@@ -136,6 +141,8 @@ Settings live in `config/settings/`: `dev` (the default for `manage.py`), `test`
 | `DJANGO_HSTS_SECONDS`, `DJANGO_HSTS_INCLUDE_SUBDOMAINS`, `DJANGO_HSTS_PRELOAD` | `prod` | HSTS, each off by default: turn them on once the domain is ready |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | `prod` (required, `https://` only) | Comma-separated origins, e.g. `https://materials.example.org` |
 | `MFA_ENCRYPTION_KEYS` | `prod` (required) | Comma-separated Fernet keys, newest first, separate from the secret key; see [docs/security.md](docs/security.md#mfa) |
+| `OUTBOX_ENCRYPTION_KEYS` | `prod` (required) | Comma-separated Fernet keys, newest first, that seal security emails while they wait to be sent; never an MFA key |
+| `DJANGO_ADMIN_ENABLED` | all | The read-only Django admin (on in `dev`, off by default in `prod`) |
 | `DJANGO_SESSION_AGE_SECONDS` | all | Session lifetime for ordinary accounts (default 14 days) |
 | `DJANGO_PRIVILEGED_SESSION_AGE_SECONDS` | all | Session lifetime for privileged accounts (default 12 hours) |
 | `DJANGO_SESSION_IDLE_SECONDS` | all | Inactivity that ends a session of an ordinary account (default 2 hours) |
@@ -143,9 +150,14 @@ Settings live in `config/settings/`: `dev` (the default for `manage.py`), `test`
 | `ATTACHMENT_SCAN_SOCKET`, `ATTACHMENT_DECODER_SOCKET` | `prod` | The malware scanner's and the image decoder's sockets (the stack's fixed paths by default; a system check refuses them empty) |
 | `SECURITY_CACHE_MAX_ENTRIES` | all | Capacity of the rate-limit cache (default 50,000; at capacity new keys get 429) |
 | `DJANGO_LOG_LEVEL` | all | Root log level (default `INFO`); logs are JSON lines on stdout |
-| `DJANGO_DEFAULT_FROM_EMAIL` | all | Sender address of account emails |
+| `DJANGO_DEFAULT_FROM_EMAIL` | all | Sender address of every email |
+| `OUTBOUND_EMAIL` | all | Lets the worker send email (default off: nothing leaves) |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL` | the worker | The SMTP server (`EMAIL_HOST` is required in `prod` once `OUTBOUND_EMAIL` is on; port 587 with STARTTLS by default) |
+| `PO_DISPATCH` | all | Purchase orders to suppliers by email: `off` (print only, the default), `manual` (a button on the order) or `on` (also at every issue and amendment) |
+| `IN_APP_READ_RETENTION`, `IN_APP_UNREAD_RETENTION`, `IN_APP_MAX_PER_PERSON` | the worker | How long notifications in the application are kept: 30 days once read, 90 days unread, at most 200 per person |
+| `ATTACHMENT_STORAGE_LIMIT_MB` | all | Space for uploaded files (default 5,120 MB) |
 
-Generate an MFA key with `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+Generate an MFA or outbox key with `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
 
 Two health endpoints serve the stack's checks: `/healthz/` answers without touching the database, and `/readyz/` checks the database and answers 503, with no details, when it is down.
 
