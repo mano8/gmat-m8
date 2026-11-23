@@ -22,3 +22,9 @@ app changes.
 ## Project receiving screens (M9.2)
 
 The project page offers "Receive materials" (to the project's expected deliveries, then the receipt form); `selectors.receives_by_order(ctx)` is false for who holds only site grants, who is never offered the order search (the receipts list and the project list lead to the projects, the form's breadcrumb returns to the project).
+
+## Rules in detail
+
+The full text of the root `CLAUDE.md`'s rules this directory implements; the root keeps a one-sentence summary of each.
+
+- Project receiving (Q44, ADR-0028): every business role posts receipts at the worksite of a project in its membership's scope, whoever requested the goods. `receipt.view`/`receipt.post` are `Reach.SITE` (○ site) for site managers, technicians and partners (documents only through their project; no branch row, warehouse or order), and for these `SITE_CAPABILITIES` the branch roles' grants also reach their projects' worksite documents. Warehouse receiving and `receipt.void` stay with the order's branch; a project receiver without `po.view` names only the project's lines and allocations. Its screens: *Project receiving screens* above.

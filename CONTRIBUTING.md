@@ -26,7 +26,7 @@ On Windows, keep LF line endings (`.gitattributes` enforces them); scripts under
 
 ## How the code is organised
 
-Read [CLAUDE.md](CLAUDE.md) before writing code: it is the working agreement for every contributor, human or agent, and lists the architecture invariants. In short:
+Read [CLAUDE.md](CLAUDE.md) before writing code: it is the working agreement for every contributor, human or agent, and lists the architecture invariants. The detail of each part lives next to it, in the `CLAUDE.md` of its directory (each app under `apps/`, `templates/`, `tests/`, `tests/e2e/`, `docker/`, `docker_compose/`; the root file's first section lists them): read the one of every directory you change. In short:
 
 - Views read through `selectors` and write through `services`, never through models directly.
 - Every mutating service authorizes inside its transaction (`authorize_in_txn`), then locks, validates, writes, and records an audit event.

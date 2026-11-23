@@ -545,7 +545,7 @@ Templates in `templates/`, styles in `static/src/app.css`, code in `static/js/ap
 
 ## Browser tests (step M8.2)
 
-`tests/e2e` drives Chromium against the compose stack (the `e2e` workflow; `uv run pytest tests/e2e -m e2e` on a fresh stack, see CLAUDE.md). Besides the role flows, it proves in a real browser what the unit and live layers can only assert about headers:
+`tests/e2e` drives Chromium against the compose stack (the `e2e` workflow; `uv run pytest tests/e2e -m e2e` on a fresh stack, see `tests/e2e/CLAUDE.md`). Besides the role flows, it proves in a real browser what the unit and live layers can only assert about headers:
 
 - **CSP.** Every page a test opens is watched: a `securitypolicyviolation`, an uncaught script error or a 5xx answer fails the test that caused it (and one test proves the listener fires on an inline script).
 - **History.** Sign out, another person signs in at the same browser, Back through the whole history: nothing of the first person's pages is shown (`no-store` responses, htmx's empty history cache, `refreshOnHistoryMiss`).
