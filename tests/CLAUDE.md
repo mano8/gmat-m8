@@ -27,3 +27,10 @@ CI runs this suite under pytest-xdist in four shards at once (ADR-0025, `docs/ad
 - a fake SMTP server in `tests/smtp.py`, outbox helpers in `tests/outbox.py` (`FakeOrders`, `no_dispatch_source` for bare-outbox tests, `make_dispatch`, `start_worker`)
 - tests queue mail in the outbox and the worker's mailer is locmem
 - Rehearsal: `REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s` runs `deploy.sh`, `recover.sh`, the drill and the offsite rules against real containers in throwaway projects; about 21 minutes, about 3 GB free at its peak; `REHEARSAL_KEEP=1` leaves them, `REHEARSAL_DIR` chooses where. Skips without `REHEARSAL_REQUIRED=1`.
+
+## Commands
+
+```bash
+LEDGER_MACHINE_EXAMPLES=300 LEDGER_MACHINE_STEPS=50 uv run pytest tests/integration/test_ledger_machine.py   # M8.1: a deeper run of the ledger state machine (CI: 20 examples of up to 30 steps, derandomized)
+REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s   # M8.4: deploy.sh, recover.sh, the drill and the offsite rules against real containers (about 21 min; tests/CLAUDE.md)
+```
