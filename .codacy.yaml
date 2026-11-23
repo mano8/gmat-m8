@@ -7,6 +7,7 @@ exclude_paths:
   - "static/dist/**"                      # built CSS
   - "locale/**"                           # gettext catalogs
   - "CLAUDE.md"                           # agent instructions, not code
+  - "**/CLAUDE.md"                        # the per-directory agent instructions
   - ".github/pull_request_template.md"    # opens with the title hint comment by design
   - "**/*.sql"                            # PostgreSQL run through psql (:'name' variables);
                                           # Codacy's SQL tools target other dialects

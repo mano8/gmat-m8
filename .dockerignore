@@ -2,6 +2,7 @@
 .plans/
 .claude/
 CLAUDE.md
+**/CLAUDE.md
 .git/
 .github/
 
