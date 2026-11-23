@@ -36,7 +36,8 @@ from apps.core.ids import new_id
 from apps.handovers.models import Handover, HandoverLine
 from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
-from apps.notifications.models import EmailOutbox, Kind, Status
+from apps.notifications.kinds import SUBJECT, Notice
+from apps.notifications.models import EmailOutbox, InAppNotification, Kind, Status
 from apps.organizations.models import Branch, Company, Membership
 from apps.projects.models import Project, ProjectAssignment
 from apps.purchasing.models import PurchaseAllocation, PurchaseOrder, PurchaseOrderLine
@@ -64,6 +65,8 @@ class Scale:
     projects: int = 300
     users: int = 1_000
     invitations: int = 400
+    in_app_per_person: int = 200  # the purge's cap (Q98): what a busy person keeps at steady state
+    in_app_people: int = 300  # other people with a full list
     suppliers: int = 500
     companies: int = 150
     units: int = 120
@@ -855,6 +858,48 @@ class _Builder:
         return hot
 
 
+IN_APP_MIX = (
+    (Notice.REQUEST_APPROVED, 4),
+    (Notice.REQUEST_HANDED_OVER, 4),
+    (Notice.REQUEST_EDITED, 1),
+    (Notice.REQUEST_REJECTED, 1),
+)
+
+
+def _in_app_rows(
+    builder: _Builder, user: User, about: list[MaterialRequest], mix: Any
+) -> list[InAppNotification]:
+    """A full list of a person (M17.3): the newest a third unread, about ``about``."""
+    rng, count = builder.rng, builder.scale.in_app_per_person
+    return [
+        InAppNotification(
+            id=new_id(),
+            user=user,
+            notice=_pick(rng, mix),
+            object_type=SUBJECT,
+            object_id=rng.choice(about).pk,
+            notified_at=builder.now - timedelta(hours=index * 3),
+            read_at=None if index < count // 3 else builder.now - timedelta(hours=index),
+        )
+        for index in range(count)
+    ]
+
+
+def _add_in_app(builder: _Builder, requests: list[MaterialRequest], users: list[User]) -> None:
+    """The requester's own requests, the reviewer's to review (with a few they no longer
+    reach: another branch's), and a full list for many others."""
+    people = builder.people
+    own = [r for r in requests if r.requested_by_id == people.tech_mad.pk and r.number]
+    numbered = [r for r in requests if r.number]
+    review = ((Notice.REQUEST_TO_REVIEW, 9), (Notice.REQUEST_ASSIGNED, 1))
+    rows = _in_app_rows(builder, people.tech_mad, own, IN_APP_MIX)
+    rows += _in_app_rows(builder, people.mm_mad, numbered, review)
+    for user in users[: builder.scale.in_app_people]:
+        rows += _in_app_rows(builder, user, numbered, IN_APP_MIX)
+    _insert(InAppNotification, rows)
+    builder.counts["in_app_notifications"] = len(rows)
+
+
 def build_volume(org: Org, people: People, scale: Scale | None = None) -> Volume:
     """Build the dataset inside the current transaction and ``ANALYZE`` it."""
     scale = scale or Scale()
@@ -871,6 +916,7 @@ def build_volume(org: Org, people: People, scale: Scale | None = None) -> Volume
     builder.receipts(orders, order_lines, allocations)
     builder.handovers(lines, requests)
     hot_request = builder.audit(requests, users)
+    _add_in_app(builder, requests, users)
     with connection.cursor() as cursor:
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")  # the deferred foreign keys, now
         cursor.execute("SET CONSTRAINTS ALL DEFERRED")

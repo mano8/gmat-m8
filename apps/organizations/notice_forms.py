@@ -1,72 +1,83 @@
-"""The forms of the email notification screens (M15.3, Q87, Q89).
+"""The forms of the notification screens of the administration (M15.3, M17.4: Q87, Q89, Q93).
 
-One form per setting for everyone (the value to set, never a toggle: a double tap sets the same
-value again) and one per person (a choice per notice). Both carry a server-issued idempotency
-key; the services check everything again.
+One form per notification for everyone (a value per channel: the value to set, never a toggle, so
+a double tap sets the same value again) and one per person and channel (a choice per notification).
+Both carry a server-issued idempotency key and what they showed (``seen_*``), so a save changes
+only what the administrator changed; the services check everything again.
 """
+
+from typing import Any
 
 from django import forms
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 
 from apps.core.forms import IdempotentForm
-from apps.notifications.kinds import NOTICES, Mode, Notice
-from apps.notifications.services import NOTICE_DEFAULT_OPERATION, PERSON_NOTICES_OPERATION
+from apps.notifications.forms import FOLLOW, OFF, ON, NoticeChoicesForm, seen_name
+from apps.notifications.kinds import CHANNELS, Channel, Mode, Notice
+from apps.notifications.services import NOTICE_CHANNELS_OPERATION, PERSON_NOTICES_OPERATION
 
-FOLLOW = ""  # the person's choice that deletes their row: follow the setting for everyone
+__all__ = ["FOLLOW", "NoticeDefaultForm", "PersonNoticesForm"]
 
 
 class NoticeDefaultForm(IdempotentForm):
-    """Turn one notice on or off for everyone."""
+    """Send one notification to everyone or to nobody, on each channel."""
 
-    operation = NOTICE_DEFAULT_OPERATION
+    operation = NOTICE_CHANNELS_OPERATION
 
-    enabled = forms.ChoiceField(choices=[("on", "on"), ("off", "off")], widget=forms.HiddenInput)
+    VALUES = (
+        (ON, pgettext_lazy("notice state", "Sent")),
+        (OFF, pgettext_lazy("notice state", "Not sent")),
+    )
 
-    def is_on(self) -> bool:
-        return bool(self.cleaned_data["enabled"] == "on")
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        for channel, spec in CHANNELS.items():
+            self.fields[channel.value] = forms.ChoiceField(label=spec.label, choices=self.VALUES)
+            self.fields[seen_name(channel.value)] = forms.ChoiceField(
+                required=False, choices=self.VALUES, widget=forms.HiddenInput
+            )
+
+    @staticmethod
+    def initial_for(enabled: dict[Channel, bool]) -> dict[str, str]:
+        """The form's initial values from the settings for everyone."""
+        shown = {channel.value: ON if on else OFF for channel, on in enabled.items()}
+        return shown | {seen_name(key): value for key, value in shown.items()}
+
+    def changes(self) -> dict[Channel, bool]:
+        """What the administrator changed, ready for ``set_notice_channels``: a channel whose
+        value equals what the dialog showed is left out. A post without what was shown names
+        every channel."""
+        chosen = self.cleaned_data
+        return {
+            channel: chosen[channel.value] == ON
+            for channel in CHANNELS
+            if seen_name(channel.value) not in self.data
+            or chosen[channel.value] != chosen.get(seen_name(channel.value))
+        }
 
 
-class PersonNoticesForm(IdempotentForm):
-    """A person's setting for each notice: follow the one for everyone, always or never."""
+class PersonNoticesForm(NoticeChoicesForm):
+    """A person's setting for each notification on one channel: follow the one for everyone,
+    always or never."""
 
     operation = PERSON_NOTICES_OPERATION
-
-    CHOICES = (
+    choices = (
         (FOLLOW, _("Follow the setting for everyone")),
         (Mode.ALWAYS.value, _("Always send")),
         (Mode.NEVER.value, _("Never send")),
     )
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
-        for notice, spec in NOTICES.items():
-            self.fields[notice.value] = forms.ChoiceField(
-                label=spec.label, required=False, choices=self.CHOICES
-            )
-            # What the dialog showed, posted back: a save changes only what the administrator
-            # changed, so another administrator's change made since is not undone.
-            self.fields[self.seen_name(notice)] = forms.ChoiceField(
-                required=False, choices=self.CHOICES, widget=forms.HiddenInput
-            )
-
-    @staticmethod
-    def seen_name(notice: Notice) -> str:
-        return f"seen_{notice.value}"
-
     @classmethod
     def initial_for(cls, modes: dict[Notice, Mode | None]) -> dict[str, str]:
-        """The form's initial values from the person's own settings (``None``: follow)."""
-        shown = {notice.value: mode.value if mode else FOLLOW for notice, mode in modes.items()}
-        return shown | {f"seen_{key}": value for key, value in shown.items()}
+        """The form's initial values from the person's settings (``None``: follow)."""
+        return cls.initial_values(
+            {notice: mode.value if mode else FOLLOW for notice, mode in modes.items()}
+        )
 
-    def modes(self) -> dict[Notice, Mode | None]:
-        """What the administrator changed, ready for ``set_person_notices``: a notice whose choice
-        equals what the dialog showed is left out. A post without what was shown (no script, a
-        script of one's own) names every notice."""
-        chosen = self.cleaned_data
+    def modes(self) -> dict[tuple[Notice, Channel], Mode | None]:
+        """What the administrator changed, ready for ``set_person_notices``."""
         return {
-            notice: Mode(chosen[notice.value]) if chosen.get(notice.value) else None
-            for notice in NOTICES
-            if self.seen_name(notice) not in self.data
-            or chosen.get(notice.value) != chosen.get(self.seen_name(notice))
+            (notice, self.channel): Mode(value) if value else None
+            for notice, value in self.changed().items()
         }

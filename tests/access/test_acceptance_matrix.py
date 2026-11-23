@@ -184,7 +184,7 @@ ADMIN_MODELS = {
     "receiving": ("goodsreceipt", "goodsreceiptline", "receiptattribution"),
     "handovers": ("handover", "handoverline"),
     "attachments": ("attachment", "attachmentreservation", "storagequota", "mediadeletion"),
-    "notifications": ("noticedefault", "noticesetting"),
+    "notifications": ("noticedefault", "noticesetting", "noticechoice", "channelswitch"),
 }
 # The admin pages of a model that shows its own sentinels: the supplier's contact details
 # (also in an order's supplier snapshot) and the allocations' quantities. Prices never
@@ -326,6 +326,12 @@ def _object_url(name: str, key: str) -> Callable[[World], str]:
 
 def _person_url(name: str) -> Callable[[World], str]:
     return lambda world: reverse(name, args=[world.people.tech_mad.pk])
+
+
+def _person_channel_url(channel: str) -> Callable[[World], str]:
+    return lambda world: reverse(
+        "org:person_notifications", args=[world.people.tech_mad.pk, channel]
+    )
 
 
 def _notice_url(notice: str) -> Callable[[World], str]:
@@ -1173,8 +1179,68 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "catalog:list": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
     "catalog:search": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
     # M7.1: every member (catalog.view) sets their own business-email choice.
+    # M17.4: the page, its two parts' POSTs and the person's own in-app notifications. Only one's
+    # own rows are reached: another person's notification is a 404 (never a 403), and the bell's
+    # fragment is GET-only.
     "notifications:settings": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
-    "notifications:save": (Route(app_action(**_each(REDIRECT, CATALOG_VIEWERS))),),
+    "notifications:save_channels": (
+        Route(
+            app_action(**_each(REDIRECT, CATALOG_VIEWERS)),
+            note="nothing shown, nothing changed: every channel is named",
+        ),
+        Route(
+            app_action(**_each(UNPROCESSABLE, CATALOG_VIEWERS)),
+            position="htmx",
+            headers=HTMX,
+            data=lambda world: {"seen_EMAIL": "maybe"},
+            note="an invalid form from the dialog: the form again with its errors",
+        ),
+    ),
+    "notifications:save_choices": (
+        Route(
+            app_action(**_each(REDIRECT, CATALOG_VIEWERS)),
+            path=lambda world: reverse("notifications:save_choices", args=["email"]),
+        ),
+        Route(
+            app_action(**_each(UNPROCESSABLE, CATALOG_VIEWERS)),
+            position="htmx",
+            path=lambda world: reverse("notifications:save_choices", args=["in-app"]),
+            headers=HTMX,
+            data=lambda world: {"REQUEST_APPROVED": "sometimes"},
+            note="an unknown choice from the dialog: the form again with its errors",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, CATALOG_VIEWERS)),
+            position="unknown channel",
+            path=lambda world: reverse("notifications:save_choices", args=["telegram"]),
+        ),
+    ),
+    "inapp:list": (Route(app_page(**_each(OK, CATALOG_VIEWERS))),),
+    "inapp:bell": (
+        Route(app_page(**_each(OK, CATALOG_VIEWERS)), note="GET-only, not activity"),
+        Route(
+            app_page(**_each(OK, CATALOG_VIEWERS)),
+            position="htmx",
+            headers=HTMX,
+            note="the page's poll asks for the same URL with htmx",
+        ),
+    ),
+    "inapp:read_all": (
+        Route(app_action(**_each(REDIRECT, CATALOG_VIEWERS)), note="only one's own rows"),
+    ),
+    "inapp:open": (
+        Route(
+            app_action(**(_each(NOT_FOUND, CATALOG_VIEWERS) | {"tech_mad": REDIRECT})),
+            position="the technician's own",
+            path=_object_url("inapp:open", "notification"),
+            note="the owner is led to the request; anyone else, even a group administrator, 404",
+        ),
+        Route(
+            app_action(**_each(NOT_FOUND, CATALOG_VIEWERS)),
+            position="unknown",
+            path=_unknown_url("inapp:open"),
+        ),
+    ),
     # M8.3 (X5): every signed-in account, whatever its memberships; session MFA as everywhere.
     # Only one's own rows are reached: someone else's id answers as an ended session does.
     "sessions:list": (
@@ -2434,15 +2500,20 @@ APP_ROUTES: dict[str, tuple[Route, ...]] = {
     "org:person_notifications": (
         Route(
             org_action(),
-            path=_person_url("org:person_notifications"),
+            path=_person_channel_url("email"),
             note="no key: nothing changes",
         ),
         Route(
             org_action(UNPROCESSABLE),
             position="htmx",
-            path=_person_url("org:person_notifications"),
+            path=_person_channel_url("in-app"),
             headers=HTMX,
             note="an empty form from the dialog: the form again with its errors",
+        ),
+        Route(
+            app_action(group_admin=NOT_FOUND),
+            position="unknown channel",
+            path=_person_channel_url("telegram"),
         ),
     ),
     "org:revoke_membership": (

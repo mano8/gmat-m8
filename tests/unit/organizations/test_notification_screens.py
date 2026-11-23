@@ -1,14 +1,15 @@
-"""Which business emails are sent: the administration page, the person's page and one's own page
-(M15.3, Q87-Q89).
+"""Which business notifications are sent: the administration page and the person's page, per
+channel (M15.3, M17.4: Q87-Q89, Q93, Q97).
 
-A group administrator sets the emails for everyone and for a person from dialogs; the person
-sees, read-only, what applies to them beside their own switch. Nobody else reads another
-person's settings.
+A group administrator sets the notifications for everyone and for a person from dialogs; the
+person's own choices (their page, ``tests/unit/notifications/test_own_screens.py``) are shown
+read-only beside them. Nobody else reads another person's settings.
 """
 
 import re
 
 import pytest
+from django.contrib.messages import get_messages
 from django.test import Client
 from django.urls import reverse
 from django.utils import translation
@@ -18,9 +19,15 @@ from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.core.idempotency import issue_key
 from apps.notifications import resolution, services
-from apps.notifications.kinds import NOTICES, Channel, Mode, Notice
-from apps.notifications.models import NoticeDefault, NoticeSetting, NotificationPreference
-from apps.notifications.services import NOTICE_DEFAULT_OPERATION, PERSON_NOTICES_OPERATION
+from apps.notifications.kinds import NOTICES, Channel, Mode, Notice, channel_slug
+from apps.notifications.models import (
+    ChannelSwitch,
+    NoticeChoice,
+    NoticeDefault,
+    NoticeSetting,
+    NotificationPreference,
+)
+from apps.notifications.services import NOTICE_CHANNELS_OPERATION, PERSON_NOTICES_OPERATION
 from tests.org import People
 from tests.org import client_for as signed_in
 from tests.support import principal_for
@@ -39,8 +46,8 @@ def default_url(notice: Notice) -> str:
     return reverse("org:notification_default", args=[notice.value])
 
 
-def person_url(user: User) -> str:
-    return reverse("org:person_notifications", args=[user.pk])
+def person_url(user: User, channel: Channel = Channel.EMAIL) -> str:
+    return reverse("org:person_notifications", args=[user.pk, channel_slug(channel)])
 
 
 def html_of(client: Client, url: str) -> str:
@@ -59,13 +66,24 @@ def key_of(html: str, field: str) -> str:
 
 def state_of(html: str, notice: Notice) -> str:
     """The text of one notice's row of the page: its state and what is said about it."""
-    row = re.search(rf'data-notice="{notice.value}".*?</(?:tr|li)>', html, re.S)
+    row = re.search(rf'data-notice="{notice.value}".*?</tr>', html, re.S)
     assert row is not None, notice
     return " ".join(re.sub(r"<[^>]+>", " ", row.group(0)).split())
 
 
+def cell_of(html: str, notice: Notice, channel: Channel) -> str:
+    """The text of one cell of a notice's row: its state on one channel and why."""
+    row = re.search(rf'data-notice="{notice.value}".*?</tr>', html, re.S)
+    assert row is not None, notice
+    cell = re.search(rf'<td[^>]*data-channel="{channel.value}".*?</td>', row.group(0), re.S)
+    assert cell is not None, (notice, channel)
+    return " ".join(re.sub(r"<[^>]+>", " ", cell.group(0)).split())
+
+
 class TestAdministrationPage:
-    def test_every_email_in_the_registry_order_with_who_and_when(self, people: People) -> None:
+    def test_every_notification_in_the_registry_order_with_who_and_when(
+        self, people: People
+    ) -> None:
         html = html_of(client_for(people.group_admin), reverse("org:notifications"))
         positions = [html.index(f'data-notice="{notice.value}"') for notice in NOTICES]
         assert positions == sorted(positions)
@@ -73,19 +91,18 @@ class TestAdministrationPage:
             for spec in NOTICES.values():
                 assert escape(str(spec.recipients)) in html and escape(str(spec.when)) in html
 
-    def test_all_on_at_first_and_no_own_settings(self, people: People) -> None:
+    def test_all_on_at_first_on_every_channel_and_no_own_settings(self, people: People) -> None:
         html = html_of(client_for(people.group_admin), reverse("org:notifications"))
         for notice in NOTICES:
-            text = state_of(html, notice)
-            assert "Not sent" not in text and "Sent" in text
-        assert "Turn off for everyone" in html and "Turn on for everyone" not in html
+            for channel in Channel:
+                text = cell_of(html, notice, channel)
+                assert "Not sent" not in text and "Sent" in text
+                assert "No settings of their own" in text
 
-    def test_an_email_turned_off_offers_to_turn_it_on_and_counts_own_settings(
-        self, people: People
-    ) -> None:
+    def test_a_notification_off_on_one_channel_only(self, people: People) -> None:
         admin = people.group_admin
         NoticeDefault.objects.create(
-            notice=Notice.REQUEST_APPROVED, channel=Channel.EMAIL, enabled=False, changed_by=admin
+            notice=Notice.REQUEST_APPROVED, channel=Channel.IN_APP, enabled=False, changed_by=admin
         )
         for user, mode in ((people.tech_mad, Mode.ALWAYS), (people.mm_mad, Mode.NEVER)):
             NoticeSetting.objects.create(
@@ -96,10 +113,11 @@ class TestAdministrationPage:
                 set_by=admin,
             )
         html = html_of(client_for(admin), reverse("org:notifications"))
-        text = state_of(html, Notice.REQUEST_APPROVED)
-        assert "Not sent" in text and "Turn on for everyone" in text
-        assert "2 people (1 always, 1 never)" in text
-        assert "Turn off for everyone" in state_of(html, Notice.REQUEST_REJECTED) + html
+        in_app = cell_of(html, Notice.REQUEST_APPROVED, Channel.IN_APP)
+        assert "Not sent" in in_app and "No settings of their own" in in_app
+        email = cell_of(html, Notice.REQUEST_APPROVED, Channel.EMAIL)
+        assert "Not sent" not in email and "2 people (1 always, 1 never)" in email
+        assert "Not sent" not in cell_of(html, Notice.REQUEST_REJECTED, Channel.IN_APP)
 
     def test_a_person_who_left_has_no_count(self, people: People) -> None:
         NoticeSetting.objects.create(
@@ -114,7 +132,8 @@ class TestAdministrationPage:
 
     def test_the_menu_names_the_page(self, people: People) -> None:
         html = html_of(client_for(people.group_admin), reverse("org:notifications"))
-        assert reverse("org:notifications") in html and "Email notifications" in html
+        assert reverse("org:notifications") in html
+        assert "Email notifications" not in html and "Notifications" in html
         assert html.count('aria-current="page"') >= 1
 
     def test_other_roles_do_not_see_the_page_nor_the_menu_entry(self, people: People) -> None:
@@ -124,39 +143,88 @@ class TestAdministrationPage:
             assert reverse("org:notifications") not in html_of(client, reverse("core:home"))
 
 
+def default_data(html: str, notice: Notice, **values: str) -> dict[str, str]:
+    """What the dialog of ``notice`` posts: its key, what it showed and what is changed."""
+    slug = notice.value.lower()
+    shown = {"EMAIL": "on", "IN_APP": "on"}
+    data = {"idempotency_key": key_of(html, f"id_notice_{slug}_idempotency_key")}
+    data |= shown | {f"seen_{key}": value for key, value in shown.items()}
+    return data | values
+
+
 class TestTheSettingForEveryone:
-    def test_turns_an_email_off_and_on_from_its_dialog(self, people: People) -> None:
+    def test_turns_a_channel_off_and_on_from_the_dialog(self, people: People) -> None:
         client = client_for(people.group_admin)
         html = html_of(client, reverse("org:notifications"))
-        key = key_of(html, "id_notice_request_rejected_idempotency_key")
         response = client.post(
             default_url(Notice.REQUEST_REJECTED),
-            {"enabled": "off", "idempotency_key": key},
+            default_data(html, Notice.REQUEST_REJECTED, IN_APP="off"),
             headers=HTMX,
         )
         assert response.status_code == 204
         assert response["HX-Redirect"] == reverse("org:notifications")
-        assert not NoticeDefault.objects.get(notice=Notice.REQUEST_REJECTED).enabled
+        # Only the channel that changed is written: email was left as it showed.
+        row = NoticeDefault.objects.get()
+        assert (row.notice, row.channel, row.enabled) == (
+            Notice.REQUEST_REJECTED,
+            Channel.IN_APP,
+            False,
+        )
         event = AuditEvent.objects.get(action="notification.default_changed")
+        assert event.data["channel"] == "IN_APP"
         assert event.data["before"] is True and event.data["after"] is False
-        assert "Not sent" in state_of(
-            html_of(client, reverse("org:notifications")), Notice.REQUEST_REJECTED
+        page = html_of(client, reverse("org:notifications"))
+        assert "Not sent" in cell_of(page, Notice.REQUEST_REJECTED, Channel.IN_APP)
+        assert "Not sent" not in cell_of(page, Notice.REQUEST_REJECTED, Channel.EMAIL)
+        # Another operation's key is refused; a fresh key of this one turns it on again.
+        other = default_data(page, Notice.REQUEST_REJECTED, IN_APP="on", seen_IN_APP="off")
+        other["idempotency_key"] = issue_key(people.group_admin.pk, "x")
+        assert client.post(default_url(Notice.REQUEST_REJECTED), other).status_code == 400
+        key = issue_key(people.group_admin.pk, NOTICE_CHANNELS_OPERATION)
+        data = default_data(page, Notice.REQUEST_REJECTED, IN_APP="on", seen_IN_APP="off")
+        client.post(default_url(Notice.REQUEST_REJECTED), data | {"idempotency_key": key})
+        assert NoticeDefault.objects.get().enabled
+
+    def test_a_save_changes_only_what_the_dialog_changed(self, people: People) -> None:
+        """Another administrator's change made after the dialog was drawn is not undone."""
+        client = client_for(people.group_admin)
+        html = html_of(client, reverse("org:notifications"))
+        services.set_notice_default(
+            principal_for(people.group_admin),
+            Notice.REQUEST_EDITED,
+            enabled=False,
+            channel=Channel.EMAIL,
         )
-        again = client.post(
-            default_url(Notice.REQUEST_REJECTED),
-            {"enabled": "on", "idempotency_key": issue_key(people.group_admin.pk, "x")},
+        data = default_data(html, Notice.REQUEST_EDITED, IN_APP="off")
+        assert (
+            client.post(default_url(Notice.REQUEST_EDITED), data, headers=HTMX).status_code == 204
         )
-        assert again.status_code == 400  # a key of another operation is refused
-        key = issue_key(people.group_admin.pk, NOTICE_DEFAULT_OPERATION)
-        client.post(default_url(Notice.REQUEST_REJECTED), {"enabled": "on", "idempotency_key": key})
-        assert NoticeDefault.objects.get(notice=Notice.REQUEST_REJECTED).enabled
+        rows = {row.channel: row.enabled for row in NoticeDefault.objects.all()}
+        assert rows == {Channel.EMAIL: False, Channel.IN_APP: False}
+
+    def test_a_post_without_what_was_shown_names_every_channel(self, people: People) -> None:
+        client = client_for(people.group_admin)
+        key = issue_key(people.group_admin.pk, NOTICE_CHANNELS_OPERATION)
+        data = {"EMAIL": "off", "IN_APP": "off", "idempotency_key": key}
+        assert client.post(default_url(Notice.REQUEST_EDITED), data).status_code == 302
+        assert {row.channel for row in NoticeDefault.objects.filter(enabled=False)} == set(Channel)
+
+    def test_nothing_changed_writes_and_audits_nothing(self, people: People) -> None:
+        client = client_for(people.group_admin)
+        html = html_of(client, reverse("org:notifications"))
+        response = client.post(
+            default_url(Notice.REQUEST_EDITED), default_data(html, Notice.REQUEST_EDITED)
+        )
+        assert response.status_code == 302
+        assert not NoticeDefault.objects.exists()
+        assert not AuditEvent.objects.filter(action="notification.default_changed").exists()
+        messages = [str(m) for m in get_messages(response.wsgi_request)]
+        assert messages == ["Nothing changed."]
 
     def test_a_double_tap_changes_once(self, people: People) -> None:
         client = client_for(people.group_admin)
-        data = {
-            "enabled": "off",
-            "idempotency_key": issue_key(people.group_admin.pk, NOTICE_DEFAULT_OPERATION),
-        }
+        html = html_of(client, reverse("org:notifications"))
+        data = default_data(html, Notice.REQUEST_EDITED, EMAIL="off")
         for _ in range(2):
             assert client.post(default_url(Notice.REQUEST_EDITED), data).status_code == 302
         assert AuditEvent.objects.filter(action="notification.default_changed").count() == 1
@@ -164,24 +232,21 @@ class TestTheSettingForEveryone:
     def test_an_invalid_value_comes_back_in_the_dialog(self, people: People) -> None:
         client = client_for(people.group_admin)
         data = {
-            "enabled": "maybe",
-            "idempotency_key": issue_key(people.group_admin.pk, NOTICE_DEFAULT_OPERATION),
+            "EMAIL": "maybe",
+            "idempotency_key": issue_key(people.group_admin.pk, NOTICE_CHANNELS_OPERATION),
         }
         response = client.post(default_url(Notice.REQUEST_EDITED), data, headers=HTMX)
         assert response.status_code == 422
         assert b'data-testid="notice-request-edited-form"' in response.content
         assert not NoticeDefault.objects.exists()
-        # The notice is on, so the dialog that comes back still offers to turn it off.
-        assert "Turn off</button>" in response.content.decode()
-        assert "Turn on</button>" not in response.content.decode()
 
-    def test_an_unknown_email_is_a_404_and_a_get_a_405(self, people: People) -> None:
+    def test_an_unknown_notification_is_a_404_and_a_get_a_405(self, people: People) -> None:
         client = client_for(people.group_admin)
-        assert client.post("/org/notifications/NOT_AN_EMAIL/", {}).status_code == 404
+        assert client.post("/org/notifications/NOT_A_NOTICE/", {}).status_code == 404
         assert client.get(default_url(Notice.REQUEST_EDITED)).status_code == 405
 
     def test_other_roles_are_refused(self, people: People) -> None:
-        data = {"enabled": "off"}
+        data = {"EMAIL": "off", "IN_APP": "off"}
         for user in (people.mm_mad, people.engineer, people.tech_mad, people.partner):
             response = client_for(user).post(default_url(Notice.REQUEST_EDITED), data)
             assert response.status_code == 403, user.email
@@ -189,7 +254,7 @@ class TestTheSettingForEveryone:
 
 
 class TestThePersonsPage:
-    def test_the_section_says_what_applies_and_why(self, people: People) -> None:
+    def test_the_section_says_what_applies_and_why_on_each_channel(self, people: People) -> None:
         tech, admin = people.tech_mad, people.group_admin
         NoticeDefault.objects.create(
             notice=Notice.REQUEST_REJECTED, channel=Channel.EMAIL, enabled=False, changed_by=admin
@@ -197,15 +262,18 @@ class TestThePersonsPage:
         NoticeSetting.objects.create(
             user=tech,
             notice=Notice.REQUEST_APPROVED,
-            channel=Channel.EMAIL,
+            channel=Channel.IN_APP,
             mode=Mode.NEVER,
             set_by=admin,
         )
         html = html_of(client_for(admin), reverse("org:person", args=[tech.pk]))
-        assert 'data-testid="person-notices"' in html and 'data-testid="notices-open"' in html
-        approved = state_of(html, Notice.REQUEST_APPROVED)
+        assert 'data-testid="person-notices"' in html
+        assert 'data-testid="notices-email-open"' in html
+        assert 'data-testid="notices-in-app-open"' in html
+        approved = cell_of(html, Notice.REQUEST_APPROVED, Channel.IN_APP)
         assert "Not sent" in approved and "Set for this person: never sent." in approved
-        rejected = state_of(html, Notice.REQUEST_REJECTED)
+        assert "Sent" in cell_of(html, Notice.REQUEST_APPROVED, Channel.EMAIL)
+        rejected = cell_of(html, Notice.REQUEST_REJECTED, Channel.EMAIL)
         assert "Not sent" in rejected and "Follows the setting for everyone." in rejected
         edited = state_of(html, Notice.REQUEST_EDITED)
         assert "Sent" in edited and "Not sent" not in edited
@@ -221,8 +289,9 @@ class TestThePersonsPage:
         )
         assert "do not receive" not in state_of(reviewer, Notice.REQUEST_TO_REVIEW)
 
-    def test_their_own_refusal_is_named_first(self, people: People) -> None:
+    def test_their_own_switch_for_a_channel_is_named_first(self, people: People) -> None:
         NotificationPreference.objects.create(user=people.tech_mad, email_opt_out=True)
+        ChannelSwitch.objects.create(user=people.tech_mad, channel=Channel.IN_APP, enabled=False)
         NoticeSetting.objects.create(
             user=people.tech_mad,
             notice=Notice.REQUEST_APPROVED,
@@ -233,15 +302,37 @@ class TestThePersonsPage:
         html = html_of(
             client_for(people.group_admin), reverse("org:person", args=[people.tech_mad.pk])
         )
-        text = state_of(html, Notice.REQUEST_APPROVED)
-        assert "turned business email off themselves" in text and "Not sent" in text
+        for channel in Channel:
+            text = cell_of(html, Notice.REQUEST_APPROVED, channel)
+            assert "The person turned this channel off." in text and "Not sent" in text
 
-    def test_the_dialog_saves_the_choices(self, people: People) -> None:
+    def test_their_own_choice_is_shown_with_where_it_overrides(self, people: People) -> None:
+        tech, admin = people.tech_mad, people.group_admin
+        NoticeSetting.objects.create(
+            user=tech,
+            notice=Notice.REQUEST_APPROVED,
+            channel=Channel.EMAIL,
+            mode=Mode.NEVER,
+            set_by=admin,
+        )
+        for notice in (Notice.REQUEST_APPROVED, Notice.REQUEST_REJECTED):
+            NoticeChoice.objects.create(
+                user=tech, notice=notice, channel=Channel.EMAIL, enabled=True
+            )
+        html = html_of(client_for(admin), reverse("org:person", args=[tech.pk]))
+        approved = cell_of(html, Notice.REQUEST_APPROVED, Channel.EMAIL)
+        assert "The person chose this themselves." in approved and "Not sent" not in approved
+        assert "It overrides what the administrators set for them." in approved
+        # A choice that agrees with the administrators overrides nothing.
+        rejected = cell_of(html, Notice.REQUEST_REJECTED, Channel.EMAIL)
+        assert "chose this themselves" in rejected and "overrides" not in rejected
+
+    def test_the_dialog_saves_the_choices_of_one_channel(self, people: People) -> None:
         tech, admin = people.tech_mad, people.group_admin
         client = client_for(admin)
         html = html_of(client, reverse("org:person", args=[tech.pk]))
         data = {
-            "idempotency_key": key_of(html, "id_notices_idempotency_key"),
+            "idempotency_key": key_of(html, "id_notices_email_idempotency_key"),
             "REQUEST_APPROVED": "NEVER",
             "REQUEST_REJECTED": "ALWAYS",
             "REQUEST_EDITED": "",
@@ -249,11 +340,14 @@ class TestThePersonsPage:
         response = client.post(person_url(tech), data, headers=HTMX)
         assert response.status_code == 204
         assert response["HX-Redirect"] == reverse("org:person", args=[tech.pk])
-        assert dict(NoticeSetting.objects.filter(user=tech).values_list("notice", "mode")) == {
-            "REQUEST_APPROVED": "NEVER",
-            "REQUEST_REJECTED": "ALWAYS",
+        assert {
+            (row.notice, row.channel): row.mode for row in NoticeSetting.objects.filter(user=tech)
+        } == {
+            ("REQUEST_APPROVED", "EMAIL"): "NEVER",
+            ("REQUEST_REJECTED", "EMAIL"): "ALWAYS",
         }
         assert resolution.wanted([tech.pk], Notice.REQUEST_APPROVED) == set()
+        assert resolution.wanted([tech.pk], Notice.REQUEST_APPROVED, Channel.IN_APP) == {tech.pk}
         # The dialog now starts from what is set.
         again = html_of(client, reverse("org:person", args=[tech.pk]))
         assert re.search(r'<option value="NEVER" selected>', again)
@@ -267,6 +361,16 @@ class TestThePersonsPage:
         assert not NoticeSetting.objects.filter(user=tech).exists()
         assert AuditEvent.objects.filter(action="notification.person_changed").count() == 2
 
+    def test_each_channel_has_its_own_dialog(self, people: People) -> None:
+        tech, admin = people.tech_mad, people.group_admin
+        client = client_for(admin)
+        html = html_of(client, reverse("org:person", args=[tech.pk]))
+        key = key_of(html, "id_notices_in_app_idempotency_key")
+        data = {"idempotency_key": key, "REQUEST_APPROVED": "NEVER"}
+        assert client.post(person_url(tech, Channel.IN_APP), data).status_code == 302
+        assert NoticeSetting.objects.get().channel == Channel.IN_APP
+        assert resolution.wanted([tech.pk], Notice.REQUEST_APPROVED) == {tech.pk}
+
     def test_a_save_changes_only_what_the_dialog_changed(self, people: People) -> None:
         """Another administrator's change made after the dialog was drawn is not undone."""
         tech, admin = people.tech_mad, people.group_admin
@@ -275,10 +379,12 @@ class TestThePersonsPage:
         assert 'name="seen_REQUEST_APPROVED"' in html
         # Someone else sets one notice while this dialog is open.
         services.set_person_notices(
-            principal_for(people.group_admin), tech.pk, {Notice.REQUEST_APPROVED: Mode.NEVER}
+            principal_for(people.group_admin),
+            tech.pk,
+            {(Notice.REQUEST_APPROVED, Channel.EMAIL): Mode.NEVER},
         )
         data = {
-            "idempotency_key": key_of(html, "id_notices_idempotency_key"),
+            "idempotency_key": key_of(html, "id_notices_email_idempotency_key"),
             "REQUEST_EDITED": "ALWAYS",
         }
         for notice in Notice:
@@ -298,13 +404,13 @@ class TestThePersonsPage:
         }
         response = client.post(person_url(people.tech_mad), data, headers=HTMX)
         assert response.status_code == 422
-        assert b'data-testid="notices-form"' in response.content
+        assert b'data-testid="notices-email-form"' in response.content
         assert not NoticeSetting.objects.exists()
 
     def test_an_administrator_may_set_their_own(self, people: People) -> None:
         admin = people.group_admin
         html = html_of(client_for(admin), reverse("org:person", args=[admin.pk]))
-        assert 'data-testid="notices-open"' in html
+        assert 'data-testid="notices-email-open"' in html
         data = {
             "idempotency_key": issue_key(admin.pk, PERSON_NOTICES_OPERATION),
             "REQUEST_TO_REVIEW": "NEVER",
@@ -324,58 +430,15 @@ class TestThePersonsPage:
         assert client.post(person_url(people.operator), data).status_code == 403
         assert not NoticeSetting.objects.exists()
 
-    def test_a_person_out_of_reach_is_a_404_and_other_roles_a_403(self, people: People) -> None:
+    def test_a_person_out_of_reach_or_a_channel_unknown_is_a_404_and_other_roles_a_403(
+        self, people: People
+    ) -> None:
         data = {"REQUEST_APPROVED": "NEVER"}
-        missing = reverse("org:person_notifications", args=["00000000-0000-7000-8000-000000000000"])
+        missing = reverse(
+            "org:person_notifications", args=["00000000-0000-7000-8000-000000000000", "email"]
+        )
         assert client_for(people.group_admin).post(missing, data).status_code == 404
+        unknown = reverse("org:person_notifications", args=[people.tech_mad.pk, "telegram"])
+        assert client_for(people.group_admin).post(unknown, data).status_code == 404
         for user in (people.mm_mad, people.engineer, people.tech_mad):
             assert client_for(user).post(person_url(people.partner), data).status_code == 403
-
-
-class TestOwnPage:
-    def test_what_an_administrator_set_is_shown_beside_the_switch(self, people: People) -> None:
-        tech = people.tech_mad
-        NoticeDefault.objects.create(
-            notice=Notice.REQUEST_REJECTED,
-            channel=Channel.EMAIL,
-            enabled=False,
-            changed_by=people.group_admin,
-        )
-        NoticeSetting.objects.create(
-            user=tech,
-            notice=Notice.REQUEST_APPROVED,
-            channel=Channel.EMAIL,
-            mode=Mode.NEVER,
-            set_by=people.group_admin,
-        )
-        html = html_of(client_for(tech), reverse("notifications:settings"))
-        assert 'data-testid="notification-settings"' in html
-        assert 'data-testid="own-notices"' in html
-        approved = state_of(html, Notice.REQUEST_APPROVED)
-        assert "An administrator set this email never to reach you." in approved
-        assert "Not sent" in approved
-        assert "Follows the setting for everyone." in state_of(html, Notice.REQUEST_REJECTED)
-        assert "Not sent" in state_of(html, Notice.REQUEST_REJECTED)
-        assert "Your current roles do not receive it." in state_of(html, Notice.REQUEST_TO_REVIEW)
-
-    def test_your_own_refusal_wins_and_says_so(self, people: People) -> None:
-        NotificationPreference.objects.create(user=people.mm_mad, email_opt_out=True)
-        html = html_of(client_for(people.mm_mad), reverse("notifications:settings"))
-        assert "You turned business email off." in state_of(html, Notice.REQUEST_TO_REVIEW)
-
-    def test_it_is_read_only_and_the_page_offers_no_way_to_change_it(self, people: People) -> None:
-        html = html_of(client_for(people.tech_mad), reverse("notifications:settings"))
-        assert reverse("org:person_notifications", args=[people.tech_mad.pk]) not in html
-        assert "notices-open" not in html
-
-    def test_nothing_of_another_person_reaches_a_page(self, people: People) -> None:
-        NoticeSetting.objects.create(
-            user=people.mm_mad,
-            notice=Notice.REQUEST_TO_REVIEW,
-            channel=Channel.EMAIL,
-            mode=Mode.NEVER,
-            set_by=people.group_admin,
-        )
-        html = html_of(client_for(people.tech_mad), reverse("notifications:settings"))
-        assert people.mm_mad.email not in html
-        assert "never to reach you" not in state_of(html, Notice.REQUEST_TO_REVIEW)

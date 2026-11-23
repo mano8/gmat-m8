@@ -1,10 +1,11 @@
 """Who may still receive a message: checked by the worker in the claim transaction (plan §5).
 
 - **Notifications**: each recipient must be active, not offboarded, still want the
-  message's notice (``resolution``: their refusal of business email (M7.1), their own
-  setting, the setting for everyone; M15), and still hold the message's capability on its
-  object (anywhere, for a message without an object), evaluated at the database clock of
-  the claim through the recipient's own ``AccessContext``.
+  message's notice on email (``resolution``: their *no business email* (M7.1), their own
+  choice (M17), an administrator's setting for them, the setting for everyone; Q93), and
+  still hold the message's capability on its object (anywhere, for a message without an
+  object), evaluated at the database clock of the claim through the recipient's own
+  ``AccessContext``.
   Addresses come from the current user records.
 - **Security emails**: the message's named rule must still hold for its target. M2.5
   registers ``account.active`` (allauth's mail: the account is active and still has this

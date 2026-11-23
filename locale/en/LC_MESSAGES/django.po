@@ -7731,3 +7731,262 @@ msgstr ""
 #: apps/organizations/views/notification_screens.py
 msgid "Email notifications saved."
 msgstr ""
+
+#: apps/notifications/templates/notifications/states.html
+msgid "You chose this yourself."
+msgstr ""
+
+#: apps/notifications/templates/notifications/states.html
+msgid "The person chose this themselves."
+msgstr ""
+
+#: apps/notifications/kinds.py
+msgid "In the application"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "wanted"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "channel on"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "own notice choice"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "own notice choices"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "channel switch"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "channel switches"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "in-app notification"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "in-app notifications"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "object type"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "object id"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "notified at"
+msgstr ""
+
+#: apps/notifications/models.py
+msgid "read at"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Change where you are told"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "A channel you turn off tells you nothing, whatever you chose below; your choices are kept for when you turn it on again. Account security emails and supplier orders are always sent."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Change what you get: %(channel)s"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Change: %(channel)s"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Your own choice wins over what the administrators set, for you only. Choose “As the administrators set it” to follow them again."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Business notifications by email. Account security emails are always sent."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Business notifications in the bell and the list, while you are signed in."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "As the administrators set it"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Send it to me"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Do not send it to me"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "As the administrators set it: sent"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "As the administrators set it: not sent"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "%(count)d notification marked as read."
+msgid_plural "%(count)d notifications marked as read."
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/notifications/views.py
+msgid "Nothing to mark as read."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Nothing to change."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "This person has left: their email notifications are not changed."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Notifications, %(shown)s unread"
+msgid_plural "Notifications, %(shown)s unread"
+msgstr[0] ""
+msgstr[1] ""
+
+#: apps/notifications/views.py
+msgid "What happened to your requests, while you were away. Opening one marks it read and leads to the request."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Mark all as read"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "My notifications"
+msgstr ""
+
+#: apps/notifications/views.py
+msgctxt "notification state"
+msgid "New"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "No notifications"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Nothing has happened to your requests yet, or you turned notifications in the application off."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Choose where you are told about your requests and deliveries, then which notifications you want there. Your own choice comes before what the administrators set."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "1. Where you are told"
+msgstr ""
+
+#: apps/notifications/views.py
+msgctxt "channel state"
+msgid "On"
+msgstr ""
+
+#: apps/notifications/views.py
+msgctxt "channel state"
+msgid "Off"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Account security emails and supplier orders are always sent: they are not notifications you can turn off."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "2. What you are told"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Each notification on each channel, and why you do or do not get it. A column is greyed while its channel is off."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "You turned this channel off."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "The person turned this channel off."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "It overrides what the administrators set."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "It overrides what the administrators set for them."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "An administrator set it to always reach you."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "An administrator set it never to reach you."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Change for everyone"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "A notification that is not sent is sent to nobody who has no setting of their own."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "People who have a setting of their own, or chose for themselves, keep it."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Change notifications: %(channel)s"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Always and never beat the setting for everyone, but the person's own choices come first: someone who chose for themselves, or turned this channel off, keeps that. The person is not told."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Choose which business notifications the application sends, on each channel. A person's own choices, made on My notifications, come before what is set here; so does their switch for a channel. Security emails (invitations, email changes, password and second-factor notices) and supplier orders are never optional."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Business notifications"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "No settings of their own"
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Business notifications about requests and deliveries, on each channel. The person's own choices come before the administrators' settings. Security emails and supplier orders are never optional."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Nothing changed."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Saved."
+msgstr ""
+
+#: apps/notifications/views.py
+msgid "Notifications saved."
+msgstr ""

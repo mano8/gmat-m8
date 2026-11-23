@@ -44,8 +44,15 @@ from apps.material_requests.models import (
     MaterialRequestLine,
     MaterialRequestLineRevision,
 )
-from apps.notifications.kinds import Channel, Mode, Notice
-from apps.notifications.models import EmailOutbox, NoticeDefault, NoticeSetting
+from apps.notifications.kinds import SUBJECT, Channel, Mode, Notice
+from apps.notifications.models import (
+    ChannelSwitch,
+    EmailOutbox,
+    InAppNotification,
+    NoticeChoice,
+    NoticeDefault,
+    NoticeSetting,
+)
 from apps.notifications.models import Status as MailStatus
 from apps.notifications.outbox import queue_security_email
 from apps.organizations.models import Branch, JointVentureMember, Membership
@@ -132,6 +139,16 @@ def _notice_settings(world: World) -> None:
         channel=Channel.EMAIL,
         mode=Mode.ALWAYS,
         set_by=admin,
+    )
+    # The person's own choice and switch (M17.1): they leave everything on as well.
+    world.objects["noticechoice"] = NoticeChoice.objects.create(
+        user=world.people.tech_mad,
+        notice=Notice.REQUEST_APPROVED,
+        channel=Channel.EMAIL,
+        enabled=True,
+    )
+    world.objects["channelswitch"] = ChannelSwitch.objects.create(
+        user=world.people.tech_mad, channel=Channel.IN_APP, enabled=True
     )
 
 
@@ -353,6 +370,12 @@ def _admin_rows(world: World) -> None:
     )
     _sev_2_receipt(world)
     _attachments(world)
+    world.objects["notification"] = InAppNotification.objects.create(
+        user=people.tech_mad,
+        notice=Notice.REQUEST_APPROVED,
+        object_type=SUBJECT,
+        object_id=world.objects["materialrequest"].pk,
+    )
     world.objects["membership"] = Membership.objects.get(user=people.tech_mad)
     world.objects["projectassignment"] = ProjectAssignment.objects.get(user=people.site_manager)
     later = timezone.now() + timedelta(hours=24)

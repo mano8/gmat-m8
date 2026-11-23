@@ -49,7 +49,7 @@ BRANCH_PAGES = (
     "confirm_reactivate_branch",
 )
 STRUCTURE_PAGES = (*COMPANY_PAGES, *BRANCH_PAGES)
-#: The email notification pages under ``/org/`` (M15.3): not People's either.
+#: The notification pages under ``/org/`` (M15.3, M17.4): not People's either.
 NOTICE_PAGES = ("notifications", "notification_default")
 #: The warehouse pages (M10.3), lazy dialogs opened as pages of their own included.
 WAREHOUSE_PAGES = (
@@ -241,9 +241,9 @@ CATEGORIES: tuple[Category, ...] = (
             ),
             Entry(
                 "notifications",
-                _("Email notifications"),
+                _("Notifications"),
                 "org:notifications",
-                "mail",
+                "bell",
                 "org.manage",
                 _url(*(f"org:{name}" for name in NOTICE_PAGES)),
                 21,

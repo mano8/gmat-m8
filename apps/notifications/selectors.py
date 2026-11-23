@@ -1,4 +1,5 @@
-"""Reads of the notification screens (M7.1) and the delivery badges (M7c.1)."""
+"""Reads of the notification screens (M7.1), the delivery badges (M7c.1) and the person's
+in-app notifications (M17.3: the bell's count and the list, through ``in_app.visible``)."""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -15,15 +16,16 @@ from apps.access.context import AccessContext
 from apps.access.policy import is_staff_account
 from apps.access.roles import Capability
 from apps.accounts.models import User
-from apps.notifications import resolution
-from apps.notifications.kinds import NOTICES, Channel, Mode, NoticeSpec
+from apps.material_requests.models import MaterialRequest
+from apps.notifications import in_app, resolution
+from apps.notifications.kinds import CHANNELS, NOTICES, Channel, ChannelSpec, Mode, NoticeSpec
 from apps.notifications.models import (
     DISPATCH_KINDS,
     EmailOutbox,
+    InAppNotification,
     Kind,
     NoticeDefault,
     NoticeSetting,
-    NotificationPreference,
     Status,
 )
 from apps.notifications.resolution import Reason
@@ -105,13 +107,6 @@ class DeliveryStatus:
         return POLL_EVERY_DELAYED if self.delayed else POLL_EVERY
 
 
-def email_opt_out(ctx: AccessContext) -> bool:
-    """Whether the signed-in user turned business email off."""
-    if ctx.user_id is None:
-        return False
-    return NotificationPreference.objects.filter(user_id=ctx.user_id, email_opt_out=True).exists()
-
-
 def with_delivery_state(rows: QuerySet[Any], object_type: str) -> QuerySet[Any]:
     """``rows`` (objects of ``object_type``, read through a scoped selector) annotated with
     ``delivery_state``: the status of the latest security email about each, ``None`` for none.
@@ -181,15 +176,16 @@ def quarantined_dispatches() -> QuerySet[EmailOutbox]:
     )
 
 
-# --- the business notices' settings (M15.3, Q87-Q89) ---------------------------------------
+# --- the business notices' settings (M15.3, M17.4: Q87-Q89, Q93, Q97) -----------------------
 
 
 @dataclass(frozen=True)
-class NoticeState:
-    """A notice as the administration page shows it: its state for everyone and how many
-    people (active accounts) have a setting of their own, split by what it says."""
+class DefaultCell:
+    """One notice on one channel as the administration page shows it: whether it is sent to
+    everyone who has no setting of their own and how many people (active accounts) have one,
+    split by what it says."""
 
-    spec: NoticeSpec
+    channel: Channel
     enabled: bool
     always: int
     never: int
@@ -198,69 +194,184 @@ class NoticeState:
     def own(self) -> int:
         return self.always + self.never
 
+    @property
+    def label(self) -> str:
+        return CHANNELS[self.channel].label
 
-def notice_states(ctx: AccessContext, channel: Channel = Channel.EMAIL) -> list[NoticeState]:
+
+@dataclass(frozen=True)
+class NoticeState:
+    """A notice as the administration page shows it: its state on each channel."""
+
+    spec: NoticeSpec
+    cells: tuple[DefaultCell, ...]
+
+    def cell(self, channel: Channel) -> DefaultCell:
+        return next(cell for cell in self.cells if cell.channel == channel)
+
+
+def notice_states(ctx: AccessContext) -> list[NoticeState]:
     """Every notice in the registry's order with its setting for everyone and the people who
-    have their own (``org.manage`` only; nothing for anyone else)."""
+    have their own, on every channel (``org.manage`` only; nothing for anyone else)."""
     if not ctx.has(Capability.ORG_MANAGE):
         return []
-    defaults = dict(NoticeDefault.objects.filter(channel=channel).values_list("notice", "enabled"))
-    counts = {
-        row["notice"]: (row["always"], row["never"])
-        for row in NoticeSetting.objects.filter(
-            channel=channel, user__is_active=True, user__offboarded_at__isnull=True
+    defaults = {
+        (notice, channel): enabled
+        for notice, channel, enabled in NoticeDefault.objects.values_list(
+            "notice", "channel", "enabled"
         )
-        .values("notice")
+    }
+    counts = {
+        (row["notice"], row["channel"]): (row["always"], row["never"])
+        for row in NoticeSetting.objects.filter(
+            user__is_active=True, user__offboarded_at__isnull=True
+        )
+        .values("notice", "channel")
         .annotate(
             always=Count("pk", filter=Q(mode=Mode.ALWAYS)),
             never=Count("pk", filter=Q(mode=Mode.NEVER)),
         )
     }
     return [
-        NoticeState(spec, defaults.get(notice, True), *counts.get(notice, (0, 0)))
+        NoticeState(
+            spec,
+            tuple(
+                DefaultCell(
+                    channel,
+                    defaults.get((notice, channel), channel_spec.default),
+                    *counts.get((notice, channel), (0, 0)),
+                )
+                for channel, channel_spec in CHANNELS.items()
+            ),
+        )
         for notice, spec in NOTICES.items()
     ]
 
 
 @dataclass(frozen=True)
 class PersonNotice:
-    """One notice for one person: what applies, which level decided, and whether their current
-    roles receive it at all (the notice is queued only for who holds its capability)."""
+    """One notice on one channel for one person: what applies and which level decided, the
+    person's own choice (``None``: they follow the administrators), an administrator's setting
+    for them, and what the administrators' levels give (what following them would give)."""
 
-    spec: NoticeSpec
+    channel: Channel
     wanted: bool
     reason: Reason
+    choice: bool | None
     mode: Mode | None
+    administrators: bool
+
+    @property
+    def label(self) -> str:
+        return CHANNELS[self.channel].label
+
+    @property
+    def overrides(self) -> bool:
+        """The person's own choice differs from what the administrators set for them."""
+        return self.reason == Reason.OWN and self.choice != self.administrators
+
+    @property
+    def off(self) -> bool:
+        """The person turned the whole channel off."""
+        return self.reason == Reason.CHANNEL_OFF
+
+
+@dataclass(frozen=True)
+class NoticeRow:
+    """One notice for one person on every channel, and whether their current roles receive it at
+    all (a notice is queued only for who holds its capability)."""
+
+    spec: NoticeSpec
     receivable: bool
+    cells: tuple[PersonNotice, ...]
+
+    def cell(self, channel: Channel) -> PersonNotice:
+        return next(cell for cell in self.cells if cell.channel == channel)
 
 
-def _person_notices(person: User, channel: Channel) -> list[PersonNotice]:
+def _person_notices(person: User) -> list[NoticeRow]:
     held = AccessContext.for_user(person)
-    decided = resolution.decisions(person.pk, channel)
+    by_channel = {channel: resolution.decisions(person.pk, channel) for channel in CHANNELS}
     return [
-        PersonNotice(
+        NoticeRow(
             spec,
-            decided[notice].wanted,
-            decided[notice].reason,
-            decided[notice].mode,
             held.has(spec.capability),
+            tuple(
+                PersonNotice(
+                    channel,
+                    decided[notice].wanted,
+                    decided[notice].reason,
+                    decided[notice].choice,
+                    decided[notice].mode,
+                    decided[notice].administrators,
+                )
+                for channel, decided in by_channel.items()
+            ),
         )
         for notice, spec in NOTICES.items()
     ]
 
 
-def person_notices(
-    ctx: AccessContext, person: User, channel: Channel = Channel.EMAIL
-) -> list[PersonNotice]:
-    """Every notice for ``person`` (``org.manage``; a staff account's settings are not shown:
-    nobody changes them)."""
+def person_notices(ctx: AccessContext, person: User) -> list[NoticeRow]:
+    """Every notice for ``person`` on every channel (``org.manage``; a staff account's settings
+    are not shown: nobody changes them)."""
     if not ctx.has(Capability.ORG_MANAGE) or is_staff_account(person):
         return []
-    return _person_notices(person, channel)
+    return _person_notices(person)
 
 
-def own_notices(ctx: AccessContext, channel: Channel = Channel.EMAIL) -> list[PersonNotice]:
-    """Every notice for the signed-in user: their own state, nobody else's."""
+def own_notices(ctx: AccessContext) -> list[NoticeRow]:
+    """Every notice for the signed-in user on every channel: their own state, nobody else's."""
     if ctx.user is None:
         return []
-    return _person_notices(ctx.user, channel)
+    return _person_notices(ctx.user)
+
+
+@dataclass(frozen=True)
+class ChannelState:
+    """A channel and whether the person receives anything on it."""
+
+    spec: ChannelSpec
+    enabled: bool
+
+
+def own_channels(ctx: AccessContext) -> list[ChannelState]:
+    """The signed-in person's switch per channel, in the registry's order (level 1 of Q93)."""
+    if ctx.user_id is None:
+        return []
+    mine = User.objects.filter(pk=ctx.user_id)
+    return [
+        ChannelState(spec, not mine.filter(resolution.turned_off(channel)).exists())
+        for channel, spec in CHANNELS.items()
+    ]
+
+
+# --- in-app notifications (M17.3, Q99) -------------------------------------------------------
+
+UNREAD_CAP = 99  # the bell's count stops here and reads "99+" (as a dashboard's, M7d.4)
+
+
+@dataclass(frozen=True)
+class Unread:
+    """The bell's count: the person's unread notifications they may still see, up to the cap."""
+
+    count: int
+    more: bool
+
+    @property
+    def label(self) -> str:
+        return f"{UNREAD_CAP}+" if self.more else str(self.count)
+
+
+def unread_count(ctx: AccessContext) -> Unread:
+    """How many of the person's notifications are unread, counting at most ``UNREAD_CAP + 1`` rows
+    (one ``COUNT`` over a ``LIMIT``ed subquery: the cost of the cap, never of the backlog)."""
+    found = in_app.visible(ctx).filter(read_at__isnull=True).values("pk")[: UNREAD_CAP + 1].count()
+    return Unread(count=min(found, UNREAD_CAP), more=found > UNREAD_CAP)
+
+
+def in_app_notifications(ctx: AccessContext) -> QuerySet[InAppNotification]:
+    """The person's notifications they may still see, newest first, each with the number of its
+    request (``number``), for ``apps.core.listing.paginate``: the database pages it."""
+    number = MaterialRequest.objects.filter(pk=OuterRef("object_id")).values("number")[:1]
+    return in_app.visible(ctx).annotate(number=Subquery(number)).order_by("-notified_at", "-pk")

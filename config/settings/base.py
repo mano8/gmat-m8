@@ -275,6 +275,12 @@ WORKER_HEARTBEAT_FILE = env_str("WORKER_HEARTBEAT_FILE", "/tmp/gmat-worker.heart
 WORKER_POLL_INTERVAL = 2
 WORKER_RECONCILE_INTERVAL = 60
 WORKER_HOUSEKEEPING_INTERVAL = 3600
+# In-app notifications (M17.3, Q98): the worker's housekeeping deletes those read this many days
+# ago, those unread this many days old, all but the newest IN_APP_MAX_PER_PERSON of a person, and
+# every one of a person offboarded IN_APP_READ_RETENTION days ago.
+IN_APP_READ_RETENTION = env_int("IN_APP_READ_RETENTION", 30, minimum=1, maximum=3650)
+IN_APP_UNREAD_RETENTION = env_int("IN_APP_UNREAD_RETENTION", 90, minimum=1, maximum=3650)
+IN_APP_MAX_PER_PERSON = env_int("IN_APP_MAX_PER_PERSON", 200, minimum=10, maximum=10_000)
 
 # --- attachments (plan §5, Q22; M6.4) -------------------------------------------------
 # Files live on the private media volume and are never served from it directly

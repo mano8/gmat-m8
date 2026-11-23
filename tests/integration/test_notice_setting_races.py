@@ -12,8 +12,8 @@ from apps.access.roles import Role
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.notifications import services
-from apps.notifications.kinds import Mode, Notice
-from apps.notifications.models import NoticeDefault, NoticeSetting
+from apps.notifications.kinds import Channel, Mode, Notice
+from apps.notifications.models import ChannelSwitch, NoticeChoice, NoticeDefault, NoticeSetting
 from tests.integration.conftest import run_concurrently
 from tests.support import grant, principal_for
 
@@ -50,9 +50,30 @@ def test_two_settings_of_one_person(
     results: list[Any] = run_concurrently(
         2,
         lambda index: services.set_person_notices(
-            admins[index], person.pk, {Notice.REQUEST_TO_REVIEW: modes[index]}
+            admins[index], person.pk, {(Notice.REQUEST_TO_REVIEW, Channel.EMAIL): modes[index]}
         ),
     )
     assert all(isinstance(result, User) for result in results), results
     assert NoticeSetting.objects.filter(user=person).count() == 1
     assert AuditEvent.objects.filter(action="notification.person_changed").count() == 2
+
+
+def test_two_tabs_of_one_person_choosing_at_once(make_user: Callable[..., User]) -> None:
+    """The person's user row serializes their two saves: one row per choice and one event each."""
+    person = make_user("tabs@example.org")
+    grant(person, Role.GROUP_ADMIN)
+    principal = principal_for(person)
+    results: list[Any] = run_concurrently(
+        4,
+        lambda index: (
+            services.set_own_notices(
+                principal, {(Notice.REQUEST_APPROVED, Channel.IN_APP): bool(index % 2)}
+            )
+            if index < 2
+            else services.set_own_channels(principal, {Channel.IN_APP: bool(index % 2)})
+        ),
+    )
+    assert all(isinstance(result, User) for result in results), results
+    assert NoticeChoice.objects.filter(user=person).count() == 1
+    assert ChannelSwitch.objects.filter(user=person).count() == 1
+    assert AuditEvent.objects.filter(action="notification.own_changed").count() >= 2

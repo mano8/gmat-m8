@@ -96,7 +96,8 @@ urlpatterns = [
     path("people/<uuid:user_id>/employer/", views.set_employer, name="set_employer"),
     path("people/<uuid:user_id>/offboard/", views.offboard, name="offboard"),
     path("people/<uuid:user_id>/email/", views.request_email_change, name="request_email_change"),
-    # M15.3: which business emails are sent, for everyone and for one person (Q87-Q89).
+    # M15.3, M17.4: which business notifications are sent, for everyone and for one person, per
+    # channel (Q87-Q89, Q93).
     path("notifications/", views.notifications, name="notifications"),
     path(
         "notifications/<slug:notice>/",
@@ -104,7 +105,7 @@ urlpatterns = [
         name="notification_default",
     ),
     path(
-        "people/<uuid:user_id>/notifications/",
+        "people/<uuid:user_id>/notifications/<slug:channel>/",
         views.person_notifications,
         name="person_notifications",
     ),

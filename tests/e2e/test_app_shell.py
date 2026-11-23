@@ -141,7 +141,7 @@ def test_the_user_menu_closes_with_escape_and_gives_focus_back(
     opener = page.get_by_role("button", name="Account menu")
     opener.click()
     expect(page.locator("#user-menu")).to_be_visible()
-    for name in ("Sessions", "Notifications", "Security", "Sign out"):
+    for name in ("Sessions", "My notifications", "Security", "Sign out"):
         expect(page.locator("#user-menu").get_by_text(name, exact=True).first).to_be_visible()
     page.keyboard.press("Escape")
     expect(page.locator("#user-menu")).to_be_hidden()

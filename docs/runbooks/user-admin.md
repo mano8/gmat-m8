@@ -106,15 +106,17 @@ Check the person's identity **out of band** (call a number you already had, not 
 
 People → the person → **Change the name**. The application shows people by name everywhere (an older account without one shows "—"), so correct a misspelt name or name an older account here. You may correct your own. Each change is audited (`user.renamed`, the old and the new name). A staff or superuser account's name is not changed from the app.
 
-## Which business emails are sent
+## Which business notifications are sent
 
-The application emails people about requests: a request to review, a request assigned to someone, an approval, a rejection, a reviewer's edits and goods handed over or received on site. Group administrators decide what is sent, on two levels, and each person's own choice comes first:
+The application tells people about requests: a request to review, a request assigned to someone, an approval, a rejection, a reviewer's edits and goods handed over or received on site. It tells them on two channels: **by email** and **in the application** (the bell in the header, with the number of unread notifications, and the list it opens). Both are on for everyone until someone decides, so nothing changes by itself. Group administrators set what is sent on two levels; each person may choose for themselves, and **the person's own choice wins**, in both directions:
 
-1. **Everyone.** Administration → **Email notifications** lists the six emails with who receives each, when, whether it is sent and how many people have a setting of their own. **Turn off for everyone** (or **Turn on**) opens a dialog that says what it changes. All six are on until someone decides, so nothing changes by itself. A message already queued and not yet sent follows the change; one the worker has already claimed still leaves.
-2. **One person.** People → the person → **Email notifications** shows each email, whether the person receives it and why (the setting for everyone, set for this person, or the person turned business email off). **Change email notifications** sets each one to *follow the setting for everyone*, *always* or *never*. Use *never* for a group administrator flooded by *A request to review*: you may set your own. The person is not told, and sees what applies to them, read-only, on their own **Notifications** page. A staff or superuser account's settings are not changed from the app.
-3. **The person's own choice.** Someone who turned off business email on their Notifications page receives none of them, whatever an administrator set: *always* does not override it.
+1. **Everyone.** Administration → **Notifications** lists the six notifications with who receives each, when, and on each channel whether it is sent and how many people have a setting of their own. **Change** opens a dialog with a value per channel and says what it changes. A message already queued and not yet sent follows the change; one the worker has already claimed still leaves.
+2. **One person.** People → the person → **Notifications** shows each notification on each channel, whether the person receives it and why: the person turned the channel off, the person chose themselves (and whether that overrides what you set), set for this person, or the setting for everyone. **Change: Email** and **Change: In the application** set each one to *follow the setting for everyone*, *always* or *never* on that channel. Use *never* for a group administrator flooded by *A request to review*: you may set your own. The person is not told. A staff or superuser account's settings are not changed from the app.
+3. **The person's own choice.** On **My notifications** (their own menu) each person turns a channel off (**1. Where you are told**: nothing of any notification reaches them there) and chooses, per notification and channel, *send it to me*, *do not send it to me* or *as the administrators set it* (**2. What you are told**). Their choice comes before both of your levels: their *send it to me* beats your *never* or an *off* for everyone, their *do not send it to me* beats your *always*. *As the administrators set it* gives them your settings back. You see their choices on their page, never their notifications.
 
-Never optional, whatever is set: security email (invitations, email changes, password and second-factor notices, resets) and supplier purchase orders. Every change is audited (`notification.default_changed`, `notification.person_changed`, with the setting before and after) and the audit viewer shows who made it. A setting is business data: a restore brings back what the backup holds, and nothing needs confirming afterwards.
+Whatever is set, a notification reaches only someone who may still see its request; an in-app notification whose request a person can no longer see disappears from their list and count. Never optional, whatever is set: security email (invitations, email changes, password and second-factor notices, resets) and supplier purchase orders, which are email only. Every change is audited (`notification.default_changed`, `notification.person_changed`, `notification.own_changed`, with the setting before and after) and the audit viewer shows who made it; reading one's own notifications is not. A setting is business data: a restore brings back what the backup holds, and nothing needs confirming afterwards.
+
+In-app notifications are deleted by the worker: 30 days after they were read, after 90 days unread, beyond a person's 200 newest, and those of someone offboarded after 30 days (`IN_APP_READ_RETENTION`, `IN_APP_UNREAD_RETENTION`, `IN_APP_MAX_PER_PERSON` in `app.env` change these).
 
 ## Sessions, inactivity and notices
 
@@ -199,7 +201,7 @@ If the old key may have **leaked**, moving secrets to a new key is not enough: a
 | New address | People → the person → Change email |
 | Lost phone | People → the person → Reset the second factor (a staff account: `manage reset_mfa`) |
 | A person's name | People → the person → Change the name |
-| Which business emails are sent | Administration → Email notifications (everyone); People → the person → Email notifications (one person) |
+| Which business notifications are sent | Administration → Notifications (everyone); People → the person → Notifications (one person); each person's My notifications (their own choice, which wins) |
 | Retiring an MFA key | `manage reencrypt_mfa` |
 | A person's own sessions | Sessions, in their own menu |
 | After a restore | `manage confirm_account` |

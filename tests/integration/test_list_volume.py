@@ -35,6 +35,7 @@ from apps.dashboards.panels import COUNT_CAP
 from apps.handovers.models import Handover
 from apps.locations.models import Location
 from apps.material_requests.models import MaterialRequest, MaterialRequestLine
+from apps.notifications.models import InAppNotification
 from apps.organizations.models import Branch, Company
 from apps.purchasing import selectors as purchasing_selectors
 from apps.purchasing.models import PurchaseOrder
@@ -61,14 +62,29 @@ class World:
 
 @pytest.fixture(scope="module")
 def world(django_db_setup: None, django_db_blocker: Any) -> Iterator[World]:
-    with django_db_blocker.unblock(), transaction.atomic():
-        org = build_org()
-        people = build_people(org)
-        volume = build_volume(org, people)
-        who = ("group_admin", "mm_mad", "tech_mad", "site_manager", "wo_mad")
-        clients = {name: client_for(getattr(people, name)) for name in who}
-        yield World(org, people, volume, clients)
-        transaction.set_rollback(True)
+    with django_db_blocker.unblock():
+        with transaction.atomic():
+            org = build_org()
+            people = build_people(org)
+            volume = build_volume(org, people)
+            who = ("group_admin", "mm_mad", "tech_mad", "site_manager", "wo_mad")
+            clients = {name: client_for(getattr(people, name)) for name in who}
+            yield World(org, people, volume, clients)
+            transaction.set_rollback(True)
+        forget_the_volume_statistics()
+
+
+def forget_the_volume_statistics() -> None:
+    """``ANALYZE`` the tables again once the dataset is rolled back.
+
+    The rollback removes the rows, but not all of what ``build_volume``'s ``ANALYZE`` wrote:
+    PostgreSQL updates a table's row estimate (``pg_class.reltuples``) in place, outside the
+    transaction. Left alone, the tests that follow in the same database plan their queries for
+    the volume's 2,000 handovers on tables that hold a few, and a dashboard panel measured
+    against its budget afterwards takes twice as long.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("ANALYZE")
 
 
 @dataclass(frozen=True)
@@ -315,6 +331,9 @@ SCREENS = (
     ),
     *PANELS,
     *CHARTS,
+    # M17.4: the person's list (a fixed page of 25) and the bell's fragment, polled every minute.
+    Screen("in-app-list", reverse_("inapp:list"), ("tech_mad", "mm_mad"), {}, fixed_size=True),
+    Screen("in-app-bell", reverse_("inapp:bell"), ("tech_mad", "mm_mad"), {}, fixed_size=True),
     Screen(
         "audit-history",
         lambda w: reverse(
@@ -387,6 +406,7 @@ def test_the_dataset_has_the_specified_size(world: World) -> None:
         "branches": (Branch.objects.count(), 300),
         "warehouses": (Location.objects.filter(kind="WAREHOUSE").count(), 300),
         "units": (UnitOfMeasure.objects.count(), 120),
+        "in-app notifications": (InAppNotification.objects.count(), 60_000),
     }
     for what, (found, at_least) in counts.items():
         assert found >= at_least, f"{what}: {found} < {at_least}"
@@ -500,3 +520,14 @@ def test_zz_timings(world: World, capsys: pytest.CaptureFixture[str]) -> None:
         for name, found in sorted(TIMINGS.items()):
             last, filtered = found["last"] * 1000, found["filtered"] * 1000
             print(f"  {name:36} last {last:5.0f} ms   filtered {filtered:5.0f} ms")
+
+
+# --- in-app notifications (M17.4): the bell's count has rows to count -----------------------
+
+
+@pytest.mark.parametrize("actor", ["tech_mad", "mm_mad"])
+def test_the_bell_counts_unread_rows(world: World, actor: str) -> None:
+    """The list and the bell are ``Screen``s above; this keeps them honest: the dataset gives each
+    of them unread rows, so the budget is measured on a count that reads a stretch of the table."""
+    body = world.clients[actor].get(reverse("inapp:bell")).content.decode()
+    assert re.search(r'data-unread="[1-9]\d*"', body)

@@ -6,9 +6,12 @@ Every email is a row of ``EmailOutbox``, written in the transaction that causes 
 (``notifications.0002``, ``0006``) refuses any change to it, except wiping a body to the empty
 string.
 
-The settings that decide who receives a business notice (M15, Q87) live here too:
-``NoticeDefault`` (for everyone) and ``NoticeSetting`` (one person); the registry of notices
-is ``apps.notifications.kinds``, the rule ``apps.notifications.resolution``.
+The settings that decide who receives a business notice (M15, Q87; M17, Q93) live here too:
+the person's switch per channel (``NotificationPreference.email_opt_out`` for email,
+``ChannelSwitch`` for the others), the person's own choice (``NoticeChoice``), an
+administrator's setting for the person (``NoticeSetting``) and the setting for everyone
+(``NoticeDefault``); the registries of notices and channels are ``apps.notifications.kinds``,
+the rule ``apps.notifications.resolution``.
 """
 
 from django.contrib.postgres.fields import ArrayField
@@ -18,7 +21,7 @@ from django.db.models.functions import Now
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import BaseModel
-from apps.notifications.kinds import Channel, Mode, Notice
+from apps.notifications.kinds import NOTICES, Channel, Mode, Notice, NoticeSpec
 
 # Fan-out (plan §5): one message per event, at most this many BCC recipients each.
 MAX_RECIPIENTS = 20
@@ -262,7 +265,8 @@ class NotificationPreference(BaseModel):
 
     Business notifications (a request to review, a decision, goods handed over) are skipped
     for a user who opted out. Security email and supplier dispatches are never optional. No
-    row means the default: notifications on.
+    row means the default: notifications on. Since M17 this is the person's switch for the
+    email channel; the other channels' switches are ``ChannelSwitch`` rows.
     """
 
     user = models.OneToOneField(
@@ -312,9 +316,9 @@ class NoticeDefault(BaseModel):
 class NoticeSetting(BaseModel):
     """One person's setting for a business notice on a channel (M15, Q87).
 
-    ``ALWAYS`` or ``NEVER``; no row means: follow the setting for everyone. The person's own
-    refusal of business email (``NotificationPreference``) wins over ``ALWAYS``. Set only by
-    a group administrator, through ``set_person_notices`` (M15.2).
+    ``ALWAYS`` or ``NEVER``; no row means: follow the setting for everyone. The person's switch
+    for the channel and their own choice (``NoticeChoice``, M17) win over it. Set only by a
+    group administrator, through ``set_person_notices`` (M15.2).
     """
 
     user = models.ForeignKey(
@@ -346,3 +350,144 @@ class NoticeSetting(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.user_id} {self.notice}/{self.channel}: {self.mode}"
+
+
+class NoticeChoice(BaseModel):
+    """The person's own choice for a business notice on a channel (M17, Q93).
+
+    ``enabled`` on or off; no row means: follow what the administrators set (``NoticeSetting``,
+    then ``NoticeDefault``). Kept apart from the administrator's ``NoticeSetting``, so putting a
+    choice back to *follow* brings the administrator's setting back. Written only by the person,
+    for themselves (M17.2); it wins over both administrators' levels, in both directions, but
+    never over the person's switch for the channel.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="notice_choices",
+        verbose_name=_("user"),
+    )
+    notice = models.CharField(_("notice"), max_length=40, choices=Notice.choices)
+    channel = models.CharField(_("channel"), max_length=20, choices=Channel.choices)
+    enabled = models.BooleanField(_("wanted"))
+    changed_at = models.DateTimeField(_("changed at"), db_default=Now())
+
+    class Meta:
+        verbose_name = _("own notice choice")
+        verbose_name_plural = _("own notice choices")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "notice", "channel"],
+                name="notifications_noticechoice_one_per_user",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.notice}/{self.channel}: {'on' if self.enabled else 'off'}"
+
+
+class ChannelSwitch(BaseModel):
+    """The person's switch for a channel other than email (M17, Q93 level 1).
+
+    Off: nothing of any notice reaches them on that channel. No row means the channel's
+    default (``kinds.CHANNELS``: on, unless the channel is opt-in). Email's switch stays
+    ``NotificationPreference.email_opt_out`` (M7.1), which the previous release reads and
+    writes; a CHECK keeps a second one from being stored here. One row per person and channel,
+    so a later channel adds a value, not a column. Written only by the person (M17.2).
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="channel_switches",
+        verbose_name=_("user"),
+    )
+    channel = models.CharField(_("channel"), max_length=20, choices=Channel.choices)
+    enabled = models.BooleanField(_("channel on"))
+    changed_at = models.DateTimeField(_("changed at"), db_default=Now())
+
+    class Meta:
+        verbose_name = _("channel switch")
+        verbose_name_plural = _("channel switches")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "channel"], name="notifications_channelswitch_one_per_user"
+            ),
+            models.CheckConstraint(
+                condition=~Q(channel=Channel.EMAIL),
+                name="notifications_channelswitch_not_email",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.channel}: {'on' if self.enabled else 'off'}"
+
+
+# The notices whose unread in-app row is refreshed instead of adding another (Q98): a reviewer's
+# edits, as ``notices.EDIT_BATCH`` groups their email.
+GROUPED_IN_APP = (Notice.REQUEST_EDITED,)
+
+
+class InAppNotification(BaseModel):
+    """A business notice shown to one person in the application (M17.3, Q94, Q98, Q99).
+
+    No text is stored: the notice's key, the object it is about (``kinds.SUBJECT`` and its id)
+    and when. The row is drawn when shown, from the registry and from the object as the person
+    may see it then, so a person who lost access to the object neither sees nor counts it
+    (``apps.notifications.in_app.visible``). Written by the business change's transaction
+    (``in_app.notify``) for who wants it on ``Channel.IN_APP``; ``read_at`` is set when the
+    person opens it or marks everything read; the worker's housekeeping purges old rows
+    (``in_app_notifications``), so the table stays small.
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="in_app_notifications",
+        verbose_name=_("user"),
+    )
+    notice = models.CharField(_("notice"), max_length=40, choices=Notice.choices)
+    object_type = models.CharField(_("object type"), max_length=100)
+    object_id = models.UUIDField(_("object id"))
+    notified_at = models.DateTimeField(_("notified at"), db_default=Now())
+    read_at = models.DateTimeField(_("read at"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("in-app notification")
+        verbose_name_plural = _("in-app notifications")
+        indexes = [
+            # The bell (unread of one person) and the purge of one person's oldest.
+            models.Index(
+                fields=["user", "read_at", "notified_at"], name="notif_inapp_user_read_idx"
+            ),
+            # The list: one person's, newest first.
+            models.Index(fields=["user", "-notified_at", "-id"], name="notif_inapp_user_list_idx"),
+            # The purge of old unread and old read rows, across people.
+            models.Index(
+                fields=["notified_at"],
+                condition=Q(read_at__isnull=True),
+                name="notif_inapp_unread_age_idx",
+            ),
+            models.Index(
+                fields=["read_at"],
+                condition=Q(read_at__isnull=False),
+                name="notif_inapp_read_age_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "notice", "object_type", "object_id"],
+                condition=Q(read_at__isnull=True, notice__in=GROUPED_IN_APP),
+                name="notifications_inapp_one_unread_grouped",
+            ),
+        ]
+
+    @property
+    def spec(self) -> NoticeSpec:
+        """What the registry says about this row's notice (its label, the page it opens)."""
+        return NOTICES[Notice(self.notice)]
+
+    def __str__(self) -> str:
+        state = "read" if self.read_at else "unread"
+        return f"{self.user_id} {self.notice} {self.object_id}: {state}"

@@ -416,3 +416,27 @@ vulnerabilities:
       to 128 MiB and restarts by itself. Compensating control: those limits, plus a short expiry, as
       the fix is to take the first Caddy release that has it. Owner: maintainer (mano8).
     expired_at: 2026-12-07
+  - id: CVE-2026-124709
+    statement: >-
+      OpenSSL 3.5.9 (libssl3t64, openssl, openssl-provider-legacy) in the Debian 13 base image of
+      the application image has no fixed version yet (Debian tracker status 'affected', found by
+      the scan of PR #78 on 2026-11-22; accepted by the maintainer in that PR). A denial of service
+      through a memory leak in QUIC stream handling. Nothing in the image speaks QUIC: Python's ssl
+      module and libpq use OpenSSL for TLS over TCP only (SMTP from the worker, the database),
+      Gunicorn serves plain HTTP behind Caddy, and HTTP/3 at the edge is Caddy's own Go stack, not
+      OpenSSL. Compensating control: the unreachable code path, the container's memory limit and
+      restart policy, plus the entry's expiry, which forces a re-review; drop it when Debian ships
+      a fix. Owner: maintainer (mano8).
+    expired_at: 2027-02-19
+  - id: CVE-2026-107494
+    statement: >-
+      OpenSSL 3.5.9 (libssl3t64, openssl, openssl-provider-legacy) in the Debian 13 base image of
+      the application image has no fixed version yet (Debian tracker status 'affected', found by
+      the scan of PR #78 on 2026-11-23; accepted by the maintainer in that PR). A denial of service
+      through unbounded QUIC frame queueing. Nothing in the image speaks QUIC: Python's ssl module
+      and libpq use OpenSSL for TLS over TCP only (SMTP from the worker, the database), Gunicorn
+      serves plain HTTP behind Caddy, and HTTP/3 at the edge is Caddy's own Go stack, not OpenSSL.
+      Compensating control: the unreachable code path, the container's memory limit and restart
+      policy, plus the entry's expiry, which forces a re-review; drop it when Debian ships a fix.
+      Owner: maintainer (mano8).
+    expired_at: 2027-02-19
