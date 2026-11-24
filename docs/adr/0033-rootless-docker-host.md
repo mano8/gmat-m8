@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (the maintainer's requirement of 2026-11-15; M12.1). Q74 and Q75 below are working assumptions until the maintainer accepts this record at the review of the M12 pull request
 - **Date:** 2026-11-24
-- **Governs:** `docs/runbooks/vps-setup.md`, `docs/rootless-host.md`, `docker_compose/gmat_m8/init.sh`, `docker_compose/gmat_m8/ops/common.sh`
+- **Governs:** `docs/runbooks/vps-setup.md`, `docs/rootless-host.md`, `docker_compose/gmat_m8/init.sh`, `docker_compose/gmat_m8/ops/common.sh`, `apps/notifications/worker.py`
 
 ## Context
 
@@ -38,7 +38,7 @@ The facts this record relies on were checked against Docker's current rootless d
 
    `deploy.sh` refuses, before anything changes, a `backups/` that is neither (or that is world-writable outside a CI runner's root daemon): the pre-deploy dump would fail with the site closed.
 
-   `flags/` stays `deploy`'s, mode 0755, with world-readable flags. Its directory mode is what lets a shifted worker see `worker.paused`. The scripts create a missing one with that mode whatever their umask, and refuse one that others cannot search before they write the first flag. They never widen its mode themselves.
+   `flags/` stays `deploy`'s, mode 0755, with world-readable flags. Its directory mode is what lets a shifted worker see `worker.paused`. The scripts create a missing one with that mode whatever their umask, and refuse one that others cannot search before they write the first flag. They never widen its mode themselves. The worker counts a pause flag it cannot check as set: only "no such file" means not paused, so a `flags/` it may not search keeps it paused and its log says why.
 
 ## Alternatives rejected
 

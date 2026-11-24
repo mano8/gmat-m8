@@ -1,6 +1,7 @@
 """The worker process: staged SMTP outcomes, the deadline, switches and the loop (plan §5)."""
 
 import json
+import os
 import signal
 import socket
 import threading
@@ -274,6 +275,39 @@ def heartbeat(worker: Worker) -> dict[str, Any]:
 
 
 class TestSwitches:
+    @pytest.mark.skipif(os.getuid() == 0, reason="root searches any directory")
+    def test_a_flag_it_cannot_check_keeps_it_paused(
+        self,
+        make_worker: Callable[..., Worker],
+        flags: Path,
+        security_mail: Callable[..., EmailOutbox],
+        django_assert_num_queries: Any,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A flags/ its uid may not search (a rootless daemon's shifted uid, ADR-0033) hides the
+        flag: the gate fails closed, and the log says why, once."""
+        message = security_mail()
+        monkeypatch.setattr("apps.notifications.worker.connections.close_all", lambda: None)
+        worker = make_worker()
+        flags.chmod(0o600)
+        try:
+            with django_assert_num_queries(0):
+                assert worker.tick() is False
+                assert worker.tick() is False
+            assert heartbeat(worker)["state"] == PAUSED
+            assert caplog.text.count("cannot be checked (Permission denied)") == 1
+        finally:
+            flags.chmod(0o700)
+        assert EmailOutbox.objects.get(pk=message.pk).status == Status.QUEUED
+        assert worker.tick() is True
+        assert heartbeat(worker)["state"] == RUNNING
+
+    def test_no_flags_directory_is_no_pause(
+        self, make_worker: Callable[..., Worker], tmp_path: Path
+    ) -> None:
+        assert make_worker(flags_dir=tmp_path / "absent").state() == RUNNING
+
     def test_paused_claims_nothing_and_touches_no_database(
         self,
         make_worker: Callable[..., Worker],

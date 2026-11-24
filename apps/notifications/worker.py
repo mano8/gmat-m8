@@ -7,7 +7,9 @@ base may (``check_access_rules.py``, rule ``mail-outside-outbox``).
 Each loop iteration (``Worker.tick``):
 
 1. **Switches.** While ``<WORKER_FLAGS_DIR>/worker.paused`` exists (deploys, recoveries) the
-   worker only writes its heartbeat: no query, no claim, no send, no housekeeping. With
+   worker only writes its heartbeat: no query, no claim, no send, no housekeeping. A flag it
+   cannot check (a ``flags/`` its uid may not search, as a rootless daemon's shifted uid with a
+   0700 directory, ADR-0033) counts as there: the gate fails closed, never open. With
    ``OUTBOUND_EMAIL=off`` (restore drills, test stacks) it never claims a message and never
    opens an SMTP connection; the database-only reconciliation and housekeeping still run.
 2. **Abandoned attempts**, at start-up, every ``WORKER_RECONCILE_INTERVAL`` and as soon as
@@ -302,6 +304,7 @@ class Worker:
     next_reconcile: float = 0.0
     next_housekeeping: float = 0.0
     was_paused: bool = False
+    flag_unchecked: bool = False
 
     @classmethod
     def from_settings(cls, **overrides: Any) -> Worker:
@@ -318,9 +321,27 @@ class Worker:
         return cls(**(values | overrides))
 
     def state(self) -> str:
-        if (self.flags_dir / PAUSE_FLAG).exists():
+        if self._pause_flag_set():
             return PAUSED
         return RUNNING if self.outbound else OUTBOUND_OFF
+
+    def _pause_flag_set(self) -> bool:
+        """Whether the pause flag is there, failing closed. ``Path.exists()`` answers ``False``
+        on any error, a permission error included: only "no such file" means not paused."""
+        try:
+            (self.flags_dir / PAUSE_FLAG).stat()
+        except FileNotFoundError:
+            self.flag_unchecked = False
+            return False
+        except OSError as error:
+            if not self.flag_unchecked:
+                logger.warning(
+                    "Worker paused: the pause flag in %s cannot be checked (%s)",
+                    self.flags_dir,
+                    error.strerror or type(error).__name__,
+                )
+            self.flag_unchecked = True
+        return True
 
     def beat(self, state: str) -> None:
         """Write the heartbeat atomically (``entrypoint.sh worker-healthcheck`` reads it)."""
