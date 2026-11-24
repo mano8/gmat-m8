@@ -36,3 +36,4 @@ Each ADR names the files it governs (`- **Governs:**`). A pull request that touc
 - [ADR-0030](0030-administration-in-the-app.md): Administration happens in the app; the Django admin is optional and read-only
 - [ADR-0031](0031-business-email-notices-set-by-administrators.md): Business email notifications: settings for everyone and per person, by group administrators
 - [ADR-0032](0032-notification-channels-and-own-choices.md): Notifications: channels and the person's own choices
+- [ADR-0033](0033-rootless-docker-host.md): The host runs Docker rootless; no `docker` group
