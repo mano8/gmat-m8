@@ -14,7 +14,12 @@ REQUIRED_DENY = {
     # Merging, approving, releasing, dispatching, settings and secrets.
     "Bash(gh pr merge:*)",
     "Bash(gh pr review --approve:*)",
-    "Bash(gh release:*)",
+    # Every `gh release` subcommand that writes; `view`, `list`, `download` and `verify` only read.
+    "Bash(gh release create:*)",
+    "Bash(gh release edit:*)",
+    "Bash(gh release delete:*)",
+    "Bash(gh release delete-asset:*)",
+    "Bash(gh release upload:*)",
     "Bash(gh workflow run:*)",
     "Bash(gh repo edit:*)",
     "Bash(gh secret:*)",
