@@ -65,6 +65,11 @@ import hashlib, json, os, subprocess, sys
 
 args = sys.argv[1:]
 verb = args[0]
+if verb == "version":
+    # deploy.sh's preflight wants cosign 3 (vps-setup.md §4.3); COSIGN_IMAGE is v2.5.0, which
+    # proves the refusals, so the stand-in answers as the version the runbook installs.
+    print("GitVersion:    v3.0.6")
+    sys.exit(0)
 if verb in os.environ.get("REHEARSAL_REAL_COSIGN", "").split(","):
     cwd = os.getcwd()
     sys.exit(subprocess.call(

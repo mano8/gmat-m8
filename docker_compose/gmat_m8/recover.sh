@@ -119,6 +119,25 @@ require_unfinished_deploy() {
     [ "$(reached_step)" -ge 4 ] || die "that deploy stopped before the gates: nothing changed"
 }
 
+# The daemon's kind and, under a rootless one, its port driver (ADR-0033). In subshells: status
+# answers whatever the daemon does, and a check that fails is shown, never fatal.
+daemon_status() {
+    local kind driver code=0
+    kind=$( (detect_daemon && printf '%s' "$DAEMON_KIND") 2>&1) || kind="unknown: ${kind##*ERROR: }"
+    printf 'docker daemon:     %s\n' "$kind"
+    if [ "$kind" = root ]; then
+        printf 'port driver:       none, a root daemon publishes ports itself\n'
+    fi
+    [ "$kind" = rootless ] || return 0
+    driver=$( (_namespace_target && port_driver) 2>&1) || code=$?
+    driver="${driver##*ERROR: }"
+    case "$code" in
+        0) printf "port driver:       %s, keeps the visitor's address\n" "$driver" ;;
+        2) printf 'port driver:       refused by deploy.sh: %s\n' "$driver" ;;
+        *) printf 'port driver:       unknown: %s\n' "$driver" ;;
+    esac
+}
+
 cmd_status() {
     local status reached
     status=$(state_get STATUS)
@@ -130,6 +149,7 @@ cmd_status() {
     printf 'last deploy:       %s, target %s, stopped at step %s\n' \
         "${status:-none}" "$(state_get TARGET_VERSION)" "$reached"
     printf 'pre-deploy dump:   %s\n' "$(state_get DUMP)"
+    daemon_status
     printf '\nDecision tree:\n'
     if [ "$status" = failed ] && [ "$reached" -lt 4 ]; then
         printf '  -> it stopped before the gates: nothing changed, nothing to recover\n'

@@ -22,7 +22,7 @@ Checked on 2026-11-24 against Docker's rootless documentation ([overview](https:
 | A port is published once (`0.0.0.0:443`), not once per host address; RootlessKit listens like any process, so the INPUT chain (ufw) sees the traffic | pilot | to re-check in M12.5 with ufw on |
 | Docker's AppArmor profile does not apply; seccomp, dropped capabilities, `no-new-privileges` and the read-only root filesystem do | Docker, troubleshooting (AppArmor listed as unsupported) | confirmed |
 | `$XDG_RUNTIME_DIR/docker.pid` holds **`dockerd`'s** pid, not `rootlesskit`'s; RootlessKit is started without `--pidns`, so it is a pid of the host. `dockerd` runs in RootlessKit's user, mount and network namespaces; Docker documents `nsenter -U --preserve-credentials -n -m -t $(cat $XDG_RUNTIME_DIR/docker.pid)` to enter them | Docker, troubleshooting; `dockerd-rootless.sh` | confirmed |
-| RootlessKit's state directory is `$XDG_RUNTIME_DIR/dockerd-rootless` (`DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR`), with its REST API on `api.sock` there; `GET /v1/info` returns `networkDriver.driver`, `portDriver.driver` and `portDriver.protos` | RootlessKit, API; `dockerd-rootless.sh` | confirmed from the documentation; M12.3 reads it on a real daemon |
+| RootlessKit's state directory is `$XDG_RUNTIME_DIR/dockerd-rootless` (`DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR`), with its REST API on `api.sock` there; `GET /v1/info` returns `networkDriver.driver`, `portDriver.driver` and `portDriver.protos` | RootlessKit, API; `dockerd-rootless.sh` | confirmed on a real daemon (M12.3, below) |
 | `deploy.sh` works unchanged with `DOCKER_HOST=unix:///run/user/<uid>/docker.sock`; `recover.sh status` works; nothing that reads `backups/` from the host does | pilot | the file-access list below explains each |
 | Ubuntu 24.04 restricts unprivileged user namespaces and relies on the AppArmor profile that the deb package ships for `rootlesskit` | Docker, troubleshooting | Debian 13 is the runbook's system; M12.4 states what it needs |
 
@@ -130,7 +130,7 @@ Every host-side read or write under `backups/` and `flags/`, as M12.1 listed the
 
 | Line | Access | Rootless before | Now |
 | --- | --- | --- | --- |
-| 128–129 `[ -e ]` of both flags (`status`) | read | worked | unchanged; M12.3 adds the daemon's kind and port driver |
+| 128–129 `[ -e ]` of both flags (`status`) | read | worked | unchanged; since M12.3 `status` also prints the daemon's kind and port driver, read-only |
 | 233–235 `[ -f "backups/$dump.dump" ]` (`restore-predeploy`) | test | **failed**: "not in backups/" | the dump pattern on the recorded name, `backups_ready`, then `exists dump`, all before the confirmation |
 | 243 `restore_database "backups/$dump.dump"` | read | failed | `restore_database BASE` (above) |
 | 244 `restore_media` | as above | skipped the attachments | as above |
@@ -204,15 +204,38 @@ A name is checked before it reaches the helper, a path or a container, in the C 
 
 Until M12.2 only `deploy.sh` checked a dump's name (`gmat-*`), and nothing checked a snapshot id, the `restore` argument or `--dump`. The patterns apply under both daemons. A snapshot is named by its id, never `latest`: on a host whose offsite credentials can only append, an attacker can add snapshots, and the newest one is then theirs.
 
-## The port driver (M12.3)
+## The host checks of `deploy.sh` (M12.3)
 
-Under a rootless daemon, `deploy.sh`'s preflight reads the port driver in this order and uses the first answer:
+`deploy.sh` checks the host itself after taking the lock and before it fetches a release, so a host set up the wrong way is refused before anything changes, and the message names the fix. Every check is read-only, and `--resume` runs them the same way: gates that an earlier failure left on stay on.
 
-1. RootlessKit's API: `curl --silent --max-time 5 --unix-socket "$XDG_RUNTIME_DIR/dockerd-rootless/api.sock" http://rootlesskit/v1/info`, then `portDriver.driver` and `portDriver.protos` (parsed by `ops/checks.py`). This is what the running daemon uses.
-2. The `--port-driver=` argument on the command line of the `rootlesskit` process found above (`/proc/<ppid>/cmdline`, NUL-separated). `dockerd-rootless.sh` always passes it.
-3. Neither: warn, and point at the runbook's check (the address in `/account/sessions/` seen from another machine).
+| Check | Refused | Warned |
+| --- | --- | --- |
+| `cosign version`'s `GitVersion` (`ops/checks.py cosign-version`) | a major below 3, or no version found: "cosign 3 or newer is required (vps-setup.md §4.3)". cosign 2 finds none of the signatures cosign 3 makes (M11) | — |
+| `backups/` and `flags/` (`check_host_directories`, M12.2) | as the file-access list says | — |
+| a rootless daemon's port driver (below) | one that hides the visitor's address or does not carry UDP | none of its sources names it |
+| the `docker` group (`getent group docker`, `id -G`) | — | this account is a member, under either daemon: the group is root on the host, and the runbook's host leaves it empty. Never refused: CI runners and developers' machines use it |
 
-`slirp4netns` and `implicit` pass. Any other driver is refused, `builtin` included (ADR-0033 point 4), with the fix: the override file and `systemctl --user restart docker`. A driver whose `protos` lacks `udp` is also refused, because the production overlay publishes 443/udp. `systemctl --user show docker -p Environment` is not a signal: it shows what the unit would set, not what runs, and an empty value means `builtin`.
+### The port driver
+
+Under a rootless daemon, after the namespace target checks pass (they find RootlessKit's pid), `port_driver` in `ops/common.sh` reads the driver in this order and uses the first answer that names one:
+
+1. RootlessKit's API: `curl --silent --fail --max-time 5 --unix-socket "$XDG_RUNTIME_DIR/dockerd-rootless/api.sock" http://rootlesskit/v1/info`, then `portDriver.driver` and `portDriver.protos` (`ops/checks.py port-driver --from api`). This is what the running daemon uses. An answer that is not JSON or names no driver leaves it to the next source.
+2. The `--port-driver` argument of the `rootlesskit` process that is `dockerd`'s parent (`/proc/<ppid>/cmdline`, NUL-separated; `--from cmdline`). RootlessKit's child runs with its parent's arguments, and `dockerd-rootless.sh` always passes one. Given more than once, the **last** counts, as RootlessKit reads it.
+3. Neither: a warning that points at the runbook's check (the address in `/account/sessions/`, seen from another machine), and the deploy goes on.
+
+`slirp4netns` and `implicit` pass. Any other driver is refused (ADR-0033 point 4), `builtin` included, with why (allauth's per-address rate limits would count every visitor as one, and the audit log's addresses would mean nothing) and the fix: the override file and `systemctl --user restart docker`. A driver whose `protos` lack `udp` is refused too, because the production overlay publishes 443/udp. `systemctl --user show docker -p Environment` is not a source: it shows what the unit would set, not what runs, and an empty value means `builtin`. `ops/checks.py port-driver` exits 0 (keeps the address), 2 (refused) or 3 (does not say).
+
+`recover.sh status` prints the daemon's kind and, under a rootless daemon, the port driver as `deploy.sh` would judge it. It never stops on either: a daemon that does not answer, or a target that fails its checks, is shown as `unknown` with the reason.
+
+Checked on 2026-11-24 against a real rootless `dockerd` (Docker's `docker:29-dind-rootless` image, Docker 29.10.0, RootlessKit 3.3.0, run privileged and thrown away on the maintainer's Linux machine). The answers and command lines are the fixtures of `tests/unit/docker/fixtures/`:
+
+- With the default `builtin`, `/v1/info` lists `tcp`, `udp` and their 4/6 forms in `portDriver.protos`, and `extra.sourceIPTransparentBackend: iptables` (RootlessKit 3.0's TCP-only address keeping). `protos` alone would let it pass, so the driver's name decides first.
+- With `slirp4netns`, `protos` is `tcp, tcp4, udp, udp4`, and `disallowLoopbackChildIP` is `true`.
+- With `--port-driver=builtin` and a later `--port-driver=slirp4netns` on the command line, the API reported `slirp4netns`: the last one counts.
+- RootlessKit's child process (`/proc/self/exe`) carries the same arguments as its parent.
+- The `dockerd-rootless.sh` of `docker-ce-rootless-extras` 29.9.3 offers a new port driver, `pesto` (with `pasta`, experimental, IPv4 only). It is refused like any driver ADR-0033 does not name; a measurement may add it.
+
+That image starts `rootlesskit` itself, without `dockerd-rootless.sh`, under `docker-init`, and with a state directory in `/tmp`, so it is not the runbook's process tree: M12.5 runs `deploy.sh` and `recover.sh status` against a daemon set up by the runbook.
 
 ## Found while writing this
 

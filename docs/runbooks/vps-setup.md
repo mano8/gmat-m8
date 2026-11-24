@@ -105,7 +105,7 @@ timedatectl                                     # System clock synchronized: yes
    ```
 
    `flock` and `timeout` come from `util-linux` and `coreutils`; Python 3 is only used for small JSON checks (`ops/checks.py`), no packages needed.
-3. **`cosign`.** Every release is verified with it, so install it from the project's release page and check the download against the published checksums. It must be **v3.0.6 or newer**: the release workflow signs with cosign 3 (`sigstore/cosign-installer` v4), whose signatures cosign 2 does not find, so with a 2.x `deploy.sh` stops at step 2 ("the signature of ... does not verify", cosign itself says "no signatures found") before changing anything.
+3. **`cosign`.** Every release is verified with it, so install it from the project's release page and check the download against the published checksums. It must be **v3.0.6 or newer**: the release workflow signs with cosign 3 (`sigstore/cosign-installer` v4), whose signatures cosign 2 does not find ("no signatures found"). `deploy.sh` reads `cosign version` before it fetches a release and stops on anything older than 3 ("cosign 3 or newer is required"), before changing anything.
 
    ```bash
    VER=v3.0.6

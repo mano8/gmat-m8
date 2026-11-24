@@ -1,5 +1,5 @@
-"""A compose directory with fake ``docker``, ``cosign``, ``curl`` and ``nsenter``: the host
-scripts' world.
+"""A compose directory with fake ``docker``, ``cosign``, ``curl``, ``getent`` and ``nsenter``: the
+host scripts' world.
 
 ``deploy.sh``, ``recover.sh``, ``restore-drill.sh`` and ``init.sh`` run for real in a copy of the
 stack directory. The fakes log what they were asked, with the state of both gates at that moment,
@@ -14,6 +14,11 @@ here, so its process tree is a fake ``/proc`` and its subordinate ids fake ``/et
 uid and gid as the containers' (an unprivileged test cannot give a file to uid 1000). Those
 constants are the only lines of a script a test rewrites; ``test_backups_helper`` checks their
 values in the repository. M12.5 rehearses the scripts against a real rootless daemon.
+
+What the real tools print is in ``fixtures/`` (M12.3): ``cosign version`` of cosign v2.5.0 and
+v3.0.6 (their official images), and RootlessKit 3.3.0's ``GET /v1/info`` answer and its child's
+command line (one argument per line here), with the ``builtin`` and the ``slirp4netns`` port
+driver, read from a rootless ``dockerd`` in Docker's ``docker:29-dind-rootless`` image.
 """
 
 import json
@@ -33,6 +38,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 STACK = ROOT / "docker_compose" / "gmat_m8"
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 APP_DIGEST = "sha256:" + "a" * 64
 BACKUP_DIGEST = "sha256:" + "b" * 64
 OLD_APP = "sha256:" + "c" * 64
@@ -112,10 +118,17 @@ elif "post-restore-reconcile" in line:
     print('{"failed_state_used": true}')
 """
 
+# ``cosign version`` prints what ``World.cosign_version`` gave it, and is not logged: the log is
+# what was verified.
 FAKE_COSIGN = r"""#!/usr/bin/env python3
 import os, pathlib, sys
 fake = pathlib.Path(os.environ["FAKE_DIR"])
 line = " ".join(sys.argv[1:])
+if sys.argv[1:2] == ["version"]:
+    version = fake / "cosign_version"
+    print(version.read_text(), end="")
+    sys.exit(int((fake / "cosign_version_exit").read_text() or 0)
+             if (fake / "cosign_version_exit").exists() else 0)
 with (fake / "cosign.log").open("a") as log:
     log.write(line + "\n")
 failing = fake / "cosign_fail"
@@ -129,6 +142,15 @@ import os, pathlib, shutil, sys
 fake = pathlib.Path(os.environ["FAKE_DIR"])
 args = sys.argv[1:]
 url = next(a for a in reversed(args) if a.startswith("http"))
+if "--unix-socket" in args:  # RootlessKit's API, only at the path dockerd-rootless.sh gives it
+    socket = args[args.index("--unix-socket") + 1]
+    info = fake / "rootlesskit_info"
+    runtime = os.environ.get("XDG_RUNTIME_DIR", "/nowhere")
+    expected = os.path.join(runtime, "dockerd-rootless/api.sock")
+    if socket != expected or url != "http://rootlesskit/v1/info" or not info.exists():
+        sys.exit(7)
+    print(info.read_text(), end="")
+    sys.exit(0)
 if "--config" in args:
     (fake / "curl_config").write_text(sys.stdin.read())
 if "--write-out" in args:
@@ -142,6 +164,28 @@ if not source.exists():
     sys.exit(22)
 shutil.copy(source, args[args.index("--output") + 1])
 """
+
+# ``getent group docker`` answers what ``World.docker_group`` gave it, or that there is no such
+# group; anything else is the system's.
+FAKE_GETENT = r"""#!/usr/bin/env python3
+import os, pathlib, sys
+fake = pathlib.Path(os.environ["FAKE_DIR"])
+if sys.argv[1:] != ["group", "docker"]:
+    os.execv("/usr/bin/getent", ["getent", *sys.argv[1:]])
+entry = fake / "docker_group"
+if not entry.exists():
+    sys.exit(2)
+print(entry.read_text().strip())
+"""
+
+# How dockerd-rootless.sh starts RootlessKit with the runbook's override (its child process runs
+# with the same arguments as /proc/self/exe): slirp4netns for the network and the ports.
+ROOTLESSKIT_ARGS = (
+    "/proc/self/exe", "--state-dir=/run/user/1000/dockerd-rootless", "--net=slirp4netns",
+    "--mtu=65520", "--slirp4netns-sandbox=auto", "--slirp4netns-seccomp=auto",
+    "--disable-host-loopback", "--port-driver=slirp4netns", "--copy-up=/etc", "--copy-up=/run",
+    "--propagation=rslave", "--detach-netns", "/usr/bin/dockerd-rootless.sh",
+)  # fmt: skip
 
 # Enters nothing: it checks that it was asked for the daemon's user namespace alone and a tool by
 # its absolute path, then runs the command with backups/ open, as it is to the namespace's root.
@@ -371,6 +415,7 @@ class World:
         kit.mkdir()
         (kit / "exe").symlink_to("/usr/bin/rootlesskit")
         (kit / "status").write_text("Name:\trootlesskit\nPPid:\t1\n")
+        self.rootlesskit_cmdline(list(ROOTLESSKIT_ARGS))
         (self.proc / "self" / "ns").mkdir(parents=True)
         (self.proc / "self" / "ns" / "user").symlink_to("user:[4026531837]")
 
@@ -394,6 +439,36 @@ class World:
     def backup_names(self) -> set[str]:
         with self.opened_backups() as backups:
             return {path.name for path in backups.iterdir()}
+
+    # --- the host's setup (M12.3) --------------------------------------------------------------
+
+    def cosign_version(self, text: str, *, exit_code: int = 0) -> None:
+        """What ``cosign version`` prints, and how it exits."""
+        (self.fake / "cosign_version").write_text(text, encoding="utf-8")
+        (self.fake / "cosign_version_exit").write_text(str(exit_code), encoding="utf-8")
+
+    def rootlesskit_info(self, text: str | None) -> None:
+        """What RootlessKit's API answers; None: its socket does not answer."""
+        info = self.fake / "rootlesskit_info"
+        if text is None:
+            info.unlink(missing_ok=True)
+        else:
+            info.write_text(text, encoding="utf-8")
+
+    def rootlesskit_cmdline(self, arguments: list[str] | None) -> None:
+        """The command line of the fake rootlesskit; None: unreadable, as a vanished process."""
+        cmdline = self.proc / str(ROOTLESSKIT_PID) / "cmdline"
+        cmdline.unlink(missing_ok=True)
+        if arguments is not None:
+            cmdline.write_bytes("".join(f"{argument}\0" for argument in arguments).encode())
+
+    def docker_group(self, entry: str | None) -> None:
+        """``getent group docker``'s line (``docker:x:GID:MEMBERS``); None: no such group."""
+        path = self.fake / "docker_group"
+        if entry is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_text(entry, encoding="utf-8")
 
     def nsenter_log(self) -> list[str]:
         path = self.fake / "nsenter.log"
@@ -453,6 +528,7 @@ def world(tmp_path: Path) -> Iterator[World]:
     _executable(bin_dir / "cosign", FAKE_COSIGN)
     _executable(bin_dir / "curl", FAKE_CURL)
     _executable(bin_dir / "nsenter", FAKE_NSENTER)
+    _executable(bin_dir / "getent", FAKE_GETENT)
     env = {
         **os.environ,
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
@@ -468,6 +544,9 @@ def world(tmp_path: Path) -> Iterator[World]:
         env.pop(name, None)
     world = World(stack=stack, fake=fake, env=env)
     world.point_at(CONTAINER_UID=os.getuid(), CONTAINER_GID=os.getgid())
+    # The runbook's host: cosign 3, nobody in the docker group, which Docker's package creates.
+    world.cosign_version((FIXTURES / "cosign-version-v3.0.6.txt").read_text(encoding="utf-8"))
+    world.docker_group("docker:x:999999:")
     yield world
     backups = stack / "backups"
     if backups.is_dir():

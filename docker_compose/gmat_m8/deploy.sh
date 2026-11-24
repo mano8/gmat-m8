@@ -7,7 +7,9 @@
 #   --resume    go on although an earlier deploy or recovery left the gates on (a fix-forward
 #               release after a failure). Both gates stay on until this one's commit point.
 #
-#   1  lock                the same flock as recover.sh and the restore drill
+#   1  lock                the same flock as recover.sh and the restore drill; then, read-only:
+#                          cosign 3 or newer, the env files, backups/ and flags/, and under a
+#                          rootless daemon a port driver that keeps the visitor's address
 #   2  verify the release  signed manifest, signed images, both pulled by digest; any mismatch aborts
 #   3  preflight           the third-party images pulled; with the new image, read-only: migrate-plan,
 #                          check --deploy, the offsite repository answers; a flagged irreversible
@@ -110,6 +112,15 @@ require_tools() {
     docker compose version >/dev/null || die "the docker compose plugin is not installed"
 }
 
+# cosign 2 cannot read the signatures docker-publish makes with cosign 3: every release would be
+# refused at step 2 as unsigned (M11). Said here, with the fix, before the release is fetched.
+check_cosign() {
+    local found
+    found=$(timeout 30 cosign version 2>&1 | python3 ops/checks.py cosign-version - 2>&1) \
+        || die "cosign 3 or newer is required (vps-setup.md §4.3): ${found:-cosign version failed}"
+    say "cosign $found"
+}
+
 check_env_files() {
     local file
     for file in .env app.env; do
@@ -139,6 +150,34 @@ check_host_directories() {
         "root $CONTAINER_UID 700" | "rootless $CONTAINER_UID 700" | "root "*" 777") return 0 ;;
     esac
     die "backups/ is uid ${seen% *} mode ${seen#* } as the $DAEMON_KIND daemon's containers see it, not uid $CONTAINER_UID mode 700: run bash init.sh"
+}
+
+# Under a rootless daemon the port driver decides whether the containers see the visitor's address
+# (ADR-0033 point 4). One that hides it is refused; one no source names is a warning, since
+# a person can still check it from another machine.
+check_port_driver() {
+    [ "$DAEMON_KIND" = rootless ] || return 0
+    _namespace_target
+    local found code=0
+    found=$(port_driver 2>&1) || code=$?
+    case "$code" in
+        0) say "port driver: $found" ;;
+        3) say "WARNING: the rootless daemon's port driver cannot be read ($found): from another machine, check that /account/sessions/ shows that machine's own address (vps-setup.md §4)" ;;
+        *) die "${found:-the port driver could not be checked}. Set DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns and DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=slirp4netns in ~/.config/systemd/user/docker.service.d/override.conf, then systemctl --user daemon-reload && systemctl --user restart docker (vps-setup.md §4)" ;;
+    esac
+}
+
+# Whoever is in the docker group is root on this host (ADR-0033): the runbook's host runs Docker
+# rootless and nobody is in it. CI runners and developers' machines use the group, so it is a
+# warning, never a refusal.
+warn_docker_group() {
+    local entry gid members me
+    entry=$(getent group docker 2>/dev/null) || return 0
+    IFS=: read -r _ _ gid members <<<"$entry"
+    me=$(id -un)
+    if [[ ",$members," == *",$me,"* ]] || [[ " $(id -G) " == *" $gid "* ]]; then
+        say "WARNING: $me is in the docker group, which is root on this host: the runbook's host runs Docker rootless and nobody is in it (vps-setup.md §4, §8)"
+    fi
 }
 
 # The compose files on this machine must be the release's own. Outside a git checkout (a
@@ -232,8 +271,11 @@ main() {
     take_lock
     refuse_unfinished
     require_tools
+    check_cosign
     check_env_files
     check_host_directories
+    check_port_driver
+    warn_docker_group
 
     say "step 2: verifying release $VERSION"
     verify_release "$VERSION" ".release/$VERSION"

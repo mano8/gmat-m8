@@ -1,0 +1,1 @@
+{"apiVersion":"1.1.3","version":"3.3.0","stateDir":"/tmp/rootlesskit1817042801","childPID":73,"networkDriver":{"driver":"slirp4netns","dns":["10.0.2.3"],"childIP":"10.0.2.100"},"portDriver":{"driver":"builtin","protos":["tcp","tcp4","tcp6","udp","udp4","udp6"],"extra":{"sourceIPTransparentBackend":"iptables"}}}

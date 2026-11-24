@@ -50,6 +50,9 @@ SNAPSHOT_PATTERN='^[0-9a-f]{8,64}$'
 # Found out, never inherited: detect_daemon and _namespace_target set them.
 DAEMON_KIND=""
 NAMESPACE_PID=""
+ROOTLESSKIT_PID=""
+# RootlessKit's API, in the state directory dockerd-rootless.sh gives it under XDG_RUNTIME_DIR.
+ROOTLESSKIT_API=dockerd-rootless/api.sock
 
 say() { printf '%s %s\n' "$(date -u +%H:%M:%SZ)" "$*" >&2; }
 die() {
@@ -413,7 +416,7 @@ _daemon_socket_is() { # _daemon_socket_is PATH
 # The pid whose user namespace backups_do enters, checked every time before it is entered: this
 # account's dockerd (docker.pid holds dockerd's pid, not rootlesskit's), started by this account's
 # rootlesskit, in a user namespace that is not this shell's and maps only this account's ids.
-# Stops at the first check that fails, saying why; sets NAMESPACE_PID.
+# Stops at the first check that fails, saying why; sets NAMESPACE_PID and ROOTLESSKIT_PID.
 _namespace_target() {
     local runtime="${XDG_RUNTIME_DIR:-}" me pid="" parent="" namespace="" own=""
     me=$(id -un)
@@ -434,6 +437,34 @@ _namespace_target() {
         || die "the user namespace of dockerd ($pid) maps ids that are not $me's own and subordinate ones ($SUBUID_FILE, $SUBGID_FILE)"
     command -v nsenter >/dev/null || die "nsenter is not installed (util-linux)"
     NAMESPACE_PID="$pid"
+    ROOTLESSKIT_PID="$parent"
+}
+
+# --- the rootless daemon's port driver (ADR-0033 point 4, docs/rootless-host.md) ----------------
+
+# What the running RootlessKit says of itself, then the --port-driver it was started with.
+# Prints the driver (and its protocols); 0 keeps the visitor's address, 2 hides it or does not
+# carry UDP (the reason on stderr), 3 neither source tells; 1 called before _namespace_target.
+port_driver() {
+    local info code=0 cmdline="$PROC_ROOT/$ROOTLESSKIT_PID/cmdline"
+    if [ -z "$NAMESPACE_PID" ] || [ -z "$ROOTLESSKIT_PID" ]; then
+        printf 'the rootless daemon was not checked first\n' >&2
+        return 1
+    fi
+    if info=$(curl --silent --fail --max-time 5 \
+        --unix-socket "$XDG_RUNTIME_DIR/$ROOTLESSKIT_API" http://rootlesskit/v1/info 2>/dev/null); then
+        info=$(printf '%s' "$info" | python3 ops/checks.py port-driver --from api - 2>&1) || code=$?
+        case "$code" in
+            0) printf '%s\n' "$info" && return 0 ;;
+            3) ;; # an answer without a driver: the command line may still tell
+            *) printf '%s\n' "$info" >&2 && return "$code" ;;
+        esac
+    fi
+    if [ ! -r "$cmdline" ]; then
+        printf "neither RootlessKit's API nor its command line answers\n" >&2
+        return 3
+    fi
+    python3 ops/checks.py port-driver --from cmdline - <"$cmdline"
 }
 
 # --- the one helper for backups/ (ADR-0033) ----------------------------------------------------
