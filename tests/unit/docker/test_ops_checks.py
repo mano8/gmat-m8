@@ -1,6 +1,7 @@
 """``docker_compose/gmat_m8/ops/checks.py``: what the host scripts read from JSON."""
 
 import importlib.util
+import io
 import json
 import sys
 from pathlib import Path
@@ -253,3 +254,30 @@ class TestBackupManifest:
         assert run("compare-counts", str(wanted), str(found)) == 0
         found.write_text(json.dumps({"row_counts": {"a": 2}}), encoding="utf-8")
         assert run("compare-counts", str(wanted), str(found)) == 2
+
+    @pytest.mark.parametrize(
+        ("command", "printed"),
+        [("dump-version", "1.2.3"), ("dump-time", "2026-11-04T06:00:00Z")],
+    )
+    def test_a_manifest_on_stdin(
+        self,
+        command: str,
+        printed: str,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """``-``: the scripts pipe it from the helper, which alone reads backups/ (ADR-0033)."""
+        manifest = {"app_version": "1.2.3", "created_at": "2026-11-04T06:00:00Z"}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(manifest)))
+        assert run(command, "-") == 0
+        assert capsys.readouterr().out.strip() == printed
+
+    def test_counts_against_a_manifest_on_stdin(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        found = tmp_path / "r.json"
+        found.write_text(json.dumps({"row_counts": {"a": 1}}), encoding="utf-8")
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"row_counts": {"a": 1}})))
+        assert run("compare-counts", "-", str(found)) == 0
+        monkeypatch.setattr("sys.stdin", io.StringIO("not json"))
+        assert run("compare-counts", "-", str(found)) == 2

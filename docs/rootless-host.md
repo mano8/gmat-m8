@@ -2,7 +2,7 @@
 
 The design behind [ADR-0033](adr/0033-rootless-docker-host.md) (Docker rootless on the host, no `docker` group): the facts it rests on, how the scripts tell the daemons apart, and every place where a host script reads or writes under `backups/` or `flags/`. This document is the specification for the helper and the preflight checks that follow it. It is written for whoever changes `init.sh`, `deploy.sh`, `recover.sh`, `restore-drill.sh` or `ops/`. The runbook for setting up such a host is [runbooks/vps-setup.md](runbooks/vps-setup.md).
 
-The line numbers refer to the scripts as they were when this document was written (commit `aa06558`). The change that rewrites a line updates its row.
+The line numbers refer to the scripts as they were when this document was written (commit `aa06558`); each row says what its line became. A change that rewrites one of these lines updates its row.
 
 ## The facts, checked
 
@@ -57,27 +57,32 @@ It enters only the user namespace (`-U`). The mount namespace is not entered, so
 
 Before it enters, it checks the target, and stops at the first failure with the reason:
 
-1. `$XDG_RUNTIME_DIR` is set, and `$XDG_RUNTIME_DIR/docker.pid` exists, belongs to `deploy` and holds a number.
-2. `/proc/<pid>` exists and belongs to `deploy`, and `/proc/<pid>/exe` resolves to a file named `dockerd`.
-3. Its parent (`PPid` in `/proc/<pid>/status`) belongs to `deploy` and its `exe` resolves to a file named `rootlesskit`.
-4. `/proc/<pid>/ns/user` differs from `/proc/self/ns/user`: it is another namespace, not the caller's.
-5. `/proc/<pid>/uid_map` maps 0 to `deploy`'s uid (length 1), and the rest to a range that starts at `deploy`'s entry in `/etc/subuid`.
-6. `nsenter` is on the path (`util-linux`).
+1. `$XDG_RUNTIME_DIR` is set, and the CLI talks to the socket in it (below).
+2. `$XDG_RUNTIME_DIR/docker.pid` exists, belongs to `deploy` and holds a number.
+3. `/proc/<pid>` exists and belongs to `deploy`, and `/proc/<pid>/exe` resolves to a file named `dockerd`. A binary replaced since the daemon started (`… (deleted)`, after a package upgrade) still counts: the process was started from it.
+4. Its parent (`PPid` in `/proc/<pid>/status`) belongs to `deploy` and its `exe` resolves to a file named `rootlesskit`. That parent is RootlessKit's child process, which runs inside the namespaces as `/proc/self/exe`; its `exe` link names the `rootlesskit` binary.
+5. `/proc/<pid>/ns/user` differs from `/proc/self/ns/user`: it is another namespace, not the caller's. A shell that already entered it by hand is refused.
+6. `/proc/<pid>/uid_map` maps 0 to `deploy`'s uid alone (length 1), maps the containers' uid 1000, and maps nothing outside `deploy`'s entries in `/etc/subuid`, by name or uid. `gid_map` is checked the same way against `/etc/subgid` and the containers' gid 1000.
+7. `nsenter` is on the path (`util-linux`).
 
-The daemon the CLI talks to and the pid checked here are the same only if `DOCKER_HOST` (or the current context) is `unix://$XDG_RUNTIME_DIR/docker.sock`. A `tcp://` or `ssh://` endpoint is refused under a rootless daemon: the namespace would not be the daemon's.
+The daemon the CLI talks to and the pid checked here are the same only if `DOCKER_HOST` (or, without it, the current context) is `unix://$XDG_RUNTIME_DIR/docker.sock`, compared after resolving both paths. A `tcp://` or `ssh://` endpoint is refused under a rootless daemon: the namespace would not be the daemon's.
 
-The tool is named by its absolute path and the arguments are fixed per operation (below), so neither `PATH` nor a name can turn the helper into a different command.
+The checks run before every operation, not once per script, so a daemon restarted in between is checked again. `DAEMON_KIND` and `NAMESPACE_PID` are cleared when `ops/common.sh` is sourced, so the environment cannot preset either.
+
+The tool is named by its absolute path and the arguments are fixed per operation (below), so neither `PATH` nor a name can turn the helper into a different command. `nsenter` itself comes from `PATH`, like `docker` and `cosign`.
+
+This was tried on the maintainer's Linux machine with an unprivileged user namespace (`unshare -U -r`): `nsenter -U --preserve-credentials -t <pid> -- /usr/bin/stat` reports the account's own files as uid 0, and `id -u` inside answers 0. The fake process tree of the unit tests (`tests/unit/docker/conftest.py`) covers each check; M12.5 runs the scripts against a real rootless daemon.
 
 ## Who owns what
 
 | Path | Written by | Root daemon (host uid) | Rootless daemon (host uid) | Mode |
 | --- | --- | --- | --- | --- |
-| `backups/` | `init.sh` | `deploy` = 1000 | `subuid_start + 999`, through the helper | 0700 (`--ci`: 0777) |
+| `backups/` | `init.sh` | `deploy` = 1000 | `subuid_start + 999`, through the helper | 0700 (`--ci`: 0777, root daemon only) |
 | `backups/gmat-*.dump`, `.manifest.json`, `.media/` and its files | the `backup` container (uid 1000) | 1000 | `subuid_start + 999` | 0600 files, 0700 directories |
 | `backups/.backup.lock`, `.last-success`, `.last-verify-ok` | the `backup` container | 1000 | `subuid_start + 999` | 0600 |
 | `backups/.offsite/` (`recover.sh restore-offsite`) | the `backup` container, restic | 1000 | `subuid_start + 999` | restic's |
-| `backups/.offsite/` (`restore-drill.sh --snapshot`) | a one-off container, `--user $(id -u):$(id -g)` | the operator (1000 by assumption) | container uid 1000, so `subuid_start + 999`; not "the operator" | restic's |
-| `backups/<base>.*` (`restore-drill.sh --from-dir`) | `cp -a` on the host | the operator | cannot be written today | as copied |
+| `backups/.offsite/` (`restore-drill.sh --snapshot`) | a one-off container, `--user 1000:1000` (until M12.2: the operator's `$(id -u):$(id -g)`) | 1000 | `subuid_start + 999` | restic's |
+| `backups/<base>.{dump,manifest.json,media}` (`restore-drill.sh --from-dir`) | the helper's `import` | the operator (`deploy`, 1000) | `subuid_start + 999` | as copied |
 | `flags/` | `init.sh`; `gates_on` if missing | `deploy` | `deploy` (container root) | 0755 |
 | `flags/maintenance.on`, `flags/worker.paused` | `gates_on`; a person with `touch` | `deploy` | `deploy` | 0644 by `gates_on`; whatever the person's umask gives |
 
@@ -87,80 +92,82 @@ What the host scripts keep for themselves is not bind-mounted and does not chang
 
 ## The file-access list
 
-Every host-side read or write under `backups/` and `flags/`. "Rootless today" says what happens there now. "Change" is what M12.2 (or M12.3, where marked) does; "none" means the line works under both daemons.
+Every host-side read or write under `backups/` and `flags/`, as M12.1 listed them, with the line numbers of commit `aa06558`. "Rootless before" is what happened there before M12.2. "Now" is what the line became in M12.2 (or M12.3, where marked): an operation of the helper, or "unchanged" where the line works under both daemons.
 
 ### `init.sh`
 
-| Line | Access | Rootless today | Change |
+| Line | Access | Rootless before | Now |
 | --- | --- | --- | --- |
-| 161 `mkdir -p backups flags` | creates both as `deploy` | `backups/` belongs to container root, so the `backup` container (uid 1000) cannot write to it, and every dump fails | `backups/`: create, then helper `prepare` |
+| 161 `mkdir -p backups flags` | creates both as `deploy` | `backups/` belonged to container root, so the `backup` container (uid 1000) could not write to it, and every dump failed | `flags/` unchanged; `backups/` through `prepare` |
 | 162 `chmod 0700 backups` | mode | as above | inside `prepare` |
-| 163 `chmod 0755 flags` | mode | works | none |
-| 170 `chmod 0777 backups` (`--ci`) | mode | CI never runs rootless | none; never under a rootless daemon |
+| 163 `chmod 0755 flags` | mode | worked | unchanged |
+| 170 `chmod 0777 backups` (`--ci`) | mode | CI never runs rootless | unchanged on a root daemon; `--ci` on a rootless daemon is refused |
 
-`init.sh` does not talk to the daemon today. Under the new design it asks `docker info` when it creates or checks `backups/`. If the daemon does not answer, it keeps today's behaviour, which widens nothing, and says that a rootless host must run it again once its daemon runs. `deploy.sh`'s preflight check below catches a host that did not.
+`init.sh` sources `ops/common.sh` for the helper and asks `docker info`. If the daemon does not answer, it creates `backups/` as before (as `deploy`, mode 0700), which widens nothing, and says that a rootless host must run it again once its daemon runs. `deploy.sh`'s preflight refuses a host that did not. A daemon that remaps users is refused.
 
 ### `ops/common.sh`
 
-| Line | Access | Rootless today | Change |
+| Line | Access | Rootless before | Now |
 | --- | --- | --- | --- |
-| 90 `mkdir -p flags` (`gates_on`) | creates `flags/` if missing, under the scripts' `umask 077`, so mode 0700 | **fails open**: a shifted worker cannot search a 0700 directory, `Path.exists()` answers `False`, and the worker runs behind a closed gate | `install -d -m 0755 flags`, and refuse a `flags/` whose mode does not let others search it |
-| 91–93 `: >` and `chmod 0644` of both flags | write | works | none |
-| 163, 168 `rm -f` of each flag (`commit_point`) | write | works | none |
-| 189 `[ -e ]` of both flags (`reached_step`) | read | works | none |
-| 315–327 `restore_database`, 324 `<"$1"` | reads the dump into `pg_restore`'s stdin | **fails**: permission denied | the helper's `read dump BASE` on a pipe; the function takes the base name, not a path |
-| 332 `[ -d "backups/$1.media" ]` (`restore_media`) | test | **silently skips the attachments**: the test is false, the function returns 0, and the restore goes on without them | the helper's `exists media BASE`; a test that cannot be answered stops the script, never reads as "no media" |
-| 333 `-v "$PWD/backups/$1.media:/restored-media:ro"` | a bind mount, read by `web` as uid 1000 | works: the daemon mounts it and uid 1000 owns the files | none |
-| 337–339 `verify_dump` | inside the `backup` container | works | none |
+| 90 `mkdir -p flags` (`gates_on`) | creates `flags/` if missing, under the scripts' `umask 077`, so mode 0700 | **failed open**: a shifted worker cannot search a 0700 directory, `Path.exists()` answers `False`, and the worker ran behind a closed gate | `require_flags_searchable` refuses a `flags/` whose mode does not let others search it, before the first flag is written, so the gates stay as they were; a missing one is created with `mkdir -m 0755` |
+| 91–93 `: >` and `chmod 0644` of both flags | write | worked | unchanged |
+| 163, 168 `rm -f` of each flag (`commit_point`) | write | worked | unchanged |
+| 189 `[ -e ]` of both flags (`reached_step`) | read | worked | unchanged |
+| 315–327 `restore_database`, 324 `<"$1"` | reads the dump into `pg_restore`'s stdin | **failed**: permission denied | `restore_database BASE`: `exists dump` before the database is dropped, then `read dump` on a pipe |
+| 332 `[ -d "backups/$1.media" ]` (`restore_media`) | test | **skipped the attachments silently** | `exists media`: not there means no media; a link, or a test that cannot be answered, stops the restore |
+| 333 `-v "$PWD/backups/$1.media:/restored-media:ro"` | a bind mount, read by `web` as uid 1000 | worked | unchanged |
+| 337–339 `verify_dump` | inside the `backup` container | worked | unchanged |
 
 ### `deploy.sh`
 
-| Line | Access | Rootless today | Change |
+| Line | Access | Rootless before | Now |
 | --- | --- | --- | --- |
-| 99 `[ -e ]` of both flags (`refuse_unfinished`) | read | works | none |
-| 206–209 `backup_before_migrating` | the dump's name from the container's output, checked only against `gmat-*` | works | the full dump pattern (below): `restore-predeploy` later uses that name as a path |
-| (new, preflight, before the gates) | `backups/` stat | none today | M12.2: the helper's `stat`: `backups/` exists and belongs to the containers' uid 1000 as the namespace sees it (`deploy` under a root daemon), or has mode 0777 (CI); otherwise refuse with "run init.sh" before anything changes |
+| 99 `[ -e ]` of both flags (`refuse_unfinished`) | read | worked | unchanged |
+| 206–209 `backup_before_migrating` | the dump's name from the container's output, checked only against `gmat-*` | worked | the dump pattern (`dump_name_ok`): `restore-predeploy` later reads `backups/` under that name |
+| new: `check_host_directories`, after the env files and before the release is fetched | `flags/` mode, `backups/` stat | — | `require_flags_searchable`, then the helper's `stat`: `backups/` is uid 1000 mode 700 as the helper sees it (`deploy` under a root daemon), or mode 777 on a root daemon (a CI runner, `init.sh --ci`). Otherwise "run bash init.sh", before anything changes |
 
 ### `recover.sh`
 
-| Line | Access | Rootless today | Change |
+| Line | Access | Rootless before | Now |
 | --- | --- | --- | --- |
-| 128–129 `[ -e ]` of both flags (`status`) | read | works | none; M12.3 adds the daemon's kind and port driver to `status` |
-| 233–235 `[ -f "backups/$dump.dump" ]` (`restore-predeploy`) | test | **fails**: "not in backups/" | the dump pattern, then `exists dump BASE` |
-| 243 `restore_database "backups/$dump.dump"` | read | fails | `restore_database BASE` (above) |
-| 244 `restore_media` | as above | skips the attachments | as above |
-| 288–289 `dump="${DUMP_ARG%.dump}"; dump="${dump##*/}"` (`restore`) | name taken from the command line | — | the dump pattern; anything else refused |
-| 290–291 `[ -f ]` of the dump and its manifest | test | fails | `exists dump BASE`, `exists manifest BASE` |
-| 292 `python3 ops/checks.py dump-version "backups/$dump.manifest.json"` | the host's `python3` reads the manifest | fails | `read manifest BASE \| python3 ops/checks.py dump-version -`: `checks.py` reads `-` as stdin, so `python3` never runs inside the namespace |
-| 294 `checks.py dump-time` | read | fails | the same |
+| 128–129 `[ -e ]` of both flags (`status`) | read | worked | unchanged; M12.3 adds the daemon's kind and port driver |
+| 233–235 `[ -f "backups/$dump.dump" ]` (`restore-predeploy`) | test | **failed**: "not in backups/" | the dump pattern on the recorded name, `backups_ready`, then `exists dump`, all before the confirmation |
+| 243 `restore_database "backups/$dump.dump"` | read | failed | `restore_database BASE` (above) |
+| 244 `restore_media` | as above | skipped the attachments | as above |
+| 288–289 `dump="${DUMP_ARG%.dump}"; dump="${dump##*/}"` (`restore`) | name taken from the command line | — | the dump pattern on what is left; anything else refused |
+| 290–291 `[ -f ]` of the dump and its manifest | test | failed | `backups_ready`, `exists dump`, `exists manifest` |
+| 292 `python3 ops/checks.py dump-version "backups/$dump.manifest.json"` | the host's `python3` reads the manifest | failed | without `--version`: `read manifest BASE \| python3 ops/checks.py dump-version -`, so `python3` never runs inside the namespace |
+| 294 `checks.py dump-time` | read | failed | `read manifest BASE \| python3 ops/checks.py dump-time -` |
 | 307, 308 `restore_database`, `restore_media` | read | as above | as above |
-| 320–322 `fetch_snapshot`: restic in the `backup` container | writes `backups/.offsite/` as uid 1000 | works | the snapshot pattern before the call |
-| 324 `find backups/.offsite/backups -maxdepth 1 -name 'gmat-*.dump'` | read | **fails**: "snapshot holds no dump" | the helper's `find-fetched`, then the dump pattern on its answer |
-| 327 `mv backups/.offsite/backups/"$FETCHED"* backups/` | write | fails | the helper's `adopt BASE`: the three names `BASE.dump`, `BASE.manifest.json`, `BASE.media`, never a glob that also matches `BASE-other` |
-| 328 `rm -rf backups/.offsite` | write | fails | the helper's `drop-offsite`: that one fixed path |
+| 320–322 `fetch_snapshot`: restic in the `backup` container | writes `backups/.offsite/` as uid 1000 | worked | the snapshot pattern and `backups_ready` before the lock and the gates |
+| 324 `find backups/.offsite/backups -maxdepth 1 -name 'gmat-*.dump'` | read | **failed**: "snapshot holds no dump" | `find-fetched`, then the dump pattern on its answer |
+| 327 `mv backups/.offsite/backups/"$FETCHED"* backups/` | write | failed | `adopt BASE`: the three names `BASE.dump`, `BASE.manifest.json`, `BASE.media`, never a glob that also matches `BASE-other` |
+| 328 `rm -rf backups/.offsite` | write | failed | `drop-offsite`: that one fixed path |
 | 344, 345 `restore_database`, `restore_media` | read | as above | as above |
 
 ### `restore-drill.sh`
 
-| Line | Access | Rootless today | Change |
+| Line | Access | Rootless before | Now |
 | --- | --- | --- | --- |
-| 81 `mkdir -p backups` | creates it as the operator | the `backup` container cannot write it (as in `init.sh`) | the helper's `prepare` |
-| 83–87 restic in a one-off container, `--user "$(id -u):$(id -g)"` | writes `backups/.offsite/` | `id -u` is a container uid here, not the operator: 1000 becomes `subuid_start + 999` by coincidence | `--user 1000:1000` under both daemons, the `backup` service's own uid; the snapshot pattern before the call |
-| 89 `find …` | read | fails | `find-fetched`, then the dump pattern |
-| 92 `mv … "$DUMP"* backups/` | write | fails | `adopt BASE` |
-| 93 `rm -rf backups/.offsite` | write | fails | `drop-offsite` |
-| 95 `cp -a "$FROM_DIR/$DUMP".* backups/` | write | fails | the dump pattern on `--dump`, then the helper's `import DIR BASE`: copies the three names, then gives them to uid 1000 inside the namespace (the `backup` container reads them in `verify_dump`) |
-| 97–98 `[ -f ]` of the dump and its manifest | test | fails | `exists dump BASE`, `exists manifest BASE` |
-| 121 `checks.py compare-counts "backups/$DUMP.manifest.json" "$restored"` | read | fails | `read manifest BASE \| python3 ops/checks.py compare-counts - "$restored"` |
-| 162 `<"backups/$DUMP.manifest.json"` (`check_attachments`) | read | fails | `read manifest BASE` on a pipe |
+| 81 `mkdir -p backups` | creates it as the operator | the `backup` container could not write it (as in `init.sh`) | `prepare`, the drill's first change: it checks the namespace target before the gates |
+| 83–87 restic in a one-off container, `--user "$(id -u):$(id -g)"` | writes `backups/.offsite/` | `id -u` is a container uid here, not the operator: 1000 became `subuid_start + 999` by coincidence | `--user 1000:1000` (`$CONTAINER_UID:$CONTAINER_GID`) under both daemons, the `backup` service's own uid; the snapshot pattern when the options are read |
+| 89 `find …` | read | failed | `find-fetched`, then the dump pattern |
+| 92 `mv … "$DUMP"* backups/` | write | failed | `adopt BASE` |
+| 93 `rm -rf backups/.offsite` | write | failed | `drop-offsite` |
+| 95 `cp -a "$FROM_DIR/$DUMP".* backups/` | write | failed | the dump pattern on `--dump` when the options are read, then `import DIR BASE`: copies the three names, then, under a rootless daemon, gives them to uid 1000 inside the namespace (the `backup` container reads them in `verify_dump`) |
+| 97–98 `[ -f ]` of the dump and its manifest | test | failed | `exists dump`, `exists manifest` |
+| 121 `checks.py compare-counts "backups/$DUMP.manifest.json" "$restored"` | read | failed | `read manifest BASE \| python3 ops/checks.py compare-counts - "$restored"` |
+| 162 `<"backups/$DUMP.manifest.json"` (`check_attachments`) | read | failed | `read manifest BASE` on a pipe into the one-off `web` |
 | 223, 224 `restore_database`, `restore_media` | read | as above | as above |
-| 258 `rm -rf backups/gmat-* drill flags/maintenance.on flags/worker.paused` (`--wipe`) | write | `backups/gmat-*` fails; the rest works | the helper's `wipe-dumps` for `backups/`; `drill/` and the flags as today |
+| 258 `rm -rf backups/gmat-* drill flags/maintenance.on flags/worker.paused` (`--wipe`) | write | `backups/gmat-*` failed; the rest worked | `wipe-dumps` for `backups/`; `drill/` and the flags unchanged |
+
+`--preserved-dump FILE` is still read by the host (`<"$1"`): it is a file the operator fetched by hand, outside `backups/`.
 
 ### `ops/checks.py`
 
-| Function | Access | Change |
+| Function | Access | Now |
 | --- | --- | --- |
-| `_load` (line 49), for `dump-version`, `dump-time` and `compare-counts`' manifest | opens the path it is given | accept `-` for stdin. The host's `python3` then never needs to read `backups/` |
+| `_load` (line 49), for `dump-version`, `dump-time` and `compare-counts`' manifest | opens the path it is given | `-` reads stdin. The host's `python3` never reads `backups/` |
 
 ### Read by people, in the runbooks (M12.4)
 
@@ -168,32 +175,34 @@ Every host-side read or write under `backups/` and `flags/`. "Rootless today" sa
 
 ## The helper's operations
 
-One function in `ops/common.sh`, `backups_do OPERATION ARGUMENTS…`. Each operation is a fixed command line. Its only variable parts are a base name that already matched the dump pattern, or a directory given by the drill's operator. Each part is passed as its own argument:
+One function in `ops/common.sh`, `backups_do OPERATION ARGUMENTS…`. Each operation is a fixed command line. Its only variable parts are a dump's base name, checked against the dump pattern again inside the helper whatever the caller did, and a directory given by the drill's operator. Each part is passed as its own argument, and each operation takes a fixed number of them. `backups` below is the absolute path of the stack's `backups/` directory, and every tool is `/usr/bin/<tool>`:
 
 | Operation | Command (inside the namespace under a rootless daemon, directly under a root one) |
 | --- | --- |
-| `prepare` | `mkdir -p backups`, then `chown 1000:1000 backups` (rootless only) and `chmod 0700 backups` |
-| `stat` | `stat -c '%u %a' backups` |
-| `exists dump\|manifest\|media BASE` | `test -f backups/BASE.dump`, `test -f backups/BASE.manifest.json`, `test -d backups/BASE.media`; exit 0 yes, 1 no, anything else stops the script |
+| `prepare` | `mkdir -p -- backups`; under a rootless daemon only, `chown -R --no-dereference 1000:1000 -- backups`; `chmod 0700 -- backups` |
+| `stat` | `stat -c '%u %a' -- backups` |
+| `exists dump\|manifest\|media BASE` | `find backups -mindepth 1 -maxdepth 1 -name BASE.dump -printf %y` (or `BASE.manifest.json`, `BASE.media`). Nothing printed: 1, not there. `f` (`d` for the media): 0. Any other type, a link say, or a failure stops the script; it never reads as "not there" |
 | `read dump\|manifest BASE` | `cat -- backups/BASE.dump` or `backups/BASE.manifest.json` to stdout |
-| `find-fetched` | `find backups/.offsite/backups -maxdepth 1 -type f -name 'gmat-*.dump' -print -quit` |
-| `adopt BASE` | `mv --` each of `backups/.offsite/backups/BASE.{dump,manifest.json,media}` that exists into `backups/` |
+| `find-fetched` | `find backups/.offsite/backups -mindepth 1 -maxdepth 1 -type f -name 'gmat-*.dump' -print -quit` |
+| `adopt BASE` | `find backups/.offsite/backups -mindepth 1 -maxdepth 1 ( -name BASE.dump -o -name BASE.manifest.json -o -name BASE.media ) -exec mv -t backups -- {} +` |
 | `drop-offsite` | `rm -rf -- backups/.offsite` |
-| `import DIR BASE` | `cp -a --` each of `DIR/BASE.{dump,manifest.json,media}` that exists into `backups/`, then `chown -R 1000:1000` those three (rootless only) |
-| `wipe-dumps` | `find backups -maxdepth 1 -name 'gmat-*' -exec rm -rf -- {} +` |
+| `import DIR BASE` | the same `find` in `DIR` (made absolute) with `-exec cp -a -t backups -- {} +`; then, under a rootless daemon, the same `find` in `backups` with `-exec chown -R --no-dereference 1000:1000 -- {} +` |
+| `wipe-dumps` | `find backups -mindepth 1 -maxdepth 1 -name 'gmat-*' -exec rm -rf -- {} +` |
 
-Tools are called by absolute path. No operation writes outside `backups/`. None changes a mode or an owner except `prepare` and `import`, which set uid 1000 and 0700, the owner and mode that a dump has anyway. Nothing is ever given to `deploy`.
+No operation writes outside `backups/`. None changes a mode or an owner except `prepare` and `import`, which set uid 1000 and 0700, the owner and mode that a dump has anyway. Under a rootless daemon, `prepare` gives everything already in `backups/` to uid 1000. A host that ran the root daemon left its dumps to `deploy`, which is root inside the namespace, so this keeps them readable to the `backup` container after the move. Nothing is ever given to `deploy`. `find` never follows a link (`-P`, its default), and `chown` never changes what a link points to.
+
+`backups_ready` (`detect_daemon`, then `stat`) runs before anything changes in `recover.sh restore`, `restore-predeploy` and `restore-offsite`. A refusal of the target checks there leaves both gates as the script found them. The drill's first change is `prepare`, before its gates. `deploy.sh` reads only `stat`.
 
 ## Names
 
-A name is checked before it reaches the helper, a path or a container:
+A name is checked before it reaches the helper, a path or a container, in the C locale, so that `[0-9]` takes in no digit of another script:
 
 | Name | Pattern | Where it comes from |
 | --- | --- | --- |
 | A dump's base | `^gmat-[0-9]{8}T[0-9]{6}Z(-[A-Za-z0-9._-]{1,40})?$` (`backup.sh`: the stamp and its `--label` rule) | `deploy.sh` (the backup's output), `recover.sh restore DUMP`, `--dump`, `deploy.state`, and the answer of `find-fetched` |
 | A restic snapshot | `^[0-9a-f]{8,64}$` | `recover.sh --snapshot`, `restore-drill.sh --snapshot` |
 
-Before this change only `deploy.sh` checked a dump's name (`gmat-*`), and nothing checked a snapshot id, the `restore` argument or `--dump`. The patterns apply under both daemons.
+Until M12.2 only `deploy.sh` checked a dump's name (`gmat-*`), and nothing checked a snapshot id, the `restore` argument or `--dump`. The patterns apply under both daemons. A snapshot is named by its id, never `latest`: on a host whose offsite credentials can only append, an attacker can add snapshots, and the newest one is then theirs.
 
 ## The port driver (M12.3)
 
@@ -207,11 +216,11 @@ Under a rootless daemon, `deploy.sh`'s preflight reads the port driver in this o
 
 ## Found while writing this
 
-These go beyond the step cards. Each is handled above, and the maintainer sees them in the pull request:
+These went beyond the step cards. Each is handled above, and the maintainer sees them in the pull request:
 
-- **The M12.2 card's target check was wrong.** It says to refuse a pid whose `/proc/<pid>/exe` is not `rootlesskit`, but `docker.pid` holds `dockerd`'s pid. The check above verifies `dockerd` and its `rootlesskit` parent.
-- **The M12.2 card says the names are "already validated".** They are not, except the pre-deploy dump's, loosely. The patterns above are new.
-- **`restore_media` skips the attachments silently** on a rootless host. A restore would report success without them.
-- **`gates_on` fails open** if `flags/` is missing on a rootless host (0700 under `umask 077`). The worker also reads an unreadable directory as "not paused". The script fix is above. Making the worker treat any error other than "no such file" as paused, and log it, is a small change in `apps/notifications/worker.py`. It is proposed for M12.2, where the maintainer can accept it or leave it out.
-- **The drill's `--user "$(id -u):$(id -g)"`** names a container uid, which is not the operator under a rootless daemon.
+- **The M12.2 card's target check was wrong.** It says to refuse a pid whose `/proc/<pid>/exe` is not `rootlesskit`, but `docker.pid` holds `dockerd`'s pid. The helper checks `dockerd` and its `rootlesskit` parent (M12.2).
+- **The M12.2 card says the names are "already validated".** They were not, except the pre-deploy dump's, loosely. The patterns above are new (M12.2).
+- **`restore_media` skipped the attachments silently** on a rootless host: a restore would have reported success without them. `exists media` now tells "not there" from "cannot tell" (M12.2).
+- **`gates_on` failed open** if `flags/` was missing on a rootless host (0700 under `umask 077`). The script fix is above (M12.2). The worker also reads a pause flag it cannot check as "not paused", because Python's `Path.exists()` answers `False` on a permission error. Making the worker treat any error other than "no such file" as paused, and log it, is a small change in `apps/notifications/worker.py`, proposed for M12.2, where the maintainer can accept it or leave it out.
+- **The drill's `--user "$(id -u):$(id -g)"`** named a container uid, which is not the operator under a rootless daemon. It is uid 1000 under both daemons (M12.2).
 - **Q75's premise changed.** `builtin` keeps the address from RootlessKit 3.0 for TCP only. That still does not cover HTTP/3, so the decision holds, for a different reason.

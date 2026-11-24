@@ -16,6 +16,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.unit.docker.conftest import World
+
 ROOT = Path(__file__).resolve().parents[3]
 STACK = ROOT / "docker_compose" / "gmat_m8"
 ENTRYPOINT = ROOT / "docker" / "app" / "entrypoint.sh"
@@ -263,26 +265,17 @@ def test_caddy_gates_the_admin_only_while_it_is_on() -> None:
     assert "@blocked not remote_ip {$ADMIN_ALLOWED_CIDRS:127.0.0.1/32 ::1/128}" in caddyfile
 
 
-def test_init_adds_the_admin_switch_to_an_existing_env(tmp_path: Path) -> None:
+def test_init_adds_the_admin_switch_to_an_existing_env(world: World) -> None:
     """An installation from before ADR-0030 gets the key, off, on its next init.sh."""
-    stack = tmp_path / "docker_compose" / "gmat_m8"
-    (stack / "clamav").mkdir(parents=True)
-    (tmp_path / "docker" / "postgres" / "initdb").mkdir(parents=True)
-    for name in ("init.sh", ".env.example", "app.env.example"):
-        (stack / name).write_bytes((STACK / name).read_bytes())
-    for name in ("clamd.conf", "freshclam.conf"):
-        (stack / "clamav" / name).write_bytes((STACK / "clamav" / name).read_bytes())
-    subprocess.run(["bash", "init.sh"], cwd=stack, check=True, capture_output=True)  # noqa: S607
-    env = stack / ".env"
+    for name in (".env", "app.env"):
+        (world.stack / name).unlink()
+    first = world.run("init.sh")
+    assert first.returncode == 0, first.stderr
+    env = world.stack / ".env"
     kept = [line for line in env.read_text().splitlines() if not line.startswith("DJANGO_ADMIN_")]
     env.write_text("\n".join(kept) + "\n")
-    result = subprocess.run(
-        ["bash", "init.sh"],  # noqa: S607
-        cwd=stack,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    result = world.run("init.sh")
+    assert result.returncode == 0, result.stderr
     assert "added to .env: DJANGO_ADMIN_ENABLED" in result.stdout
     assert env.read_text().splitlines()[-1] == "DJANGO_ADMIN_ENABLED=false"
 

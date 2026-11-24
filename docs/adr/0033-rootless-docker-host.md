@@ -23,7 +23,7 @@ The facts this record relies on were checked against Docker's current rootless d
    - The driver in use must carry UDP, or the production overlay stops publishing 443/udp.
 5. **Detection, not configuration.** The scripts decide that the daemon is rootless from what it says, never from a setting that a person could forget or get wrong. `docker info` asks the very daemon the scripts are about to use; its security options name `rootless`. A daemon that names `userns` (a root daemon with `userns-remap`) is not supported, and `deploy.sh` refuses it. A daemon that names neither is a root daemon, and every script behaves as it does today. If `docker info` fails, the scripts stop.
 6. **One helper reads and writes under `backups/`** (M12.2, in `ops/common.sh`). Under a rootless daemon it runs one of a fixed set of operations inside the daemon's user namespace, where `deploy` is root and owns every mapped uid. It enters that namespace with `nsenter -U --preserve-credentials`: the user namespace only, so paths keep the host's meaning. The rules:
-   - **The target is verified before it is entered.** It is the pid in `$XDG_RUNTIME_DIR/docker.pid`. That pid is `dockerd`'s, not `rootlesskit`'s. The process is `deploy`'s own, runs inside a user namespace that is not the caller's, has `rootlesskit` as its parent, and its `uid_map` maps 0 to `deploy`'s uid and the rest to `deploy`'s subordinate range.
+   - **The target is verified every time before it is entered.** It is the pid in `$XDG_RUNTIME_DIR/docker.pid`, and the CLI must talk to the socket next to it. That pid is `dockerd`'s, not `rootlesskit`'s. The process is `deploy`'s own, runs inside a user namespace that is not the caller's, and has `rootlesskit` as its parent. Its `uid_map` and `gid_map` map 0 to `deploy` alone, map the containers' uid and gid 1000, and map nothing outside `deploy`'s subordinate ranges.
    - **It fails closed:** any check fails, or `nsenter` is missing, and the script stops and says why.
    - **What it never does:**
      - it never falls back to reading as `deploy`;
@@ -34,9 +34,11 @@ The facts this record relies on were checked against Docker's current rootless d
    Under a root daemon the helper runs the same operation directly, as `deploy`. [`docs/rootless-host.md`](../rootless-host.md) lists every line it replaces and the operations it allows.
 7. **Ownership is the containers' uid, seen from inside.** `backups/` and everything in it belong to the containers' uid 1000, mode 0700 for directories and 0600 for files:
    - under a root daemon that is `deploy` (uid 1000, as the runbook requires);
-   - under a rootless daemon it is host uid `subuid_start + 999` (100999 with the usual range). `init.sh` creates the directory that way through the helper.
+   - under a rootless daemon it is host uid `subuid_start + 999` (100999 with the usual range). `init.sh` creates the directory that way through the helper, and gives what is already in it to that uid too.
 
-   `flags/` stays `deploy`'s, mode 0755, with world-readable flags. Its directory mode is what lets a shifted worker see `worker.paused`, so `deploy.sh` and `recover.sh` create it with that mode explicitly.
+   `deploy.sh` refuses, before anything changes, a `backups/` that is neither (or that is world-writable outside a CI runner's root daemon): the pre-deploy dump would fail with the site closed.
+
+   `flags/` stays `deploy`'s, mode 0755, with world-readable flags. Its directory mode is what lets a shifted worker see `worker.paused`. The scripts create a missing one with that mode whatever their umask, and refuse one that others cannot search before they write the first flag. They never widen its mode themselves.
 
 ## Alternatives rejected
 
@@ -56,5 +58,5 @@ The facts this record relies on were checked against Docker's current rootless d
 - **Subordinate ids and linger are prerequisites.** Without `/etc/subuid` and `/etc/subgid` entries the daemon does not start. Without linger it stops at logout and does not start at boot, and the stack with it.
 - **Limits.** `mem_limit` and `pids_limit` need cgroup v2 and systemd's delegation of `memory` and `pids`. Debian 13 has both by default, and the stack sets no CPU limit.
 - **Where things live.** The data root moves to `~deploy/.local/share/docker`, which disk monitoring must watch. The socket is `/run/user/<uid>/docker.sock`, and `DOCKER_HOST` or the `rootless` context must reach every session that runs the scripts.
-- **A host on the root daemon moves by restoring.** Volumes do not move across daemons. Dump, set up rootless, deploy, restore (runbook, M12.4).
+- **A host on the root daemon moves by restoring.** Volumes do not move across daemons. Dump, set up rootless, deploy, restore (runbook, M12.4). Running `init.sh` once the rootless daemon runs gives the dumps already in `backups/`, which were `deploy`'s, to the containers' shifted uid, so the `backup` container can verify and restore them.
 - **The root daemon stays supported** everywhere it is used today (CI, the rehearsal, developers' machines): under it, every script behaves as before. [ADR-0012](0012-maintenance-gate-deploys-recovery.md) still holds. Gates, the lock, dumps and the offsite copy are unchanged; only the way the host reaches `backups/` changes.

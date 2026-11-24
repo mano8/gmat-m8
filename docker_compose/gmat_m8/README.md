@@ -44,7 +44,7 @@ bash init.sh                                  # .env and app.env with generated 
 docker compose up -d --build --wait           # https://localhost:8443 (accept or trust Caddy's CA)
 ```
 
-`init.sh` never overwrites an existing env file and prints no secret. Run it again after an upgrade: it appends to existing env files only the keys a newer template added (generating secrets such as `OUTBOX_ENCRYPTION_KEYS`) and prints their names. Flags: `--ci` (for a CI runner), `--reset-db [--yes]` (deletes the database volume after asking).
+`init.sh` never overwrites an existing env file and prints no secret. Run it again after an upgrade: it appends to existing env files only the keys a newer template added (generating secrets such as `OUTBOX_ENCRYPTION_KEYS`) and prints their names. Flags: `--ci` (for a CI runner on a root daemon; refused on a rootless one), `--reset-db [--yes]` (deletes the database volume after asking).
 
 The first administrator is invited from a shell, while no active group administrator exists (a second run is refused once one does):
 

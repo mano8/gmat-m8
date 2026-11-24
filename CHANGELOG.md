@@ -4,6 +4,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Fixed
+
+- **Restores work on a host that runs Docker rootless.** There, the dumps under `backups/` belong to the containers' shifted user, which the account that deploys cannot read: `recover.sh restore`, `restore-predeploy` and `restore-offsite` and the restore drill stopped, and a restore could go on without the attachments and not say so. The scripts now ask Docker which kind of daemon runs. Under a rootless one they read and write `backups/` through one helper, which enters the daemon's user namespace only after checking that it belongs to the deploying account's own daemon, and stops otherwise. Under the root daemon nothing changes. Dump names and snapshot ids are checked before they are used. `deploy.sh` refuses, before anything changes, a `backups/` the backup container could not write and a `flags/` the worker could not read. The restore drill runs restic as the backup service's own user. **On a host moved to rootless Docker, run `bash init.sh` again** once the daemon runs: it gives `backups/` and the dumps already in it to the containers' user.
+
 ## [0.3.0] - 2026-11-23
 
 The pilot's second round of feedback ([#70](https://github.com/mano8/gmat-m8/issues/70), [#72](https://github.com/mano8/gmat-m8/issues/72), [#75](https://github.com/mano8/gmat-m8/issues/75)): group administrators choose which business notifications are sent, each person chooses where and what they are told, notifications in the application with a bell, and buttons that keep their own width. The checks to run with the pilot's users after the upgrade are in [docs/runbooks/pilot.md](https://github.com/mano8/gmat-m8/blob/v0.3.0/docs/runbooks/pilot.md); who sets what is in [docs/runbooks/user-admin.md](https://github.com/mano8/gmat-m8/blob/v0.3.0/docs/runbooks/user-admin.md).

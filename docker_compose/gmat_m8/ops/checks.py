@@ -15,6 +15,9 @@ python3). Each command prints plain text for the shell and exits non-zero on a m
   dump-time MANIFEST        when a backup was taken (a restore's loss window starts there)
   compare-counts MANIFEST RESTORED
                             the restored row counts against a backup manifest
+
+A file named ``-`` is read from stdin: the scripts pipe a backup manifest from the helper that
+alone reads backups/ (ADR-0033), so this never opens a file there.
 """
 
 import argparse
@@ -47,7 +50,8 @@ class Refused(Exception):
 
 
 def _load(path: str) -> Any:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    text = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+    return json.loads(text)
 
 
 def asset_url(release: dict[str, Any], name: str) -> str:

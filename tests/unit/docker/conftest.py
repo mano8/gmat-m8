@@ -1,16 +1,30 @@
-"""A compose directory with fake ``docker``, ``cosign`` and ``curl``: the host scripts' world.
+"""A compose directory with fake ``docker``, ``cosign``, ``curl`` and ``nsenter``: the host
+scripts' world.
 
-``deploy.sh`` and ``recover.sh`` run for real in a copy of the stack directory. The fakes log
-what they were asked, with the state of both gates at that moment, and fail on request. The
-same scripts against real containers are ``tests/rehearsal``.
+``deploy.sh``, ``recover.sh``, ``restore-drill.sh`` and ``init.sh`` run for real in a copy of the
+stack directory. The fakes log what they were asked, with the state of both gates at that moment,
+and fail on request. The same scripts against real containers are ``tests/rehearsal``.
+
+The fake ``docker`` answers as a root daemon unless ``World.rootless()`` makes it a rootless one
+(ADR-0033). Then ``backups/`` is closed (mode 0000), as the containers' shifted uid's directory is
+to the host account, and only the fake ``nsenter`` opens it, for the one command it runs: a
+script that reads or writes there without the helper fails. A real rootless daemon cannot run
+here, so its process tree is a fake ``/proc`` and its subordinate ids fake ``/etc/subuid`` and
+``/etc/subgid`` files: the copy of ``ops/common.sh`` is pointed at them, and at this account's own
+uid and gid as the containers' (an unprivileged test cannot give a file to uid 1000). Those
+constants are the only lines of a script a test rewrites; ``test_backups_helper`` checks their
+values in the repository. M12.5 rehearses the scripts against a real rootless daemon.
 """
 
 import json
 import os
+import pwd
 import shutil
 import stat
 import subprocess
 import textwrap
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,6 +39,14 @@ OLD_APP = "sha256:" + "c" * 64
 OLD_BACKUP = "sha256:" + "d" * 64
 PREFIX = "registry.test/mano8"
 REPOSITORY = "mano8/gmat-m8"
+# The fake rootless daemon's processes: dockerd, and the rootlesskit that started it.
+DOCKERD_PID = 4242
+ROOTLESSKIT_PID = 4241
+DAEMON_OPTIONS = {
+    "root": '["name=apparmor","name=seccomp,profile=builtin","name=cgroupns"]',
+    "rootless": '["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]',
+    "userns": '["name=apparmor","name=seccomp,profile=builtin","name=userns","name=cgroupns"]',
+}
 
 FAKE_DOCKER = r"""#!/usr/bin/env python3
 import os, pathlib, sys
@@ -44,7 +66,23 @@ for pattern in failing.read_text().splitlines() if failing.exists() else []:
         print(f"fake docker refuses: {line}", file=sys.stderr)
         sys.exit(3)
 sql = sys.stdin.read() if ("exec -T db" in line and not sys.stdin.isatty()) else ""
-if "config --images" in line:
+if "pg_restore" in line:
+    (fake / "pg_restore.in").write_text(sql)
+if line.split(" ")[0] == "info":
+    daemon = fake / "daemon"
+    kind = daemon.read_text().strip() if daemon.exists() else "root"
+    if kind == "down":
+        print("Cannot connect to the Docker daemon", file=sys.stderr)
+        sys.exit(1)
+    print(os.environ["FAKE_OPTIONS_" + kind.upper()])
+elif line.startswith("context inspect"):
+    context = fake / "context"
+    print(context.read_text().strip() if context.exists() else "unix:///var/run/docker.sock")
+elif "--entrypoint python web" in line:
+    (fake / "python.in").write_text(sys.stdin.read())
+elif "'row_counts'" in sql:
+    print('{"row_counts": {"core_thing": 3}}')
+elif "config --images" in line:
     print(f"{os.environ['FAKE_PREFIX']}/gmat-m8@{os.environ['APP_DIGEST']}")
     print(f"{os.environ['FAKE_PREFIX']}/gmat-m8-backup@{os.environ['BACKUP_DIGEST']}")
     print("caddy:fake@sha256:aaaa")
@@ -105,6 +143,31 @@ if not source.exists():
 shutil.copy(source, args[args.index("--output") + 1])
 """
 
+# Enters nothing: it checks that it was asked for the daemon's user namespace alone and a tool by
+# its absolute path, then runs the command with backups/ open, as it is to the namespace's root.
+FAKE_NSENTER = r"""#!/usr/bin/env python3
+import os, pathlib, subprocess, sys
+fake = pathlib.Path(os.environ["FAKE_DIR"])
+args = sys.argv[1:]
+with (fake / "nsenter.log").open("a") as log:
+    log.write(" ".join(args) + "\n")
+pid = (pathlib.Path(os.environ["XDG_RUNTIME_DIR"]) / "docker.pid").read_text().strip()
+if args[:5] != ["-U", "--preserve-credentials", "-t", pid, "--"]:
+    sys.exit(f"fake nsenter: not the daemon's user namespace alone: {args}")
+command = args[5:]
+if not command or not command[0].startswith("/usr/bin/"):
+    sys.exit(f"fake nsenter: not a tool named by its path: {command}")
+backups = pathlib.Path("backups")
+if backups.is_dir():
+    backups.chmod(0o700)
+try:
+    code = subprocess.run(command, check=False).returncode
+finally:
+    if backups.is_dir():
+        backups.chmod(0o000)
+sys.exit(code)
+"""
+
 
 def _executable(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
@@ -147,8 +210,8 @@ class World:
         return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
 
     def clear_logs(self) -> None:
-        (self.fake / "docker.log").unlink(missing_ok=True)
-        (self.fake / "cosign.log").unlink(missing_ok=True)
+        for name in ("docker.log", "cosign.log", "nsenter.log"):
+            (self.fake / name).unlink(missing_ok=True)
 
     def gates(self) -> tuple[bool, bool]:
         flags = self.stack / "flags"
@@ -245,6 +308,101 @@ class World:
         kept = [line for line in lines if not line.startswith(f"{key}=")]
         path.write_text("\n".join(kept) + "\n", encoding="utf-8")
 
+    # --- the daemon (ADR-0033) ------------------------------------------------------------
+
+    def daemon(self, kind: str) -> None:
+        """What ``docker info`` answers: root, rootless, userns, or down."""
+        (self.fake / "daemon").write_text(kind, encoding="utf-8")
+
+    @property
+    def proc(self) -> Path:
+        return self.fake / "proc"
+
+    @property
+    def runtime(self) -> Path:
+        return self.fake / "run"
+
+    def rootless(self, *, fake_proc: bool = True) -> None:
+        """A rootless daemon: its pid file, its socket for the CLI, its process tree, and
+        ``backups/`` closed to this account."""
+        if os.getuid() == 0 or os.getgid() == 0:
+            pytest.skip("root reads every file: the closed backups/ would prove nothing")
+        self.daemon("rootless")
+        self.runtime.mkdir(exist_ok=True)
+        (self.runtime / "docker.pid").write_text(f"{DOCKERD_PID}\n", encoding="utf-8")
+        self.env["XDG_RUNTIME_DIR"] = str(self.runtime)
+        self.env["DOCKER_HOST"] = f"unix://{self.runtime}/docker.sock"
+        if fake_proc:
+            self._fake_process_tree()
+            user = pwd.getpwuid(os.getuid()).pw_name
+            for name in ("subuid", "subgid"):
+                (self.fake / name).write_text(f"{user}:100000:65536\n", encoding="utf-8")
+            self.point_at(
+                PROC_ROOT=self.proc,
+                SUBUID_FILE=self.fake / "subuid",
+                SUBGID_FILE=self.fake / "subgid",
+            )
+        backups = self.stack / "backups"
+        if backups.is_dir():
+            backups.chmod(0o000)
+
+    def point_at(self, **constants: Any) -> None:
+        """Rewrites constants of the copy of ``ops/common.sh`` (their repository values are
+        checked by ``test_backups_helper``)."""
+        common = self.stack / "ops" / "common.sh"
+        text = common.read_text(encoding="utf-8")
+        for name, value in constants.items():
+            lines = [line for line in text.splitlines() if line.startswith(f"{name}=")]
+            assert len(lines) == 1, f"{name} is not one constant of ops/common.sh"
+            text = text.replace(lines[0], f"{name}={value}")
+        common.write_text(text, encoding="utf-8")
+
+    def _fake_process_tree(self) -> None:
+        dockerd = self.proc / str(DOCKERD_PID)
+        (dockerd / "ns").mkdir(parents=True, exist_ok=True)
+        (dockerd / "exe").symlink_to("/usr/bin/dockerd")
+        (dockerd / "status").write_text(f"Name:\tdockerd\nPPid:\t{ROOTLESSKIT_PID}\n")
+        (dockerd / "ns" / "user").symlink_to("user:[4026532200]")
+        (dockerd / "uid_map").write_text(f"         0 {os.getuid():>10}          1\n"
+                                         "         1     100000      65536\n")  # fmt: skip
+        (dockerd / "gid_map").write_text(f"         0 {os.getgid():>10}          1\n"
+                                         "         1     100000      65536\n")  # fmt: skip
+        kit = self.proc / str(ROOTLESSKIT_PID)
+        kit.mkdir()
+        (kit / "exe").symlink_to("/usr/bin/rootlesskit")
+        (kit / "status").write_text("Name:\trootlesskit\nPPid:\t1\n")
+        (self.proc / "self" / "ns").mkdir(parents=True)
+        (self.proc / "self" / "ns" / "user").symlink_to("user:[4026531837]")
+
+    @contextmanager
+    def opened_backups(self) -> Iterator[Path]:
+        """``backups/`` open to the test for a moment, then as the scripts left it."""
+        backups = self.stack / "backups"
+        mode = stat.S_IMODE(backups.stat().st_mode)
+        backups.chmod(0o700)
+        try:
+            yield backups
+        finally:
+            backups.chmod(mode)
+
+    def put_backup(self, name: str, text: str = "DUMP") -> None:
+        with self.opened_backups() as backups:
+            target = backups / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+
+    def backup_names(self) -> set[str]:
+        with self.opened_backups() as backups:
+            return {path.name for path in backups.iterdir()}
+
+    def nsenter_log(self) -> list[str]:
+        path = self.fake / "nsenter.log"
+        return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+
+    def restored(self) -> str:
+        """What the last ``pg_restore`` read on its stdin."""
+        return (self.fake / "pg_restore.in").read_text(encoding="utf-8")
+
 
 ENV_FILE = textwrap.dedent(
     """\
@@ -260,13 +418,28 @@ ENV_FILE = textwrap.dedent(
 )
 
 
-@pytest.fixture
-def world(tmp_path: Path) -> World:
-    stack = tmp_path / "stack"
-    stack.mkdir()
-    for name in ("deploy.sh", "recover.sh", "restore-drill.sh"):
+def _checkout(root: Path) -> Path:
+    """The parts of a checkout the host scripts reach: the stack directory and what it reads
+    from ``docker/`` (``init.sh``'s role scripts, the drill's manifest query)."""
+    stack = root / "docker_compose" / "gmat_m8"
+    stack.mkdir(parents=True)
+    for name in ("deploy.sh", "recover.sh", "restore-drill.sh", "init.sh"):
+        shutil.copy2(STACK / name, stack / name)
+    for name in (".env.example", "app.env.example"):
         shutil.copy2(STACK / name, stack / name)
     shutil.copytree(STACK / "ops", stack / "ops", ignore=shutil.ignore_patterns("__pycache__"))
+    (stack / "clamav").mkdir()
+    for name in ("clamd.conf", "freshclam.conf"):
+        shutil.copy2(STACK / "clamav" / name, stack / "clamav" / name)
+    shutil.copytree(ROOT / "docker/postgres/initdb", root / "docker/postgres/initdb")
+    (root / "docker/backup").mkdir(parents=True)
+    shutil.copy2(ROOT / "docker/backup/manifest.sql", root / "docker/backup/manifest.sql")
+    return stack
+
+
+@pytest.fixture
+def world(tmp_path: Path) -> Iterator[World]:
+    stack = _checkout(tmp_path / "checkout")
     (stack / "backups").mkdir(mode=0o700)
     (stack / ".env").write_text(ENV_FILE, encoding="utf-8")
     (stack / ".env").chmod(0o600)
@@ -279,15 +452,23 @@ def world(tmp_path: Path) -> World:
     _executable(bin_dir / "docker", FAKE_DOCKER)
     _executable(bin_dir / "cosign", FAKE_COSIGN)
     _executable(bin_dir / "curl", FAKE_CURL)
+    _executable(bin_dir / "nsenter", FAKE_NSENTER)
     env = {
         **os.environ,
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "FAKE_DIR": str(fake),
         "FAKE_PREFIX": PREFIX,
+        **{f"FAKE_OPTIONS_{kind.upper()}": value for kind, value in DAEMON_OPTIONS.items()},
         "DEPLOY_IMAGE_PREFIX": PREFIX,
         "DEPLOY_GITHUB_REPOSITORY": REPOSITORY,
         "DEPLOY_LOCK_FILE": str(fake / "lock"),
         "GITHUB_API_URL": "https://github.test",
     }
-    env.pop("COMPOSE_FILE", None)
-    return World(stack=stack, fake=fake, env=env)
+    for name in ("COMPOSE_FILE", "DOCKER_HOST", "DOCKER_CONTEXT", "XDG_RUNTIME_DIR"):
+        env.pop(name, None)
+    world = World(stack=stack, fake=fake, env=env)
+    world.point_at(CONTAINER_UID=os.getuid(), CONTAINER_GID=os.getgid())
+    yield world
+    backups = stack / "backups"
+    if backups.is_dir():
+        backups.chmod(0o700)

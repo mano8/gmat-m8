@@ -126,6 +126,21 @@ check_env_files() {
         || die "with DJANGO_ADMIN_ENABLED on, ADMIN_ALLOWED_CIDRS in .env names who may reach the admin (runbook vps-setup.md)"
 }
 
+# Read-only, before anything changes (ADR-0033): the backup container must be able to write
+# backups/, or the pre-deploy dump fails at step 6 with the site closed, and the worker must be
+# able to see flags/worker.paused. backups/ is the containers' uid's and 0700 as the helper sees it
+# (deploy under a root daemon), or world-writable on a CI runner's root daemon (init.sh --ci).
+check_host_directories() {
+    require_flags_searchable
+    detect_daemon
+    local seen
+    seen=$(backups_do stat) || die "backups/ cannot be read: run bash init.sh"
+    case "$DAEMON_KIND $seen" in
+        "root $CONTAINER_UID 700" | "rootless $CONTAINER_UID 700" | "root "*" 777") return 0 ;;
+    esac
+    die "backups/ is uid ${seen% *} mode ${seen#* } as the $DAEMON_KIND daemon's containers see it, not uid $CONTAINER_UID mode 700: run bash init.sh"
+}
+
 # The compose files on this machine must be the release's own. Outside a git checkout (a
 # rehearsal, an unpacked archive) there is nothing to compare.
 check_checkout() {
@@ -206,7 +221,8 @@ backup_before_migrating() {
     output=$(compose run --rm --no-deps -T backup run --wait 1800 \
         --label "pre-deploy-$VERSION" </dev/null) || die "the pre-deploy backup failed"
     dump=$(printf '%s\n' "$output" | tail -n 1)
-    [[ "$dump" == gmat-* ]] || die "the backup named no dump"
+    # recover.sh restore-predeploy later reads backups/ under this name.
+    dump_name_ok "$dump" || die "the backup named no dump"
     state_set DUMP "$dump"
     say "pre-deploy dump: $dump"
 }
@@ -217,6 +233,7 @@ main() {
     refuse_unfinished
     require_tools
     check_env_files
+    check_host_directories
 
     say "step 2: verifying release $VERSION"
     verify_release "$VERSION" ".release/$VERSION"

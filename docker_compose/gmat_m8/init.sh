@@ -5,14 +5,19 @@
 #                                   generate every secret, set mode 0600, create backups/ and flags/;
 #                                   existing env files get only the keys a later release added
 #   bash init.sh --ci               the same, for a CI runner: backups/ is world-writable so the
-#                                   container user (uid 1000) can write whatever uid the runner has
+#                                   container user (uid 1000) can write whatever uid the runner has;
+#                                   refused on a rootless daemon
 #   bash init.sh --reset-db [--yes] stop the stack and DELETE the database volume (asks first)
 #
 # Existing env files are never overwritten. Secrets come from /dev/urandom and are written
-# only to the env files; this script prints no secret.
+# only to the env files; this script prints no secret. backups/ belongs to the containers' uid
+# 1000 as the daemon sees it: under a rootless daemon that is a shifted uid, set through the
+# helper of ops/common.sh (ADR-0033); run init.sh again whenever the daemon changes.
 set -euo pipefail
 umask 077
 cd "$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=ops/common.sh
+. ops/common.sh
 
 ci=0
 reset_db=0
@@ -23,7 +28,7 @@ for arg in "$@"; do
         --reset-db) reset_db=1 ;;
         --yes) assume_yes=1 ;;
         -h | --help)
-            sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -102,7 +107,7 @@ add_missing_keys() { # add_missing_keys FILE TEMPLATE
     fi
 }
 
-env_value() { # env_value FILE KEY
+first_value() { # first_value FILE KEY
     sed -n "s/^$2=//p" "$1" | head -n 1
 }
 
@@ -137,8 +142,8 @@ fi
 if [ ! -f app.env ]; then
     cp app.env.example app.env
     fill_generated app.env
-    domain=$(env_value .env APP_DOMAIN)
-    https_port=$(env_value .env HTTPS_PORT)
+    domain=$(first_value .env APP_DOMAIN)
+    https_port=$(first_value .env HTTPS_PORT)
     origin="https://${domain:-localhost}"
     if [ -n "${https_port:-}" ] && [ "$https_port" != "443" ]; then
         origin="${origin}:${https_port}"
@@ -157,16 +162,28 @@ fi
 chmod 0600 .env app.env
 
 # Directories -------------------------------------------------------------------------------
-# backups/ is written by the backup container (uid 1000), flags/ is read by Caddy.
-mkdir -p backups flags
-chmod 0700 backups
+# flags/ is read by Caddy and the worker (a shifted uid under a rootless daemon): deploy's, 0755.
+mkdir -p flags
 chmod 0755 flags
+# backups/ is written by the backup container (uid 1000): theirs as the daemon sees it, 0700.
+if docker info >/dev/null 2>&1; then
+    detect_daemon
+    [ "$ci" = 0 ] || [ "$DAEMON_KIND" = root ] \
+        || die "--ci is for a CI runner's root daemon: a rootless host never makes backups/ world-writable"
+    backups_do prepare
+else
+    # Widens nothing: on a rootless host the backup container cannot write here yet, and
+    # deploy.sh refuses to start until init.sh has run with the daemon up.
+    say "the Docker daemon does not answer: backups/ is created as $(id -un), mode 0700. On a rootless host, run init.sh again once the daemon runs (docs/rootless-host.md)"
+    mkdir -p backups
+    chmod 0700 backups
+fi
 # Read by the scanner's containers and the database under their own uid, whatever the checkout's
 # umask was.
 chmod 0644 clamav/clamd.conf clamav/freshclam.conf
 chmod -R a+rX ../../docker/postgres/initdb
 if [ "$ci" = 1 ]; then
-    # A CI runner is not uid 1000; the data is throwaway.
+    # A CI runner is not uid 1000; the data is throwaway. Only on a root daemon (above).
     chmod 0777 backups
 fi
 
