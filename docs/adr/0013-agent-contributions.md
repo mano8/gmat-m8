@@ -16,6 +16,7 @@ AI coding agents implement the plan; the maintainer reviews, merges, releases an
 - Agents use the `gh` and git credentials already configured in the maintainer's workspace. One phase is one branch is one draft PR, pushed to `origin`. Agents never push `main`.
 - That account is a repository admin, so server-side permissions do not stop it. The hard rules are in `CLAUDE.md` and the `.claude/settings.json` deny rules. The `main` ruleset (no bypass) still refuses direct pushes, force-pushes and deletion.
 - Agents never merge or approve a PR, create tags or releases, run `gh workflow run`, change repository settings, rulesets or secrets, or deploy. Commits and PRs carry no AI attribution.
+- The deny rules name the commands that write: for releases `gh release create`, `edit`, `delete`, `delete-asset` and `upload` (amended 2026-11-24). Reading stays open (`gh release view`, `list`, `download`, `verify`), so an agent can check a release the maintainer published.
 - Branches pushed to `origin` run their own workflows with upstream's token. Any change under `.github/workflows/` needs the maintainer's explicit review. This is an accepted, temporary regression of the fork-based isolation.
 - The `main` ruleset requires a PR with 0 approvals while agents use the maintainer's account (an author cannot approve their own PR). The maintainer's review before merging is a working rule.
 
