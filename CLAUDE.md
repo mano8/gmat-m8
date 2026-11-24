@@ -125,7 +125,7 @@ uv run python manage.py import_catalog|import_suppliers|import_projects <file.cs
 uv run python manage.py seed_demo --operator <email> [--password …]   # M3.4: dev/test settings only; the A/B/C organization, people, projects, ~200 materials, 5 suppliers
 uv run python manage.py styleguide [--theme light|dark]   # M8b.1: every component in each variant to build/styleguide/index.html (dev/test settings only; build the CSS first, templates/CLAUDE.md)
 
-# Compose stack (M1.5); docker_compose/gmat_m8/README.md has the rest
+# Compose stack (M1.5); docker_compose/gmat_m8/README.md has the rest. Production runs it on a rootless daemon, nobody in the `docker` group (ADR-0033, docs/runbooks/vps-setup.md §4)
 cd docker_compose/gmat_m8 && bash init.sh
 docker compose up -d --build --wait                  # https://localhost:8443; .env's COMPOSE_FILE adds Mailpit (local mail sink)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build

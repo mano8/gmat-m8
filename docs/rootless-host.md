@@ -24,7 +24,7 @@ Checked on 2026-11-24 against Docker's rootless documentation ([overview](https:
 | `$XDG_RUNTIME_DIR/docker.pid` holds **`dockerd`'s** pid, not `rootlesskit`'s; RootlessKit is started without `--pidns`, so it is a pid of the host. `dockerd` runs in RootlessKit's user, mount and network namespaces; Docker documents `nsenter -U --preserve-credentials -n -m -t $(cat $XDG_RUNTIME_DIR/docker.pid)` to enter them | Docker, troubleshooting; `dockerd-rootless.sh` | confirmed |
 | RootlessKit's state directory is `$XDG_RUNTIME_DIR/dockerd-rootless` (`DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR`), with its REST API on `api.sock` there; `GET /v1/info` returns `networkDriver.driver`, `portDriver.driver` and `portDriver.protos` | RootlessKit, API; `dockerd-rootless.sh` | confirmed on a real daemon (M12.3, below) |
 | `deploy.sh` works unchanged with `DOCKER_HOST=unix:///run/user/<uid>/docker.sock`; `recover.sh status` works; nothing that reads `backups/` from the host does | pilot | the file-access list below explains each |
-| Ubuntu 24.04 restricts unprivileged user namespaces and relies on the AppArmor profile that the deb package ships for `rootlesskit` | Docker, troubleshooting | Debian 13 is the runbook's system; M12.4 states what it needs |
+| Ubuntu 24.04 restricts unprivileged user namespaces and relies on the AppArmor profile that the deb package ships for `rootlesskit` | Docker, troubleshooting | Debian 13 is the runbook's system and its defaults are enough (vps-setup.md §4.1); the runbook names no Ubuntu step |
 
 ## Which daemon
 
@@ -171,7 +171,7 @@ Every host-side read or write under `backups/` and `flags/`, as M12.1 listed the
 
 ### Read by people, in the runbooks (M12.4)
 
-`ls -l backups/.last-success backups/.last-verify-ok` (backup-restore.md, pilot.md, runbooks README, vps-setup.md §9) and `ls backups/` (deploy-rollback.md) fail on a rootless host. They become `docker compose exec backup ls -l /backups/…` or `restore --list`, which work under both daemons. `ls -ld backups flags` in vps-setup.md §8 expects `deploy` as the owner, and changes with the table above. `touch flags/…` (incident.md, email.md, the stack's README) works under both daemons.
+`ls -l backups/.last-success backups/.last-verify-ok` (backup-restore.md, pilot.md, runbooks README, vps-setup.md §9) and `ls backups/` (deploy-rollback.md) fail on a rootless host. They are now `docker compose exec backup ls -l /backups/…` and `restore --list`, which work under both daemons. `ls -ld backups flags` in vps-setup.md §8 expected `deploy` as the owner: it now checks `flags/` as `deploy`'s and `backups/` as the containers' uid, shown as a number. The restore drill's wipe check (`ls backups`) and an incident's copy of a dump (`dc cp backup:/backups/…`, through the daemon) follow the same rule. `touch flags/…` (incident.md, email.md, the stack's README) works under both daemons. A restore on a new rootless server needs `bash init.sh` after the env files are in place, because `backups_ready` stops on a `backups/` that does not exist (backup-restore.md, "The VPS is gone").
 
 ## The helper's operations
 
@@ -246,4 +246,5 @@ These went beyond the step cards. Each is handled above, and the maintainer sees
 - **`restore_media` skipped the attachments silently** on a rootless host: a restore would have reported success without them. `exists media` now tells "not there" from "cannot tell" (M12.2).
 - **`gates_on` failed open** if `flags/` was missing on a rootless host (0700 under `umask 077`). The script fix is above (M12.2). The worker also read a pause flag it could not check as "not paused", because Python's `Path.exists()` answers `False` on a permission error. Since M12.2 it counts a flag it cannot check as set, logs why, and stays paused (`apps/notifications/worker.py`); the maintainer may still leave that change out.
 - **The drill's `--user "$(id -u):$(id -g)"`** named a container uid, which is not the operator under a rootless daemon. It is uid 1000 under both daemons (M12.2).
+- **A restore on a new rootless server needs `bash init.sh` first.** The runbook said "no `init.sh`" for the loss of a VPS (so that no secret is generated), but `backups_ready` stops on a `backups/` that does not exist. With both env files in place `init.sh` generates and overwrites nothing, and it creates `backups/` for the containers' uid. backup-restore.md says so (M12.4).
 - **Q75's premise changed.** `builtin` keeps the address from RootlessKit 3.0 for TCP only. That still does not cover HTTP/3, so the decision holds, for a different reason.

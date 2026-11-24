@@ -47,9 +47,9 @@ Collect before you rebuild or restore; a restore changes the thing you want to e
 | Security events (sign-ins, failures, factor changes, resets, offboardings) | `dc logs web \| grep gmat.security`. Account ids and short hints, never passwords or the address typed |
 | Business history | the audit viewer `/audit/` (append-only, enforced by a database trigger) and an object's history `/audit/object/<type>/<id>/` |
 | HTTP access log | `dc logs caddy`. Token URLs and query strings are redacted by design |
-| The state of the database | `dc exec backup backup-now --label incident` before touching anything, and keep the dump |
+| The state of the database | `dc exec backup backup-now --label incident` before touching anything, and keep the dump. On the rootless host `deploy` cannot read `backups/`: copy a dump off the machine through the daemon, with `( umask 077; dc cp backup:/backups/<name>.dump ~/ )`, and delete the copy when you are done. Do not enter the daemon's namespace or change an owner by hand |
 | Worker activity | `dc logs worker`; every dispatch attempt is audited on its order |
-| The host | `last -20`, `journalctl -u ssh --since "2 days ago"`, `docker events --since 24h --until now`, `ps aux` |
+| The host | `last -20`, `journalctl -u ssh --since "2 days ago"`, `journalctl --user -u docker --since "2 days ago"` (the daemon's own log), `docker events --since 24h --until now`, `ps aux` |
 
 Do not copy these into chat tools or tickets in full: they hold account ids and times. Share the part that is needed.
 
@@ -61,7 +61,7 @@ Assume the worst until shown otherwise.
 2. **Keep evidence** (section 3). If an attacker may have root on the VPS, do not trust anything printed *by* that machine; copy the dump and logs off it first.
 3. **Decide scope.**
    - *An application account* (phished password, stolen phone): offboard it and review its audit trail. Done; the rest is routine.
-   - *The server* (SSH key stolen, container escape, unknown process): **rebuild**. Provision a new VPS ([vps-setup.md](vps-setup.md)), restore from the last good offsite snapshot ([backup-restore.md](backup-restore.md#the-vps-is-gone)), after rotating everything in the table below. The old server is destroyed once you have taken what you need from it.
+   - *The server* (SSH key stolen, container escape, unknown process): **rebuild**. Under the rootless daemon a container escape lands as `deploy` or as one of its subordinate uids, **not as root**: root still needs `sudo` and its password, and `deploy` is in no `docker` group. That narrows what the attacker could reach; it is still everything `deploy` owns (the env files with every secret, the live database's volume, the daemon, its socket, `flags/` and the stack's directory), so the rotation below is the same, and you rebuild. Provision a new VPS ([vps-setup.md](vps-setup.md)), restore from the last good offsite snapshot ([backup-restore.md](backup-restore.md#the-vps-is-gone)), after rotating everything in the table below. The old server is destroyed once you have taken what you need from it.
    - *Offsite storage or its credentials* (see forged snapshots below).
 4. **Rotate.** Anything that was on the machine, or that the attacker could read, is burnt:
 

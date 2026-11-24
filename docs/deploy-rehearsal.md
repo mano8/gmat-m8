@@ -18,6 +18,14 @@ It takes about 21 minutes once the images are cached, needs about **3 GB of memo
 | Machine | Linux, 2 cores, 16 GB with desktop applications open (about 6 GB free), Docker 29.9.3, Compose 5.7.0 |
 | restic | 0.18.1, in the backup image |
 
+## Which daemon
+
+The production host runs Docker **rootless** ([ADR-0033](adr/0033-rootless-docker-host.md), [rootless-host.md](rootless-host.md)); CI and developers' machines run the **root** daemon, and the scripts behave as before under it. The rehearsal today runs on a root daemon: the command above uses `sg docker`, the group that the production host does not have, and it is a developer's machine, not the server. Nothing in the harness names the daemon: the scripts ask `docker info`.
+
+- After M12.2's helper (`backups_do`), the rehearsal was run again on the root daemon: 40 passed in 18 min 22 s, the drill passed twice, the lowest free memory 8.1 GB (2026-11-24).
+- The same run under a **rootless daemon** (`DOCKER_HOST` set to its socket, on a non-production x86-64 machine, never on the pilot host), with the measurements of Q75 (the client's address reaching Caddy, UDP 443 answered, a 10 MiB upload, `slirp4netns` and, if offered, `pasta`), belongs to M12.5 and is **not recorded here yet**. Until it is, the unit tests (`tests/unit/docker/`, a fake rootless daemon) and the real-daemon checks of [rootless-host.md](rootless-host.md) are what pin the rootless path.
+- What a rootless run needs: the daemon of [runbooks/vps-setup.md](runbooks/vps-setup.md) §4.1 for the account that runs pytest (subordinate ids, `slirp4netns`, `nsenter`), and `DOCKER_HOST` or the `rootless` context in the shell that starts it.
+
 ## What is real and what is not
 
 Real: both images built from the checkout and pulled by digest from a registry; PostgreSQL, Caddy, Gunicorn, the worker, the backup, ClamAV's `clamd` and `freshclam` and the decoder in their production overlay (`verify-internal` asks the scanner and the decoder for an answer; a real upload through them is `tests/live/test_attachments.py`); TLS and the maintenance gate through Caddy; `pg_dump`, `pg_restore`, the role bootstrap; restic against a REST server in `--append-only` mode; Mailpit counting what the worker sent; sessions, links and codes tried over HTTPS.
@@ -79,3 +87,4 @@ And from the tests against fakes, before the first real run: inside `cmd || die`
 - The first real signature, ACME certificate, GHCR pull and offsite storage are H8.6 and H8.7.
 - `cosign` and `python3` must be on the VPS; [runbooks/vps-setup.md](runbooks/vps-setup.md) says how.
 - `docker compose` on the host reads `.env`, which holds the offsite credentials: mode 0600, as `deploy.sh` checks.
+- The rehearsal under a rootless daemon and the real offsite fetch on the pilot host: M12.5 and H12.6.

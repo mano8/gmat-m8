@@ -1,6 +1,6 @@
 # Deploy and roll back
 
-How a release reaches production, and what to do when it does not go well. Everything runs on the VPS, as the `deploy` user, from `docker_compose/gmat_m8/` in a checkout of the release's tag. Only the maintainer deploys. The tooling is `deploy.sh` and `recover.sh`; their headers and [../release.md](../release.md) have the details, and [../deploy-rehearsal.md](../deploy-rehearsal.md) shows what was rehearsed against real containers.
+How a release reaches production, and what to do when it does not go well. Everything runs on the VPS, as the `deploy` user, from `docker_compose/gmat_m8/` in a checkout of the release's tag, against the **rootless Docker daemon** of that account ([vps-setup.md](vps-setup.md#4-install-rootless-docker-engine-cosign-and-the-other-tools)). `docker` must reach it in every session, an SSH command included: the CLI's context is `rootless`, or `DOCKER_HOST` is `unix://$XDG_RUNTIME_DIR/docker.sock`. The scripts refuse any other endpoint, and nobody uses `sudo docker`. Only the maintainer deploys. The tooling is `deploy.sh` and `recover.sh`; their headers and [../release.md](../release.md) have the details, and [../deploy-rehearsal.md](../deploy-rehearsal.md) shows what was rehearsed against real containers.
 
 The rule behind all of it: **a human decides, the script executes.** A failed deploy stops with both gates on (the public site answers the 503 maintenance page and the worker sends nothing), so there is time to read and think. Nothing in this page is urgent enough to skip that.
 
@@ -15,7 +15,9 @@ The rule behind all of it: **a human decides, the script executes.** A failed de
 
    ```bash
    df -h /                                   # room for the images, a dump and a possible preserved copy
-   ./recover.sh status                       # gates off, last deploy finished
+   docker system df                          # what Docker's data root holds (~/.local/share/docker, on the filesystem of /home)
+   systemctl --user is-active docker         # active
+   ./recover.sh status                       # gates off, last deploy finished; the daemon is rootless and the port driver is slirp4netns
    docker compose -f docker-compose.yml -f docker-compose.production.yml ps    # everything healthy
    ```
 
@@ -34,7 +36,7 @@ cd docker_compose/gmat_m8
 
 | Step | What | If it fails |
 | --- | --- | --- |
-| 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the env files (0600), the admin allowlist (only while `DJANGO_ADMIN_ENABLED` turns the admin on), the offsite repository setting and the checkout. | Nothing changed. Fix and run again. |
+| 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the **cosign version** (3 or newer), the env files (0600), the **host** (`flags/` searchable by the worker, `backups/` the containers' uid at mode 0700), the **port driver** of a rootless daemon (it must keep the visitor's address and carry UDP), the admin allowlist (only while `DJANGO_ADMIN_ENABLED` turns the admin on), the offsite repository setting and the checkout. A member of the `docker` group is warned about, never refused. | Nothing changed. Fix and run again ([the refusals](#refusals-of-step-1-on-a-rootless-host)). |
 | 2 | Downloads the manifest, verifies its **signature** and the signature of both images against the workflow identity of that tag, checks version, repository and registry, pulls both images **by digest**. | Nothing changed, the site stayed open. |
 | 3 | Preflight: pulls the third-party images (Caddy, PostgreSQL, ClamAV), then with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
 | 4 | **Gates on**: `flags/maintenance.on` and `flags/worker.paused`. Confirms from outside that Caddy answers 503. | Gates stay on. |
@@ -81,6 +83,21 @@ Notes that apply to every row:
 - Prefer the smallest action that works. **Never** delete the gate files by hand to "get the site back" while a deploy is unresolved: that is how a half-migrated database starts taking writes.
 - A fix-forward release after a failed deploy needs `./deploy.sh X.Y.Z+1 --resume`. Both gates stay on until its own commit point, and it goes back to the dump taken before the first failed attempt. If the fix fails too, even at its first step, `./recover.sh status` still knows the failed release migrated, so `rollback` stays refused and the row is the migration's.
 
+### Refusals of step 1 on a rootless host
+
+All of these stop before a release is fetched, with the gates as they were and the site open. `--resume` runs the same checks.
+
+| It says | Because | Do |
+| --- | --- | --- |
+| `cosign 3 or newer is required` | cosign 2 finds none of the signatures the release workflow makes | Install v3.0.6 or newer ([vps-setup.md](vps-setup.md#43-cosign)) |
+| `the Docker daemon does not answer`, or `the Docker CLI talks to … not the rootless daemon's socket` | the daemon is down, or the CLI points at another endpoint (`tcp://`, `ssh://`, a root daemon's socket) | `systemctl --user start docker`; `docker context use rootless` or `export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock` |
+| `this daemon remaps users (userns-remap)` | a root daemon with user-namespace remapping: its dumps belong to a range `deploy` cannot enter | Use the rootless daemon ([vps-setup.md](vps-setup.md#41-docker-rootless)); this one is not supported |
+| `backups/ cannot be read`, or `backups/ is uid … mode … not uid 1000 mode 700` | `init.sh` did not run after the rootless daemon came up, or something changed the directory | `bash init.sh`. Never `chown` or `chmod` it by hand |
+| `XDG_RUNTIME_DIR is not set`, `docker.pid is missing`, `… does not name … dockerd`, `… was not started by … rootlesskit`, `not in a user namespace of its own`, `maps ids that are not … own`, `nsenter is not installed` | the target the helper would enter is not this account's rootless daemon (or `nsenter` is missing) | Read the reason; start the daemon as `deploy`, install `util-linux`. The scripts do not fall back to reading as `deploy` |
+| `flags/ is mode …: the worker could not see worker.paused` | `flags/` is mode 0700, so the worker (a shifted uid) cannot search it and would run behind a pause | `chmod 0755 flags` as `deploy`, which owns it |
+| the **port driver** is `builtin` (or hides the address, or has no UDP) | every visitor would look like one internal address: sign-in limits would lock everybody out, and the audit log's addresses would mean nothing | Set the two `slirp4netns` lines in `~/.config/systemd/user/docker.service.d/override.conf` and restart the daemon ([vps-setup.md](vps-setup.md#41-docker-rootless), point 5) |
+| a *warning* that the driver cannot be read | no source names it | From another machine, check that `/account/sessions/` shows that machine's own address |
+
 ### Rolling back the images after the commit point
 
 Only when the release's signed manifest says the old code works on the new schema:
@@ -96,7 +113,7 @@ It starts the previous digests with the new schema, behind the gates. Users keep
 This loses data, so it is a decision, not a reflex:
 
 1. Write down what is wrong, who found it, and why a fix-forward cannot work.
-2. Pick the dump (list them with `docker compose exec backup restore --list`, newest first, or `ls backups/`). The pre-deploy dump is `gmat-<stamp>-pre-deploy-X.Y.Z`.
+2. Pick the dump (list them with `docker compose exec backup restore --list`, newest first: `deploy` cannot list `backups/` itself on a rootless host). The pre-deploy dump is `gmat-<stamp>-pre-deploy-X.Y.Z`.
 3. Run:
 
    ```bash
@@ -129,12 +146,14 @@ Everything is administered in the app. The Django admin is an optional, read-onl
 Different from a failed deploy. Check, in this order:
 
 ```bash
+systemctl --user is-active docker
 docker compose -f docker-compose.yml -f docker-compose.production.yml ps
 docker compose -f docker-compose.yml -f docker-compose.production.yml logs --since 15m caddy web db
 ./recover.sh status
 df -h /
 ```
 
+- `docker` cannot connect, or `systemctl --user` says it is not active: **the daemon is down, and every container with it.** `systemctl --user restart docker`, then `journalctl --user -u docker --since "1 hour ago"` for the reason (a full disk, a failed upgrade, no linger after a reboot: `loginctl show-user deploy -p Linger` must say `yes`). The containers come back by themselves (`restart: unless-stopped`); check the gates with `./recover.sh status` before you assume the site is open. Over SSH without `XDG_RUNTIME_DIR` (not a login session), `systemctl --user` fails with "Failed to connect to bus": log in again.
 - Gate flags present (`ls flags/`)? Someone paused it; see `status` and [incident.md](incident.md).
 - A container restarting? Read its log; most often a full disk or an env file mistake.
 - Only `web` unhealthy: `docker compose ... restart web`. Do not restart `db` unless the logs say to.

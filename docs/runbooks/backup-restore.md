@@ -20,6 +20,12 @@ A dump is **snapshot-consistent**: the backup holds the advisory lock `gmat:medi
 
 The local copies are **not encrypted** (exception X12): `backups/` is mode 0700 and the files 0600. The offsite copies are encrypted by restic.
 
+**On the rootless host** (the production server, [vps-setup.md](vps-setup.md#4-install-rootless-docker-engine-cosign-and-the-other-tools)) `backups/` belongs to the containers' uid 1000, which on the host is a shifted uid (100999 with the usual range): `deploy` cannot list it or read a dump, and that is the design, not a fault. Everything below that reads a dump, `recover.sh` and `restore-drill.sh`, does it through one checked helper that enters the daemon's user namespace (`backups_do` in `ops/common.sh`, [../rootless-host.md](../rootless-host.md)). So:
+
+- Never enter the namespace by hand (`nsenter`, `unshare`, `podman unshare`), never `sudo` into `backups/`, and never `chown` or `chmod` anything there to make it readable by `deploy`: the scripts refuse a `backups/` that is not the containers' uid at mode 0700, and a dump readable by another account widens who can read personal data.
+- To look at what exists, ask the backup container: `dc exec backup restore --list` (the dumps, newest first) and `dc exec backup ls -l /backups`.
+- A script that stops with a message about "the daemon's user namespace" or "the Docker CLI talks to …" has found the daemon set up differently from the runbook (the CLI pointing at another socket, the daemon not rootless, a namespace that is not the daemon's). Fix that, as the message says; do not look for a way around it. It stopped before it changed anything, and the gates are as it found them.
+
 Dumps leave out the rows of `django_session`, `usersessions_usersession` and `django_cache`: session keys, the addresses and browsers of the session list, and rate-limit counters do not travel. The malware scanner's signatures are not backed up either; a new server gets them from the scanner's image and `freshclam`.
 
 A backup holds second-factor secrets under the MFA key **of its day**. Keep a retired `MFA_ENCRYPTION_KEYS` key offline until the last backup that needs it has aged out, 90 days after you rotated ([user-admin.md](user-admin.md#rotating-the-mfa-key)).
@@ -40,7 +46,7 @@ dc exec backup restore --verify gmat-<stamp>.dump     # a named one
 dc exec backup restore --list              # the dumps, newest first
 ```
 
-Check on level 1 and 2 monthly, even though the heartbeat alerts you: `ls -l backups/.last-success backups/.last-verify-ok` (their modification times are the last good run) and `dc logs --since 24h backup`.
+Check on level 1 and 2 monthly, even though the heartbeat alerts you: `dc exec backup ls -l /backups/.last-success /backups/.last-verify-ok` (their modification times are the last good run; `deploy` cannot list `backups/` on a rootless host, the container can) and `dc logs --since 24h backup`.
 
 A backup that has not been restored is a hope, not a backup. If level 2 fails, treat it as an incident ([incident.md](incident.md)) the same day.
 
@@ -60,7 +66,7 @@ The drill proves that the offsite copy, the offline keys and the written procedu
 
 ### The machine
 
-An isolated machine you control, with an **encrypted disk**, Docker with the Compose plugin, `python3`, a checkout of this repository, and **no access to production** (no VPN, no SSH keys to the VPS, no production env files). A laptop is fine. The drill's directory must never have run a deploy (`restore-drill.sh` refuses a directory that has a `deployed.log`).
+An isolated machine you control, with an **encrypted disk**, Docker with the Compose plugin, `python3`, a checkout of this repository, and **no access to production** (no VPN, no SSH keys to the VPS, no production env files). A laptop is fine. Either kind of daemon works: the script asks the daemon which it is and reads the dumps the way that daemon needs (on a rootless one it needs `nsenter` from `util-linux` and the daemon of [vps-setup.md](vps-setup.md#4-install-rootless-docker-engine-cosign-and-the-other-tools), and it enters the daemon's user namespace itself, so nobody does it by hand). The drill's directory must never have run a deploy (`restore-drill.sh` refuses a directory that has a `deployed.log`).
 
 You need from the offline storage: `.env` and `app.env` (or at least the database role settings and `RESTIC_*`) and the **delete-capable or read credentials** for the restic repository. Reading a snapshot needs no delete right: use the append-only credentials if you prefer.
 
@@ -82,6 +88,8 @@ The drill stack starts neither the scanner nor the decoder: it stores no upload,
    mkdir -p ~/drill-input && restic -r <repository> restore <id> --target ~/drill-input
    ls ~/drill-input/backups                             # gmat-<stamp>.dump, .manifest.json, .media/
    ```
+
+   `~/drill-input` is outside `backups/`, so you read it as yourself under either daemon. The script copies the three names it needs into `backups/` and, on a rootless daemon, gives them to the containers' uid.
 
    Or let the script fetch it (`--snapshot <id>`, with the `RESTIC_*` values in the environment or `.env`; this one step needs the route).
 3. Cut the network (airplane mode, unplug, or a firewall rule), then:
@@ -106,10 +114,11 @@ The drill stack starts neither the scanner nor the decoder: it stores no upload,
    - a revocation recorded after the snapshot is re-applied (with `--preserved-dump`), or privileged accounts are suspended (without);
    - queued messages, supplier dispatches included, are `QUARANTINED` and nothing was sent;
    - `web` and the `worker` cannot open an outbound HTTP or SMTP connection.
-5. **Wipe.** Add `--wipe` to the command of step 3 (it wipes once the checks have run), or run `docker compose -f docker-compose.yml -f docker-compose.restore-drill.yml -p gmat-m8-restore-drill down --volumes` and delete `backups/gmat-*` and `drill/` yourself. Check afterwards:
+5. **Wipe.** Add `--wipe` to the command of step 3 (it wipes once the checks have run: the project's containers and volumes, `backups/gmat-*` through the helper, and `drill/`), or run `docker compose -f docker-compose.yml -f docker-compose.restore-drill.yml -p gmat-m8-restore-drill down --volumes` and delete `drill/` yourself, and `backups/gmat-*` too on a root daemon. Never delete `backups/gmat-*` by hand on a rootless one: you cannot, and the answer is `--wipe`. Check afterwards:
 
    ```bash
-   docker ps -a; docker volume ls; ls backups drill 2>/dev/null
+   docker ps -a; docker volume ls; ls drill 2>/dev/null
+   ls backups 2>/dev/null          # root daemon only: nothing named gmat-*. A rootless daemon refuses the listing; that is expected
    rm -rf ~/drill-input
    ```
 
@@ -141,8 +150,8 @@ It states the loss window (from when that dump was taken until now) and asks you
 
 Time budget 4 hours. You need: the offline copy of `.env` and `app.env`, the append-only (or admin) restic credentials, a GitHub token that can read the repository, and a DNS record you can change.
 
-1. Create the new server and follow [vps-setup.md](vps-setup.md) through step 5 (no `init.sh`). Use the same domain name or update `APP_DOMAIN` and the allowed hosts.
-2. Put the offline `.env` and `app.env` in place, mode 0600. Change nothing yet except what the new server requires.
+1. Create the new server and follow [vps-setup.md](vps-setup.md) through step 5, **rootless Docker included** (step 4: nobody in the `docker` group, the slirp4netns drivers, linger). Use the same domain name or update `APP_DOMAIN` and the allowed hosts.
+2. Put the offline `.env` and `app.env` in place, mode 0600. Change nothing yet except what the new server requires. Then run `bash init.sh`: with both files there it generates no secret and overwrites nothing, and on a rootless host it creates `backups/` for the containers' uid, which every restore needs first (without it the restore stops: "backups/ cannot be reached: run bash init.sh").
 3. Point the DNS record at the new address. Caddy needs it to obtain a certificate; the maintenance page is served from the start.
 4. List the snapshots and pick the newest good one (`restic -r … snapshots`; the newest is not always right: if the last run was during the incident, take the one before).
 5. Run the restore. It finds the release's digests from the signed manifest of the version you name, which should be the version that ran last (`deployed.log` is lost with the VPS: use the newest GitHub Release you deployed):
@@ -223,3 +232,4 @@ After a prune it lists the repository again, because restic exits 0 even when a 
 | Lost the restic password? | Offsite backups are unreadable, permanently. Keep the offline copy ([vps-setup.md](vps-setup.md#7-keep-the-keys-somewhere-else)) |
 | Lost the MFA or outbox key? | [user-admin.md](user-admin.md#encryption-keys-mfa-and-outbox) |
 | Where are attachments in a backup? | `gmat-<stamp>.media/`, restored together with the dump |
+| Where are the dumps, and why can `deploy` not read them? | `backups/` in the stack's directory. On a rootless host they belong to the containers' uid 1000, a shifted host uid, in a 0700 directory. List them with `dc exec backup restore --list`; the scripts read them through their helper |
