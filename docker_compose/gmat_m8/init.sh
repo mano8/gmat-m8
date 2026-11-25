@@ -28,7 +28,7 @@ for arg in "$@"; do
         --reset-db) reset_db=1 ;;
         --yes) assume_yes=1 ;;
         -h | --help)
-            sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -172,11 +172,13 @@ if docker info >/dev/null 2>&1; then
         || die "--ci is for a CI runner's root daemon: a rootless host never makes backups/ world-writable"
     backups_do prepare
 else
-    # Widens nothing: on a rootless host the backup container cannot write here yet, and
-    # deploy.sh refuses to start until init.sh has run with the daemon up.
-    say "the Docker daemon does not answer: backups/ is created as $(id -un), mode 0700. On a rootless host, run init.sh again once the daemon runs (docs/rootless-host.md)"
-    mkdir -p backups
-    chmod 0700 backups
+    # Without the daemon no one can tell a CI runner's root daemon from a rootless host.
+    [ "$ci" = 0 ] || die "--ci needs the Docker daemon to answer (docker info)"
+    # Widens nothing: on a rootless host the backup container cannot write a new one yet, and
+    # deploy.sh refuses to start until init.sh has run with the daemon up. An existing one is left
+    # as it is: on a rootless host it is the containers' by now, and not this account's to change.
+    say "the Docker daemon does not answer: a missing backups/ is created as $(id -un), mode 0700. On a rootless host, run init.sh again once the daemon runs (docs/rootless-host.md)"
+    [ -e backups ] || [ -L backups ] || mkdir -m 0700 backups
 fi
 # Read by the scanner's containers and the database under their own uid, whatever the checkout's
 # umask was.

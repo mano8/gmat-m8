@@ -487,6 +487,9 @@ backups_do() { # backups_do OPERATION [ARGUMENTS...]
     esac
     shift
     [ "$#" -eq "$arity" ] || die "backups_do $operation takes $arity argument(s)"
+    # Its owner and mode would be the link's, and an operation would act where it points.
+    [ ! -L "$BACKUPS_DIR" ] \
+        || die "backups/ is a symbolic link, which the helper never follows: make it a directory (mount another disk on it instead)"
     detect_daemon
     "_backups_${operation//-/_}" "$@"
 }
@@ -549,32 +552,48 @@ _backups_exists() { # exists dump|manifest|media BASE
     esac
 }
 
+# O_NOFOLLOW: a link put at the name after `exists` answered is not read either.
 _backups_read() { # read dump|manifest BASE: the file on stdout
     _backups_entry "$1" "$2"
     [ "$ENTRY_TYPE" = f ] || die "backups_do read: a dump or a manifest only"
-    _backups_run /usr/bin/cat -- "$BACKUPS_DIR/$ENTRY_NAME"
+    _backups_run /usr/bin/dd "if=$BACKUPS_DIR/$ENTRY_NAME" iflag=nofollow bs=1M status=none
 }
 
-# The first dump a restic restore left in backups/.offsite/backups; a link is never followed.
-_backups_find_fetched() {
-    _backups_run /usr/bin/find "$BACKUPS_DIR/.offsite/backups" -mindepth 1 -maxdepth 1 -type f \
-        -name 'gmat-*.dump' -print -quit
+# What a restic restore left in backups/.offsite/backups, found from backups/ itself: everything
+# else in backups/ is pruned, and find never follows a link, so a .offsite or .offsite/backups
+# that is one is never entered. Sets OFFSITE_FIND, find's arguments before the entries' tests.
+_offsite_entries() {
+    local escaped
+    escaped=$(printf '%s' "$BACKUPS_DIR" | sed 's/[][*?\\]/\\&/g')
+    OFFSITE_FIND=("$BACKUPS_DIR" -mindepth 1 -maxdepth 3
+        ! -path "$escaped/.offsite" ! -path "$escaped/.offsite/*" -prune
+        -o -path "$escaped/.offsite/backups/*")
+}
+
+_backups_find_fetched() { # the first dump fetched
+    _offsite_entries
+    _backups_run /usr/bin/find "${OFFSITE_FIND[@]}" -type f -name 'gmat-*.dump' -print -quit
 }
 
 _backups_adopt() { # adopt BASE: the fetched dump, manifest and media, by name, into backups/
     _dump_set "$1"
-    _backups_run /usr/bin/find "$BACKUPS_DIR/.offsite/backups" -mindepth 1 -maxdepth 1 \
-        "${DUMP_SET[@]}" -exec /usr/bin/mv -t "$BACKUPS_DIR" -- '{}' +
+    _offsite_entries
+    _backups_run /usr/bin/find "${OFFSITE_FIND[@]}" "${DUMP_SET[@]}" \
+        -exec /usr/bin/mv -t "$BACKUPS_DIR" -- '{}' +
 }
 
 _backups_drop_offsite() { _backups_run /usr/bin/rm -rf -- "$BACKUPS_DIR/.offsite"; }
 
 # import DIR BASE: the drill's files fetched by hand, copied in and, under a rootless daemon,
 # given to the containers' uid (the backup container reads them), the owner a dump has anyway.
+# Never over an entry of the same name: cp would write through a link left there.
 _backups_import() {
-    local from
+    local from held
     _dump_set "$2"
     from=$(readlink -f -- "$1") && [ -d "$from" ] || die "$1 is not a directory"
+    held=$(_backups_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
+        -printf '%f ') || die "backups/ cannot be read"
+    [ -z "$held" ] || die "backups/ already holds ${held% }: remove it first (a drill with --wipe leaves none)"
     detect_daemon
     _backups_run /usr/bin/find "$from" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
         -exec /usr/bin/cp -a -t "$BACKUPS_DIR" -- '{}' +

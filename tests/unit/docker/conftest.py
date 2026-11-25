@@ -55,7 +55,7 @@ DAEMON_OPTIONS = {
 }
 
 FAKE_DOCKER = r"""#!/usr/bin/env python3
-import os, pathlib, sys
+import os, pathlib, shutil, sys
 fake = pathlib.Path(os.environ["FAKE_DIR"])
 args = sys.argv[1:]
 while len(args) >= 2 and args[0] == "compose" and args[1] == "-f":
@@ -116,6 +116,15 @@ elif "format_version" in sql:
     print('{"format_version": 1, "audit": [], "outbox": []}')
 elif "post-restore-reconcile" in line:
     print('{"failed_state_used": true}')
+elif "--target /backups/.offsite" in line and (fake / "snapshot").is_dir():
+    # restic restore: what the test staged as the snapshot arrives under backups/.offsite.
+    backups = pathlib.Path("backups")
+    mode = backups.stat().st_mode & 0o777
+    backups.chmod(0o700)
+    try:
+        shutil.copytree(fake / "snapshot", backups / ".offsite", dirs_exist_ok=True)
+    finally:
+        backups.chmod(mode)
 """
 
 # ``cosign version`` prints what ``World.cosign_version`` gave it, and is not logged: the log is

@@ -85,6 +85,8 @@ expect_value() { # expect_value TEXT SQL EXPECTED
 fetch_files() {
     backups_do prepare
     if [ -n "$SNAPSHOT" ]; then
+        # As recover.sh does: restic never writes into what an earlier run left there.
+        backups_do drop-offsite
         docker run --rm --network "${DRILL_RESTIC_NETWORK:-bridge}" --entrypoint restic \
             --user "$CONTAINER_UID:$CONTAINER_GID" -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
             -e RESTIC_REST_USERNAME -e RESTIC_REST_PASSWORD -e AWS_ACCESS_KEY_ID \

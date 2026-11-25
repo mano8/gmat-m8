@@ -85,12 +85,19 @@ def later_dump(world: World) -> None:
 
 
 def fetched_snapshot(world: World, base: str = OFFSITE) -> None:
-    """What a restic restore of the snapshot leaves under backups/.offsite."""
-    world.put_backup(f".offsite/backups/{base}.dump", "OFFSITE DUMP")
-    world.put_backup(f".offsite/backups/{base}.manifest.json", MANIFEST)
-    world.put_backup(f".offsite/backups/{base}.media/ab/cd", "attachment")
-    # Named like the dump, but not one of its three: the old glob took it along.
-    world.put_backup(f".offsite/backups/{base}-copy.manifest.json", "{}")
+    """What a restic restore of the snapshot leaves under backups/.offsite (the fake docker
+    puts it there when the restore runs)."""
+    files = {
+        f"{base}.dump": "OFFSITE DUMP",
+        f"{base}.manifest.json": MANIFEST,
+        f"{base}.media/ab/cd": "attachment",
+        # Named like the dump, but not one of its three: the old glob took it along.
+        f"{base}-copy.manifest.json": "{}",
+    }
+    for name, text in files.items():
+        path = world.fake / "snapshot" / "backups" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
 
 def drill(world: World, *args: str) -> subprocess.CompletedProcess[str]:
@@ -104,6 +111,24 @@ def drill(world: World, *args: str) -> subprocess.CompletedProcess[str]:
 
 def mode(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
+
+
+def read_command(world: World, name: str) -> str:
+    """How the helper reads a dump or a manifest: never through a link at its name."""
+    return f"/usr/bin/dd if={world.stack}/backups/{name} iflag=nofollow bs=1M status=none"
+
+
+def helper(world: World, *args: str) -> subprocess.CompletedProcess[str]:
+    """``backups_do`` called on its own, as the scripts call it."""
+    return subprocess.run(  # noqa: S603 (the copy of ops/common.sh)
+        ["bash", "-c", '. ops/common.sh && backups_do "$@"', "helper", *args],  # noqa: S607
+        cwd=world.stack,
+        env=world.env,
+        text=True,
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
 
 
 # --- each script's path through the helper ------------------------------------------------------
@@ -122,8 +147,7 @@ class TestEachScriptReadsTheDumpsThroughTheHelper:
         if daemon == "root":
             assert not used
         else:
-            assert any(line.startswith(f"/usr/bin/cat -- {stopped.stack}/backups/{PREDEPLOY}.dump")
-                       for line in used)  # fmt: skip
+            assert read_command(stopped, f"{PREDEPLOY}.dump") in used
             assert any("-name " + f"{PREDEPLOY}.media -printf %y" in line for line in used)
 
     def test_restore_after_writes(self, world: World, daemon: str) -> None:
@@ -138,7 +162,7 @@ class TestEachScriptReadsTheDumpsThroughTheHelper:
         assert ran(ready, f"backups/{LATER}.media:/restored-media:ro")
         assert ready.deployed()[-1][-1] == "restore"
         if daemon == "rootless":
-            manifest = f"/usr/bin/cat -- {ready.stack}/backups/{LATER}.manifest.json"
+            manifest = read_command(ready, f"{LATER}.manifest.json")
             assert sum(line == manifest for line in tools(ready)) == 2, "the version and the time"
         info = [line for line in ready.docker_log() if " info --format " in line]
         assert len(info) == 1, "the daemon is asked once per run"
@@ -248,6 +272,24 @@ class TestInit:
         assert "run init.sh again once the daemon runs" in result.stderr
         assert mode(uninitialised.stack / "backups") == 0o700
 
+    def test_a_daemon_that_does_not_answer_leaves_backups_as_it_is(self, world: World) -> None:
+        """On a rootless host backups/ is the containers' by now: deploy may not change its mode,
+        so init.sh leaves it to its next run with the daemon up, and to deploy.sh's check."""
+        backups = world.stack / "backups"
+        backups.chmod(0o750)
+        world.daemon("down")
+        result = world.run("init.sh")
+        assert result.returncode == 0, result.stderr
+        assert mode(backups) == 0o750
+
+    def test_ci_needs_a_daemon_that_answers(self, uninitialised: World) -> None:
+        """Without it no one can tell a CI runner's root daemon from a rootless host."""
+        uninitialised.daemon("down")
+        result = uninitialised.run("init.sh", "--ci")
+        assert result.returncode != 0
+        assert "--ci needs the Docker daemon to answer" in result.stderr
+        assert not (uninitialised.stack / "backups").exists()
+
     def test_a_remapping_daemon_is_refused(self, uninitialised: World) -> None:
         uninitialised.daemon("userns")
         result = uninitialised.run("init.sh")
@@ -297,6 +339,13 @@ class TestDeployPreflight:
         ready.rootless()
         ready.point_at(CONTAINER_UID=os.getuid() + 1)
         self.refused(ready, f"backups/ is uid {os.getuid()} mode 700")
+        assert "run bash init.sh" in ready.run("deploy.sh", VERSION).stderr
+
+    def test_under_a_root_daemon_another_owner_names_the_fix(self, ready: World) -> None:
+        """init.sh never changes an owner under a root daemon: the message cannot send there."""
+        ready.point_at(CONTAINER_UID=os.getuid() + 1)
+        self.refused(ready, f"sudo chown {os.getuid() + 1}:1000 backups")
+        assert "run bash init.sh" not in ready.run("deploy.sh", VERSION).stderr
 
     def test_a_flags_directory_the_worker_cannot_search(self, ready: World) -> None:
         (ready.stack / "flags").mkdir(mode=0o700)
@@ -581,6 +630,83 @@ class TestEntriesOfAnotherType:
         assert not ran(ready, "/restored-media")
         assert ready.gates() == (True, True)
 
+    def test_a_read_never_follows_a_link(self, world: World, daemon: str) -> None:
+        """A link swapped in after ``exists`` answered is not read either (O_NOFOLLOW)."""
+        on(world, daemon)
+        later_dump(world)
+        with world.opened_backups() as backups:
+            (backups / f"{LATER}.manifest.json").unlink()
+            (backups / f"{LATER}.manifest.json").symlink_to(world.stack / ".env")
+        result = helper(world, "read", "manifest", LATER)
+        assert result.returncode != 0
+        assert "RESTIC_PASSWORD" not in result.stdout
+
+    def test_backups_that_is_a_link(self, world: World, daemon: str, tmp_path: Path) -> None:
+        """Its owner and mode would be the link's, and init.sh could not fix them: refused."""
+        world.previously_deployed()
+        world.release(VERSION)
+        on(world, daemon)
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir(mode=0o700)
+        backups = world.stack / "backups"
+        backups.chmod(0o700)
+        backups.rmdir()
+        backups.symlink_to(elsewhere)
+        world.clear_logs()
+        for script in ("deploy.sh", "init.sh"):
+            result = world.run(script, *([VERSION] if script == "deploy.sh" else []))
+            assert result.returncode != 0, script
+            assert "backups/ is a symbolic link" in result.stderr, script
+        assert world.gates() == (False, False)
+        assert not world.nsenter_log()
+        assert mode(elsewhere) == 0o700
+
+    def test_a_drill_never_copies_over_what_backups_holds(
+        self, world: World, daemon: str, tmp_path: Path
+    ) -> None:
+        """A link left at a dump's name would be written through: the drill refuses instead."""
+        on(world, daemon)
+        later_dump(world)
+        with world.opened_backups() as backups:
+            (backups / f"{LATER}.dump").unlink()
+            (backups / f"{LATER}.dump").symlink_to(world.stack / ".env")
+        env_before = (world.stack / ".env").read_text(encoding="utf-8")
+        fetched = tmp_path / "fetched"
+        fetched.mkdir()
+        (fetched / f"{LATER}.dump").write_text("DRILL DUMP")
+        (fetched / f"{LATER}.manifest.json").write_text(MANIFEST)
+        result = drill(world, "--dump", LATER, "--from-dir", str(fetched))
+        assert result.returncode != 0
+        assert f"backups/ already holds {LATER}" in result.stderr
+        assert (world.stack / ".env").read_text(encoding="utf-8") == env_before
+        assert world.gates() == (False, False)
+
+    @pytest.mark.parametrize("script", ["recover", "drill"])
+    def test_an_offsite_directory_that_is_a_link_is_not_followed(
+        self, world: World, daemon: str, tmp_path: Path, script: str
+    ) -> None:
+        """Planted before the fetch: nothing is taken from where it points."""
+        on(world, daemon)
+        world.release(VERSION)
+        elsewhere = tmp_path / "elsewhere"
+        (elsewhere / "backups").mkdir(parents=True)
+        for name, text in ((f"{OFFSITE}.dump", "NOT FETCHED"), (f"{OFFSITE}.manifest.json", "{}")):
+            (elsewhere / "backups" / name).write_text(text)
+        with world.opened_backups() as backups:
+            (backups / ".offsite").symlink_to(elsewhere)
+        if script == "recover":
+            result = world.run("recover.sh", "restore-offsite", "--snapshot", SNAPSHOT,
+                               "--version", VERSION, *RESTORE)  # fmt: skip
+        else:
+            result = drill(world, "--snapshot", SNAPSHOT)
+        assert result.returncode != 0
+        assert f"snapshot {SNAPSHOT} holds no dump" in result.stderr
+        assert sorted(path.name for path in (elsewhere / "backups").iterdir()) == [
+            f"{OFFSITE}.dump",
+            f"{OFFSITE}.manifest.json",
+        ]
+        assert not ran(world, "pg_restore")
+
 
 # --- flags/ -----------------------------------------------------------------------------------
 
@@ -645,8 +771,11 @@ SCRIPTS = {
 def test_nothing_is_given_to_this_account(name: str) -> None:
     """The only owner a script ever sets is the containers', and no link is followed to set it."""
     code = [line for line in SCRIPTS[name].splitlines() if not line.lstrip().startswith("#")]
+    # A line that runs it (a message that names the command for a person does not).
+    runs = re.compile(r"(?:^|_backups_run |-exec |&& |\|\| )(?:/usr/bin/)?chown\b")
+    assert any(runs.search(line.strip()) for line in code) == (name == "ops/common.sh")
     for line in code:
-        if "chown" in line:
+        if runs.search(line.strip()):
             assert '"$CONTAINER_UID:$CONTAINER_GID"' in line and "--no-dereference" in line, line
 
 

@@ -149,7 +149,11 @@ check_host_directories() {
     case "$DAEMON_KIND $seen" in
         "root $CONTAINER_UID 700" | "rootless $CONTAINER_UID 700" | "root "*" 777") return 0 ;;
     esac
-    die "backups/ is uid ${seen% *} mode ${seen#* } as the $DAEMON_KIND daemon's containers see it, not uid $CONTAINER_UID mode 700: run bash init.sh"
+    local fix="run bash init.sh"
+    # init.sh sets the owner only under a rootless daemon; under a root one it is this account's.
+    [ "$DAEMON_KIND" = rootless ] || [ "${seen% *}" = "$CONTAINER_UID" ] \
+        || fix="the containers write it as uid $CONTAINER_UID: sudo chown $CONTAINER_UID:$CONTAINER_GID backups && chmod 0700 backups"
+    die "backups/ is uid ${seen% *} mode ${seen#* } as the $DAEMON_KIND daemon's containers see it, not uid $CONTAINER_UID mode 700: $fix"
 }
 
 # Under a rootless daemon the port driver decides whether the containers see the visitor's address
