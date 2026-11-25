@@ -3,28 +3,32 @@
 The record of plan step M8.4's "Done when": `deploy.sh`, `recover.sh`, the restore drill and the offsite rules run against real containers before they are ever used on the VPS. Run it again after changing any of them:
 
 ```bash
-sg docker -c "REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s -v"
+REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s -v                  # the root daemon
+DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock \
+    REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s -v              # a rootless one (below)
 ```
 
-It takes about 21 minutes once the images are cached, needs about **3 GB of memory free** at its peak, and leaves only Docker's build cache behind. Run nothing else heavy next to it, and start with about 6 GB free (see "What the rehearsal found").
+It takes about 18 to 21 minutes once the images are cached, needs about **3 GB of memory free** at its peak, and leaves only Docker's build cache behind. Run nothing else heavy next to it, and start with about 6 GB free (see "What the rehearsal found").
 
 ## The last run
 
 | | |
 | --- | --- |
-| Commit | `170d073` on `m8-hardening`; one commit after it, `worker` and `backup` are created after `web`, checked apart (below) |
-| Date | 2026-11-06 |
-| Result | **39 passed in 21 min 4 s**. 40 checks of the drill script over its two runs, none failed. Memory never went below 2.9 GB free, and nothing was killed. The live and browser suites run in CI, on the same stack |
-| Machine | Linux, 2 cores, 16 GB with desktop applications open (about 6 GB free), Docker 29.9.3, Compose 5.7.0 |
+| Commit | `d27cdee` on `m12-rootless-host` (M12.5), the same commit under both daemons |
+| Date | 2026-11-25 |
+| Result | **Rootless daemon: 40 passed in 17 min 40 s. Root daemon: 40 passed in 17 min 38 s.** Each ran the drill script twice, 40 checks, none failed. Gate windows: first deploy 50 s and 52 s, 1.0.0 → 1.1.0 37 s under both. The lowest free memory was 7.3 GB, and nothing was killed. The live and browser suites run in CI, on the root daemon |
+| Machine | Linux (a VMware VM, 2 vCPU, 16 GB, desktop applications open), Docker 29.9.3, Compose 5.7.0; rootless: RootlessKit 3.3.0, slirp4netns 1.2.1, set up as [runbooks/vps-setup.md](runbooks/vps-setup.md) §4.1 says |
 | restic | 0.18.1, in the backup image |
+
+Earlier runs: 39 passed in 21 min 4 s at `170d073` (M8.4, root daemon, 2026-11-06); 40 passed in 18 min 22 s after M12.2's helper (root daemon, 2026-11-24); during M12.5, 40 passed under the rootless daemon at `ba01db7` and `72087c5` and under the root daemon at `72087c5`, before the last changes to the scripts (`pasta` refused) and to the harness.
 
 ## Which daemon
 
-The production host runs Docker **rootless** ([ADR-0033](adr/0033-rootless-docker-host.md), [rootless-host.md](rootless-host.md)); CI and developers' machines run the **root** daemon, and the scripts behave as before under it. The rehearsal today runs on a root daemon: the command above uses `sg docker`, the group that the production host does not have, and it is a developer's machine, not the server. Nothing in the harness names the daemon: the scripts ask `docker info`.
+The production host runs Docker **rootless** ([ADR-0033](adr/0033-rootless-docker-host.md), [rootless-host.md](rootless-host.md)); CI and developers' machines run the **root** daemon, and the scripts behave as before under it. The rehearsal passes under both (above), on a non-production x86-64 machine, never on the pilot host.
 
-- After M12.2's helper (`backups_do`), the rehearsal was run again on the root daemon: 40 passed in 18 min 22 s, the drill passed twice, the lowest free memory 8.1 GB (2026-11-24).
-- The same run under a **rootless daemon** (`DOCKER_HOST` set to its socket, on a non-production x86-64 machine, never on the pilot host), with the measurements of Q75 (the client's address reaching Caddy, UDP 443 answered, a 10 MiB upload, `slirp4netns` and, if offered, `pasta`), belongs to M12.5 and is **not recorded here yet**. Until it is, the unit tests (`tests/unit/docker/`, a fake rootless daemon) and the real-daemon checks of [rootless-host.md](rootless-host.md) are what pin the rootless path.
-- What a rootless run needs: the daemon of [runbooks/vps-setup.md](runbooks/vps-setup.md) §4.1 for the account that runs pytest (subordinate ids, `slirp4netns`, `nsenter`), and `DOCKER_HOST` or the `rootless` context in the shell that starts it.
+- **The rootless daemon** was installed for the account that runs pytest as the runbook's §4.1 says: `uidmap`, `slirp4netns`, subordinate ids `100000:65536`, `dockerd-rootless-setuptool.sh install` (with `--force`, since the root daemon stayed for the other run), and the `slirp4netns` override. The CLI context stayed `default`; `DOCKER_HOST` named the rootless socket for the run. The scripts found it rootless from `docker info`, passed the namespace target checks and the port-driver check against the real process tree, and read and wrote `backups/` through the helper alone.
+- **What the harness adapts**, through the same detection: the containers' uid 1000 is a subordinate id there, so the offsite directory the REST servers write is given to it, a dump in `backups/` is checked, the later dump the drill reads as `--preserved-dump` is copied out of `backups/` first (as an operator fetches one by hand), and the leftovers are removed, all in the daemon's user namespace (`as_daemon` in `tests/rehearsal/conftest.py`). Under the root daemon the same commands run as they are.
+- The port drivers of Q75 were measured on the same rootless daemon (below).
 
 ## Q75: the port driver, measured
 
@@ -104,4 +108,4 @@ And from the tests against fakes, before the first real run: inside `cmd || die`
 - The first real signature, ACME certificate, GHCR pull and offsite storage are H8.6 and H8.7.
 - `cosign` and `python3` must be on the VPS; [runbooks/vps-setup.md](runbooks/vps-setup.md) says how.
 - `docker compose` on the host reads `.env`, which holds the offsite credentials: mode 0600, as `deploy.sh` checks.
-- The rehearsal under a rootless daemon and the real offsite fetch on the pilot host: M12.5 and H12.6.
+- The real offsite fetch, a visitor from another machine and ufw turned on, on the pilot host after v0.4.0: H12.6. The rootless runs here used a desktop distribution next to a root daemon; the runbook's own server steps (Docker's apt repository, the root daemon turned off, the sysctl, linger) were not run on a blank Debian 13 server, which H12.6's move of the pilot host covers.
