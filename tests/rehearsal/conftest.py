@@ -93,9 +93,8 @@ sys.exit(0 if f"{identity} {subject}" in signed else 1)
 
 
 def run(*command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    kwargs.setdefault("check", True)
     return subprocess.run(  # noqa: S603 (fixed tools, test input only)
-        command, capture_output=True, text=True, **kwargs
+        command, capture_output=True, text=True, check=True, **kwargs
     )
 
 
@@ -117,12 +116,20 @@ def rootless() -> bool:
     return "name=rootless" in docker("info", "--format", "{{json .SecurityOptions}}")
 
 
-def as_daemon(*command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    """``command`` where the containers' files can be read and written."""
+def as_daemon(*command: str) -> subprocess.CompletedProcess[str]:
+    """``command`` where the containers' files can be read and written; raises if it fails."""
     if not rootless():
-        return run(*command, **kwargs)
+        return run(*command)
     pid = (Path(os.environ["XDG_RUNTIME_DIR"]) / "docker.pid").read_text(encoding="utf-8").strip()
-    return run("nsenter", "-U", "--preserve-credentials", "-t", pid, "--", *command, **kwargs)
+    return run("nsenter", "-U", "--preserve-credentials", "-t", pid, "--", *command)
+
+
+def as_daemon_succeeds(*command: str) -> bool:
+    try:
+        as_daemon(*command)
+    except subprocess.CalledProcessError:
+        return False
+    return True
 
 
 def identity_of(version: str) -> str:
@@ -314,7 +321,7 @@ class World:
     def has_dump(self, name: str) -> bool:
         """Whether backups/ holds ``name``'s dump, a plain file (the containers' own, 0700)."""
         path = self.compose_dir / "backups" / f"{name}.dump"
-        return as_daemon("test", "-f", str(path), check=False).returncode == 0
+        return as_daemon_succeeds("test", "-f", str(path))
 
     def copy_dump_out(self, name: str, target: Path) -> Path:
         """``name``'s dump copied out of backups/ as an operator fetches one, this account's."""
@@ -692,7 +699,7 @@ def base() -> Iterator[dict[str, Any]]:
         if os.environ.get("REHEARSAL_KEEP") != "1":
             _clean()
             # Under a rootless daemon the containers' files are not this account's to remove.
-            as_daemon("rm", "-rf", "--", str(root), check=False)
+            as_daemon_succeeds("rm", "-rf", "--", str(root))
             shutil.rmtree(root, ignore_errors=True)
 
 

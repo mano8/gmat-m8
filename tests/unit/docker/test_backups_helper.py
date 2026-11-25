@@ -344,7 +344,8 @@ class TestDeployPreflight:
     def test_under_a_root_daemon_another_owner_names_the_fix(self, ready: World) -> None:
         """init.sh never changes an owner under a root daemon: the message cannot send there."""
         ready.point_at(CONTAINER_UID=os.getuid() + 1)
-        self.refused(ready, f"sudo chown {os.getuid() + 1}:1000 backups")
+        # The world points CONTAINER_GID at this account's gid (conftest).
+        self.refused(ready, f"sudo chown {os.getuid() + 1}:{os.getgid()} backups")
         assert "run bash init.sh" not in ready.run("deploy.sh", VERSION).stderr
 
     def test_a_flags_directory_the_worker_cannot_search(self, ready: World) -> None:
@@ -384,7 +385,8 @@ def _no_nsenter(world: World) -> None:
         if not os.path.isdir(directory):
             continue
         for entry in os.scandir(directory):
-            if entry.name != "nsenter" and not (system / entry.name).exists():
+            # lexists: a dangling link of the system's (a runner has some) is taken once too.
+            if entry.name != "nsenter" and not os.path.lexists(system / entry.name):
                 (system / entry.name).symlink_to(entry.path)
     world.env["PATH"] = f"{world.fake / 'bin'}{os.pathsep}{system}"
 
