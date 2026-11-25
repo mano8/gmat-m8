@@ -341,6 +341,9 @@ class Worker:
                     error.strerror or type(error).__name__,
                 )
             self.flag_unchecked = True
+            return True
+        # Checked: a later failure to check is logged again, even if the flag never went away.
+        self.flag_unchecked = False
         return True
 
     def beat(self, state: str) -> None:

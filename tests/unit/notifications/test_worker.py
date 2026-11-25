@@ -303,6 +303,24 @@ class TestSwitches:
         assert worker.tick() is True
         assert heartbeat(worker)["state"] == RUNNING
 
+    @pytest.mark.skipif(os.getuid() == 0, reason="root searches any directory")
+    def test_each_time_the_flag_cannot_be_checked_again_is_logged(
+        self,
+        make_worker: Callable[..., Worker],
+        flags: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Unsearchable, fixed while the flag is set, then unsearchable again: two warnings."""
+        worker = make_worker()
+        (flags / "worker.paused").touch()
+        try:
+            for mode in (0o600, 0o700, 0o600):
+                flags.chmod(mode)
+                assert worker.state() == PAUSED
+        finally:
+            flags.chmod(0o700)
+        assert caplog.text.count("cannot be checked (Permission denied)") == 2
+
     def test_no_flags_directory_is_no_pause(
         self, make_worker: Callable[..., Worker], tmp_path: Path
     ) -> None:
