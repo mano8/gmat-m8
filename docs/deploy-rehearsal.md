@@ -26,6 +26,23 @@ The production host runs Docker **rootless** ([ADR-0033](adr/0033-rootless-docke
 - The same run under a **rootless daemon** (`DOCKER_HOST` set to its socket, on a non-production x86-64 machine, never on the pilot host), with the measurements of Q75 (the client's address reaching Caddy, UDP 443 answered, a 10 MiB upload, `slirp4netns` and, if offered, `pasta`), belongs to M12.5 and is **not recorded here yet**. Until it is, the unit tests (`tests/unit/docker/`, a fake rootless daemon) and the real-daemon checks of [rootless-host.md](rootless-host.md) are what pin the rootless path.
 - What a rootless run needs: the daemon of [runbooks/vps-setup.md](runbooks/vps-setup.md) §4.1 for the account that runs pytest (subordinate ids, `slirp4netns`, `nsenter`), and `DOCKER_HOST` or the `rootless` context in the shell that starts it.
 
+## Q75: the port driver, measured
+
+What [ADR-0033](adr/0033-rootless-docker-host.md) point 4 asked of M12.5, on the machine of the rootless run (2026-11-25; 2 vCPU, Docker 29.9.3, RootlessKit 3.3.0, slirp4netns 1.2.1, passt 2024-02-20). Caddy 2.11.9 (the stack's image) with HTTP/1.1, 2 and 3 answered its own `{remote_host}`, and passed a 10 MiB body on to a small server that read it to the end. The visitor was a container of the root daemon on a network of its own (`192.168.250.0/24`), reaching the host's address; HTTP/3 came from the host itself (aioquic 1.2.0). The daemon was restarted with each pair of drivers through the runbook's override file, then set back to `slirp4netns`.
+
+| Daemon, network/port driver | Address Caddy saw over TCP (the visitor was `192.168.250.2`) | HTTP/3 (UDP) answered, address seen | 10 MiB over HTTP/2, median of 5 | 10 MiB over HTTP/3, median of 3 |
+| --- | --- | --- | --- | --- |
+| root (for comparison) | `172.18.0.1` (from the same host, through Docker's proxy) | yes | 0.058 s | 0.269 s |
+| rootless, `slirp4netns`/`slirp4netns` (the runbook's) | **`192.168.250.2`** | yes, the host's own address | 0.070 s | 0.317 s |
+| rootless, `pasta`/`implicit` | **`192.168.250.2`** | yes, the host's own address | 0.112 s | 0.281 s |
+| rootless, `slirp4netns`/`builtin` (Docker's default) | `172.18.0.1`, the network's gateway | yes, but `172.18.0.1` | 0.062 s | 0.243 s |
+
+- `slirp4netns` keeps the visitor's address and carries UDP 443: Q75's choice holds, and user-mode networking costs about 12 ms on a 10 MiB upload here.
+- `builtin` hides the address over TCP too with Docker's defaults, so `deploy.sh` refuses it, which it did on this daemon, with its reason.
+- `pasta` with `implicit` keeps the address too, but was slower here and publishes a port only on every host address (`-p <one address>:…` fails with "cannot assign requested address"). It stays accepted, not recommended. `pesto` needs a newer `pasta` than Debian and Ubuntu ship.
+- Two limits found on the way: HTTP/3 from the host's own loopback gets no answer under `slirp4netns` (TCP from there arrives from `10.0.2.2`, as on the pilot host); and a visitor whose address lies inside one of the daemon's own networks never gets an answer. The first visitor tried, a container at `172.17.0.3`, met the second: the rootless daemon's bridge is `172.17.0.0/16` inside its namespace too ([rootless-host.md](rootless-host.md)).
+- Not measured here: a visitor on another machine (the pilot host checks it from outside, vps-setup.md §8), and ufw turned on.
+
 ## What is real and what is not
 
 Real: both images built from the checkout and pulled by digest from a registry; PostgreSQL, Caddy, Gunicorn, the worker, the backup, ClamAV's `clamd` and `freshclam` and the decoder in their production overlay (`verify-internal` asks the scanner and the decoder for an answer; a real upload through them is `tests/live/test_attachments.py`); TLS and the maintenance gate through Caddy; `pg_dump`, `pg_restore`, the role bootstrap; restic against a REST server in `--append-only` mode; Mailpit counting what the worker sent; sessions, links and codes tried over HTTPS.

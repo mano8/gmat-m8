@@ -141,7 +141,7 @@ The daemon runs as `deploy`, as one of its `systemd` user services. Docker's own
    dockerd-rootless-setuptool.sh install      # starts docker.service (user), creates and selects the CLI context "rootless"
    ```
 
-   Then choose the **network and port drivers**. The default port driver (`builtin`) shows every visitor to Caddy as one internal address (or, from RootlessKit 3.0, keeps the address for TCP only and never for UDP). The application limits sign-in attempts **per address** and writes the address in its audit log and its session list, so with one address for everybody a single attacker's failed sign-ins would lock all the users out, and the log would mean nothing. `slirp4netns` keeps the visitor's address (and carries UDP 443, HTTP/3). Create `~/.config/systemd/user/docker.service.d/override.conf`:
+   Then choose the **network and port drivers**. The default port driver (`builtin`) shows every visitor to Caddy as one internal address, over TCP and HTTP/3 alike (measured; RootlessKit 3.0 can keep it for TCP only, with Docker's userland proxy turned off, and never for UDP). The application limits sign-in attempts **per address** and writes the address in its audit log and its session list, so with one address for everybody a single attacker's failed sign-ins would lock all the users out, and the log would mean nothing. `slirp4netns` keeps the visitor's address (and carries UDP 443, HTTP/3). Create `~/.config/systemd/user/docker.service.d/override.conf`:
 
    ```bash
    mkdir -p ~/.config/systemd/user/docker.service.d
