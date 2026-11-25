@@ -39,7 +39,7 @@ What [ADR-0033](adr/0033-rootless-docker-host.md) point 4 asked of M12.5, on the
 
 - `slirp4netns` keeps the visitor's address and carries UDP 443: Q75's choice holds, and user-mode networking costs about 12 ms on a 10 MiB upload here.
 - `builtin` hides the address over TCP too with Docker's defaults, so `deploy.sh` refuses it, which it did on this daemon, with its reason.
-- `pasta` with `implicit` keeps the address too, but was slower here and publishes a port only on every host address (`-p <one address>:…` fails with "cannot assign requested address"). It stays accepted, not recommended. `pesto` needs a newer `pasta` than Debian and Ubuntu ship.
+- `pasta` with `implicit` keeps the address too, but was slower here and publishes a port only on every host address (`-p <one address>:…` fails with "cannot assign requested address"). The maintainer refused it after this measurement, and `deploy.sh` now refuses it, saying why (checked on this daemon). `pesto` needs a newer `pasta` than Debian and Ubuntu ship.
 - Two limits found on the way: HTTP/3 from the host's own loopback gets no answer under `slirp4netns` (TCP from there arrives from `10.0.2.2`, as on the pilot host); and a visitor whose address lies inside one of the daemon's own networks never gets an answer. The first visitor tried, a container at `172.17.0.3`, met the second: the rootless daemon's bridge is `172.17.0.0/16` inside its namespace too ([rootless-host.md](rootless-host.md)).
 - Not measured here: a visitor on another machine (the pilot host checks it from outside, vps-setup.md §8), and ufw turned on.
 

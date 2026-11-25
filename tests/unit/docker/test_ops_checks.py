@@ -369,12 +369,18 @@ class TestPortDriver:
 
     @pytest.mark.parametrize("driver", ["builtin", "gvisor-tap-vsock", "pesto", "none", "vpnkit"])
     def test_every_other_driver_is_refused(self, driver: str) -> None:
-        """ADR-0033 point 4: only slirp4netns and implicit, until a measurement says more."""
+        """ADR-0033 point 4: only slirp4netns, until a measurement says more."""
         with pytest.raises(checks.Refused, match="rate limits would count every visitor as one"):
             checks.check_port_driver(driver, ["tcp", "udp"])
 
-    def test_implicit_passes(self) -> None:
-        assert checks.check_port_driver("implicit", ["tcp", "udp"]) == "implicit (tcp, udp)"
+    def test_implicit_is_refused_for_what_it_is(self) -> None:
+        """pasta keeps the address (M12.5) but is not the one chosen: the message says so."""
+        with pytest.raises(checks.Refused) as refused:
+            checks.check_port_driver("implicit", ["tcp", "udp"])
+        assert "keeps the visitors' addresses, but ADR-0033 accepts slirp4netns alone" in str(
+            refused.value
+        )
+        assert "rate limits" not in str(refused.value)
 
     def test_a_driver_without_udp_is_refused(self) -> None:
         found = checks.port_driver_from_info(json.loads(info(driver="slirp4netns", protos=["tcp"])))

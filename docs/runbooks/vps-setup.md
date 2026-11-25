@@ -153,7 +153,7 @@ The daemon runs as `deploy`, as one of its `systemd` user services. Docker's own
    systemctl --user daemon-reload && systemctl --user restart docker
    ```
 
-   `deploy.sh` reads the driver of the running daemon before it fetches a release and **refuses** `builtin`, any driver that does not carry UDP, and any it has not been told about ([../rootless-host.md](../rootless-host.md)). The other driver it accepts, `implicit` with the `pasta` network driver, is experimental in Docker and not part of this runbook.
+   `deploy.sh` reads the driver of the running daemon before it fetches a release and **refuses** `builtin`, any driver that does not carry UDP, and any other than `slirp4netns` ([../rootless-host.md](../rootless-host.md)), `implicit` with the `pasta` network driver included: it keeps the address too, but Docker calls it experimental, it was slower when measured, and it publishes a port only on every host address.
 6. **Reach the daemon from every session.** The setup tool makes `rootless` the CLI's current context, which is stored in `~/.docker/config.json` and read by every session of `deploy`, interactive or not. Check both ways, from your own machine, not only from a shell you are already in:
 
    ```bash

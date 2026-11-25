@@ -52,10 +52,16 @@ MIGRATION_KEYS = ("irreversible", "old_code_works")
 # M11). Moves with the runbook's minimum (vps-setup.md §4.3) when the installer's cosign does.
 COSIGN_MIN_MAJOR = 3
 GIT_VERSION = re.compile(r"^GitVersion:[ \t]+(v?(\d+)\.\d+\.\d+\S*)[ \t]*$", re.MULTILINE)
-# RootlessKit's port drivers that hand the visitor's address to the containers, for TCP and UDP
-# alike (ADR-0033 point 4). ``builtin`` keeps it for TCP only, from RootlessKit 3.0 and without
-# the userland proxy, and never for UDP; the others are slower, experimental or hide it.
-KEEPS_ADDRESS = frozenset({"slirp4netns", "implicit"})
+# The port driver ADR-0033 point 4 accepts: it hands the visitor's address to the containers, for
+# TCP and UDP alike (measured in M12.5). ``builtin`` hid it there with Docker's defaults; the
+# others are unmeasured, experimental or hide it.
+KEEPS_ADDRESS = frozenset({"slirp4netns"})
+# Drivers that keep the address too but that the maintainer refused (M12.5), and why.
+NOT_CHOSEN = {
+    "implicit": "keeps the visitors' addresses, but ADR-0033 accepts slirp4netns alone: pasta is "
+    "experimental in Docker, was slower when measured, and publishes a port only on every host "
+    "address",
+}
 PORT_DRIVER_OPTION = "--port-driver"
 
 
@@ -218,6 +224,8 @@ def port_driver_from_cmdline(text: str) -> tuple[str, None]:
 def check_port_driver(driver: str, protos: list[str] | None) -> str:
     """The driver as the scripts print it, if it keeps the visitor's address (ADR-0033)."""
     stated = f"{driver} ({', '.join(protos)})" if protos else driver
+    if driver in NOT_CHOSEN:
+        raise Refused(f"the port driver {stated} {NOT_CHOSEN[driver]}")
     if driver not in KEEPS_ADDRESS:
         raise Refused(
             f"the port driver {stated} hides the visitors' addresses: allauth's per-address "
