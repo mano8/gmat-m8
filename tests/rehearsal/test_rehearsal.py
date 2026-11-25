@@ -142,7 +142,7 @@ def test_v_n_to_v_n_plus_one(world: World) -> None:
     assert world.running_image("worker").endswith(world.images["next"])
     row = world.deployed()[-1]
     assert row[1:4] == [V2, world.images["next"], world.images["backup"]]
-    assert (world.compose_dir / "backups" / f"{row[4]}.dump").exists()
+    assert world.has_dump(row[4])
     assert row[4].endswith(f"pre-deploy-{V2}")
     assert world.worker_state() == "running"
     after = counts(world)
@@ -1038,9 +1038,10 @@ print(json.dumps("ok"))
             .splitlines()[-1]
         )
         drill = drill_world(base, "drill-b", "172.30.84.0/24", world)
+        # Fetched by hand, outside backups/ (docs/rootless-host.md): the drill reads it as is.
+        preserved = world.copy_dump_out(later, drill.directory / f"{later}.dump")
         out = run_drill(
-            drill, base, world, offsite_snapshot["id"],
-            "--preserved-dump", str(world.compose_dir / "backups" / f"{later}.dump"),
+            drill, base, world, offsite_snapshot["id"], "--preserved-dump", str(preserved)
         )  # fmt: skip
         assert "PASS  the failed state was replayed" in out
         report = json.loads((drill.compose_dir / "drill/reconcile-report.json").read_text())

@@ -8,12 +8,15 @@ but GitHub and the keyless signatures, which only a tag push in Actions can prod
   where the rehearsal proves a refusal (an unsigned image must fail real verification);
 - a restic REST server pair: append-only for the VPS, delete-capable for the maintainer.
 
-    sg docker -c "REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s"
+    REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s
 
-Without ``REHEARSAL_REQUIRED=1`` everything skips. It takes about 21 minutes, more on a machine
-short of memory, and leaves only Docker's build cache behind unless ``REHEARSAL_KEEP=1``.
+Without ``REHEARSAL_REQUIRED=1`` everything skips. It takes about 20 minutes, more on a machine
+short of memory, and leaves only Docker's build cache behind unless ``REHEARSAL_KEEP=1``. It runs
+against whichever daemon ``docker`` reaches: the root one, or a rootless one set up as the runbook
+says (``DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock``; ADR-0033, ``as_daemon`` below).
 """
 
+import functools
 import hashlib
 import http.server
 import json
@@ -90,13 +93,36 @@ sys.exit(0 if f"{identity} {subject}" in signed else 1)
 
 
 def run(*command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    kwargs.setdefault("check", True)
     return subprocess.run(  # noqa: S603 (fixed tools, test input only)
-        command, capture_output=True, text=True, check=True, **kwargs
+        command, capture_output=True, text=True, **kwargs
     )
 
 
 def docker(*args: str, **kwargs: Any) -> str:
     return str(run("docker", *args, **kwargs).stdout).strip()
+
+
+# --- which daemon (ADR-0033) ---------------------------------------------------------------------
+# The rehearsal runs under either daemon, told apart as the scripts tell them (`docker info`).
+# Under a rootless one the containers' uid 1000 is a subordinate id of this account, so what they
+# own (backups/, the offsite repository) is reached in the daemon's user namespace, where this
+# account is root over those ids: the way ops/common.sh's helper enters it, without its checks
+# (this is a test's own daemon). Under a root daemon the same commands run as they are.
+CONTAINER_UID = 1000
+
+
+@functools.cache
+def rootless() -> bool:
+    return "name=rootless" in docker("info", "--format", "{{json .SecurityOptions}}")
+
+
+def as_daemon(*command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    """``command`` where the containers' files can be read and written."""
+    if not rootless():
+        return run(*command, **kwargs)
+    pid = (Path(os.environ["XDG_RUNTIME_DIR"]) / "docker.pid").read_text(encoding="utf-8").strip()
+    return run("nsenter", "-U", "--preserve-credentials", "-t", pid, "--", *command, **kwargs)
 
 
 def identity_of(version: str) -> str:
@@ -284,6 +310,16 @@ class World:
         if not path.exists():
             return []
         return [row.split("\t") for row in path.read_text(encoding="utf-8").splitlines()]
+
+    def has_dump(self, name: str) -> bool:
+        """Whether backups/ holds ``name``'s dump, a plain file (the containers' own, 0700)."""
+        path = self.compose_dir / "backups" / f"{name}.dump"
+        return as_daemon("test", "-f", str(path), check=False).returncode == 0
+
+    def copy_dump_out(self, name: str, target: Path) -> Path:
+        """``name``'s dump copied out of backups/ as an operator fetches one, this account's."""
+        as_daemon("cp", "--", str(self.compose_dir / "backups" / f"{name}.dump"), str(target))
+        return target
 
     def gates(self) -> tuple[bool, bool]:
         flags = self.compose_dir / "flags"
@@ -631,6 +667,9 @@ def base() -> Iterator[dict[str, Any]]:
     )
     offsite = root / "offsite"
     offsite.mkdir()
+    if rootless():
+        # The REST servers run as the containers' uid; under a root daemon it is this account.
+        as_daemon("chown", f"{CONTAINER_UID}:{CONTAINER_UID}", "--", str(offsite))
     fake_bin = root / "bin"
     fake_bin.mkdir()
     _executable(fake_bin / "cosign", FAKE_COSIGN)
@@ -652,6 +691,8 @@ def base() -> Iterator[dict[str, Any]]:
         gh.server.shutdown()
         if os.environ.get("REHEARSAL_KEEP") != "1":
             _clean()
+            # Under a rootless daemon the containers' files are not this account's to remove.
+            as_daemon("rm", "-rf", "--", str(root), check=False)
             shutil.rmtree(root, ignore_errors=True)
 
 

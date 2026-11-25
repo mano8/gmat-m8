@@ -26,7 +26,7 @@ CI runs this suite under pytest-xdist in four shards at once (ADR-0025, `docs/ad
 - tokens read back from queued mail in `tests/tokens.py`
 - a fake SMTP server in `tests/smtp.py`, outbox helpers in `tests/outbox.py` (`FakeOrders`, `no_dispatch_source` for bare-outbox tests, `make_dispatch`, `start_worker`)
 - tests queue mail in the outbox and the worker's mailer is locmem
-- Rehearsal: `REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s` runs `deploy.sh`, `recover.sh`, the drill and the offsite rules against real containers in throwaway projects; about 21 minutes, about 3 GB free at its peak; `REHEARSAL_KEEP=1` leaves them, `REHEARSAL_DIR` chooses where. Skips without `REHEARSAL_REQUIRED=1`.
+- Rehearsal: `REHEARSAL_REQUIRED=1 uv run pytest tests/rehearsal -m rehearsal -s` runs `deploy.sh`, `recover.sh`, the drill and the offsite rules against real containers in throwaway projects; about 20 minutes, about 3 GB free at its peak; `REHEARSAL_KEEP=1` leaves them, `REHEARSAL_DIR` chooses where. Skips without `REHEARSAL_REQUIRED=1`. It runs under the root daemon or, with `DOCKER_HOST` set to its socket, a rootless one set up as `vps-setup.md` §4.1 says (M12.5): it tells them apart as the scripts do, and reaches what the containers own (the offsite directory, a dump in `backups/`, its own leftovers) in that daemon's user namespace (`as_daemon`).
 
 ## Commands
 
