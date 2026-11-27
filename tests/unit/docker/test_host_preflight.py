@@ -319,6 +319,15 @@ class TestPublishedPorts:
         result = refused_at_preflight(rootless)
         assert "ERROR: net.ipv4.ip_unprivileged_port_start cannot be read" in result.stderr
 
+    def test_a_config_compose_cannot_give_is_named_as_such(self, rootless: World) -> None:
+        """Not as a floor to lower: the floor allows 80 here."""
+        rootless.fail_on("config --format json")
+        result = refused_at_preflight(rootless)
+        assert "docker compose config failed: which ports the stack publishes is unknown" in (
+            result.stderr
+        )
+        assert "Either lower it" not in result.stderr
+
     def test_a_root_daemon_publishes_any_port(self, ready: World) -> None:
         """It never reads the floor (a CI runner's is 1024) nor asks compose for the ports."""
         result = deployed(ready)

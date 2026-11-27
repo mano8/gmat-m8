@@ -240,11 +240,14 @@ check_offsite() {
 # redirected to the unprivileged ports the overlay then publishes. Needs the release's digests.
 check_published_ports() {
     [ "$DAEMON_KIND" = rootless ] || return 0
-    local floor found
+    local floor config found
     floor=$(cat -- "$PROC_ROOT/sys/net/ipv4/ip_unprivileged_port_start" 2>/dev/null) || floor=""
     [[ "$floor" =~ ^[0-9]{1,5}$ ]] \
         || die "net.ipv4.ip_unprivileged_port_start cannot be read: which ports the rootless daemon may publish is unknown"
-    found=$(compose config --format json | python3 ops/checks.py published-ports - --floor "$floor" 2>&1) \
+    # It holds the env files' values: kept in memory and piped, never in a temporary file.
+    config=$(compose config --format json) \
+        || die "docker compose config failed: which ports the stack publishes is unknown"
+    found=$(printf '%s' "$config" | python3 ops/checks.py published-ports - --floor "$floor" 2>&1) \
         || die "$found. Either lower it to 80 (net.ipv4.ip_unprivileged_port_start=80), or keep it, redirect 80 and 443 to 8080 and 8443 and publish those (PUBLISHED_HTTP_PORT and PUBLISHED_HTTPS_PORT in .env): vps-setup.md §4.1, point 3"
     say "published ports: $found"
 }
