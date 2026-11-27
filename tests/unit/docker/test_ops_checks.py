@@ -474,3 +474,105 @@ class TestPortDriver:
             run("port-driver", "--from", "api", str(FIXTURES / "rootlesskit-info-builtin.json"))
             == 2
         )
+
+
+# --- the ports a rootless daemon publishes (M12.5, ADR-0033 point 3) -----------------------------
+
+
+def caddy_ports(http: str, https: str, **extra: str) -> list[dict[str, Any]]:
+    """Caddy's ports as ``docker compose config --format json`` gives them (Compose 5.7.0)."""
+    return [
+        {"mode": "ingress", "target": 80, "published": http, "protocol": "tcp", **extra},
+        {"mode": "ingress", "target": 443, "published": https, "protocol": "tcp", **extra},
+        {"mode": "ingress", "target": 443, "published": https, "protocol": "udp", **extra},
+    ]
+
+
+def config(**ports: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"name": "gmat-m8", "services": {"db": {"image": "postgres"}, **{
+        name: {"image": name, "ports": value} for name, value in ports.items()
+    }}}  # fmt: skip
+
+
+PRODUCTION = json.dumps(config(caddy=caddy_ports("80", "443")))
+
+
+class TestPublishedPorts:
+    def test_the_floor_lowered_to_80_publishes_80_and_443(self) -> None:
+        found = checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 80)
+        assert found == "80/tcp, 443/tcp, 443/udp"
+
+    def test_the_kernels_floor_refuses_the_lowest_port_and_names_its_service(self) -> None:
+        with pytest.raises(checks.Refused) as refused:
+            checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 1024)
+        assert str(refused.value) == (
+            "the rootless daemon cannot publish caddy's port 80/tcp: "
+            "net.ipv4.ip_unprivileged_port_start is 1024"
+        )
+
+    def test_one_below_the_floor_is_enough(self) -> None:
+        with pytest.raises(checks.Refused, match="port 443/tcp"):
+            checks.check_published_ports(config(caddy=caddy_ports("8080", "443")), 1024)
+
+    def test_ports_a_host_redirects_to(self) -> None:
+        found = checks.check_published_ports(config(caddy=caddy_ports("8080", "8443")), 1024)
+        assert found == "8080/tcp, 8443/tcp, 8443/udp"
+
+    def test_the_floor_itself_may_be_published(self) -> None:
+        assert checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 80)
+        with pytest.raises(checks.Refused):
+            checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 81)
+
+    def test_every_service_counts(self) -> None:
+        """The rehearsal's overlay publishes its delete-capable REST server too."""
+        admin = [{"mode": "ingress", "host_ip": "127.0.0.1", "target": 8000, "published": "1001"}]
+        ports = config(caddy=caddy_ports("18080", "18443", host_ip="127.0.0.1"), rest=admin)
+        with pytest.raises(checks.Refused, match="rest's port 1001/tcp"):
+            checks.check_published_ports(ports, 1024)
+
+    def test_a_range_counts_from_its_first_port(self) -> None:
+        ports = config(web=[{"target": 8000, "published": "1000-1100", "protocol": "tcp"}])
+        with pytest.raises(checks.Refused, match="port 1000/tcp"):
+            checks.check_published_ports(ports, 1024)
+
+    @pytest.mark.parametrize("published", ["", None], ids=["empty", "missing"])
+    def test_a_port_the_daemon_chooses_is_never_below_the_floor(self, published: Any) -> None:
+        port: dict[str, Any] = {"target": 8000, "protocol": "tcp"}
+        if published is not None:
+            port["published"] = published
+        assert checks.check_published_ports(config(web=[port]), 1024) == "none"
+
+    @pytest.mark.parametrize("answer", [{}, [], {"services": []}, "text"], ids=repr)
+    def test_a_config_without_services_is_refused(self, answer: Any) -> None:
+        with pytest.raises(checks.Refused, match="names no services"):
+            checks.check_published_ports(answer, 80)
+
+    @pytest.mark.parametrize(
+        ("text", "floor", "code", "printed"),
+        [
+            (PRODUCTION, "80", 0, "80/tcp, 443/tcp, 443/udp"),
+            (PRODUCTION, "1024", 2, ""),
+            ("not json", "80", 2, ""),
+            (json.dumps(config(caddy=caddy_ports("http", "443"))), "80", 2, ""),
+        ],
+        ids=["passes", "refused", "not json", "not a port"],
+    )  # fmt: skip
+    def test_through_the_command_line(
+        self,
+        text: str,
+        floor: str,
+        code: int,
+        printed: str,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """deploy.sh pipes compose's answer in: 0 goes ahead, anything else refuses."""
+        monkeypatch.setattr("sys.stdin", io.StringIO(text))
+        assert run("published-ports", "-", "--floor", floor) == code
+        assert capsys.readouterr().out.strip() == printed
+
+    def test_a_floor_that_is_not_a_number(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exited:
+            run("published-ports", "-", "--floor", "eighty")
+        assert exited.value.code == 2
+        assert "invalid int value" in capsys.readouterr().err

@@ -1,9 +1,10 @@
 """``deploy.sh``'s checks of the host itself (M12.3, ADR-0033): cosign 3 or newer, a rootless
-daemon's port driver that keeps the visitor's address, and the ``docker`` group; and what
-``recover.sh status`` says of the daemon.
+daemon's port driver that keeps the visitor's address, and the ``docker`` group; the ports a
+rootless daemon may publish (M12.5); and what ``recover.sh status`` says of the daemon.
 
-Every check is read-only and runs before the release is fetched: a host set up the wrong way is
-refused before anything changes, and the message names the fix. What the real tools print is in
+Every check is read-only: a host set up the wrong way is refused before anything changes, and the
+message names the fix. All but the ports run before the release is fetched; the ports need its
+digests, so they are checked at step 3, still before the gates. What the real tools print is in
 ``fixtures/`` (``conftest.py`` says where each comes from).
 """
 
@@ -11,6 +12,7 @@ import ast
 import json
 import os
 import pwd
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -68,6 +70,23 @@ def refused_before_anything(world: World, *args: str) -> subprocess.CompletedPro
     stack_calls = [line for line in world.docker_log() if " compose " in f" {line}"]
     assert stack_calls in ([], [f"{flags} compose version"]), stack_calls
     assert snapshot(world) == before
+    return result
+
+
+STACK_CHANGES = re.compile(r"\bcompose (up|stop|restart|run|exec|pull --quiet caddy)\b")
+
+
+def refused_at_preflight(world: World, *args: str) -> subprocess.CompletedProcess[str]:
+    """Refused at step 3, after the release was verified: the gates as they were, nothing pulled
+    for the stack, started, stopped or run in it, and the record of the last deploy untouched."""
+    gates = world.gates()
+    before = world.deployed()
+    result = world.run("deploy.sh", VERSION, *args)
+    assert result.returncode != 0, result.stderr
+    assert world.gates() == gates
+    assert world.cosign_log(), "the release was verified first"
+    assert not [line for line in world.docker_log() if STACK_CHANGES.search(line)]
+    assert world.deployed() == before
     return result
 
 
@@ -139,6 +158,16 @@ class TestResume:
         failed.rootlesskit_info(fixture("rootlesskit-info-slirp4netns.json"))
         deployed(failed, "--resume")
         assert failed.gates() == (False, False)
+
+    def test_ports_the_daemon_cannot_publish_are_refused_and_the_gates_stay_on(
+        self, failed: World
+    ) -> None:
+        failed.rootless()
+        failed.rootlesskit_info(fixture("rootlesskit-info-slirp4netns.json"))
+        failed.port_floor("1024\n")
+        result = refused_at_preflight(failed, "--resume")
+        assert "cannot publish caddy's port 80/tcp" in result.stderr
+        assert failed.gates() == (True, True)
 
 
 # --- the rootless daemon's port driver ------------------------------------------------------------
@@ -226,6 +255,84 @@ class TestPortDriver:
         rootless.rootlesskit_info(fixture("rootlesskit-info-slirp4netns.json"))
         result = refused_before_anything(rootless)
         assert "does not name" in result.stderr
+
+
+# --- the ports a rootless daemon publishes (M12.5) ------------------------------------------------
+
+
+class TestPublishedPorts:
+    """ADR-0033 point 3: the runbook's two ways pass, the floor lowered to 80 (A) or 80 and 443
+    redirected to the ports the overlay then publishes (B). A port below the floor is refused
+    before the gates, naming both: the daemon would refuse it at step 4 without saying why."""
+
+    BOTH_WAYS = (
+        "Either lower it to 80 (net.ipv4.ip_unprivileged_port_start=80), or keep it, redirect 80 "
+        "and 443 to 8080 and 8443 and publish those (PUBLISHED_HTTP_PORT and PUBLISHED_HTTPS_PORT "
+        "in .env): vps-setup.md §4.1, point 3"
+    )
+
+    @staticmethod
+    def redirecting(world: World) -> World:
+        world.port_floor("1024\n")
+        world._set_env("PUBLISHED_HTTP_PORT", "8080")
+        world._set_env("PUBLISHED_HTTPS_PORT", "8443")
+        return world
+
+    def test_the_floor_lowered_to_80(self, rootless: World) -> None:
+        result = deployed(rootless)
+        assert "published ports: 80/tcp, 443/tcp, 443/udp" in result.stderr
+        assert {probe.split()[0] for probe in rootless.public_probes()} == {
+            "gmat.test:443:127.0.0.1"
+        }
+
+    def test_the_kernels_floor_is_refused_with_both_ways_named(self, rootless: World) -> None:
+        rootless.port_floor("1024\n")
+        result = refused_at_preflight(rootless)
+        assert (
+            "the rootless daemon cannot publish caddy's port 80/tcp: "
+            f"net.ipv4.ip_unprivileged_port_start is 1024. {self.BOTH_WAYS}" in result.stderr
+        )
+        assert "Stopped at step 3, before the gates" in result.stderr
+        assert not rootless.public_probes()
+
+    def test_a_host_that_redirects_and_publishes_unprivileged_ports(self, rootless: World) -> None:
+        """deploy.sh asks the published port itself, so no deploy depends on the redirect."""
+        result = deployed(self.redirecting(rootless))
+        assert "published ports: 8080/tcp, 8443/tcp, 8443/udp" in result.stderr
+        probes = rootless.public_probes()
+        assert probes, "the gates were checked from outside"
+        assert {probe.split()[0] for probe in probes} == {"gmat.test:8443:127.0.0.1"}
+        assert all(probe.split()[1].startswith("https://gmat.test:8443/") for probe in probes)
+
+    def test_a_redirect_without_its_ports_is_refused(self, rootless: World) -> None:
+        """The redirect set up but .env forgotten: the overlay still publishes 80 and 443."""
+        rootless.port_floor("1024\n")
+        rootless._set_env("PUBLISHED_HTTPS_PORT", "8443")
+        result = refused_at_preflight(rootless)
+        assert "cannot publish caddy's port 80/tcp" in result.stderr
+
+    @pytest.mark.parametrize("floor", [None, "", "eighty\n"], ids=["unreadable", "empty", "text"])
+    def test_a_floor_that_cannot_be_read_is_refused(
+        self, rootless: World, floor: str | None
+    ) -> None:
+        rootless.port_floor(floor)
+        result = refused_at_preflight(rootless)
+        assert "ERROR: net.ipv4.ip_unprivileged_port_start cannot be read" in result.stderr
+
+    def test_a_root_daemon_publishes_any_port(self, ready: World) -> None:
+        """It never reads the floor (a CI runner's is 1024) nor asks compose for the ports."""
+        result = deployed(ready)
+        assert "published ports" not in result.stderr
+        assert not [line for line in ready.docker_log() if "config --format json" in line]
+
+    def test_an_operator_set_port_wins(self, rootless: World) -> None:
+        """DEPLOY_PUBLIC_PORT (a rehearsal, another installation) over .env's."""
+        self.redirecting(rootless)
+        rootless.env["DEPLOY_PUBLIC_PORT"] = "9443"
+        deployed(rootless)
+        assert {probe.split()[0] for probe in rootless.public_probes()} == {
+            "gmat.test:9443:127.0.0.1"
+        }
 
 
 # --- the docker group -----------------------------------------------------------------------------

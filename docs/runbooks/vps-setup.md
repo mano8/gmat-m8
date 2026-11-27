@@ -84,7 +84,7 @@ Who does this: the maintainer, by hand. Agents never touch the server.
    ufw enable && ufw status verbose
    ```
 
-   **ufw protects the published ports here.** A rootless daemon does not write firewall rules: the port it publishes is a process on the host that listens like any other, so its traffic passes ufw's INPUT chain (a root daemon's rules go ahead of ufw's, and ufw would not see it). Allow only 22/tcp, 80/tcp, 443/tcp and 443/udp, as above; nothing else may be reachable. The stack still publishes nothing but Caddy's two ports (never add a `ports:` entry for another service, never publish the database), and a port is published once (`0.0.0.0:443`), not once per host address, so who reaches it is ufw's decision alone.
+   **ufw protects the published ports here.** A rootless daemon does not write firewall rules: the port it publishes is a process on the host that listens like any other, so its traffic passes ufw's INPUT chain (a root daemon's rules go ahead of ufw's, and ufw would not see it). Allow only 22/tcp, 80/tcp, 443/tcp and 443/udp, as above; nothing else may be reachable. If you take way B of §4.1, point 3 (80 and 443 redirected), ufw sees the port after the redirect: allow `8080/tcp`, `8443/tcp` and `8443/udp` instead of 80 and 443. The stack still publishes nothing but Caddy's two ports (never add a `ports:` entry for another service, never publish the database), and a port is published once (`0.0.0.0:443`), not once per host address, so who reaches it is ufw's decision alone.
 3. Optional: `apt-get install -y fail2ban` for the SSH log-in.
 
 ## 3. Updates, time and logs
@@ -121,14 +121,74 @@ The daemon runs as `deploy`, as one of its `systemd` user services. Docker's own
    ```
 
    The package creates the group `docker`. It stays, **empty**: do not `usermod -aG docker deploy`, now or ever. Whoever is in it is root on this machine.
-3. **Ports 80 and 443 (Q74).** A rootless daemon may not listen below port 1024 by default. Let any account listen from 80 up:
+3. **Ports 80 and 443 (Q74): choose A or B.** A rootless daemon cannot publish a port below the kernel's floor for unprivileged ports (1024 by default), and its refusal does not say why. Visitors need 80 and 443. Both ways keep each visitor's address and answer HTTP/3 ([deploy-rehearsal.md](../deploy-rehearsal.md#q74-way-b-measured)). `deploy.sh` refuses, before the gates, a host where neither is done.
+
+   **A. Lower the floor to 80.** This is the default: one file, and nothing else changes.
 
    ```bash
    echo 'net.ipv4.ip_unprivileged_port_start=80' > /etc/sysctl.d/91-gmat-ports.conf
    sysctl --system | grep ip_unprivileged_port_start       # = 80
    ```
 
-   Ports below 80 (SSH on 22, SMTP, DNS) stay privileged, and on this server the only other processes are system daemons that cannot read Caddy's key. A `setcap` on `rootlesskit` would be narrower, but a package upgrade replaces the binary and drops it, and 443 would stop answering at the next restart of the daemon: that is why it is not used here ([ADR-0033](../adr/0033-rootless-docker-host.md), point 3).
+   Any account may then listen from 80 up. Ports below 80 (SSH on 22, SMTP, DNS) stay privileged, and on this server the only other processes are system daemons that cannot read Caddy's key (exception X15 in [security.md](../security.md)).
+
+   **B. Keep the floor and redirect 80 and 443** to 8080 and 8443, which the stack then publishes. Take it if your policy keeps the kernel's default, or if other people have accounts on this server.
+
+   It does not protect the site more than A. 8080 and 8443 are open to any account, as 80 and 443 are under A: a process that takes the port while the daemon has let it go receives the visitors either way. What B keeps privileged are the ports from 81 to 1023, which nothing here uses. As root:
+
+   ```bash
+   apt-get install -y nftables
+   cat > /etc/gmat-ports.nft <<'NFT'
+   #!/usr/sbin/nft -f
+   # gmat-m8 (vps-setup.md §4.1, point 3, B): 80 and 443 go to the ports the rootless daemon
+   # publishes. This table only: never `flush ruleset`, which removes ufw's rules too.
+   table inet gmat_ports
+   delete table inet gmat_ports
+   table inet gmat_ports {
+       chain prerouting {
+           type nat hook prerouting priority dstnat; policy accept;
+           tcp dport 80 redirect to :8080
+           tcp dport 443 redirect to :8443
+           udp dport 443 redirect to :8443
+       }
+       # This server's own requests to its name (deploy.sh asks 8443 itself).
+       chain output {
+           type nat hook output priority dstnat; policy accept;
+           fib daddr type local tcp dport 80 redirect to :8080
+           fib daddr type local tcp dport 443 redirect to :8443
+       }
+   }
+   NFT
+   cat > /etc/systemd/system/gmat-ports.service <<'UNIT'
+   [Unit]
+   Description=gmat-m8: 80 and 443 to the ports the rootless daemon publishes
+   DefaultDependencies=no
+   Wants=network-pre.target
+   Before=network-pre.target shutdown.target
+   Conflicts=shutdown.target
+
+   [Service]
+   Type=oneshot
+   RemainAfterExit=yes
+   ExecStart=/usr/sbin/nft -f /etc/gmat-ports.nft
+   ExecStop=/usr/sbin/nft delete table inet gmat_ports
+
+   [Install]
+   WantedBy=sysinit.target
+   UNIT
+   systemctl daemon-reload && systemctl enable --now gmat-ports.service
+   nft list table inet gmat_ports | grep -c redirect      # 5
+   ```
+
+   Then two more settings:
+   - **The firewall** (§2): allow `8080/tcp`, `8443/tcp` and `8443/udp` instead of 80 and 443, because ufw sees the port after the redirect.
+   - **`.env`** (§6): `PUBLISHED_HTTP_PORT=8080` and `PUBLISHED_HTTPS_PORT=8443`.
+
+   Caddy still listens on 80 and 443 in its container, so links and the `Alt-Svc` header of HTTP/3 keep 443.
+
+   **Never load this table through Debian's `nftables.service`.** Its stop, and so its restart, runs `nft flush ruleset`, which removes ufw's rules too. The unit above loads and removes its own table only.
+
+   A `setcap` on `rootlesskit` would be narrower than either way. It is not used: a package upgrade replaces the binary and drops the capability, and 443 would stop answering at the next restart of the daemon ([ADR-0033](../adr/0033-rootless-docker-host.md), point 3).
 4. **Start at boot.** The daemon is a user service, so without linger it stops at logout and does not start after a reboot, and the stack with it:
 
    ```bash
@@ -179,7 +239,8 @@ The daemon runs as `deploy`, as one of its `systemd` user services. Docker's own
    getent group docker                                # docker:x:<gid>:       nobody after the last colon
    id -Gn | tr ' ' '\n' | grep -cx docker             # 0
    loginctl show-user deploy -p Linger                # Linger=yes
-   sysctl net.ipv4.ip_unprivileged_port_start         # = 80
+   sysctl net.ipv4.ip_unprivileged_port_start         # = 80 with way A of point 3; 1024 with way B, and then:
+   systemctl is-active gmat-ports.service             # active (way B only)
    ```
 
    The client's address is the last thing to check, and it needs the application: it is in §8, after the first deploy. `./recover.sh status` already shows the port driver once the checkout of step 5 exists.
@@ -261,6 +322,7 @@ bash init.sh        # creates .env and app.env with generated secrets, mode 0600
 | `BACKUP_HEARTBEAT_URL` | optional: a dead-man's-switch URL (healthchecks-style) pinged after every successful dump |
 | `COMPOSE_PATH_SEPARATOR`, `COMPOSE_FILE` | **delete both lines**: they add Mailpit, the local mail sink |
 | `BIND_IP`, `HTTP_PORT`, `HTTPS_PORT` | leave: the production overlay forces 80 and 443 |
+| `PUBLISHED_HTTP_PORT`, `PUBLISHED_HTTPS_PORT` | leave empty with way A of §4.1, point 3: the stack publishes 80 and 443. With way B, `8080` and `8443`, the ports the host redirects 80 and 443 to |
 
 The database passwords, `POSTGRES_PASSWORD` and the three role passwords, were generated by `init.sh`. Keep them; they are also in the offline copy (step 7).
 
@@ -334,7 +396,7 @@ docker manifest inspect ghcr.io/<owner>/gmat-m8-backup:X.Y.Z >/dev/null && echo 
 On the release day follow [deploy-rollback.md](deploy-rollback.md). The very first deploy has no previous version: `deploy.sh` skips the checks that need one, takes the pre-deploy backup (which also creates the offsite repository), and records the first line in `deployed.log`. Then:
 
 1. Create the first administrator, a **platform operator**, so the recovery tooling has someone to run as ([user-admin.md](user-admin.md#the-first-administrator)).
-2. **Check the visitor's address**, now that Caddy answers. From **another machine** (your laptop on another network, a phone on mobile data), open `https://<domain>/` and sign in, then open the session list at `/account/sessions/`. The address shown for the session must be that machine's own public address. An address of `10.0.2.x`, `10.x` or `172.x` means the driver hides it: the sign-in limits then count everybody as one, so enough failed attempts from one person lock all the others out. Stop, go back to §4.1, point 5, and check `./recover.sh status`.
+2. **Check the visitor's address**, now that Caddy answers. From **another machine** (your laptop on another network, a phone on mobile data), open `https://<domain>/` and sign in, then open the session list at `/account/sessions/`. The address shown for the session must be that machine's own public address. An address of `10.0.2.x`, `10.x` or `172.x` means the driver hides it: the sign-in limits then count everybody as one, so enough failed attempts from one person lock all the others out. Stop, go back to §4.1, point 5, and check `./recover.sh status`. With way B of §4.1, point 3, this visit also checks the redirect, and the firewall's rules for it.
 3. Run the first offsite drill ([backup-restore.md](backup-restore.md#quarterly-offsite-drill)) before real data goes in.
 4. Set up monitoring (next section).
 

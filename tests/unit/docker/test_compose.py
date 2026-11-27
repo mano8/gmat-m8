@@ -137,6 +137,25 @@ def test_mailpit_is_a_local_sink_only(base: dict[str, Any]) -> None:
     assert "mailpit" not in compose("docker-compose.production.yml")["services"]
 
 
+def test_production_publishes_80_and_443_or_the_ports_a_host_redirects_them_to() -> None:
+    """ADR-0033 point 3, M12.5: .env names the host ports only on a rootless host that redirects
+    80 and 443. Caddy listens on 80 and 443 either way, so links and Alt-Svc keep them; the
+    fake ``docker compose config`` of ``conftest.py`` publishes the same."""
+    caddy = compose("docker-compose.production.yml")["services"]["caddy"]
+    assert caddy["ports"] == [
+        "${PUBLISHED_HTTP_PORT:-80}:80",
+        "${PUBLISHED_HTTPS_PORT:-443}:443/tcp",
+        "${PUBLISHED_HTTPS_PORT:-443}:443/udp",
+    ]
+    assert {key: caddy["environment"][key] for key in ("HTTP_PORT", "HTTPS_PORT")} == {
+        "HTTP_PORT": "80",
+        "HTTPS_PORT": "443",
+    }
+    assert caddy["environment"]["HTTPS_PORT_SUFFIX"] == ""
+    env = (STACK / ".env.example").read_text(encoding="utf-8")
+    assert "\nPUBLISHED_HTTP_PORT=\nPUBLISHED_HTTPS_PORT=\n" in env
+
+
 def test_production_runs_the_worker_from_the_signed_digest() -> None:
     worker = compose("docker-compose.production.yml")["services"]["worker"]
     assert worker["image"] == "ghcr.io/mano8/gmat-m8@${APP_DIGEST:?set APP_DIGEST in .env}"

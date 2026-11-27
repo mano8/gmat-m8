@@ -11,9 +11,10 @@
 #                          cosign 3 or newer, the env files, backups/ and flags/, and under a
 #                          rootless daemon a port driver that keeps the visitor's address
 #   2  verify the release  signed manifest, signed images, both pulled by digest; any mismatch aborts
-#   3  preflight           the third-party images pulled; with the new image, read-only: migrate-plan,
-#                          check --deploy, the offsite repository answers; a flagged irreversible
-#                          migration needs typing the version
+#   3  preflight           under a rootless daemon, ports it may publish; the third-party images
+#                          pulled; with the new image, read-only: migrate-plan, check --deploy, the
+#                          offsite repository answers; a flagged irreversible migration needs
+#                          typing the version
 #   4  gates on            flags/maintenance.on + flags/worker.paused; 503 confirmed from outside
 #   5  stop the writers    web and worker; what the release changed in db or Caddy applies now
 #   6  pre-deploy backup   dump + manifest + offsite copy; the dump id is recorded
@@ -233,6 +234,21 @@ check_offsite() {
         || die "the offsite repository does not answer: nothing changed, the site stays open"
 }
 
+# A rootless daemon publishes no port below the kernel's floor for unprivileged ports, and with
+# slirp4netns its refusal does not say why: Caddy would not start at step 4, behind the gates.
+# Both of the runbook's ways pass (ADR-0033 point 3): the floor lowered to 80, or 80 and 443
+# redirected to the unprivileged ports the overlay then publishes. Needs the release's digests.
+check_published_ports() {
+    [ "$DAEMON_KIND" = rootless ] || return 0
+    local floor found
+    floor=$(cat -- "$PROC_ROOT/sys/net/ipv4/ip_unprivileged_port_start" 2>/dev/null) || floor=""
+    [[ "$floor" =~ ^[0-9]{1,5}$ ]] \
+        || die "net.ipv4.ip_unprivileged_port_start cannot be read: which ports the rootless daemon may publish is unknown"
+    found=$(compose config --format json | python3 ops/checks.py published-ports - --floor "$floor" 2>&1) \
+        || die "$found. Either lower it to 80 (net.ipv4.ip_unprivileged_port_start=80), or keep it, redirect 80 and 443 to 8080 and 8443 and publish those (PUBLISHED_HTTP_PORT and PUBLISHED_HTTPS_PORT in .env): vps-setup.md §4.1, point 3"
+    say "published ports: $found"
+}
+
 # This process, not .env, carries the new digests until step 8: .env says what is running.
 preflight() {
     export APP_DIGEST="$RELEASE_APP_DIGEST" BACKUP_DIGEST="$RELEASE_BACKUP_DIGEST"
@@ -242,6 +258,7 @@ preflight() {
         || die "the compose files do not run $RELEASE_APP_REF: refused"
     grep -qxF "$RELEASE_BACKUP_REF" <<<"$images" \
         || die "the compose files do not run $RELEASE_BACKUP_REF: refused"
+    check_published_ports
     # The third-party images are on this machine before the gates: a registry that does not answer
     # must not stall a deploy with the site closed.
     compose pull --quiet caddy db clamd freshclam </dev/null \

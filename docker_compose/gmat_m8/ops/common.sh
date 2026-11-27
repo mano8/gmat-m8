@@ -7,7 +7,7 @@
 #   DEPLOY_LOCK_FILE           the lock deploys, recoveries and drills share
 #   DEPLOY_GITHUB_REPOSITORY   owner/name of the repository that signs releases
 #   DEPLOY_IMAGE_PREFIX        where the release images must live
-#   DEPLOY_PUBLIC_PORT         the HTTPS port Caddy publishes
+#   DEPLOY_PUBLIC_PORT         the HTTPS port Caddy publishes (.env's PUBLISHED_HTTPS_PORT, or 443)
 #   GITHUB_API_URL             where release files are fetched (their signatures decide anyway)
 #
 # Nothing here skips a check: `cosign` and `docker` are whatever PATH gives, and the identity
@@ -21,7 +21,7 @@
 : "${DEPLOY_LOCK_FILE:=/var/lock/gmat-m8-deploy}"
 : "${DEPLOY_GITHUB_REPOSITORY:=mano8/gmat-m8}"
 : "${DEPLOY_IMAGE_PREFIX:=ghcr.io/mano8}"
-: "${DEPLOY_PUBLIC_PORT:=443}"
+: "${DEPLOY_PUBLIC_PORT:=}"
 : "${GITHUB_API_URL:=https://api.github.com}"
 
 ENTRYPOINT=/app/docker/app/entrypoint.sh
@@ -130,13 +130,17 @@ gates_on() {
 }
 
 public_status() { # public_status PATH: the status Caddy answers, from outside the containers
-    local domain insecure=()
+    local domain port insecure=()
     domain=$(env_value APP_DOMAIN)
+    # The port the host publishes Caddy's 443 on: a deploy never depends on a host's redirect
+    # from 443 to it (ADR-0033 point 3).
+    port=${DEPLOY_PUBLIC_PORT:-$(env_value PUBLISHED_HTTPS_PORT)}
+    port=${port:-443}
     # Caddy's internal CA on a local stack; a real domain has a real certificate to check.
     [ "$domain" != localhost ] || insecure=(--insecure)
     curl --silent --output /dev/null --write-out '%{http_code}' --max-time 10 \
-        --resolve "$domain:$DEPLOY_PUBLIC_PORT:127.0.0.1" "${insecure[@]}" \
-        "https://$domain:$DEPLOY_PUBLIC_PORT$1" || true
+        --resolve "$domain:$port:127.0.0.1" "${insecure[@]}" \
+        "https://$domain:$port$1" || true
 }
 
 # Waits end on the clock AND after a few tries: on a host under pressure a single slow call must

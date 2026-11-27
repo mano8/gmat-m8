@@ -13,7 +13,10 @@ here, so its process tree is a fake ``/proc`` and its subordinate ids fake ``/et
 ``/etc/subgid`` files: the copy of ``ops/common.sh`` is pointed at them, and at this account's own
 uid and gid as the containers' (an unprivileged test cannot give a file to uid 1000). Those
 constants are the only lines of a script a test rewrites; ``test_backups_helper`` checks their
-values in the repository. M12.5 rehearses the scripts against a real rootless daemon.
+values in the repository. M12.5 rehearses the scripts against a real rootless daemon. The fake
+``/proc`` also holds the host's floor for unprivileged ports (80, the runbook's way A), and the
+fake ``docker compose config --format json`` publishes Caddy's ports as the production overlay
+does from ``.env``.
 
 What the real tools print is in ``fixtures/`` (M12.3): ``cosign version`` of cosign v2.5.0 and
 v3.0.6 (their official images), and RootlessKit 3.3.0's ``GET /v1/info`` answer and its child's
@@ -55,7 +58,7 @@ DAEMON_OPTIONS = {
 }
 
 FAKE_DOCKER = r"""#!/usr/bin/env python3
-import os, pathlib, shutil, sys
+import json, os, pathlib, shutil, sys
 fake = pathlib.Path(os.environ["FAKE_DIR"])
 args = sys.argv[1:]
 while len(args) >= 2 and args[0] == "compose" and args[1] == "-f":
@@ -88,6 +91,15 @@ elif "--entrypoint python web" in line:
     (fake / "python.in").write_text(sys.stdin.read())
 elif "'row_counts'" in sql:
     print('{"row_counts": {"core_thing": 3}}')
+elif "config --format json" in line:
+    # Caddy's ports as the production overlay publishes them from .env (test_compose reads the
+    # overlay itself).
+    env = dict(e.split("=", 1) for e in pathlib.Path(".env").read_text().splitlines() if "=" in e)
+    http, https = env.get("PUBLISHED_HTTP_PORT") or "80", env.get("PUBLISHED_HTTPS_PORT") or "443"
+    ports = [{"mode": "ingress", "target": target, "published": published, "protocol": protocol}
+             for target, published, protocol in ((80, http, "tcp"), (443, https, "tcp"),
+                                                 (443, https, "udp"))]
+    print(json.dumps({"services": {"caddy": {"ports": ports}, "db": {"image": "postgres"}}}))
 elif "config --images" in line:
     print(f"{os.environ['FAKE_PREFIX']}/gmat-m8@{os.environ['APP_DIGEST']}")
     print(f"{os.environ['FAKE_PREFIX']}/gmat-m8-backup@{os.environ['BACKUP_DIGEST']}")
@@ -163,6 +175,8 @@ if "--unix-socket" in args:  # RootlessKit's API, only at the path dockerd-rootl
 if "--config" in args:
     (fake / "curl_config").write_text(sys.stdin.read())
 if "--write-out" in args:
+    with (fake / "public.log").open("a") as log:
+        log.write(f"{args[args.index('--resolve') + 1]} {url}\n")
     public = fake / "public_status"
     open_status = public.read_text().strip() if public.exists() else "200"
     print("503" if pathlib.Path("flags/maintenance.on").exists() else open_status, end="")
@@ -263,7 +277,7 @@ class World:
         return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
 
     def clear_logs(self) -> None:
-        for name in ("docker.log", "cosign.log", "nsenter.log"):
+        for name in ("docker.log", "cosign.log", "nsenter.log", "public.log"):
             (self.fake / name).unlink(missing_ok=True)
 
     def gates(self) -> tuple[bool, bool]:
@@ -427,6 +441,7 @@ class World:
         self.rootlesskit_cmdline(list(ROOTLESSKIT_ARGS))
         (self.proc / "self" / "ns").mkdir(parents=True)
         (self.proc / "self" / "ns" / "user").symlink_to("user:[4026531837]")
+        self.port_floor("80\n")  # the runbook's way A (vps-setup.md §4.1, point 3)
 
     @contextmanager
     def opened_backups(self) -> Iterator[Path]:
@@ -470,6 +485,20 @@ class World:
         cmdline.unlink(missing_ok=True)
         if arguments is not None:
             cmdline.write_bytes("".join(f"{argument}\0" for argument in arguments).encode())
+
+    def port_floor(self, text: str | None) -> None:
+        """The host's ``net.ipv4.ip_unprivileged_port_start``, as the fake ``/proc`` gives it;
+        None: unreadable."""
+        floor = self.proc / "sys" / "net" / "ipv4" / "ip_unprivileged_port_start"
+        floor.unlink(missing_ok=True)
+        if text is not None:
+            floor.parent.mkdir(parents=True, exist_ok=True)
+            floor.write_text(text, encoding="utf-8")
+
+    def public_probes(self) -> list[str]:
+        """Each request the scripts sent Caddy from the host: ``--resolve`` and the URL."""
+        path = self.fake / "public.log"
+        return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
 
     def docker_group(self, entry: str | None) -> None:
         """``getent group docker``'s line (``docker:x:GID:MEMBERS``); None: no such group."""

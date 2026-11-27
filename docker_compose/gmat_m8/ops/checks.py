@@ -20,6 +20,9 @@ python3). Each command prints plain text for the shell and exits non-zero on a m
                             the rootless daemon's port driver, from RootlessKit's API answer or
                             its NUL-separated command line; refused unless it keeps the
                             visitor's address (exit 2), exit 3 when the input names none
+  published-ports CONFIG --floor N
+                            the host ports ``docker compose config --format json`` publishes;
+                            refused when one is below N, a rootless daemon's floor (exit 2)
 
 A file named ``-`` is read from stdin: the scripts pipe a backup manifest from the helper that
 alone reads backups/ (ADR-0033), so this never opens a file there.
@@ -240,6 +243,35 @@ def check_port_driver(driver: str, protos: list[str] | None) -> str:
     return stated
 
 
+def published_ports(config: Any) -> list[tuple[int, str, str]]:
+    """Each host port the merged compose files publish: (port, protocol, service), lowest first.
+    A range counts from its first port."""
+    services = config.get("services") if isinstance(config, dict) else None
+    if not isinstance(services, dict):
+        raise Refused("docker compose config names no services")
+    found = []
+    for name, service in services.items():
+        for port in (service or {}).get("ports") or []:
+            # One without a number is the daemon's choice, far above any floor.
+            published = str(port.get("published") or "")
+            if published:
+                found.append((int(published.split("-")[0]), str(port.get("protocol", "tcp")), name))
+    return sorted(found)
+
+
+def check_published_ports(config: Any, floor: int) -> str:
+    """The published ports as the scripts print them, if a rootless daemon may publish each one:
+    below the floor RootlessKit refuses, and with slirp4netns without saying why (M12.5)."""
+    ports = published_ports(config)
+    if ports and ports[0][0] < floor:  # the lowest decides
+        port, protocol, service = ports[0]
+        raise Refused(
+            f"the rootless daemon cannot publish {service}'s port {port}/{protocol}: "
+            f"net.ipv4.ip_unprivileged_port_start is {floor}"
+        )
+    return ", ".join(f"{port}/{protocol}" for port, protocol, _ in ports) or "none"
+
+
 def _asset(args: argparse.Namespace) -> str:
     return asset_url(_load(args.release), args.name)
 
@@ -299,6 +331,10 @@ def _port_driver(args: argparse.Namespace) -> str:
     return check_port_driver(*port_driver_from_info(info))
 
 
+def _published_ports(args: argparse.Namespace) -> str:
+    return check_published_ports(_load(args.config), args.floor)
+
+
 COMMANDS = {
     "asset": _asset,
     "manifest": _manifest,
@@ -309,6 +345,7 @@ COMMANDS = {
     "compare-counts": _compare_counts,
     "cosign-version": _cosign_version,
     "port-driver": _port_driver,
+    "published-ports": _published_ports,
 }
 
 
@@ -338,6 +375,9 @@ def _parser() -> argparse.ArgumentParser:
     driver = commands.add_parser("port-driver")
     driver.add_argument("file")
     driver.add_argument("--from", dest="source", choices=("api", "cmdline"), required=True)
+    ports = commands.add_parser("published-ports")
+    ports.add_argument("config")
+    ports.add_argument("--floor", type=int, required=True)
     return parser
 
 

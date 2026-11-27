@@ -47,6 +47,42 @@ What [ADR-0033](adr/0033-rootless-docker-host.md) point 4 asked of M12.5, on the
 - Two limits found on the way: HTTP/3 from the host's own loopback gets no answer under `slirp4netns` (TCP from there arrives from `10.0.2.2`, as on the pilot host); and a visitor whose address lies inside one of the daemon's own networks never gets an answer. The first visitor tried, a container at `172.17.0.3`, met the second: the rootless daemon's bridge is `172.17.0.0/16` inside its namespace too ([rootless-host.md](rootless-host.md)).
 - Not measured here: a visitor on another machine (the pilot host checks it from outside, vps-setup.md §8), and ufw turned on.
 
+## Q74: way B, measured
+
+[ADR-0033](adr/0033-rootless-docker-host.md) point 3 offers two ways to answer on 80 and 443: A lowers the kernel's floor for unprivileged ports to 80 (the runs above), and B keeps it and redirects 80 and 443 to the ports the stack then publishes. B was measured on the same machine on 2026-11-27.
+
+**The setup.** A rootless daemon set up as the runbook says (Docker 29.10.0, RootlessKit 3.3.0, `slirp4netns` for the network and the ports) ran inside a privileged container of the root daemon, whose network namespace stood for the host:
+- its floor stayed 1024;
+- Caddy, the stack's image, listened on 80 and 443 and was published on 8080 and 8443 (TCP, and UDP for 8443);
+- [vps-setup.md](runbooks/vps-setup.md) §4.1's table, loaded twice, redirected 80 and 443 to them;
+- the visitor was a container of the root daemon on that network (`192.168.251.2`), and HTTP/3 came from this machine through the network's gateway (`192.168.251.1`).
+
+| Check | Result |
+| --- | --- |
+| A visitor on 443, before the table | no answer |
+| Over TCP, through the redirect | **`192.168.251.2`**, HTTP/2 |
+| HTTP/3 (UDP 443), through the redirect | answered, **`192.168.251.1`** |
+| Port 80 | 308 to `https://localhost/…`, with no port in it |
+| `Alt-Svc` | `h3=":443"` |
+| Straight to 8443, as `deploy.sh` asks it (`Host: localhost:8443`) | the same site answered |
+| The host to its own 443 (the table's output chain) | answered, from `10.0.2.2` over loopback and from the host's own address over that address |
+| 10 MiB over HTTP/2, median of 5 | 0.077 s through the redirect, 0.078 s straight to 8443 |
+| 10 MiB over HTTP/3, median of 3 | 0.309 s |
+| A firewall that drops what it does not allow (ufw's default), allowing 80 and 443 | no answer: it sees 8443, after the redirect |
+| The same, allowing 8080/tcp, 8443/tcp and 8443/udp | TCP and HTTP/3 answered |
+| The unit's stop (`nft delete table inet gmat_ports`) | no answer again |
+| The daemon asked to publish 80 or 443 itself, with the floor at 1024 | refused by RootlessKit: `PortManager.AddPort(): reply.Error: map[desc:bad request: add_hostfwd: slirp_add_hostfwd failed]`, which does not say why. With the floor at 80, 443 was published |
+
+- **The redirect keeps the visitor's address** over TCP and HTTP/3, and costs nothing measurable here. `slirp4netns` receives the connection after the kernel has rewritten only its port.
+- **ufw must allow the published ports**, 8080 and 8443, not 80 and 443. The runbook says so in its firewall step.
+- **A host on neither way would stop at step 4**, behind the gates, on that unexplained error. Since then `deploy.sh` refuses it at step 3, before the gates, and names both ways.
+- **Not measured:**
+  - IPv6: the table is `inet`, so its rules apply to IPv6 too.
+  - ufw itself: a filter with its default policy stood for it.
+  - A boot: the unit is ordered as Debian's `nftables.service` is, and `systemd-analyze verify` passes.
+  - Debian 13's nft 1.1.3: the table loads with 1.0.9 and 1.1.6.
+- **Not comparable with Q75's table:** the server ran one level deeper here.
+
 ## What is real and what is not
 
 Real: both images built from the checkout and pulled by digest from a registry; PostgreSQL, Caddy, Gunicorn, the worker, the backup, ClamAV's `clamd` and `freshclam` and the decoder in their production overlay (`verify-internal` asks the scanner and the decoder for an answer; a real upload through them is `tests/live/test_attachments.py`); TLS and the maintenance gate through Caddy; `pg_dump`, `pg_restore`, the role bootstrap; restic against a REST server in `--append-only` mode; Mailpit counting what the worker sent; sessions, links and codes tried over HTTPS.
@@ -109,3 +145,4 @@ And from the tests against fakes, before the first real run: inside `cmd || die`
 - `cosign` and `python3` must be on the VPS; [runbooks/vps-setup.md](runbooks/vps-setup.md) says how.
 - `docker compose` on the host reads `.env`, which holds the offsite credentials: mode 0600, as `deploy.sh` checks.
 - The real offsite fetch, a visitor from another machine and ufw turned on, on the pilot host after v0.4.0: H12.6. The rootless runs here used a desktop distribution next to a root daemon; the runbook's own server steps (Docker's apt repository, the root daemon turned off, the sysctl, linger) were not run on a blank Debian 13 server, which H12.6's move of the pilot host covers.
+- Way B of Q74 on a real server (ufw, a boot, IPv6): whoever first sets one up that way checks it as vps-setup.md §4.1 and §8 say. The pilot host takes way A.

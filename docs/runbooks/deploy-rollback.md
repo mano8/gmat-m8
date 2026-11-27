@@ -38,7 +38,7 @@ cd docker_compose/gmat_m8
 | --- | --- | --- |
 | 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the **cosign version** (3 or newer), the env files (0600), the **host** (`flags/` searchable by the worker, `backups/` the containers' uid at mode 0700), the **port driver** of a rootless daemon (it must keep the visitor's address and carry UDP), the admin allowlist (only while `DJANGO_ADMIN_ENABLED` turns the admin on), the offsite repository setting and the checkout. A member of the `docker` group is warned about, never refused. | Nothing changed. Fix and run again ([the refusals](#refusals-of-step-1-on-a-rootless-host)). |
 | 2 | Downloads the manifest, verifies its **signature** and the signature of both images against the workflow identity of that tag, checks version, repository and registry, pulls both images **by digest**. | Nothing changed, the site stayed open. |
-| 3 | Preflight: pulls the third-party images (Caddy, PostgreSQL, ClamAV), then with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
+| 3 | Preflight: under a rootless daemon, that it may publish the stack's ports ([below](#refusals-of-step-1-on-a-rootless-host)); pulls the third-party images (Caddy, PostgreSQL, ClamAV), then with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
 | 4 | **Gates on**: `flags/maintenance.on` and `flags/worker.paused`. Confirms from outside that Caddy answers 503. | Gates stay on. |
 | 5 | Stops `web` and `worker`. | Gates stay on. |
 | 6 | Pre-deploy backup (`pre-deploy-X.Y.Z`) with its offsite copy. The dump id is recorded. | Gates stay on; no migration ran. |
@@ -85,7 +85,7 @@ Notes that apply to every row:
 
 ### Refusals of step 1 on a rootless host
 
-All of these stop before a release is fetched, with the gates as they were and the site open. `--resume` runs the same checks.
+All of these stop before a release is fetched, with the gates as they were and the site open; the last one stops at step 3, after the release is verified, still before the gates. `--resume` runs the same checks.
 
 | It says | Because | Do |
 | --- | --- | --- |
@@ -97,6 +97,7 @@ All of these stop before a release is fetched, with the gates as they were and t
 | `flags/ is mode …: the worker could not see worker.paused` | `flags/` is mode 0700, so the worker (a shifted uid) cannot search it and would run behind a pause | `chmod 0755 flags` as `deploy`, which owns it |
 | the **port driver** is `builtin` (or hides the address, or has no UDP) | every visitor would look like one internal address: sign-in limits would lock everybody out, and the audit log's addresses would mean nothing | Set the two `slirp4netns` lines in `~/.config/systemd/user/docker.service.d/override.conf` and restart the daemon ([vps-setup.md](vps-setup.md#41-docker-rootless), point 5) |
 | a *warning* that the driver cannot be read | no source names it | From another machine, check that `/account/sessions/` shows that machine's own address |
+| `the rootless daemon cannot publish caddy's port 80/tcp: net.ipv4.ip_unprivileged_port_start is 1024` (at step 3, still before the gates) | the host took neither way of [vps-setup.md](vps-setup.md#41-docker-rootless) §4.1, point 3, or `.env` was not changed with way B. The daemon would refuse the port at step 4, behind the gates, without saying why | Way A: the sysctl file and `sysctl --system`. Way B: the redirect's unit running, and `PUBLISHED_HTTP_PORT=8080`, `PUBLISHED_HTTPS_PORT=8443` in `.env` |
 
 ### Rolling back the images after the commit point
 
