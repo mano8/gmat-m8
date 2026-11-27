@@ -181,6 +181,7 @@ The daemon runs as `deploy`, as one of its `systemd` user services. Docker's own
    ```
 
    Then two more settings:
+
    - **The firewall** (§2): allow `8080/tcp`, `8443/tcp` and `8443/udp` instead of 80 and 443, because ufw sees the port after the redirect.
    - **`.env`** (§6): `PUBLISHED_HTTP_PORT=8080` and `PUBLISHED_HTTPS_PORT=8443`.
 

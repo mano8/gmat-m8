@@ -14,13 +14,13 @@ It takes about 18 to 21 minutes once the images are cached, needs about **3 GB o
 
 | | |
 | --- | --- |
-| Commit | `d27cdee` on `m12-rootless-host` (M12.5), the same commit under both daemons |
-| Date | 2026-11-25 |
-| Result | **Rootless daemon: 40 passed in 17 min 40 s. Root daemon: 40 passed in 17 min 38 s.** Each ran the drill script twice, 40 checks, none failed. Gate windows: first deploy 50 s and 52 s, 1.0.0 → 1.1.0 37 s under both. The lowest free memory was 7.3 GB, and nothing was killed. The live and browser suites run in CI, on the root daemon |
+| Commit | `2179f87` on `m12-rootless-host` (M12.5), the same commit under both daemons |
+| Date | 2026-11-27 |
+| Result | **Rootless daemon: 40 passed in 17 min 45 s. Root daemon: 40 passed in 17 min 39 s.** Each ran the drill script twice, 40 checks, none failed. Gate windows: first deploy 51 s under both, 1.0.0 → 1.1.0 37 s (rootless) and 38 s (root). The lowest free memory was 7.1 GB, and nothing was killed. Under the rootless daemon every deploy passed the new check of step 3 (the rehearsal publishes 18080, 18443 and 18001, above that machine's floor of 1024). The live and browser suites run in CI, on the root daemon |
 | Machine | Linux (a VMware VM, 2 vCPU, 16 GB, desktop applications open), Docker 29.9.3, Compose 5.7.0; rootless: RootlessKit 3.3.0, slirp4netns 1.2.1, set up as [runbooks/vps-setup.md](runbooks/vps-setup.md) §4.1 says |
 | restic | 0.18.1, in the backup image |
 
-Earlier runs: 39 passed in 21 min 4 s at `170d073` (M8.4, root daemon, 2026-11-06); 40 passed in 18 min 22 s after M12.2's helper (root daemon, 2026-11-24); during M12.5, 40 passed under the rootless daemon at `ba01db7` and `72087c5` and under the root daemon at `72087c5`, before the last changes to the scripts (`pasta` refused) and to the harness.
+Earlier runs: 39 passed in 21 min 4 s at `170d073` (M8.4, root daemon, 2026-11-06); 40 passed in 18 min 22 s after M12.2's helper (root daemon, 2026-11-24); during M12.5, 40 passed under the rootless daemon at `ba01db7` and `72087c5` and under the root daemon at `72087c5`, before the last changes to the scripts (`pasta` refused) and to the harness; and under both at `d27cdee` (17 min 40 s rootless, 17 min 38 s root, 2026-11-25), before Q74's two ways (the published ports checked at step 3, the check from outside on the published port).
 
 ## Which daemon
 
@@ -52,6 +52,7 @@ What [ADR-0033](adr/0033-rootless-docker-host.md) point 4 asked of M12.5, on the
 [ADR-0033](adr/0033-rootless-docker-host.md) point 3 offers two ways to answer on 80 and 443: A lowers the kernel's floor for unprivileged ports to 80 (the runs above), and B keeps it and redirects 80 and 443 to the ports the stack then publishes. B was measured on the same machine on 2026-11-27.
 
 **The setup.** A rootless daemon set up as the runbook says (Docker 29.10.0, RootlessKit 3.3.0, `slirp4netns` for the network and the ports) ran inside a privileged container of the root daemon, whose network namespace stood for the host:
+
 - its floor stayed 1024;
 - Caddy, the stack's image, listened on 80 and 443 and was published on 8080 and 8443 (TCP, and UDP for 8443);
 - [vps-setup.md](runbooks/vps-setup.md) §4.1's table, loaded twice, redirected 80 and 443 to them;
