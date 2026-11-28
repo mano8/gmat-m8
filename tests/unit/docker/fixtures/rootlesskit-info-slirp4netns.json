@@ -1,0 +1,1 @@
+{"apiVersion":"1.1.3","version":"3.3.0","stateDir":"/tmp/rootlesskit2603175639","childPID":73,"networkDriver":{"driver":"slirp4netns","dns":["10.0.2.3"],"childIP":"10.0.2.100"},"portDriver":{"driver":"slirp4netns","protos":["tcp","tcp4","udp","udp4"],"disallowLoopbackChildIP":true}}

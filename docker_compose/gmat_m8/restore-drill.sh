@@ -59,6 +59,8 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$OPERATOR" ] && [ -n "$APP_IMAGE" ] && [ -n "$BACKUP_IMAGE" ] || usage
 [ -n "$DUMP" ] || [ -n "$SNAPSHOT" ] || usage
+[ -z "$DUMP" ] || require_dump_name "$DUMP"
+[ -z "$SNAPSHOT" ] || require_snapshot_id "$SNAPSHOT"
 [ ! -f "$DEPLOYED_LOG" ] || die "this directory has run a deploy: a drill never runs next to production"
 export APP_IMAGE BACKUP_IMAGE
 
@@ -77,24 +79,30 @@ expect_value() { # expect_value TEXT SQL EXPECTED
     if [ "$found" = "$3" ]; then pass "$1"; else fail "$1 (found $found, expected $3)"; fi
 }
 
+# Every read and write under backups/ goes through backups_do (ADR-0033). restic runs as the
+# backup service's own uid under both daemons: under a rootless one, the operator's uid would name
+# a shifted container uid that is not the operator.
 fetch_files() {
-    mkdir -p backups
+    backups_do prepare
     if [ -n "$SNAPSHOT" ]; then
+        # As recover.sh does: restic never writes into what an earlier run left there.
+        backups_do drop-offsite
         docker run --rm --network "${DRILL_RESTIC_NETWORK:-bridge}" --entrypoint restic \
-            --user "$(id -u):$(id -g)" -e RESTIC_REPOSITORY -e RESTIC_PASSWORD -e RESTIC_REST_USERNAME \
-            -e RESTIC_REST_PASSWORD -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
-            -e RESTIC_CACHE_DIR=/tmp/restic-cache \
+            --user "$CONTAINER_UID:$CONTAINER_GID" -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
+            -e RESTIC_REST_USERNAME -e RESTIC_REST_PASSWORD -e AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION -e RESTIC_CACHE_DIR=/tmp/restic-cache \
             -v "$PWD/backups:/backups" "$BACKUP_IMAGE" restore "$SNAPSHOT" --target /backups/.offsite
         local found
-        found=$(find backups/.offsite/backups -maxdepth 1 -name 'gmat-*.dump' -print -quit)
+        found=$(backups_do find-fetched) || die "backups/.offsite cannot be read"
         [ -n "$found" ] || die "snapshot $SNAPSHOT holds no dump"
         DUMP=$(basename "$found" .dump)
-        mv backups/.offsite/backups/"$DUMP"* backups/
-        rm -rf backups/.offsite
+        require_dump_name "$DUMP"
+        backups_do adopt "$DUMP"
+        backups_do drop-offsite
     elif [ -n "$FROM_DIR" ]; then
-        cp -a "$FROM_DIR/$DUMP".* backups/
+        backups_do import "$FROM_DIR" "$DUMP"
     fi
-    [ -f "backups/$DUMP.dump" ] && [ -f "backups/$DUMP.manifest.json" ] \
+    backups_do exists dump "$DUMP" && backups_do exists manifest "$DUMP" \
         || die "backups/$DUMP.dump and its manifest are needed"
 }
 
@@ -118,7 +126,7 @@ SQL
 check_counts() {
     local restored="drill/restored.json"
     db_sql -t -A -v audit_table=audit_auditevent <../../docker/backup/manifest.sql >"$restored"
-    if python3 ops/checks.py compare-counts "backups/$DUMP.manifest.json" "$restored"; then
+    if backups_do read manifest "$DUMP" | python3 ops/checks.py compare-counts - "$restored"; then
         pass "row counts match the manifest"
     else
         fail "row counts match the manifest"
@@ -158,8 +166,8 @@ bad = [r["storage_key"] for r in rows[:20]
 print(f"{len(rows[:20])} checked")
 sys.exit(1 if bad else 0)
 '
-    if compose run --rm --no-deps -T --entrypoint python web -c "$checksum" \
-        <"backups/$DUMP.manifest.json"; then
+    if backups_do read manifest "$DUMP" \
+        | compose run --rm --no-deps -T --entrypoint python web -c "$checksum"; then
         pass "a sample of attachments opens and matches its checksum"
     else
         fail "a sample of attachments opens and matches its checksum"
@@ -220,7 +228,7 @@ main() {
     compose up -d --no-deps --wait db
     verify_dump "$DUMP"
     pass "the dump's checksum and contents match its manifest"
-    restore_database "backups/$DUMP.dump"
+    restore_database "$DUMP"
     restore_media "$DUMP"
     check_counts
 
@@ -255,7 +263,8 @@ main() {
         "$(date -u +%Y-%m-%d)" "$DUMP" "${APP_IMAGE##*@}" "$verdict"
     if [ "$WIPE" = 1 ]; then
         compose down --volumes --remove-orphans
-        rm -rf backups/gmat-* drill flags/maintenance.on flags/worker.paused
+        backups_do wipe-dumps
+        rm -rf drill flags/maintenance.on flags/worker.paused
         say "the drill's containers, volumes and restored files are wiped"
     else
         say "the restored data holds personal data: wipe it (--wipe) when the drill is over"

@@ -15,6 +15,17 @@ python3). Each command prints plain text for the shell and exits non-zero on a m
   dump-time MANIFEST        when a backup was taken (a restore's loss window starts there)
   compare-counts MANIFEST RESTORED
                             the restored row counts against a backup manifest
+  cosign-version OUTPUT     the version ``cosign version`` printed, refused below cosign 3
+  port-driver FILE --from api|cmdline
+                            the rootless daemon's port driver, from RootlessKit's API answer or
+                            its NUL-separated command line; refused unless it keeps the
+                            visitor's address (exit 2), exit 3 when the input names none
+  published-ports CONFIG --floor N
+                            the host ports ``docker compose config --format json`` publishes;
+                            refused when one is below N, a rootless daemon's floor (exit 2)
+
+A file named ``-`` is read from stdin: the scripts pipe a backup manifest from the helper that
+alone reads backups/ (ADR-0033), so this never opens a file there.
 """
 
 import argparse
@@ -40,14 +51,34 @@ ADMIN_ON = frozenset({"1", "true", "yes", "on"})
 ADMIN_OFF = frozenset({"", "0", "false", "no", "off"})
 IMAGE_NAMES = {"app": "gmat-m8", "backup": "gmat-m8-backup"}
 MIGRATION_KEYS = ("irreversible", "old_code_works")
+# cosign 2 cannot read the signatures docker-publish makes with cosign 3 ("no signatures found";
+# M11). Moves with the runbook's minimum (vps-setup.md §4.3) when the installer's cosign does.
+COSIGN_MIN_MAJOR = 3
+GIT_VERSION = re.compile(r"^GitVersion:[ \t]+(v?(\d+)\.\d+\.\d+\S*)[ \t]*$", re.MULTILINE)
+# The port driver ADR-0033 point 4 accepts: it hands the visitor's address to the containers, for
+# TCP and UDP alike (measured in M12.5). ``builtin`` hid it there with Docker's defaults; the
+# others are unmeasured, experimental or hide it.
+KEEPS_ADDRESS = frozenset({"slirp4netns"})
+# Drivers that keep the address too but that the maintainer refused (M12.5), and why.
+NOT_CHOSEN = {
+    "implicit": "keeps the visitors' addresses, but ADR-0033 accepts slirp4netns alone: pasta is "
+    "experimental in Docker, was slower when measured, and publishes a port only on every host "
+    "address",
+}
+PORT_DRIVER_OPTION = "--port-driver"
 
 
 class Refused(Exception):
     """The input is not what the caller may go on with."""
 
 
+class Unknown(Exception):
+    """The input does not say what the caller asked (exit 3: a warning, not a refusal)."""
+
+
 def _load(path: str) -> Any:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    text = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+    return json.loads(text)
 
 
 def asset_url(release: dict[str, Any], name: str) -> str:
@@ -153,6 +184,94 @@ def count_differences(manifest: dict[str, Any], restored: dict[str, Any]) -> lis
     ]
 
 
+def cosign_version(text: str) -> str:
+    """The version ``cosign version`` printed, if its major is at least COSIGN_MIN_MAJOR."""
+    match = GIT_VERSION.search(text)
+    if not match:
+        raise Refused("cosign version printed no GitVersion")
+    if int(match[2]) < COSIGN_MIN_MAJOR:
+        raise Refused(f"this is cosign {match[1]}")
+    return match[1]
+
+
+def port_driver_from_info(info: Any) -> tuple[str, list[str] | None]:
+    """The driver and protocols of RootlessKit's ``GET /v1/info`` answer (``portDriver``)."""
+    port = info.get("portDriver") if isinstance(info, dict) else None
+    if not isinstance(port, dict) or not isinstance(port.get("driver"), str) or not port["driver"]:
+        raise Unknown("RootlessKit's API names no port driver")
+    protos = port.get("protos")
+    return port["driver"], [str(proto) for proto in protos] if isinstance(protos, list) else None
+
+
+def port_driver_from_cmdline(text: str) -> tuple[str, None]:
+    """The ``--port-driver`` RootlessKit was started with, from its NUL-separated command line.
+
+    Repeated, the last one counts, as RootlessKit reads it (seen on RootlessKit 3.3.0). The
+    command it runs starts after its own options; dockerd has no such option and would not
+    start with one, so reading on past it finds nothing more.
+    """
+    driver = ""
+    arguments = text.split("\0")
+    for index, argument in enumerate(arguments):
+        if argument == "--":
+            break
+        if argument.startswith(f"{PORT_DRIVER_OPTION}="):
+            driver = argument.split("=", 1)[1]
+        elif argument == PORT_DRIVER_OPTION and index + 1 < len(arguments):
+            driver = arguments[index + 1]
+    if not driver:
+        raise Unknown("RootlessKit's command line names no port driver")
+    return driver, None
+
+
+def check_port_driver(driver: str, protos: list[str] | None) -> str:
+    """The driver as the scripts print it, if it keeps the visitor's address (ADR-0033)."""
+    stated = f"{driver} ({', '.join(protos)})" if protos else driver
+    if driver in NOT_CHOSEN:
+        raise Refused(f"the port driver {stated} {NOT_CHOSEN[driver]}")
+    if driver not in KEEPS_ADDRESS:
+        raise Refused(
+            f"the port driver {stated} hides the visitors' addresses: allauth's per-address "
+            "rate limits would count every visitor as one, so one attacker's failed sign-ins "
+            "would lock everyone out, and the audit log's addresses would mean nothing"
+        )
+    if protos is not None and "udp" not in protos:
+        raise Refused(
+            f"the port driver {stated} does not carry UDP: the production overlay publishes "
+            "443/udp (HTTP/3)"
+        )
+    return stated
+
+
+def published_ports(config: Any) -> list[tuple[int, str, str]]:
+    """Each host port the merged compose files publish: (port, protocol, service), lowest first.
+    A range counts from its first port."""
+    services = config.get("services") if isinstance(config, dict) else None
+    if not isinstance(services, dict):
+        raise Refused("docker compose config names no services")
+    found = []
+    for name, service in services.items():
+        for port in (service or {}).get("ports") or []:
+            # One without a number is the daemon's choice, far above any floor.
+            published = str(port.get("published") or "")
+            if published:
+                found.append((int(published.split("-")[0]), str(port.get("protocol", "tcp")), name))
+    return sorted(found)
+
+
+def check_published_ports(config: Any, floor: int) -> str:
+    """The published ports as the scripts print them, if a rootless daemon may publish each one:
+    below the floor RootlessKit refuses, and with slirp4netns without saying why (M12.5)."""
+    ports = published_ports(config)
+    if ports and ports[0][0] < floor:  # the lowest decides
+        port, protocol, service = ports[0]
+        raise Refused(
+            f"the rootless daemon cannot publish {service}'s port {port}/{protocol}: "
+            f"net.ipv4.ip_unprivileged_port_start is {floor}"
+        )
+    return ", ".join(f"{port}/{protocol}" for port, protocol, _ in ports) or "none"
+
+
 def _asset(args: argparse.Namespace) -> str:
     return asset_url(_load(args.release), args.name)
 
@@ -196,6 +315,26 @@ def _compare_counts(args: argparse.Namespace) -> str:
     return ""
 
 
+def _cosign_version(args: argparse.Namespace) -> str:
+    text = sys.stdin.read() if args.output == "-" else Path(args.output).read_text(encoding="utf-8")
+    return cosign_version(text)
+
+
+def _port_driver(args: argparse.Namespace) -> str:
+    if args.source == "cmdline":
+        raw = sys.stdin.buffer.read() if args.file == "-" else Path(args.file).read_bytes()
+        return check_port_driver(*port_driver_from_cmdline(raw.decode("utf-8", "replace")))
+    try:
+        info = _load(args.file)
+    except ValueError as exc:
+        raise Unknown(f"RootlessKit's API answered something else than JSON: {exc}") from exc
+    return check_port_driver(*port_driver_from_info(info))
+
+
+def _published_ports(args: argparse.Namespace) -> str:
+    return check_published_ports(_load(args.config), args.floor)
+
+
 COMMANDS = {
     "asset": _asset,
     "manifest": _manifest,
@@ -204,6 +343,9 @@ COMMANDS = {
     "dump-version": _dump_version,
     "dump-time": _dump_time,
     "compare-counts": _compare_counts,
+    "cosign-version": _cosign_version,
+    "port-driver": _port_driver,
+    "published-ports": _published_ports,
 }
 
 
@@ -229,6 +371,13 @@ def _parser() -> argparse.ArgumentParser:
     counts = commands.add_parser("compare-counts")
     counts.add_argument("manifest")
     counts.add_argument("restored")
+    commands.add_parser("cosign-version").add_argument("output")
+    driver = commands.add_parser("port-driver")
+    driver.add_argument("file")
+    driver.add_argument("--from", dest="source", choices=("api", "cmdline"), required=True)
+    ports = commands.add_parser("published-ports")
+    ports.add_argument("config")
+    ports.add_argument("--floor", type=int, required=True)
     return parser
 
 
@@ -236,6 +385,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         output = COMMANDS[args.command](args)
+    except Unknown as exc:
+        print(exc, file=sys.stderr)
+        return 3
     except (Refused, ValueError, OSError) as exc:
         print(exc, file=sys.stderr)
         return 2

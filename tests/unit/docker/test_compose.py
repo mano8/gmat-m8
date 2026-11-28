@@ -16,6 +16,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.unit.docker.conftest import World
+
 ROOT = Path(__file__).resolve().parents[3]
 STACK = ROOT / "docker_compose" / "gmat_m8"
 ENTRYPOINT = ROOT / "docker" / "app" / "entrypoint.sh"
@@ -133,6 +135,25 @@ def test_mailpit_is_a_local_sink_only(base: dict[str, Any]) -> None:
     assert "COMPOSE_FILE=docker-compose.yml:docker-compose.local-mail.yml" in env
     assert "COMPOSE_PATH_SEPARATOR=:" in env
     assert "mailpit" not in compose("docker-compose.production.yml")["services"]
+
+
+def test_production_publishes_80_and_443_or_the_ports_a_host_redirects_them_to() -> None:
+    """ADR-0033 point 3, M12.5: .env names the host ports only on a rootless host that redirects
+    80 and 443. Caddy listens on 80 and 443 either way, so links and Alt-Svc keep them; the
+    fake ``docker compose config`` of ``conftest.py`` publishes the same."""
+    caddy = compose("docker-compose.production.yml")["services"]["caddy"]
+    assert caddy["ports"] == [
+        "${PUBLISHED_HTTP_PORT:-80}:80",
+        "${PUBLISHED_HTTPS_PORT:-443}:443/tcp",
+        "${PUBLISHED_HTTPS_PORT:-443}:443/udp",
+    ]
+    assert {key: caddy["environment"][key] for key in ("HTTP_PORT", "HTTPS_PORT")} == {
+        "HTTP_PORT": "80",
+        "HTTPS_PORT": "443",
+    }
+    assert caddy["environment"]["HTTPS_PORT_SUFFIX"] == ""
+    env = (STACK / ".env.example").read_text(encoding="utf-8")
+    assert "\nPUBLISHED_HTTP_PORT=\nPUBLISHED_HTTPS_PORT=\n" in env
 
 
 def test_production_runs_the_worker_from_the_signed_digest() -> None:
@@ -263,26 +284,17 @@ def test_caddy_gates_the_admin_only_while_it_is_on() -> None:
     assert "@blocked not remote_ip {$ADMIN_ALLOWED_CIDRS:127.0.0.1/32 ::1/128}" in caddyfile
 
 
-def test_init_adds_the_admin_switch_to_an_existing_env(tmp_path: Path) -> None:
+def test_init_adds_the_admin_switch_to_an_existing_env(world: World) -> None:
     """An installation from before ADR-0030 gets the key, off, on its next init.sh."""
-    stack = tmp_path / "docker_compose" / "gmat_m8"
-    (stack / "clamav").mkdir(parents=True)
-    (tmp_path / "docker" / "postgres" / "initdb").mkdir(parents=True)
-    for name in ("init.sh", ".env.example", "app.env.example"):
-        (stack / name).write_bytes((STACK / name).read_bytes())
-    for name in ("clamd.conf", "freshclam.conf"):
-        (stack / "clamav" / name).write_bytes((STACK / "clamav" / name).read_bytes())
-    subprocess.run(["bash", "init.sh"], cwd=stack, check=True, capture_output=True)  # noqa: S607
-    env = stack / ".env"
+    for name in (".env", "app.env"):
+        (world.stack / name).unlink()
+    first = world.run("init.sh")
+    assert first.returncode == 0, first.stderr
+    env = world.stack / ".env"
     kept = [line for line in env.read_text().splitlines() if not line.startswith("DJANGO_ADMIN_")]
     env.write_text("\n".join(kept) + "\n")
-    result = subprocess.run(
-        ["bash", "init.sh"],  # noqa: S607
-        cwd=stack,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    result = world.run("init.sh")
+    assert result.returncode == 0, result.stderr
     assert "added to .env: DJANGO_ADMIN_ENABLED" in result.stdout
     assert env.read_text().splitlines()[-1] == "DJANGO_ADMIN_ENABLED=false"
 

@@ -42,8 +42,8 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.production.yml'
 
 ## 2. Backups and a real restore
 
-- [ ] A scheduled dump has run and reached offsite: `ls -l backups/.last-success`, `dc logs --since 12h backup`.
-- [ ] The first Sunday's level-2 check has run: `backups/.last-verify-ok` is recent ([backup-restore.md](backup-restore.md#verification-three-levels)).
+- [ ] A scheduled dump has run and reached offsite: `dc exec backup ls -l /backups/.last-success`, `dc logs --since 12h backup`.
+- [ ] The first Sunday's level-2 check has run: `/backups/.last-verify-ok` in the backup container is recent (`dc exec backup ls -l /backups/.last-verify-ok`) ([backup-restore.md](backup-restore.md#verification-three-levels)).
 - [ ] The first **offsite drill** has run on an isolated machine, **before real data goes in**, and its line is in [drill-log.md](drill-log.md) ([backup-restore.md](backup-restore.md#quarterly-offsite-drill)).
 - [ ] `python scripts/offsite_prune.py --baseline` then `--dry-run` work from your machine with the delete-capable credentials ([backup-restore.md](backup-restore.md#offsite-retention-and-pruning-maintainers-machine-only)).
 
@@ -108,7 +108,7 @@ Issues [#64](https://github.com/mano8/gmat-m8/issues/64)–[#69](https://github.
 
 - [ ] HTTPS has worked for some days; HSTS is turned on one switch at a time ([vps-setup.md](vps-setup.md#turning-on-hsts)).
 - [ ] The nightly image scan has no open issue, or each finding has an accepted, dated exception ([vulnerability-exceptions.md](vulnerability-exceptions.md)).
-- [ ] Disk use after a few weeks of dumps and attachments leaves room (`df -h /`, `docker system df`), and the server's memory holds under a morning's sign-ins (`docker stats --no-stream`).
+- [ ] Disk use after a few weeks of dumps and attachments leaves room (`df -h /`, `docker system df`; Docker's data root is `~deploy/.local/share/docker`), and the server's memory holds under a morning's sign-ins (`docker stats --no-stream`).
 - [ ] The *Calendar* of [README.md](README.md) is in your diary.
 
 ## Reporting what the pilot finds

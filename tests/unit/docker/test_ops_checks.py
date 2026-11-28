@@ -1,7 +1,9 @@
 """``docker_compose/gmat_m8/ops/checks.py``: what the host scripts read from JSON."""
 
 import importlib.util
+import io
 import json
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -253,3 +255,324 @@ class TestBackupManifest:
         assert run("compare-counts", str(wanted), str(found)) == 0
         found.write_text(json.dumps({"row_counts": {"a": 2}}), encoding="utf-8")
         assert run("compare-counts", str(wanted), str(found)) == 2
+
+    @pytest.mark.parametrize(
+        ("command", "printed"),
+        [("dump-version", "1.2.3"), ("dump-time", "2026-11-04T06:00:00Z")],
+    )
+    def test_a_manifest_on_stdin(
+        self,
+        command: str,
+        printed: str,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """``-``: the scripts pipe it from the helper, which alone reads backups/ (ADR-0033)."""
+        manifest = {"app_version": "1.2.3", "created_at": "2026-11-04T06:00:00Z"}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(manifest)))
+        assert run(command, "-") == 0
+        assert capsys.readouterr().out.strip() == printed
+
+    def test_counts_against_a_manifest_on_stdin(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        found = tmp_path / "r.json"
+        found.write_text(json.dumps({"row_counts": {"a": 1}}), encoding="utf-8")
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"row_counts": {"a": 1}})))
+        assert run("compare-counts", "-", str(found)) == 0
+        monkeypatch.setattr("sys.stdin", io.StringIO("not json"))
+        assert run("compare-counts", "-", str(found)) == 2
+
+
+# --- the host's setup (M12.3): fixtures copied from the real tools (conftest.py) ----------------
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+
+def fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def cmdline(name: str) -> str:
+    """A fixture's command line as /proc holds it: each argument ended by a NUL."""
+    return "".join(f"{argument}\0" for argument in fixture(name).splitlines())
+
+
+class TestCosignVersion:
+    def test_cosign_3_passes(self) -> None:
+        assert checks.cosign_version(fixture("cosign-version-v3.0.6.txt")) == "v3.0.6"
+
+    def test_cosign_2_is_refused(self) -> None:
+        with pytest.raises(checks.Refused, match=r"this is cosign v2\.5\.0"):
+            checks.cosign_version(fixture("cosign-version-v2.5.0.txt"))
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "",
+            "GitVersion:    devel\n",
+            "GitVersion:\n",
+            "  GitVersion:    v3.0.6\n",  # not at the start of a line: not cosign's own field
+            "BuildGitVersion: v3.0.6\n",
+            "cosign: command not found\n",
+        ],
+        ids=["empty", "devel", "no value", "indented", "another field", "not cosign"],
+    )
+    def test_an_output_that_names_no_version_is_refused(self, text: str) -> None:
+        with pytest.raises(checks.Refused, match="no GitVersion"):
+            checks.cosign_version(text)
+
+    @pytest.mark.parametrize(
+        ("line", "found"),
+        [("GitVersion:    v10.0.1", "v10.0.1"), ("GitVersion:\t3.1.0-rc.1", "3.1.0-rc.1")],
+    )
+    def test_any_later_major(self, line: str, found: str) -> None:
+        assert checks.cosign_version(f"banner\n{line}\nGitCommit: x\n") == found
+
+    def test_through_the_command_line(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr("sys.stdin", io.StringIO(fixture("cosign-version-v3.0.6.txt")))
+        assert run("cosign-version", "-") == 0
+        assert capsys.readouterr().out.strip() == "v3.0.6"
+        monkeypatch.setattr("sys.stdin", io.StringIO(fixture("cosign-version-v2.5.0.txt")))
+        assert run("cosign-version", "-") == 2
+
+    def test_the_runbook_installs_what_the_preflight_requires(self) -> None:
+        """M11: a new cosign major moves the runbook's minimum and this one together."""
+        runbook = (PATH.parents[3] / "docs/runbooks/vps-setup.md").read_text(encoding="utf-8")
+        installed = re.search(r"^\s*VER=v(\d+)\.\d+\.\d+$", runbook, re.MULTILINE)
+        assert installed, "vps-setup.md no longer installs cosign with VER=vX.Y.Z"
+        assert int(installed[1]) == checks.COSIGN_MIN_MAJOR
+
+
+def info(**port: Any) -> str:
+    """The real slirp4netns answer with its portDriver changed."""
+    answer = json.loads(fixture("rootlesskit-info-slirp4netns.json"))
+    answer["portDriver"] = port
+    return json.dumps(answer)
+
+
+class TestPortDriver:
+    def test_slirp4netns_from_the_api(self) -> None:
+        found = checks.port_driver_from_info(
+            json.loads(fixture("rootlesskit-info-slirp4netns.json"))
+        )
+        assert checks.check_port_driver(*found) == "slirp4netns (tcp, tcp4, udp, udp4)"
+
+    def test_builtin_from_the_api_is_refused_although_it_lists_udp(self) -> None:
+        """RootlessKit 3.3.0 lists udp for builtin, which never keeps a UDP client's address."""
+        found = checks.port_driver_from_info(json.loads(fixture("rootlesskit-info-builtin.json")))
+        assert "udp" in (found[1] or [])
+        with pytest.raises(checks.Refused, match=r"builtin .* hides the visitors' addresses"):
+            checks.check_port_driver(*found)
+
+    @pytest.mark.parametrize("driver", ["builtin", "gvisor-tap-vsock", "pesto", "none", "vpnkit"])
+    def test_every_other_driver_is_refused(self, driver: str) -> None:
+        """ADR-0033 point 4: only slirp4netns, until a measurement says more."""
+        with pytest.raises(checks.Refused, match="rate limits would count every visitor as one"):
+            checks.check_port_driver(driver, ["tcp", "udp"])
+
+    def test_implicit_is_refused_for_what_it_is(self) -> None:
+        """pasta keeps the address (M12.5) but is not the one chosen: the message says so."""
+        with pytest.raises(checks.Refused) as refused:
+            checks.check_port_driver("implicit", ["tcp", "udp"])
+        assert "keeps the visitors' addresses, but ADR-0033 accepts slirp4netns alone" in str(
+            refused.value
+        )
+        assert "rate limits" not in str(refused.value)
+
+    def test_a_driver_without_udp_is_refused(self) -> None:
+        found = checks.port_driver_from_info(json.loads(info(driver="slirp4netns", protos=["tcp"])))
+        with pytest.raises(checks.Refused, match=r"does not carry UDP: .* 443/udp"):
+            checks.check_port_driver(*found)
+
+    def test_protocols_not_stated_are_not_held_against_it(self) -> None:
+        found = checks.port_driver_from_info(json.loads(info(driver="slirp4netns")))
+        assert found == ("slirp4netns", None)
+        assert checks.check_port_driver(*found) == "slirp4netns"
+
+    @pytest.mark.parametrize(
+        "answer",
+        [{}, [], {"portDriver": None}, {"portDriver": {}}, {"portDriver": {"driver": ""}},
+         {"portDriver": {"driver": 3}}],
+        ids=["empty", "list", "null", "no driver", "empty driver", "not a name"],
+    )  # fmt: skip
+    def test_an_api_answer_without_a_driver_is_unknown(self, answer: Any) -> None:
+        with pytest.raises(checks.Unknown):
+            checks.port_driver_from_info(answer)
+
+    def test_builtin_from_the_command_line(self) -> None:
+        found = checks.port_driver_from_cmdline(cmdline("rootlesskit-cmdline-builtin.txt"))
+        assert found == ("builtin", None)
+
+    def test_the_last_of_a_repeated_option_counts(self) -> None:
+        """The real slirp4netns command line names builtin first, then slirp4netns; RootlessKit
+        ran with slirp4netns (its API said so)."""
+        text = cmdline("rootlesskit-cmdline-slirp4netns.txt")
+        assert text.index("--port-driver=builtin") < text.index("--port-driver=slirp4netns")
+        assert checks.port_driver_from_cmdline(text) == ("slirp4netns", None)
+
+    @pytest.mark.parametrize(
+        ("arguments", "driver"),
+        [
+            (["rootlesskit", "--port-driver", "slirp4netns", "dockerd"], "slirp4netns"),
+            (["rootlesskit", "--port-driver=slirp4netns", "--", "x", "--port-driver=builtin"],
+             "slirp4netns"),
+            (["rootlesskit", "--port-driver=builtin", "--port-driver", "implicit"], "implicit"),
+        ],
+        ids=["separate value", "after --", "both forms"],
+    )  # fmt: skip
+    def test_how_the_option_is_read(self, arguments: list[str], driver: str) -> None:
+        text = "".join(f"{argument}\0" for argument in arguments)
+        assert checks.port_driver_from_cmdline(text) == (driver, None)
+
+    @pytest.mark.parametrize(
+        "text",
+        ["", "rootlesskit\0--net=slirp4netns\0dockerd\0", "rootlesskit\0--port-driver\0",
+         "rootlesskit\0--port-driver=\0"],
+        ids=["empty", "no option", "no value", "empty value"],
+    )  # fmt: skip
+    def test_a_command_line_without_a_driver_is_unknown(self, text: str) -> None:
+        with pytest.raises(checks.Unknown):
+            checks.port_driver_from_cmdline(text)
+
+    @pytest.mark.parametrize(
+        ("source", "text", "code", "printed"),
+        [
+            ("api", fixture("rootlesskit-info-slirp4netns.json"), 0,
+             "slirp4netns (tcp, tcp4, udp, udp4)"),
+            ("api", fixture("rootlesskit-info-builtin.json"), 2, ""),
+            ("api", "not json", 3, ""),
+            ("api", "{}", 3, ""),
+            ("cmdline", cmdline("rootlesskit-cmdline-slirp4netns.txt"), 0, "slirp4netns"),
+            ("cmdline", cmdline("rootlesskit-cmdline-builtin.txt"), 2, ""),
+            ("cmdline", "", 3, ""),
+        ],
+        ids=["api ok", "api refused", "api not json", "api no driver", "cmdline ok",
+             "cmdline refused", "cmdline empty"],
+    )  # fmt: skip
+    def test_through_the_command_line(
+        self,
+        source: str,
+        text: str,
+        code: int,
+        printed: str,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """0 keeps the address, 2 refused, 3 says nothing (deploy.sh warns); stdin as bytes."""
+        monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(text.encode())))
+        assert run("port-driver", "--from", source, "-") == code
+        assert capsys.readouterr().out.strip() == printed
+
+    def test_a_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "cmdline"
+        path.write_bytes(cmdline("rootlesskit-cmdline-slirp4netns.txt").encode())
+        assert run("port-driver", "--from", "cmdline", str(path)) == 0
+        assert (
+            run("port-driver", "--from", "api", str(FIXTURES / "rootlesskit-info-builtin.json"))
+            == 2
+        )
+
+
+# --- the ports a rootless daemon publishes (M12.5, ADR-0033 point 3) -----------------------------
+
+
+def caddy_ports(http: str, https: str, **extra: str) -> list[dict[str, Any]]:
+    """Caddy's ports as ``docker compose config --format json`` gives them (Compose 5.7.0)."""
+    return [
+        {"mode": "ingress", "target": 80, "published": http, "protocol": "tcp", **extra},
+        {"mode": "ingress", "target": 443, "published": https, "protocol": "tcp", **extra},
+        {"mode": "ingress", "target": 443, "published": https, "protocol": "udp", **extra},
+    ]
+
+
+def config(**ports: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"name": "gmat-m8", "services": {"db": {"image": "postgres"}, **{
+        name: {"image": name, "ports": value} for name, value in ports.items()
+    }}}  # fmt: skip
+
+
+PRODUCTION = json.dumps(config(caddy=caddy_ports("80", "443")))
+
+
+class TestPublishedPorts:
+    def test_the_floor_lowered_to_80_publishes_80_and_443(self) -> None:
+        found = checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 80)
+        assert found == "80/tcp, 443/tcp, 443/udp"
+
+    def test_the_kernels_floor_refuses_the_lowest_port_and_names_its_service(self) -> None:
+        with pytest.raises(checks.Refused) as refused:
+            checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 1024)
+        assert str(refused.value) == (
+            "the rootless daemon cannot publish caddy's port 80/tcp: "
+            "net.ipv4.ip_unprivileged_port_start is 1024"
+        )
+
+    def test_one_below_the_floor_is_enough(self) -> None:
+        with pytest.raises(checks.Refused, match="port 443/tcp"):
+            checks.check_published_ports(config(caddy=caddy_ports("8080", "443")), 1024)
+
+    def test_ports_a_host_redirects_to(self) -> None:
+        found = checks.check_published_ports(config(caddy=caddy_ports("8080", "8443")), 1024)
+        assert found == "8080/tcp, 8443/tcp, 8443/udp"
+
+    def test_the_floor_itself_may_be_published(self) -> None:
+        assert checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 80)
+        with pytest.raises(checks.Refused):
+            checks.check_published_ports(config(caddy=caddy_ports("80", "443")), 81)
+
+    def test_every_service_counts(self) -> None:
+        """The rehearsal's overlay publishes its delete-capable REST server too."""
+        admin = [{"mode": "ingress", "host_ip": "127.0.0.1", "target": 8000, "published": "1001"}]
+        ports = config(caddy=caddy_ports("18080", "18443", host_ip="127.0.0.1"), rest=admin)
+        with pytest.raises(checks.Refused, match="rest's port 1001/tcp"):
+            checks.check_published_ports(ports, 1024)
+
+    def test_a_range_counts_from_its_first_port(self) -> None:
+        ports = config(web=[{"target": 8000, "published": "1000-1100", "protocol": "tcp"}])
+        with pytest.raises(checks.Refused, match="port 1000/tcp"):
+            checks.check_published_ports(ports, 1024)
+
+    @pytest.mark.parametrize("published", ["", None], ids=["empty", "missing"])
+    def test_a_port_the_daemon_chooses_is_never_below_the_floor(self, published: Any) -> None:
+        port: dict[str, Any] = {"target": 8000, "protocol": "tcp"}
+        if published is not None:
+            port["published"] = published
+        assert checks.check_published_ports(config(web=[port]), 1024) == "none"
+
+    @pytest.mark.parametrize("answer", [{}, [], {"services": []}, "text"], ids=repr)
+    def test_a_config_without_services_is_refused(self, answer: Any) -> None:
+        with pytest.raises(checks.Refused, match="names no services"):
+            checks.check_published_ports(answer, 80)
+
+    @pytest.mark.parametrize(
+        ("text", "floor", "code", "printed"),
+        [
+            (PRODUCTION, "80", 0, "80/tcp, 443/tcp, 443/udp"),
+            (PRODUCTION, "1024", 2, ""),
+            ("not json", "80", 2, ""),
+            (json.dumps(config(caddy=caddy_ports("http", "443"))), "80", 2, ""),
+        ],
+        ids=["passes", "refused", "not json", "not a port"],
+    )  # fmt: skip
+    def test_through_the_command_line(
+        self,
+        text: str,
+        floor: str,
+        code: int,
+        printed: str,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """deploy.sh pipes compose's answer in: 0 goes ahead, anything else refuses."""
+        monkeypatch.setattr("sys.stdin", io.StringIO(text))
+        assert run("published-ports", "-", "--floor", floor) == code
+        assert capsys.readouterr().out.strip() == printed
+
+    def test_a_floor_that_is_not_a_number(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exited:
+            run("published-ports", "-", "--floor", "eighty")
+        assert exited.value.code == 2
+        assert "invalid int value" in capsys.readouterr().err

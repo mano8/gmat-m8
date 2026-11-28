@@ -4,7 +4,7 @@ Written for the maintainer, who runs the production VPS alone. Each page can be 
 
 | I need to … | Read |
 | --- | --- |
-| Set up the server for the first time (H8.6) | [vps-setup.md](vps-setup.md) |
+| Set up the server for the first time (H8.6): Debian, rootless Docker, no `docker` group | [vps-setup.md](vps-setup.md) |
 | Run the pilot: the 0.x releases, what to try for real, when v1.0.0 can follow | [pilot.md](pilot.md) |
 | Put a release on the server, or undo a bad one | [deploy-rollback.md](deploy-rollback.md) |
 | Check backups, run the quarterly drill, restore, prune offsite | [backup-restore.md](backup-restore.md) |
@@ -16,7 +16,7 @@ Written for the maintainer, who runs the production VPS alone. Each page can be 
 
 ## Conventions
 
-- Commands run on the VPS as `deploy`, in `~/gmat-m8/docker_compose/gmat_m8`. `dc` is `docker compose -f docker-compose.yml -f docker-compose.production.yml`.
+- Commands run on the VPS as `deploy`, in `~/gmat-m8/docker_compose/gmat_m8`, against the rootless Docker daemon of that account (no `docker` group, no `sudo docker`; `deploy` cannot read `backups/`, which belongs to the containers' uid: ask the backup container, `dc exec backup …`). `dc` is `docker compose -f docker-compose.yml -f docker-compose.production.yml`.
 - `EMAIL` / `you@example.org` is a **platform operator**: an account created with `manage bootstrap_admin --superuser`. Management commands that take `--operator` run as that person and are audited under their name.
 - A human decides and a script executes. Agents never run deploys, restores or anything on the VPS.
 - Secrets never go into a ticket, chat or commit. The env files are mode 0600 and only the `*.example` templates are in the repository.
@@ -26,7 +26,7 @@ Written for the maintainer, who runs the production VPS alone. Each page can be 
 | How often | What |
 | --- | --- |
 | Every deploy | [deploy-rollback.md](deploy-rollback.md), outside working hours |
-| Weekly, automatic | `restore --verify`; look at `backups/.last-verify-ok` monthly |
+| Weekly, automatic | `restore --verify`; look at `/backups/.last-verify-ok` monthly (`dc exec backup ls -l /backups/.last-verify-ok`) |
 | Every month or two | prune offsite from the maintainer's machine |
 | **Every quarter** | the offsite restore drill, then a line in [drill-log.md](drill-log.md) |
 | **At most every 90 days** | review `.trivyignore.yaml` and the exception register ([vulnerability-exceptions.md](vulnerability-exceptions.md)) |

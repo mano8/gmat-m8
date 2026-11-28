@@ -7,11 +7,14 @@
 #   --resume    go on although an earlier deploy or recovery left the gates on (a fix-forward
 #               release after a failure). Both gates stay on until this one's commit point.
 #
-#   1  lock                the same flock as recover.sh and the restore drill
+#   1  lock                the same flock as recover.sh and the restore drill; then, read-only:
+#                          cosign 3 or newer, the env files, backups/ and flags/, and under a
+#                          rootless daemon a port driver that keeps the visitor's address
 #   2  verify the release  signed manifest, signed images, both pulled by digest; any mismatch aborts
-#   3  preflight           the third-party images pulled; with the new image, read-only: migrate-plan,
-#                          check --deploy, the offsite repository answers; a flagged irreversible
-#                          migration needs typing the version
+#   3  preflight           under a rootless daemon, ports it may publish; the third-party images
+#                          pulled; with the new image, read-only: migrate-plan, check --deploy, the
+#                          offsite repository answers; a flagged irreversible migration needs
+#                          typing the version
 #   4  gates on            flags/maintenance.on + flags/worker.paused; 503 confirmed from outside
 #   5  stop the writers    web and worker; what the release changed in db or Caddy applies now
 #   6  pre-deploy backup   dump + manifest + offsite copy; the dump id is recorded
@@ -110,6 +113,15 @@ require_tools() {
     docker compose version >/dev/null || die "the docker compose plugin is not installed"
 }
 
+# cosign 2 cannot read the signatures docker-publish makes with cosign 3: every release would be
+# refused at step 2 as unsigned (M11). Said here, with the fix, before the release is fetched.
+check_cosign() {
+    local found
+    found=$(timeout 30 cosign version 2>&1 | python3 ops/checks.py cosign-version - 2>&1) \
+        || die "cosign 3 or newer is required (vps-setup.md §4.3): ${found:-cosign version failed}"
+    say "cosign $found"
+}
+
 check_env_files() {
     local file
     for file in .env app.env; do
@@ -124,6 +136,53 @@ check_env_files() {
     python3 ops/checks.py admin-cidrs "$(env_value ADMIN_ALLOWED_CIDRS)" \
         --enabled "$(env_value DJANGO_ADMIN_ENABLED)" >/dev/null \
         || die "with DJANGO_ADMIN_ENABLED on, ADMIN_ALLOWED_CIDRS in .env names who may reach the admin (runbook vps-setup.md)"
+}
+
+# Read-only, before anything changes (ADR-0033): the backup container must be able to write
+# backups/, or the pre-deploy dump fails at step 6 with the site closed, and the worker must be
+# able to see flags/worker.paused. backups/ is the containers' uid's and 0700 as the helper sees it
+# (deploy under a root daemon), or world-writable on a CI runner's root daemon (init.sh --ci).
+check_host_directories() {
+    require_flags_searchable
+    detect_daemon
+    local seen
+    seen=$(backups_do stat) || die "backups/ cannot be read: run bash init.sh"
+    case "$DAEMON_KIND $seen" in
+        "root $CONTAINER_UID 700" | "rootless $CONTAINER_UID 700" | "root "*" 777") return 0 ;;
+    esac
+    local fix="run bash init.sh"
+    # init.sh sets the owner only under a rootless daemon; under a root one it is this account's.
+    [ "$DAEMON_KIND" = rootless ] || [ "${seen% *}" = "$CONTAINER_UID" ] \
+        || fix="the containers write it as uid $CONTAINER_UID: sudo chown $CONTAINER_UID:$CONTAINER_GID backups && chmod 0700 backups"
+    die "backups/ is uid ${seen% *} mode ${seen#* } as the $DAEMON_KIND daemon's containers see it, not uid $CONTAINER_UID mode 700: $fix"
+}
+
+# Under a rootless daemon the port driver decides whether the containers see the visitor's address
+# (ADR-0033 point 4). One that hides it is refused; one no source names is a warning, since
+# a person can still check it from another machine.
+check_port_driver() {
+    [ "$DAEMON_KIND" = rootless ] || return 0
+    _namespace_target
+    local found code=0
+    found=$(port_driver 2>&1) || code=$?
+    case "$code" in
+        0) say "port driver: $found" ;;
+        3) say "WARNING: the rootless daemon's port driver cannot be read ($found): from another machine, check that /account/sessions/ shows that machine's own address (vps-setup.md §4)" ;;
+        *) die "${found:-the port driver could not be checked}. Set DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns and DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=slirp4netns in ~/.config/systemd/user/docker.service.d/override.conf, then systemctl --user daemon-reload && systemctl --user restart docker (vps-setup.md §4)" ;;
+    esac
+}
+
+# Whoever is in the docker group is root on this host (ADR-0033): the runbook's host runs Docker
+# rootless and nobody is in it. CI runners and developers' machines use the group, so it is a
+# warning, never a refusal.
+warn_docker_group() {
+    local entry gid members me
+    entry=$(getent group docker 2>/dev/null) || return 0
+    IFS=: read -r _ _ gid members <<<"$entry"
+    me=$(id -un)
+    if [[ ",$members," == *",$me,"* ]] || [[ " $(id -G) " == *" $gid "* ]]; then
+        say "WARNING: $me is in the docker group, which is root on this host: the runbook's host runs Docker rootless and nobody is in it (vps-setup.md §4, §8)"
+    fi
 }
 
 # The compose files on this machine must be the release's own. Outside a git checkout (a
@@ -175,6 +234,24 @@ check_offsite() {
         || die "the offsite repository does not answer: nothing changed, the site stays open"
 }
 
+# A rootless daemon publishes no port below the kernel's floor for unprivileged ports, and with
+# slirp4netns its refusal does not say why: Caddy would not start at step 4, behind the gates.
+# Both of the runbook's ways pass (ADR-0033 point 3): the floor lowered to 80, or 80 and 443
+# redirected to the unprivileged ports the overlay then publishes. Needs the release's digests.
+check_published_ports() {
+    [ "$DAEMON_KIND" = rootless ] || return 0
+    local floor config found
+    floor=$(cat -- "$PROC_ROOT/sys/net/ipv4/ip_unprivileged_port_start" 2>/dev/null) || floor=""
+    [[ "$floor" =~ ^[0-9]{1,5}$ ]] \
+        || die "net.ipv4.ip_unprivileged_port_start cannot be read: which ports the rootless daemon may publish is unknown"
+    # It holds the env files' values: kept in memory and piped, never in a temporary file.
+    config=$(compose config --format json) \
+        || die "docker compose config failed: which ports the stack publishes is unknown"
+    found=$(printf '%s' "$config" | python3 ops/checks.py published-ports - --floor "$floor" 2>&1) \
+        || die "$found. Either lower it to 80 (net.ipv4.ip_unprivileged_port_start=80), or keep it, redirect 80 and 443 to 8080 and 8443 and publish those (PUBLISHED_HTTP_PORT and PUBLISHED_HTTPS_PORT in .env): vps-setup.md §4.1, point 3"
+    say "published ports: $found"
+}
+
 # This process, not .env, carries the new digests until step 8: .env says what is running.
 preflight() {
     export APP_DIGEST="$RELEASE_APP_DIGEST" BACKUP_DIGEST="$RELEASE_BACKUP_DIGEST"
@@ -184,6 +261,7 @@ preflight() {
         || die "the compose files do not run $RELEASE_APP_REF: refused"
     grep -qxF "$RELEASE_BACKUP_REF" <<<"$images" \
         || die "the compose files do not run $RELEASE_BACKUP_REF: refused"
+    check_published_ports
     # The third-party images are on this machine before the gates: a registry that does not answer
     # must not stall a deploy with the site closed.
     compose pull --quiet caddy db clamd freshclam </dev/null \
@@ -206,7 +284,8 @@ backup_before_migrating() {
     output=$(compose run --rm --no-deps -T backup run --wait 1800 \
         --label "pre-deploy-$VERSION" </dev/null) || die "the pre-deploy backup failed"
     dump=$(printf '%s\n' "$output" | tail -n 1)
-    [[ "$dump" == gmat-* ]] || die "the backup named no dump"
+    # recover.sh restore-predeploy later reads backups/ under this name.
+    dump_name_ok "$dump" || die "the backup named no dump"
     state_set DUMP "$dump"
     say "pre-deploy dump: $dump"
 }
@@ -216,7 +295,11 @@ main() {
     take_lock
     refuse_unfinished
     require_tools
+    check_cosign
     check_env_files
+    check_host_directories
+    check_port_driver
+    warn_docker_group
 
     say "step 2: verifying release $VERSION"
     verify_release "$VERSION" ".release/$VERSION"

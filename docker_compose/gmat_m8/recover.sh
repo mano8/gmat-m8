@@ -119,6 +119,25 @@ require_unfinished_deploy() {
     [ "$(reached_step)" -ge 4 ] || die "that deploy stopped before the gates: nothing changed"
 }
 
+# The daemon's kind and, under a rootless one, its port driver (ADR-0033). In subshells: status
+# answers whatever the daemon does, and a check that fails is shown, never fatal.
+daemon_status() {
+    local kind driver code=0
+    kind=$( (detect_daemon && printf '%s' "$DAEMON_KIND") 2>&1) || kind="unknown: ${kind##*ERROR: }"
+    printf 'docker daemon:     %s\n' "$kind"
+    if [ "$kind" = root ]; then
+        printf 'port driver:       none, a root daemon publishes ports itself\n'
+    fi
+    [ "$kind" = rootless ] || return 0
+    driver=$( (_namespace_target && port_driver) 2>&1) || code=$?
+    driver="${driver##*ERROR: }"
+    case "$code" in
+        0) printf "port driver:       %s, keeps the visitor's address\n" "$driver" ;;
+        2) printf 'port driver:       refused by deploy.sh: %s\n' "$driver" ;;
+        *) printf 'port driver:       unknown: %s\n' "$driver" ;;
+    esac
+}
+
 cmd_status() {
     local status reached
     status=$(state_get STATUS)
@@ -130,6 +149,7 @@ cmd_status() {
     printf 'last deploy:       %s, target %s, stopped at step %s\n' \
         "${status:-none}" "$(state_get TARGET_VERSION)" "$reached"
     printf 'pre-deploy dump:   %s\n' "$(state_get DUMP)"
+    daemon_status
     printf '\nDecision tree:\n'
     if [ "$status" = failed ] && [ "$reached" -lt 4 ]; then
         printf '  -> it stopped before the gates: nothing changed, nothing to recover\n'
@@ -232,7 +252,10 @@ cmd_restore_predeploy() {
     local dump
     dump=$(state_get ORIGINAL_DUMP)
     dump="${dump:-$(state_get DUMP)}"
-    [ -n "$dump" ] && [ -f "backups/$dump.dump" ] || die "the pre-deploy dump ${dump:-?} is not in backups/"
+    [ -n "$dump" ] || die "no pre-deploy dump is recorded"
+    require_dump_name "$dump"
+    backups_ready
+    backups_do exists dump "$dump" || die "the pre-deploy dump $dump is not in backups/"
     confirm_typed RESTORE "$CONFIRM" \
         "Restoring $dump, the database as it was before this deploy. Nothing was written since."
     begin
@@ -240,7 +263,7 @@ cmd_restore_predeploy() {
     export APP_VERSION="$PREVIOUS_VERSION" APP_DIGEST="$PREVIOUS_APP" BACKUP_DIGEST="$PREVIOUS_BACKUP"
     verify_dump "$dump"
     preserve_failed_state "$(state_get STARTED_AT)"
-    restore_database "backups/$dump.dump"
+    restore_database "$dump"
     restore_media "$dump"
     rotate_secret_key
     reconcile_from_state "$OPERATOR" "$PRESERVED/failed-state.json" "$PRESERVED/reconcile-report.json"
@@ -285,13 +308,19 @@ cmd_restore() {
     require_operator
     [ -n "$INCIDENT" ] || die "--incident TEXT is required: this decision goes in the incident log"
     [ -n "$DUMP_ARG" ] || usage
-    local dump="${DUMP_ARG%.dump}" since version
+    local dump="${DUMP_ARG%.dump}" since version="$RESTORE_VERSION"
     dump="${dump##*/}"
-    [ -f "backups/$dump.dump" ] && [ -f "backups/$dump.manifest.json" ] \
+    require_dump_name "$dump"
+    backups_ready
+    backups_do exists dump "$dump" && backups_do exists manifest "$dump" \
         || die "backups/$dump.dump and its manifest are needed"
-    version="${RESTORE_VERSION:-$(python3 ops/checks.py dump-version "backups/$dump.manifest.json")}"
+    # The manifest reaches the host's python3 on stdin: only the helper reads backups/.
+    if [ -z "$version" ]; then
+        version=$(backups_do read manifest "$dump" | python3 ops/checks.py dump-version -) \
+            || die "the manifest of $dump cannot be read"
+    fi
     [ -n "$version" ] && [ "$version" != unknown ] || die "the dump names no version: pass --version"
-    since=$(python3 ops/checks.py dump-time "backups/$dump.manifest.json") \
+    since=$(backups_do read manifest "$dump" | python3 ops/checks.py dump-time -) \
         || die "the manifest of $dump does not say when it was taken"
     take_lock
     digests_for "$version"
@@ -304,7 +333,7 @@ cmd_restore() {
     preserve_failed_state "$since"
     [ "$DB_UNREADABLE" = 1 ] || say "Written since the dump, for re-entry: $PRESERVED/written-since.json"
     note_incident restore "$dump" "$since"
-    restore_database "backups/$dump.dump"
+    restore_database "$dump"
     restore_media "$dump"
     rotate_secret_key
     if [ "$DB_UNREADABLE" = 1 ]; then
@@ -315,23 +344,27 @@ cmd_restore() {
     finish "$version" "$TARGET_APP" "$TARGET_BACKUP" "$dump" restore
 }
 
-# The snapshot's files arrive under backups/.offsite/backups/ with restic's absolute paths.
+# The snapshot's files arrive under backups/.offsite/backups/ with restic's absolute paths; the
+# dump's name is checked before its files are moved by name.
 fetch_snapshot() { # fetch_snapshot ID: sets FETCHED to the dump's base name
     compose run --rm --no-deps -T --entrypoint sh backup -c \
         'rm -rf /backups/.offsite && exec restic restore "$0" --target /backups/.offsite' "$1" \
         </dev/null
     local found
-    found=$(find backups/.offsite/backups -maxdepth 1 -name 'gmat-*.dump' -print -quit)
+    found=$(backups_do find-fetched) || die "backups/.offsite cannot be read"
     [ -n "$found" ] || die "snapshot $1 holds no dump"
     FETCHED=$(basename "$found" .dump)
-    mv backups/.offsite/backups/"$FETCHED"* backups/
-    rm -rf backups/.offsite
+    require_dump_name "$FETCHED"
+    backups_do adopt "$FETCHED"
+    backups_do drop-offsite
 }
 
 cmd_restore_offsite() {
     require_operator
     [ -n "$INCIDENT" ] || die "--incident TEXT is required"
     [ -n "$SNAPSHOT" ] && [ -n "$RESTORE_VERSION" ] || usage
+    require_snapshot_id "$SNAPSHOT"
+    backups_ready
     take_lock
     digests_for "$RESTORE_VERSION"
     export APP_VERSION="$RESTORE_VERSION" APP_DIGEST="$TARGET_APP" BACKUP_DIGEST="$TARGET_BACKUP"
@@ -341,7 +374,7 @@ cmd_restore_offsite() {
     fetch_snapshot "$SNAPSHOT"
     verify_dump "$FETCHED"
     note_incident restore-offsite "$FETCHED" ""
-    restore_database "backups/$FETCHED.dump"
+    restore_database "$FETCHED"
     restore_media "$FETCHED"
     rotate_secret_key
     PRESERVED="preserved/$(date -u +%Y%m%dT%H%M%SZ)"

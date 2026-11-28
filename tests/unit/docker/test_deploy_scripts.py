@@ -32,6 +32,10 @@ IDENTITY = (
 
 
 DUMP_TIME = "2026-11-04T06:00:00Z"
+# Names as backup.sh and restic give them: the scripts refuse any other.
+LATER_DUMP = "gmat-20261104T060000Z"
+OFFSITE_DUMP = "gmat-20261104T120000Z-offsite"
+SNAPSHOT = "4f2a9c1e"
 
 
 def position(log: list[str], fragment: str) -> int:
@@ -788,11 +792,11 @@ class TestRestoreAfterWrites:
         assert ready.run("deploy.sh", VERSION).returncode == 0
         ready.clear_logs()
         backups = ready.stack / "backups"
-        (backups / "gmat-1.dump").write_text("DUMP")
-        (backups / "gmat-1.manifest.json").write_text(
+        (backups / f"{LATER_DUMP}.dump").write_text("DUMP")
+        (backups / f"{LATER_DUMP}.manifest.json").write_text(
             json.dumps({"app_version": VERSION, "created_at": DUMP_TIME})
         )
-        return "gmat-1"
+        return LATER_DUMP
 
     def test_states_the_loss_window_keeps_the_incident_and_replays(
         self, ready: World, dump: str
@@ -813,7 +817,7 @@ class TestRestoreAfterWrites:
             result.stderr
         )
         incident = (ready.stack / "incident.log").read_text()
-        assert "#42 bad data" in incident and "gmat-1" in incident and "op@test" in incident
+        assert "#42 bad data" in incident and LATER_DUMP in incident and "op@test" in incident
         assert f"loss-window={DUMP_TIME}..now" in incident
         preserved = next((ready.stack / "preserved").iterdir())
         assert (preserved / "written-since.json").exists()
@@ -896,7 +900,7 @@ class TestRestoreAfterWrites:
 
     def test_an_older_version_is_verified_as_a_release(self, ready: World, dump: str) -> None:
         backups = ready.stack / "backups"
-        (backups / "gmat-1.manifest.json").write_text(
+        (backups / f"{LATER_DUMP}.manifest.json").write_text(
             json.dumps({"app_version": "unknown", "created_at": DUMP_TIME})
         )
         result = ready.run("recover.sh", "restore", dump, "--operator", "o@t", "--incident", "x")
@@ -933,10 +937,10 @@ class TestRestoreOffsite:
         changed.write_text("moved@test")
         offsite = world.stack / "backups" / ".offsite" / "backups"
         offsite.mkdir(parents=True)
-        (offsite / "gmat-9.dump").write_text("DUMP")
-        (offsite / "gmat-9.manifest.json").write_text("{}")
+        (offsite / f"{OFFSITE_DUMP}.dump").write_text("DUMP")
+        (offsite / f"{OFFSITE_DUMP}.manifest.json").write_text("{}")
         result = world.run(
-            "recover.sh", "restore-offsite", "--snapshot", "abc123", "--version", VERSION,
+            "recover.sh", "restore-offsite", "--snapshot", SNAPSHOT, "--version", VERSION,
             "--operator", "op@test", "--incident", "VPS lost", "--confirm", "RESTORE",
             "--gap-offboarded", str(gone), "--gap-credentials-changed", str(changed),
         )  # fmt: skip
@@ -945,7 +949,7 @@ class TestRestoreOffsite:
         in_order(
             log,
             "restic restore",
-            "--verify gmat-9.dump",
+            f"--verify {OFFSITE_DUMP}.dump",
             "pg_restore",
             "--no-failed-state",
             "web verify-internal",
@@ -954,13 +958,13 @@ class TestRestoreOffsite:
         assert "--gap-offboarded left@test" in reconcile
         assert "--gap-credentials-changed moved@test" in reconcile
         assert world.deployed()[-1][-1] == "restore-offsite"
-        assert (world.stack / "backups" / "gmat-9.dump").exists()
+        assert (world.stack / "backups" / f"{OFFSITE_DUMP}.dump").exists()
 
     def test_a_snapshot_without_a_dump(self, world: World) -> None:
         world.release(VERSION)
         (world.stack / "backups" / ".offsite" / "backups").mkdir(parents=True)
         result = world.run(
-            "recover.sh", "restore-offsite", "--snapshot", "abc", "--version", VERSION,
+            "recover.sh", "restore-offsite", "--snapshot", SNAPSHOT, "--version", VERSION,
             "--operator", "op@test", "--incident", "x", "--confirm", "RESTORE",
         )  # fmt: skip
         assert result.returncode != 0
