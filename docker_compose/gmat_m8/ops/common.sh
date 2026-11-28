@@ -185,7 +185,7 @@ stop_writers() { compose stop web worker; }
 start_caddy() {
     compose run --rm --no-deps -T caddy-perms </dev/null \
         || die "Caddy's volumes could not be given to its uid (caddy-perms): Caddy was not started"
-    compose up -d --no-deps "$@" caddy
+    compose up -d --no-deps caddy
 }
 
 # The scanner is recreated every time: its configuration is a bind mount, which `up` does not see
