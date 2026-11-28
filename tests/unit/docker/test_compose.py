@@ -39,6 +39,11 @@ _ComposeLoader.add_multi_constructor(
 )
 
 
+def _short_volumes(service: dict[str, Any]) -> list[str]:
+    """A service's mounts written as strings; the long form (a dict) is read where it matters."""
+    return [volume for volume in service.get("volumes", []) if isinstance(volume, str)]
+
+
 def compose(name: str, directory: Path = STACK) -> dict[str, Any]:
     text = (directory / name).read_text(encoding="utf-8")
     loaded: dict[str, Any] = yaml.load(text, _ComposeLoader)  # noqa: S506 (SafeLoader subclass)
@@ -73,12 +78,13 @@ def test_the_media_volume_is_private_to_web_worker_and_backup(base: dict[str, An
     serves files, never sees the volume, so nothing bypasses the authorised download."""
     services = base["services"]
     mounts = {
-        name: [volume for volume in service.get("volumes", []) if volume.startswith("media:")]
+        name: [volume for volume in _short_volumes(service) if volume.startswith("media:")]
         for name, service in services.items()
     }
     assert mounts == {
         "caddy-perms": [],
         "caddy": [],
+        "cloudflared": [],
         "migrate": [],
         "web": ["media:/srv/media"],
         "worker": ["media:/srv/media"],
@@ -178,7 +184,7 @@ def test_caddy_runs_as_uid_1000_without_a_capability(base: dict[str, Any]) -> No
     assert "cap_add" not in caddy
     assert caddy["read_only"] is True
     assert caddy["depends_on"]["caddy-perms"] == {"condition": "service_completed_successfully"}
-    assert {"caddy_data:/data", "caddy_config:/config"} <= set(caddy["volumes"])
+    assert {"caddy_data:/data", "caddy_config:/config"} <= set(_short_volumes(caddy))
 
 
 def test_caddy_perms_only_gives_caddy_its_volumes(base: dict[str, Any]) -> None:

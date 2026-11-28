@@ -41,6 +41,8 @@ The facts this record relies on were checked against Docker's current rootless d
    - **Names are checked first.** A dump or snapshot name reaches the helper only after it matches its pattern. It arrives as its own argument, never inside a string that a shell parses again.
 
    Under a root daemon the helper runs the same operation directly, as `deploy`. [`docs/rootless-host.md`](../rootless-host.md) lists every line it replaces and the operations it allows.
+
+   *Amended in M13.3 ([ADR-0034](0034-edge-modes-opt-in.md)):* the same way into the namespace (`_daemon_run`) serves `edge_secret_do`, for the edge's two secrets and nothing else: `tls/key.pem` and `tunnel/token`, each a plain file that is no link in a directory that is no link. It has two operations: `stat` (the owner and mode as the containers see them, which `deploy.sh` requires to be uid 1000 and 0400) and `give` (`chown --no-dereference` to the containers' uid and `chmod 0400`, which `init.sh` runs). Under a root daemon `give` only closes a file that is already the containers' uid's, since only root could give one away, and `init.sh` says the command. Like the rest, it never makes a file `deploy`'s or widens a mode.
 7. **Ownership is the containers' uid, seen from inside.** `backups/` and everything in it belong to the containers' uid 1000, mode 0700 for directories and 0600 for files:
    - under a root daemon that is `deploy` (uid 1000, as the runbook requires);
    - under a rootless daemon it is host uid `subuid_start + 999` (100999 with the usual range). `init.sh` creates the directory that way through the helper, and gives what is already in it to that uid too.

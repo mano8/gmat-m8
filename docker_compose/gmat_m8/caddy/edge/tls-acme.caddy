@@ -1,0 +1,7 @@
+# EDGE_TLS=acme, the default (ADR-0034 point 2): Caddy obtains and renews its certificates itself,
+# as before the edge modes existed. Each mode's file defines the same snippets; these add nothing.
+(edge-tls-global) {
+}
+
+(edge-tls-site) {
+}

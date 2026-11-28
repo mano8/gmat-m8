@@ -360,8 +360,13 @@ class World:
     def state_of_a_finished_deploy(self) -> None:
         (self.stack / "deploy.state").write_text("STEP=11\nSTATUS=done\n", encoding="utf-8")
 
-    def _set_env(self, key: str, value: str) -> None:
-        path = self.stack / ".env"
+    def set_env(self, file: str = ".env", **values: str) -> None:
+        """Sets keys of one of the env files, each replacing its line."""
+        for key, value in values.items():
+            self._set_env(key, value, file)
+
+    def _set_env(self, key: str, value: str, file: str = ".env") -> None:
+        path = self.stack / file
         lines = [
             line
             for line in path.read_text(encoding="utf-8").splitlines()
@@ -531,6 +536,17 @@ ENV_FILE = textwrap.dedent(
 )
 
 
+# The hosts deploy.sh's edge check reads (ADR-0034): Django answers APP_DOMAIN, and links in email
+# name it.
+APP_ENV_FILE = textwrap.dedent(
+    """\
+    DJANGO_SECRET_KEY=old-key-value
+    DJANGO_ALLOWED_HOSTS=gmat.test
+    DJANGO_CSRF_TRUSTED_ORIGINS=https://gmat.test
+    """
+)
+
+
 def _checkout(root: Path) -> Path:
     """The parts of a checkout the host scripts reach: the stack directory (Caddy's files
     included) and what it reads from ``docker/`` (``init.sh``'s role scripts, the drill's
@@ -559,7 +575,7 @@ def world(tmp_path: Path) -> Iterator[World]:
     (stack / "backups").mkdir(mode=0o700)
     (stack / ".env").write_text(ENV_FILE, encoding="utf-8")
     (stack / ".env").chmod(0o600)
-    (stack / "app.env").write_text("DJANGO_SECRET_KEY=old-key-value\n", encoding="utf-8")
+    (stack / "app.env").write_text(APP_ENV_FILE, encoding="utf-8")
     (stack / "app.env").chmod(0o600)
     fake = tmp_path / "fake"
     fake.mkdir()

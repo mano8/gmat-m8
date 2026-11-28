@@ -1,0 +1,12 @@
+# EDGE_TLS=files (ADR-0034 point 5): the certificate and its key are files of tls/, mounted read
+# only; the key is mode 0400 and the containers' uid's. Caddy asks ACME for nothing, and a client
+# that names no host, as a browser does for an IP address, gets this certificate too. Renewing it
+# is the operator's (ops/checks.py edge warns 30 days before it expires).
+(edge-tls-global) {
+	auto_https disable_certs
+	default_sni {$APP_DOMAIN}
+}
+
+(edge-tls-site) {
+	tls /etc/caddy/tls/cert.pem /etc/caddy/tls/key.pem
+}

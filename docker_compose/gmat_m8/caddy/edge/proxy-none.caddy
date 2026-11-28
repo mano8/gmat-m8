@@ -1,0 +1,10 @@
+# EDGE_PROXY=none, the default (ADR-0034 point 3): Caddy believes no forwarded header, and the
+# visitor is the connection's peer. Each mode's file defines the same snippets; these add nothing.
+(edge-proxy-servers) {
+}
+
+(edge-proxy-site) {
+}
+
+(edge-proxy-upstream) {
+}

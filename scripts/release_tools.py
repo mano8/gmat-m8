@@ -250,9 +250,9 @@ def build_manifest(
 
 
 def scan_targets(compose_text: str, manifest: dict[str, Any] | None) -> list[dict[str, str]]:
-    """The production image set, one entry per image and architecture: Caddy, PostgreSQL and
-    ClamAV from the compose file, plus the application and backup images of the latest release
-    when there is one.
+    """The production image set, one entry per image and architecture: Caddy, PostgreSQL, ClamAV
+    and the optional cloudflared from the compose file, plus the application and backup images of
+    the latest release when there is one.
 
     An ``image:`` line that is neither digest-pinned nor a ``${VAR}`` reference (the images
     built here) is an error: a quiet skip would shrink the scan without anyone noticing."""

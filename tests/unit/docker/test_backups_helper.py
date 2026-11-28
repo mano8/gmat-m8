@@ -757,7 +757,7 @@ def test_the_dump_pattern_is_backup_sh_naming() -> None:
 
 
 def test_every_command_of_the_helper_is_a_tool_named_by_its_path() -> None:
-    calls = re.findall(r"_backups_run (\S+)", COMMON)
+    calls = re.findall(r"_daemon_run (\S+)", COMMON)
     assert calls and all(call.startswith("/usr/bin/") for call in calls), calls
     for call in re.findall(r"-exec (\S+)", COMMON):
         assert call.startswith("/usr/bin/"), call
@@ -774,7 +774,7 @@ def test_nothing_is_given_to_this_account(name: str) -> None:
     """The only owner a script ever sets is the containers', and no link is followed to set it."""
     code = [line for line in SCRIPTS[name].splitlines() if not line.lstrip().startswith("#")]
     # A line that runs it (a message that names the command for a person does not).
-    runs = re.compile(r"(?:^|_backups_run |-exec |&& |\|\| )(?:/usr/bin/)?chown\b")
+    runs = re.compile(r"(?:^|_daemon_run |-exec |&& |\|\| )(?:/usr/bin/)?chown\b")
     assert any(runs.search(line.strip()) for line in code) == (name == "ops/common.sh")
     for line in code:
         if runs.search(line.strip()):

@@ -12,7 +12,9 @@
 # Existing env files are never overwritten. Secrets come from /dev/urandom and are written
 # only to the env files; this script prints no secret. backups/ belongs to the containers' uid
 # 1000 as the daemon sees it: under a rootless daemon that is a shifted uid, set through the
-# helper of ops/common.sh (ADR-0033); run init.sh again whenever the daemon changes.
+# helper of ops/common.sh (ADR-0033); run init.sh again whenever the daemon changes. So do the
+# edge's secrets once they are in place (tls/key.pem, tunnel/token: ADR-0034), and the edge
+# settings are checked last (ops/checks.py edge): run init.sh again after changing them.
 set -euo pipefail
 umask 077
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -28,7 +30,7 @@ for arg in "$@"; do
         --reset-db) reset_db=1 ;;
         --yes) assume_yes=1 ;;
         -h | --help)
-            sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -165,19 +167,47 @@ chmod 0600 .env app.env
 # flags/ is read by Caddy and the worker (a shifted uid under a rootless daemon): deploy's, 0755.
 mkdir -p flags
 chmod 0755 flags
+# The edge's files (ADR-0034): tls/ for Caddy alone, tunnel/ for cloudflared alone, this account's
+# and searchable by the containers' uid, which only "other" lets in under a rootless daemon. Their
+# certificates are public; their secrets are given to that uid below, mode 0400.
+for dir in tls tunnel; do
+    [ ! -L "$dir" ] || die "$dir/ is a symbolic link: make it a directory"
+    mkdir -p "$dir"
+    chmod 0755 "$dir"
+done
+for public in tls/cert.pem tunnel/ca.pem; do
+    if [ -f "$public" ] && [ ! -L "$public" ] && [ -O "$public" ]; then
+        chmod 0644 "$public"
+    fi
+done
+
+# Each secret in place becomes the containers' uid's, 0400: under a rootless daemon through the
+# helper; under a root daemon only root can, so this says how (deploy.sh refuses it otherwise).
+give_edge_secrets() {
+    local secret seen
+    for secret in tls/key.pem tunnel/token; do
+        [ -e "$secret" ] || [ -L "$secret" ] || continue
+        edge_secret_do give "$secret"
+        seen=$(edge_secret_do stat "$secret")
+        [ "$seen" = "$CONTAINER_UID 400" ] \
+            || say "$secret is uid ${seen% *} mode ${seen#* }: the containers read it as uid $CONTAINER_UID, so give it to them: sudo chown $CONTAINER_UID:$CONTAINER_GID $secret && sudo chmod 0400 $secret"
+    done
+}
+
 # backups/ is written by the backup container (uid 1000): theirs as the daemon sees it, 0700.
 if docker info >/dev/null 2>&1; then
     detect_daemon
     [ "$ci" = 0 ] || [ "$DAEMON_KIND" = root ] \
         || die "--ci is for a CI runner's root daemon: a rootless host never makes backups/ world-writable"
     backups_do prepare
+    give_edge_secrets
 else
     # Without the daemon no one can tell a CI runner's root daemon from a rootless host.
     [ "$ci" = 0 ] || die "--ci needs the Docker daemon to answer (docker info)"
     # Widens nothing: on a rootless host the backup container cannot write a new one yet, and
     # deploy.sh refuses to start until init.sh has run with the daemon up. An existing one is left
     # as it is: on a rootless host it is the containers' by now, and not this account's to change.
-    say "the Docker daemon does not answer: a missing backups/ is created as $(id -un), mode 0700. On a rootless host, run init.sh again once the daemon runs (docs/rootless-host.md)"
+    say "the Docker daemon does not answer: a missing backups/ is created as $(id -un), mode 0700, and the edge's secrets are left as they are. On a rootless host, run init.sh again once the daemon runs (docs/rootless-host.md)"
     [ -e backups ] || [ -L backups ] || mkdir -m 0700 backups
 fi
 # Read by the scanner's containers, the database and Caddy under their own uid, whatever the
@@ -194,6 +224,13 @@ if [ "${#created[@]}" -gt 0 ]; then
 else
     echo "init.sh: env files already exist and were kept"
 fi
+
+# The edge settings, last: what deploy.sh would refuse is said now (ADR-0034).
+if ! edge=$(python3 ops/checks.py edge --env .env --app-env app.env 2>&1); then
+    echo "init.sh: $edge" >&2
+    exit 1
+fi
+while IFS= read -r line; do echo "init.sh: $line"; done <<<"$edge"
 cat <<'EOF'
 
 Next:

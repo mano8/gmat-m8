@@ -10,7 +10,8 @@
 # - OUTBOUND_EMAIL=off: the worker never claims or sends a message (post-restore-reconcile
 #   then quarantines the restored outbox);
 # - the scanner and the decoder are not started: a drill stores no upload, so an upload here is
-#   refused (no scanner, no file), and they would only take memory.
+#   refused (no scanner, no file), and they would only take memory;
+# - neither Caddy nor the tunnel's connector is started (the script starts services by name).
 name: gmat-m8-restore-drill
 
 services:
@@ -41,4 +42,8 @@ networks:
   egress:
     internal: true
   updates:
+    internal: true
+  tunnel:
+    internal: true
+  tunnel_egress:
     internal: true

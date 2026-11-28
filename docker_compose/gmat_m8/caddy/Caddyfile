@@ -2,9 +2,22 @@
 # gate, the reverse proxy to Django, the redacted access log and the fallback page.
 #
 # Security headers are set by Django (one place, covered by tests), not here.
-# Caddy is the only HTTP access log. It never trusts a client-sent X-Forwarded-* header
-# (no trusted_proxies), so the client address Django sees is the one Caddy observed.
+# Caddy is the only HTTP access log. It writes the one X-Forwarded-For Django reads: the address
+# it observed, or in the tunnel's mode the one the connector names, believed from that connector's
+# address alone (ADR-0034). A client's own X-Forwarded-For or CF-Connecting-IP never reaches Django.
+#
+# The edge modes (ADR-0034), all off by default: each import names one file of caddy/edge/ by the
+# value compose passes (EDGE_TLS, EDGE_PROXY), and that file defines the named snippets imported
+# below. A value outside the allowlist names no file, or two, and Caddy refuses to start;
+# ops/checks.py edge refuses it before that.
+import edge/tls-{$EDGE_TLS}.caddy
+import edge/proxy-{$EDGE_PROXY}.caddy
+
+# Global options.
 {
+	# EDGE_TLS=files: no certificate from ACME, and the file's for a client that names no host.
+	import edge-tls-global
+
 	# No admin API: nothing can reconfigure Caddy at run time.
 	admin off
 
@@ -29,6 +42,8 @@
 			read_body {$CADDY_READ_BODY_TIMEOUT:120s}
 			idle 5m
 		}
+		# EDGE_PROXY=cloudflare: whom Caddy believes about the visitor's address.
+		import edge-proxy-servers
 	}
 
 	# Runtime and error logs (they can carry request URIs) get the same redaction as the
@@ -41,10 +56,22 @@
 				request>uri regexp "^(/accounts/password/reset/key/|/account/email-change/|/invite/)[^?]*|(\?).*$" "${1}${2}REDACTED"
 				request>headers>Referer delete
 				request>headers>Hx-Current-Url delete
+				request>headers>Cf-Access-Jwt-Assertion delete
 				resp_headers>Location delete
 			}
 		}
 	}
+}
+
+# What both proxies send web about the visitor, in every mode. Without a trusted proxy {client_ip}
+# is the peer, so this is Caddy's own value; with one, Caddy would otherwise append the connector's
+# address and Django, which believes the last entry, would see it. CF-Connecting-IP never reaches
+# web, even from a peer Caddy does not believe.
+(web-forwarded) {
+	header_up X-Forwarded-For {client_ip}
+	header_up -Cf-Connecting-Ip
+	# EDGE_PROXY=cloudflare: what else Caddy would take from the connector is Caddy's own again.
+	import edge-proxy-upstream
 }
 
 # Plain HTTP only redirects, to the port users actually reach (HTTPS_PORT_SUFFIX is ":8443"
@@ -53,7 +80,13 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 	redir https://{host}{$HTTPS_PORT_SUFFIX}{uri} 308
 }
 
-{$APP_DOMAIN:localhost}:{$HTTPS_PORT:8443} {
+# EDGE_EXTRA_HOST, empty by default, is one more name for the same site (the tunnel's). Its plain
+# HTTP gets Caddy's own redirect, which names no port: the published 443 in production.
+{$APP_DOMAIN:localhost}:{$HTTPS_PORT:8443} {$EDGE_EXTRA_HOST} {
+	# EDGE_TLS=files: the certificate and key of tls/. EDGE_PROXY=cloudflare: no-transform.
+	import edge-tls-site
+	import edge-proxy-site
+
 	encode zstd gzip
 
 	# Neither Caddy nor Gunicorn announces itself.
@@ -101,6 +134,7 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 			respond @blocked 404
 			reverse_proxy web:8000 {
 				header_up X-Request-ID {http.request.uuid}
+				import web-forwarded
 				transport http {
 					dial_timeout 3s
 				}
@@ -110,6 +144,7 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 		handle {
 			reverse_proxy web:8000 {
 				header_up X-Request-ID {http.request.uuid}
+				import web-forwarded
 				transport http {
 					dial_timeout 3s
 				}
@@ -130,11 +165,13 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 		}
 	}
 
-	# The only access log. Token-bearing paths and every query string are redacted, and the
-	# headers that can carry a full URL are dropped: Referer and HX-Current-URL, and the
-	# response's Location (Django's slash-appending 301 for a token link opened without its
-	# trailing slash points at the token URL). Credential headers (Cookie, Authorization)
-	# stay redacted by Caddy's default; never enable log_credentials.
+	# The only access log. Token-bearing paths and every query string are redacted on every host
+	# name, and the headers that can carry a full URL are dropped: Referer and HX-Current-URL, and
+	# the response's Location (Django's slash-appending 301 for a token link opened without its
+	# trailing slash points at the token URL). So is Cf-Access-Jwt-Assertion, Cloudflare Access's
+	# token for the person, which carries their email. Credential headers (Cookie, where Access's
+	# own cookie sits, and Authorization) stay redacted by Caddy's default; never enable
+	# log_credentials.
 	log {
 		output stdout
 		format filter {
@@ -143,6 +180,7 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 				request>uri regexp "^(/accounts/password/reset/key/|/account/email-change/|/invite/)[^?]*|(\?).*$" "${1}${2}REDACTED"
 				request>headers>Referer delete
 				request>headers>Hx-Current-Url delete
+				request>headers>Cf-Access-Jwt-Assertion delete
 				resp_headers>Location delete
 			}
 		}

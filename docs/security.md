@@ -72,7 +72,8 @@ Who the application defends against and what it accepts (the threat model and th
 
 - **(a) A believed proxy header.**
   - **Who may send it.** Without `EDGE_PROXY`, Caddy believes no header and the visitor is the connection's peer. With `EDGE_PROXY=cloudflare`, it believes `CF-Connecting-IP`, and only from the `cloudflared` service's one address (`EDGE_TUNNEL_ADDRESS`). That service is fixed on `tunnel`, an internal network that only Caddy and the connector join, chosen by the maintainer on 2026-11-28 (Q76). Nothing else can send from that address: no other container joins the network, and no host process short of root can send from a container's address.
-  - **The check.** Caddy's snippet writes the address followed by a literal `/32`, so a range, a list, `private_ranges` or an empty value stops Caddy from starting (measured on 2.11.9; without the suffix Caddy accepts `0.0.0.0/0`). `ops/checks.py edge` also refuses an address outside the network's subnet, its network or gateway address, and IPv6.
+  - **The check.** Caddy's snippet writes the address quoted and followed by a literal `/32`, `"{$EDGE_TUNNEL_ADDRESS}/32"`, so a range, a list, `private_ranges` or an empty value stops Caddy from starting (measured on 2.11.9). Without the suffix Caddy accepts `0.0.0.0/0`; without the quotes a list separated by spaces passes, since only its last entry gets the suffix: `0.0.0.0/0 <address>` trusted everyone (measured in M13.3). `ops/checks.py edge`, which `init.sh` and `deploy.sh` run first, also refuses an address outside the network's subnet or inside the range Caddy takes its own address from, the subnet's network, gateway and broadcast addresses, and IPv6.
+  - **Nothing else from the connector.** From a peer it believes, Caddy would also keep `X-Forwarded-Proto` and `X-Forwarded-Host` (measured), and Django reads the first. In `cloudflare` mode Caddy writes `X-Forwarded-Proto: https` itself and drops `X-Forwarded-Host`.
   - **What forging would buy:**
     - allauth's per-address limits on sign-in, failed sign-ins, resets and token links (the per-account limits do not depend on the address);
     - the address recorded in the audit trail, in `gmat.security` and in the session list.
@@ -102,13 +103,13 @@ Who the application defends against and what it accepts (the threat model and th
     - a cache rule that ignores the origin's `Cache-Control`, which would keep a `no-store` page and serve it to someone else, since Cloudflare ignores `Vary: Cookie`.
   - **The runbook** keeps Bot Fight Mode, cache rules and Zaraz off for the host, and checks that a signed-in page arrives with `cf-cache-status: DYNAMIC`.
 - **(e) A certificate from files** (`EDGE_TLS=files`).
-  - **No ACME.** Caddy reads `cert.pem` and `key.pem` from a read-only mount. The key is mode 0400 and owned by the containers' uid 1000; under the rootless daemon that owner is set through ADR-0033's helper, so `deploy` itself does not read it.
+  - **No ACME.** Caddy reads `cert.pem` and `key.pem` from a read-only mount. The key is mode 0400 and owned by the containers' uid 1000; under the rootless daemon that owner is set through ADR-0033's helper, so `deploy` itself does not read it. Only Caddy mounts `tls/`, and only the connector `tunnel/` (its token and its CA pool), so neither container sees the other's secret although both run as uid 1000. `deploy.sh` refuses at step 1 a secret that is not uid 1000's with mode 0400, and at step 3 lets Caddy validate its configuration with those files before the gates: a key that does not match its certificate stops the deploy with the site open.
   - **`default_sni`** gives that certificate to a client that sends no server name, as a browser does for an IP address. A client that names another host gets nothing more.
   - **Renewal** is a date in the runbooks' calendar, not a robot: `ops/checks.py edge` warns 30 days before expiry.
   - **The connector verifies the certificate,** with its origin server name and a CA pool, and never "No TLS Verify". The certificate is either a Cloudflare Origin CA certificate, which `cloudflared` trusts by default today (its source marks those roots for removal, so the CA pool names the issuer anyway), or a private CA's.
   - **A private CA** that devices trust is trusted for every name they visit, unless its certificate constrains the names. Whoever holds its key could then intercept those devices' traffic anywhere. The runbook keeps that key off the host and constrains the CA to the installation's names and addresses.
 - **(f) What Cloudflare adds to a request.** Access sends its token for the person to the origin in `Cf-Access-Jwt-Assertion`: a bearer credential that carries their email.
-  - Caddy logs every request header and by default redacts only `Cookie` (where Access's `CF_Authorization` cookie sits), `Set-Cookie` and `Authorization`. So both of Caddy's log filters delete `Cf-Access-Jwt-Assertion`.
+  - Caddy logs every request header and by default redacts only `Cookie` (where Access's `CF_Authorization` cookie sits), `Set-Cookie` and `Authorization`. So both of Caddy's log filters delete `Cf-Access-Jwt-Assertion`, in every mode: Access could sit in front of a host without the tunnel too.
   - The token paths are redacted on the tunnel's host name as on the main one, because the filters match paths, not hosts.
 - **(g) The tunnel's token.** Whoever holds it can run another connector for the same tunnel, and Cloudflare sends visitors to the nearest one: it is as sensitive as the TLS key.
   - It reaches `cloudflared` only as a file (`TUNNEL_TOKEN_FILE`), never as an environment value, which `docker compose config` and `docker inspect` would print.
@@ -117,7 +118,7 @@ Who the application defends against and what it accepts (the threat model and th
 **The supply chain.**
 
 - Dependencies come from `uv.lock` with hashes, with security floors (allauth), `pip-audit` and Dependabot.
-- Base images are pinned by digest and scanned by Trivy on every PR and every night, Caddy, PostgreSQL and ClamAV included, with dated exceptions (X1).
+- Base images are pinned by digest and scanned by Trivy on every PR and every night, Caddy, PostgreSQL, ClamAV and the optional `cloudflared` included, with dated exceptions (X1).
 - Actions are pinned by commit SHA, and gitleaks scans the whole history. One action fetches code when it runs, whatever its pin says (X14). The only repository secrets CI reads are the two coverage tokens, in a job that runs nothing of the project's and that no required check depends on.
 
 **Out of scope.**

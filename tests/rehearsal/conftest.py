@@ -443,6 +443,20 @@ def _prepare_directory(target: Path) -> None:
     shutil.copy2(OVERLAY, stack / OVERLAY.name)
 
 
+def network_keys(subnet: str) -> dict[str, str]:
+    """An installation's own networks: its ``edge`` subnet, and the ``tunnel`` network (ADR-0034)
+    ten /24s further on, so installations side by side, and a development stack on the defaults
+    (172.30.80.0/24 and 172.30.90.0/24), never share a pool."""
+    first, second, third, _ = subnet.split("/", 1)[0].split(".")
+    tunnel = f"{first}.{second}.{int(third) + 10}"
+    return {
+        "EDGE_SUBNET": subnet,
+        "EDGE_TUNNEL_SUBNET": f"{tunnel}.0/24",
+        "EDGE_TUNNEL_RANGE": f"{tunnel}.0/25",
+        "EDGE_TUNNEL_ADDRESS": f"{tunnel}.250",
+    }
+
+
 def _edit_template(stack: Path, values: dict[str, str]) -> None:
     template = stack / ".env.example"
     lines = template.read_text(encoding="utf-8").splitlines()
@@ -468,7 +482,7 @@ def make_world(
             "ACME_EMAIL": "ops@demo.example",
             "HTTP_PORT": str(http_port),
             "HTTPS_PORT": str(https_port),
-            "EDGE_SUBNET": subnet,
+            **network_keys(subnet),
             # The admin is off (the template's default, ADR-0030), so no allowlist is needed.
             "ADMIN_ALLOWED_CIDRS": "",
             "RESTIC_REPOSITORY": "rest:http://rest-append:8000/gmat",

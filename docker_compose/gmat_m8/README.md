@@ -61,12 +61,26 @@ It creates the company and its head office if they are missing and prints a one-
 | --- | --- |
 | `.env` | Compose-level values: domain, ports, subnet, image names, database roles and passwords, the SMTP password (`SMTP_PASSWORD`, passed to the worker only), backup and restic settings, and `COMPOSE_FILE` (adds Mailpit to a stack started without `-f`). Each secret is defined **once** here and reaches the services by interpolation. |
 | `app.env` | Django-only settings (secret key, MFA and outbox keys, allowed hosts, session ages, `OUTBOUND_EMAIL` and the SMTP relay). `app.env.production.example` is the production template. |
-| `caddy/Caddyfile` | Site configuration; `caddy/maintenance/index.html` is the maintenance and fallback page. |
+| `caddy/Caddyfile` | Site configuration; `caddy/maintenance/index.html` is the maintenance and fallback page; `caddy/edge/` holds one file per value of each edge mode (below). |
+| `tls/`, `tunnel/` | The edge's files, only with its modes: the certificate and key Caddy serves (`EDGE_TLS=files`), the tunnel's token and the CA pool its connector checks Caddy against (`EDGE_PROXY=cloudflare`). Created empty by `init.sh`; each key or token is given to the containers' uid with mode 0400 by `init.sh` once it is in place. Never committed. |
 | `flags/` | `maintenance.on` closes the public site (503 page) while `web` keeps running; `worker.paused` stops the worker from claiming, sending and cleaning up (it keeps its heartbeat). Read-only in the containers; written only by deploy and recovery tooling. |
 | `backups/` | Local dumps (mode 0700, files 0600, kept 3 days). |
 | volume `media` | Attachments (M6.4): `files/` (stored, random names) and `staging/` (uploads in progress). `web` and the worker mount it read-write, the backup read-only (`MEDIA_DIR`); Caddy never sees it. Quota `ATTACHMENT_STORAGE_LIMIT_MB` in `app.env` (default 5120). |
 
 None of the env files is committed; only the `*.example` templates are.
+
+### The edge (optional)
+
+All off by default: without these `.env` keys the site is served as above. `bash init.sh` and `deploy.sh` check them (`ops/checks.py edge`) and refuse any other spelling; run `init.sh` again after changing one.
+
+| Key | Values | What it does |
+| --- | --- | --- |
+| `EDGE_TLS` | `acme` (default), `files` | `files`: Caddy serves `tls/cert.pem` and `tls/key.pem`, asks ACME for nothing, and gives that certificate to a client that names no host (a browser on an IP address) |
+| `EDGE_EXTRA_HOST` | empty, or one host name | one more name the site answers (the tunnel's); add it to `DJANGO_ALLOWED_HOSTS` |
+| `EDGE_PROXY` | `none` (default), `cloudflare` | `cloudflare`: visitors come through Cloudflare Tunnel, whose connector runs as the `cloudflared` service (with `COMPOSE_PROFILES=tunnel`); Caddy believes their address from that connector alone. Needs `EDGE_TLS=files` |
+| `EDGE_TUNNEL_SUBNET`, `EDGE_TUNNEL_RANGE`, `EDGE_TUNNEL_ADDRESS` | `172.30.90.0/24`, `172.30.90.0/25`, `172.30.90.250` | the `tunnel` network that only Caddy and the connector join, the range Caddy takes its address from, and the connector's fixed address outside it |
+
+The links in email use the first `DJANGO_CSRF_TRUSTED_ORIGINS` entry of `app.env`, which the check prints. The design and its risks: `docs/adr/0034-edge-modes-opt-in.md` and `docs/security.md` (*The edge*).
 
 ## Overlays
 
@@ -154,8 +168,8 @@ The drill (`./restore-drill.sh`, see its header) never runs next to production: 
 ## Security notes
 
 - **Networks.** `web`, `migrate`, `backup` and `worker` each reach the database through their own internal network, so none of them can reach another (the live suite proves the worker cannot reach `web`). The worker and the backup reach the outside through `egress`. `edge` is internal and shared only by Caddy and `web`; Gunicorn trusts forwarded headers from that subnet only (`EDGE_SUBNET`, pinned). `web` has no route to the internet.
-- **Client address.** Caddy trusts no client-sent `X-Forwarded-*` header, so rate limits see the address Caddy observed.
-- **Logs.** Caddy's filter replaces token paths (`/accounts/password/reset/key/…`, and the invitation and email-change routes from M2.6) and every query string with `REDACTED` and drops `Referer` and `HX-Current-URL`. Gunicorn's access log is off; its error log goes through the same redaction as Django's.
+- **Client address.** Caddy trusts no client-sent `X-Forwarded-*` header, so rate limits see the address Caddy observed. With `EDGE_PROXY=cloudflare` it believes `CF-Connecting-IP` from the tunnel's connector alone, at its one fixed address, and still writes the `X-Forwarded-For` Django reads itself.
+- **Logs.** Caddy's filter replaces token paths (`/accounts/password/reset/key/…`, and the invitation and email-change routes from M2.6) and every query string with `REDACTED`, on every host name, and drops `Referer`, `HX-Current-URL` and Cloudflare Access's `Cf-Access-Jwt-Assertion`. Gunicorn's access log is off; its error log goes through the same redaction as Django's.
 - **Admin.** Everything is administered in the app; the Django admin is optional and read-only, off unless `DJANGO_ADMIN_ENABLED=true` in `.env` (compose gives the same switch to Caddy and Django). Off, its prefix is an unknown path (404). On, `ADMIN_URL_PATH` sets the prefix for both and `ADMIN_ALLOWED_CIDRS` restricts it at Caddy (everyone else gets a 404): a local stack defaults to open, in production an empty list lets nobody in and `deploy.sh` refuses an empty or open one. The admin also needs an MFA-verified session.
 - **Database roles.** `owner` (migrations only), `runtime` (DML only, so it cannot alter or drop tables), `backup` (`pg_read_all_data`, read-only sessions). Passwords are generated by `init.sh` and refused if weak.
 - **Mail.** Requests never talk to SMTP: they write `EmailOutbox` rows and the worker sends them. Sensitive bodies (reset links) are encrypted with `OUTBOX_ENCRYPTION_KEYS` and wiped once sent or after an hour. The SMTP password reaches the worker only.

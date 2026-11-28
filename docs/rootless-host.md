@@ -88,6 +88,9 @@ This was tried on the maintainer's Linux machine with an unprivileged user names
 | `backups/<base>.{dump,manifest.json,media}` (`restore-drill.sh --from-dir`) | the helper's `import` | the operator (`deploy`, 1000) | `subuid_start + 999` | as copied |
 | `flags/` | `init.sh`; `gates_on` if missing | `deploy` | `deploy` (container root) | 0755 |
 | `flags/maintenance.on`, `flags/worker.paused` | `gates_on`; a person with `touch` | `deploy` | `deploy` | 0644 by `gates_on`; whatever the person's umask gives |
+| `tls/`, `tunnel/` (M13.3, [ADR-0034](adr/0034-edge-modes-opt-in.md)) | `init.sh` | `deploy` | `deploy` (container root) | 0755: the containers' uid searches them through "other" |
+| `tls/cert.pem`, `tunnel/ca.pem` | the operator | `deploy` | `deploy` | 0644, set by `init.sh` on a file that is `deploy`'s |
+| `tls/key.pem` (read by Caddy alone), `tunnel/token` (by `cloudflared` alone) | the operator, then `init.sh` gives it to the containers | 1000, by `sudo chown` (`init.sh` says the command) unless `deploy` is 1000 | `subuid_start + 999`, through `edge_secret_do give` | 0400 |
 
 Read inside the containers: Caddy (since M13.2, [ADR-0034](adr/0034-edge-modes-opt-in.md) point 10; container root before) and the worker read `flags/` as uid 1000 (`deploy` under a root daemon, a shifted uid under a rootless one), so under a rootless daemon they see the flags only through the directory's "other" bits. A `flags/` they cannot search would leave Caddy's gate open as well as the worker running, so `require_flags_searchable` protects both. A flag file's own mode does not matter: checking that a file exists needs only search permission on its directory.
 
@@ -166,6 +169,10 @@ Every host-side read or write under `backups/` and `flags/`, as M12.1 listed the
 
 `--preserved-dump FILE` is still read by the host (`<"$1"`): it is a file the operator fetched by hand, outside `backups/`. The rehearsal, whose later dump is in `backups/`, copies it out through the namespace first, as an operator would.
 
+### The edge's files (M13.3)
+
+Not part of M12.1's list, which they postdate: `tls/` and `tunnel/` hold the edge's certificate, key, tunnel token and CA pool ([ADR-0034](adr/0034-edge-modes-opt-in.md)). The certificates are `deploy`'s and world-readable. Each secret is the containers' uid's, mode 0400, so under a rootless daemon `deploy` cannot read it, and only the one container that mounts its directory does. `edge_secret_do` (below) is the only line that reads its owner or sets it, through the same way into the namespace as `backups_do`; `ops/checks.py edge` only checks, as `deploy`, that the key and the token exist as plain files, which a directory of `deploy`'s lets it see without reading them. To replace a secret, `deploy` removes it (its directory is `deploy`'s), copies the new one in and runs `bash init.sh` again.
+
 ### `ops/checks.py`
 
 | Function | Access | Now |
@@ -191,6 +198,13 @@ One function in `ops/common.sh`, `backups_do OPERATION ARGUMENTS…`. Each opera
 | `drop-offsite` | `rm -rf -- backups/.offsite` |
 | `import DIR BASE` | `find backups -mindepth 1 -maxdepth 1 ( the three names ) -printf '%f '` must print nothing (M12.5); then the same `find` in `DIR` (made absolute) with `-exec cp -a -t backups -- {} +`; then, under a rootless daemon, the same `find` in `backups` with `-exec chown -R --no-dereference 1000:1000 -- {} +` |
 | `wipe-dumps` | `find backups -mindepth 1 -maxdepth 1 -name 'gmat-*' -exec rm -rf -- {} +` |
+
+`edge_secret_do stat|give FILE` (M13.3) takes only `tls/key.pem` or `tunnel/token`, refused first on the host when it or its directory is a symbolic link or it is not a plain file; `FILE` below is its absolute path:
+
+| Operation | Command |
+| --- | --- |
+| `stat` | `stat -c '%u %a' -- FILE` |
+| `give` | under a rootless daemon, `chown --no-dereference 1000:1000 -- FILE` and `chmod 0400 -- FILE`; under a root daemon, only `chmod 0400` of a file that is `deploy`'s when `deploy` is the containers' uid |
 
 Before any operation, a `backups/` that is itself a symbolic link is refused, on the host (`[ -L ]`, which needs no entry into the namespace): its owner and mode would be the link's, and the operations would act where it points (M12.5).
 

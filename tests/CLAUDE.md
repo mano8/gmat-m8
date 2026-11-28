@@ -23,6 +23,7 @@ CI runs this suite under pytest-xdist in four shards at once (ADR-0025, `docs/ad
 - `tests/clamd.py`: a fake `clamd` on a unix socket; the real one is in `tests/live`
 - the ledger checks: `tests/invariants.py` (an independent re-derivation of R, P, Q, D from the rows, compared with the app's; `violations(ctx)` for I1-I13, C4-C10 and the automatic transitions of §4.9; `Watch` for what needs the state before a step: refusals write nothing, I11, C5 and C10), `tests/ledger_world.py` (four approved requests of three projects bought by A-MAD), the state machine `tests/integration/test_ledger_machine.py` and the checker's own test `tests/integration/test_invariant_checker.py`
 - import-file helpers in `tests/imports.py`
+- certificates for the edge's `files` mode (a private CA, a site certificate, its key 0400, the tunnel's CA pool) in `tests/edge_certificates.py` (M13.3)
 - tokens read back from queued mail in `tests/tokens.py`
 - a fake SMTP server in `tests/smtp.py`, outbox helpers in `tests/outbox.py` (`FakeOrders`, `no_dispatch_source` for bare-outbox tests, `make_dispatch`, `start_worker`)
 - tests queue mail in the outbox and the worker's mailer is locmem

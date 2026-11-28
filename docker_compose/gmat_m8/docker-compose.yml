@@ -13,7 +13,9 @@
 # Caddy and web; only Caddy publishes ports, through `ingress`. The worker and the backup
 # reach the outside through `egress` (SMTP, offsite storage); web has no way out. The two services
 # that parse uploaded files, clamd and the decoder, have no network at all: web reaches each
-# through a unix socket on a volume only the two of them mount (M8.3, ADR-0015).
+# through a unix socket on a volume only the two of them mount (M8.3, ADR-0015). `tunnel` holds
+# only Caddy and the optional cloudflared, which reaches Cloudflare through `tunnel_egress`, a
+# network of its own (ADR-0034).
 name: gmat-m8
 
 x-logging: &logging
@@ -90,14 +92,29 @@ services:
       DJANGO_ADMIN_ENABLED: ${DJANGO_ADMIN_ENABLED:-false}
       ADMIN_URL_PATH: ${ADMIN_URL_PATH:-admin}
       ADMIN_ALLOWED_CIDRS: ${ADMIN_ALLOWED_CIDRS:-0.0.0.0/0 ::/0}
+      # The edge modes (ADR-0034), each file of caddy/edge/ named by its value. A value that is
+      # set but empty would not take Caddy's own default, so the defaults are given here.
+      EDGE_TLS: ${EDGE_TLS:-acme}
+      EDGE_PROXY: ${EDGE_PROXY:-none}
+      EDGE_EXTRA_HOST: ${EDGE_EXTRA_HOST:-}
+      EDGE_TUNNEL_ADDRESS: ${EDGE_TUNNEL_ADDRESS:-172.30.90.250}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/edge:/etc/caddy/edge:ro
       - ./caddy/maintenance:/srv/maintenance:ro
       - ./flags:/srv/flags:ro
+      # EDGE_TLS=files: the certificate and its key (0400, the containers' uid's). Only Caddy
+      # mounts it. init.sh creates it; a missing one stops Caddy rather than appear as root's.
+      - type: bind
+        source: ./tls
+        target: /etc/caddy/tls
+        read_only: true
+        bind:
+          create_host_path: false
       - caddy_data:/data
       - caddy_config:/config
     tmpfs: [/tmp]
-    networks: [ingress, edge]
+    networks: [ingress, edge, tunnel]
     depends_on:
       caddy-perms:
         condition: service_completed_successfully
@@ -112,6 +129,38 @@ services:
       start_period: 20s
     mem_limit: 128m
     pids_limit: 128
+
+  # The Cloudflare Tunnel's connector (ADR-0034 point 3), only with EDGE_PROXY=cloudflare: the
+  # profile, which .env's COMPOSE_PROFILES turns on in that mode alone (ops/checks.py edge), and
+  # the scripts start it by name. It is the one peer whose CF-Connecting-IP Caddy believes, from its
+  # fixed address outside the network's dynamic range, so neither Caddy nor a one-off of it can
+  # take that address. It shares no network with web, publishes nothing, and reads its token from a
+  # file (0400, the containers' uid's), never an environment value: --token and TUNNEL_TOKEN would
+  # win over the file, so neither is ever set. The Tunnel's own settings (its origin, the CA pool
+  # under /etc/gmat/tunnel/, Access) live at Cloudflare (runbook edge.md).
+  cloudflared:
+    <<: *hardened
+    image: cloudflare/cloudflared:2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
+    profiles: [tunnel]
+    user: "1000:1000"
+    # Its metrics stay inside the container: nothing else needs them.
+    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
+    environment:
+      TUNNEL_TOKEN_FILE: /etc/gmat/tunnel/token
+    volumes:
+      - type: bind
+        source: ./tunnel
+        target: /etc/gmat/tunnel
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs: [/tmp]
+    networks:
+      tunnel:
+        ipv4_address: ${EDGE_TUNNEL_ADDRESS:-172.30.90.250}
+      tunnel_egress: {}
+    mem_limit: 128m
+    pids_limit: 64
 
   migrate:
     <<: *app
@@ -415,6 +464,17 @@ networks:
   egress: {}
   # The signature mirror for freshclam alone: what parses files has no way out.
   updates: {}
+  # Shared only by Caddy and cloudflared (ADR-0034 point 3); internal. Caddy, and a one-off of it,
+  # take an address of the dynamic range, the connector its fixed one outside it, which is the only
+  # address Caddy believes a visitor's address from. Created in every mode, empty without the tunnel.
+  tunnel:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${EDGE_TUNNEL_SUBNET:-172.30.90.0/24}
+          ip_range: ${EDGE_TUNNEL_RANGE:-172.30.90.0/25}
+  # cloudflared's way out to Cloudflare. Nothing else joins it.
+  tunnel_egress: {}
 
 volumes:
   pg_data:

@@ -181,11 +181,13 @@ stop_writers() { compose stop web worker; }
 
 # Caddy runs as uid 1000 (ADR-0034 point 10); the one-shot gives it its volumes, which a release
 # before v0.4.0 left to root. Run before every start of Caddy: the scripts start it with --no-deps,
-# so compose would not run the one-shot by itself. A no-op once they are Caddy's.
+# so compose would not run the one-shot by itself. A no-op once they are Caddy's. The tunnel's
+# connector follows it in that mode.
 start_caddy() {
     compose run --rm --no-deps -T caddy-perms </dev/null \
         || die "Caddy's volumes could not be given to its uid (caddy-perms): Caddy was not started"
     compose up -d --no-deps caddy
+    start_tunnel
 }
 
 # The scanner is recreated every time: its configuration is a bind mount, which `up` does not see
@@ -220,6 +222,57 @@ commit_point() {
         die "the public site does not answer: both gates are on again"
     fi
     say "commit point passed: traffic and processing are open"
+}
+
+# --- the edge (ADR-0034) ---------------------------------------------------------------------------
+
+# The modes as compose reads them from .env: a key that is absent or empty takes the default.
+edge_tls() { local value; value=$(env_value EDGE_TLS); printf '%s' "${value:-acme}"; }
+edge_proxy() { local value; value=$(env_value EDGE_PROXY); printf '%s' "${value:-none}"; }
+
+# cloudflared runs only with EDGE_PROXY=cloudflare. The scripts start every service by name, which
+# a profile does not stop, so this is the one place that starts it. Behind the gates, like Caddy:
+# through the tunnel the site shows the gate's page.
+start_tunnel() {
+    [ "$(edge_proxy)" = cloudflare ] || return 0
+    compose up -d --no-deps cloudflared </dev/null \
+        || die "the tunnel's connector (cloudflared) did not start: see docker compose logs cloudflared"
+}
+
+# The edge's two secrets: the TLS key, which only Caddy mounts, and the tunnel's token, which only
+# cloudflared does. Each is the containers' uid's and mode 0400; under a rootless daemon that is a
+# shifted uid, read and set in the daemon's user namespace like backups/ (docs/rootless-host.md).
+# Only these two paths, a plain file that is no link in a directory that is no link.
+_edge_secret() { # _edge_secret FILE
+    case "$1" in
+        tls/key.pem | tunnel/token) ;;
+        *) die "edge_secret_do: no secret $(printf '%q' "$1")" ;;
+    esac
+    [ ! -L "${1%/*}" ] || die "${1%/*}/ is a symbolic link, which the helper never follows: make it a directory"
+    [ ! -L "$1" ] || die "$1 is a symbolic link, which the helper never follows: copy the file itself"
+    [ -f "$1" ] || die "$1 is missing"
+}
+
+edge_secret_do() { # edge_secret_do stat|give FILE
+    [ "$#" -eq 2 ] || die "edge_secret_do takes an operation and a file"
+    _edge_secret "$2"
+    detect_daemon
+    case "$1" in
+        # The owner and mode as the containers see them, "UID MODE".
+        stat) _daemon_run /usr/bin/stat -c '%u %a' -- "$PWD/$2" ;;
+        # Under a root daemon this account cannot give a file away: it only closes one that is
+        # already the containers' uid's, which it is when that uid is this account's. The caller
+        # says what is left to do.
+        give)
+            if [ "$DAEMON_KIND" = rootless ]; then
+                _daemon_run /usr/bin/chown --no-dereference "$CONTAINER_UID:$CONTAINER_GID" -- "$PWD/$2"
+                _daemon_run /usr/bin/chmod 0400 -- "$PWD/$2"
+            elif [ -O "$2" ] && [ "$(id -u)" = "$CONTAINER_UID" ]; then
+                chmod 0400 -- "$2"
+            fi
+            ;;
+        *) die "edge_secret_do: no operation $(printf '%q' "$1")" ;;
+    esac
 }
 
 # --- state of the deploy in progress ----------------------------------------------------------
@@ -483,13 +536,14 @@ port_driver() {
 # --- the one helper for backups/ (ADR-0033) ----------------------------------------------------
 
 # Every host-side read or write under backups/ goes through backups_do (the list and the
-# operations: docs/rootless-host.md). Each operation is a fixed command of a tool named by its
-# absolute path; its only variable parts are a dump's base name that matched DUMP_PATTERN and the
-# drill's directory, each passed as its own argument and never parsed by a shell again. Under a
-# rootless daemon the command runs in the daemon's user namespace, where this account is root
-# over the containers' files: only that namespace (-U), so paths keep the host's meaning. Under a
-# root daemon it runs as it is. It never falls back to reading as this account, never widens a
-# mode, and never makes a file this account's.
+# operations: docs/rootless-host.md; the edge's two secrets have edge_secret_do, ADR-0034). Each
+# operation is a fixed command of a tool named by its absolute path; its only variable parts are a
+# dump's base name that matched DUMP_PATTERN and the drill's directory, each passed as its own
+# argument and never parsed by a shell again. Under a rootless daemon the command runs in the
+# daemon's user namespace, where this account is root over the containers' files: only that
+# namespace (-U), so paths keep the host's meaning. Under a root daemon it runs as it is. It never
+# falls back to reading as this account, never widens a mode, and never makes a file this
+# account's.
 backups_do() { # backups_do OPERATION [ARGUMENTS...]
     local operation="${1:-}" arity
     case "$operation" in
@@ -513,7 +567,8 @@ backups_ready() {
     backups_do stat >/dev/null || die "backups/ cannot be reached: run bash init.sh (docs/rootless-host.md)"
 }
 
-_backups_run() { # TOOL ARGUMENTS...: the tool named by its absolute path
+# The one way into the daemon's user namespace, for backups_do and edge_secret_do.
+_daemon_run() { # TOOL ARGUMENTS...: the tool named by its absolute path
     detect_daemon
     if [ "$DAEMON_KIND" = rootless ]; then
         _namespace_target
@@ -542,21 +597,21 @@ _dump_set() { # _dump_set BASE: sets DUMP_SET, find's test for a dump, its manif
 # becomes theirs too, so the dumps of a host that ran the root daemon stay readable to them.
 _backups_prepare() {
     detect_daemon
-    _backups_run /usr/bin/mkdir -p -- "$BACKUPS_DIR"
+    _daemon_run /usr/bin/mkdir -p -- "$BACKUPS_DIR"
     if [ "$DAEMON_KIND" = rootless ]; then
-        _backups_run /usr/bin/chown -R --no-dereference "$CONTAINER_UID:$CONTAINER_GID" -- "$BACKUPS_DIR"
+        _daemon_run /usr/bin/chown -R --no-dereference "$CONTAINER_UID:$CONTAINER_GID" -- "$BACKUPS_DIR"
     fi
-    _backups_run /usr/bin/chmod 0700 -- "$BACKUPS_DIR"
+    _daemon_run /usr/bin/chmod 0700 -- "$BACKUPS_DIR"
 }
 
-_backups_stat() { _backups_run /usr/bin/stat -c '%u %a' -- "$BACKUPS_DIR"; }
+_backups_stat() { _daemon_run /usr/bin/stat -c '%u %a' -- "$BACKUPS_DIR"; }
 
 # 0 there, 1 not there. Anything else stops the script: one that cannot be read, or an entry of
 # another type (a link, say), is never taken for "not there".
 _backups_exists() { # exists dump|manifest|media BASE
     _backups_entry "$1" "$2"
     local found
-    found=$(_backups_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 -name "$ENTRY_NAME" \
+    found=$(_daemon_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 -name "$ENTRY_NAME" \
         -printf '%y') || die "backups/ cannot be read"
     case "$found" in
         '') return 1 ;;
@@ -569,7 +624,7 @@ _backups_exists() { # exists dump|manifest|media BASE
 _backups_read() { # read dump|manifest BASE: the file on stdout
     _backups_entry "$1" "$2"
     [ "$ENTRY_TYPE" = f ] || die "backups_do read: a dump or a manifest only"
-    _backups_run /usr/bin/dd "if=$BACKUPS_DIR/$ENTRY_NAME" iflag=nofollow bs=1M status=none
+    _daemon_run /usr/bin/dd "if=$BACKUPS_DIR/$ENTRY_NAME" iflag=nofollow bs=1M status=none
 }
 
 # What a restic restore left in backups/.offsite/backups, found from backups/ itself: everything
@@ -585,17 +640,17 @@ _offsite_entries() {
 
 _backups_find_fetched() { # the first dump fetched
     _offsite_entries
-    _backups_run /usr/bin/find "${OFFSITE_FIND[@]}" -type f -name 'gmat-*.dump' -print -quit
+    _daemon_run /usr/bin/find "${OFFSITE_FIND[@]}" -type f -name 'gmat-*.dump' -print -quit
 }
 
 _backups_adopt() { # adopt BASE: the fetched dump, manifest and media, by name, into backups/
     _dump_set "$1"
     _offsite_entries
-    _backups_run /usr/bin/find "${OFFSITE_FIND[@]}" "${DUMP_SET[@]}" \
+    _daemon_run /usr/bin/find "${OFFSITE_FIND[@]}" "${DUMP_SET[@]}" \
         -exec /usr/bin/mv -t "$BACKUPS_DIR" -- '{}' +
 }
 
-_backups_drop_offsite() { _backups_run /usr/bin/rm -rf -- "$BACKUPS_DIR/.offsite"; }
+_backups_drop_offsite() { _daemon_run /usr/bin/rm -rf -- "$BACKUPS_DIR/.offsite"; }
 
 # import DIR BASE: the drill's files fetched by hand, copied in and, under a rootless daemon,
 # given to the containers' uid (the backup container reads them), the owner a dump has anyway.
@@ -604,20 +659,20 @@ _backups_import() {
     local from held
     _dump_set "$2"
     from=$(readlink -f -- "$1") && [ -d "$from" ] || die "$1 is not a directory"
-    held=$(_backups_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
+    held=$(_daemon_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
         -printf '%f ') || die "backups/ cannot be read"
     [ -z "$held" ] || die "backups/ already holds ${held% }: remove it first (a drill with --wipe leaves none)"
     detect_daemon
-    _backups_run /usr/bin/find "$from" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
+    _daemon_run /usr/bin/find "$from" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
         -exec /usr/bin/cp -a -t "$BACKUPS_DIR" -- '{}' +
     if [ "$DAEMON_KIND" = rootless ]; then
-        _backups_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
+        _daemon_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 "${DUMP_SET[@]}" \
             -exec /usr/bin/chown -R --no-dereference "$CONTAINER_UID:$CONTAINER_GID" -- '{}' +
     fi
 }
 
 _backups_wipe_dumps() {
-    _backups_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 -name 'gmat-*' \
+    _daemon_run /usr/bin/find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 -name 'gmat-*' \
         -exec /usr/bin/rm -rf -- '{}' +
 }
 

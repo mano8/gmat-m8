@@ -4,6 +4,10 @@
 !*.env.example
 !*.env.production.example
 
+# The edge's files (ADR-0034): a TLS key, a tunnel token. Never committed.
+tls/
+tunnel/
+
 # Runtime state
 backups/
 flags/

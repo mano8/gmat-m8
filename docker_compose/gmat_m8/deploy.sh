@@ -8,15 +8,18 @@
 #               release after a failure). Both gates stay on until this one's commit point.
 #
 #   1  lock                the same flock as recover.sh and the restore drill; then, read-only:
-#                          cosign 3 or newer, the env files, backups/, flags/ and caddy/, and
-#                          under a rootless daemon a port driver that keeps the visitor's address
+#                          cosign 3 or newer, the env files, backups/, flags/ and caddy/, the edge
+#                          settings and their files, and under a rootless daemon a port driver
+#                          that keeps the visitor's address
 #   2  verify the release  signed manifest, signed images, both pulled by digest; any mismatch aborts
 #   3  preflight           under a rootless daemon, ports it may publish; the third-party images
-#                          pulled; with the new image, read-only: migrate-plan, check --deploy, the
-#                          offsite repository answers; a flagged irreversible migration needs
-#                          typing the version
+#                          pulled; Caddy validates its configuration with this installation's
+#                          settings and files; with the new image, read-only: migrate-plan, check
+#                          --deploy, the offsite repository answers; a flagged irreversible
+#                          migration needs typing the version
 #   4  gates on            flags/maintenance.on + flags/worker.paused; Caddy's volumes given to its
-#                          uid, Caddy (re)started; 503 confirmed from outside
+#                          uid, Caddy (re)started, and the tunnel's connector in that mode; 503
+#                          confirmed from outside
 #   5  stop the writers    web and worker; what the release changed in db or Caddy applies now
 #   6  pre-deploy backup   dump + manifest + offsite copy; the dump id is recorded
 #   7  migrate             with the new image, as the owner role
@@ -169,6 +172,39 @@ check_caddy_files() {
         || die "$closed is closed to the containers' uid $CONTAINER_UID, so Caddy could not read it: run bash init.sh"
 }
 
+# The edge settings (ADR-0034), read-only: a mode outside the allowlist, a trust wider than the
+# connector's one address, a certificate that does not name the site or a host Django would refuse
+# stops here, with the site open, not at step 4 behind the gates. Then the secret each mode needs:
+# the containers' uid's and 0400, as the daemon's containers see it.
+check_edge() {
+    local found line
+    found=$(python3 ops/checks.py edge --env .env --app-env app.env 2>&1) || die "$found"
+    while IFS= read -r line; do say "$line"; done <<<"$found"
+    [ "$(edge_tls)" != files ] || require_edge_secret tls/key.pem
+    [ "$(edge_proxy)" != cloudflare ] || require_edge_secret tunnel/token
+}
+
+require_edge_secret() { # require_edge_secret FILE
+    local seen fix="run bash init.sh"
+    seen=$(edge_secret_do stat "$1") || die "$1 cannot be read: run bash init.sh"
+    [ "$seen" != "$CONTAINER_UID 400" ] || return 0
+    # init.sh gives it away only under a rootless daemon; under a root one that takes root.
+    [ "$DAEMON_KIND" = rootless ] \
+        || fix="sudo chown $CONTAINER_UID:$CONTAINER_GID $1 && sudo chmod 0400 $1"
+    die "$1 is uid ${seen% *} mode ${seen#* } as the $DAEMON_KIND daemon's containers see it, not uid $CONTAINER_UID mode 400: $fix"
+}
+
+# Caddy itself, with the release's Caddyfile and this installation's settings and files, as it will
+# start at step 4: what the check above cannot see (a key that does not match its certificate, a
+# file uid 1000 cannot read, a network that clashes with this host's) stops here with the site
+# open. Its storage goes to its tmpfs, so the volumes stay as the running Caddy has them.
+validate_caddy() {
+    local found
+    found=$(compose run --rm --no-deps -T -e XDG_DATA_HOME=/tmp/data -e XDG_CONFIG_HOME=/tmp/config \
+        caddy caddy validate --config /etc/caddy/Caddyfile </dev/null 2>&1) \
+        || die "Caddy refuses this installation's settings or files: nothing changed, the site stays open. $(printf '%s' "$found" | tail -n 3)"
+}
+
 # Under a rootless daemon the port driver decides whether the containers see the visitor's address
 # (ADR-0033 point 4). One that hides it is refused; one no source names is a warning, since
 # a person can still check it from another machine.
@@ -278,6 +314,11 @@ preflight() {
     # must not stall a deploy with the site closed.
     compose pull --quiet caddy db clamd freshclam </dev/null \
         || die "the third-party images could not be pulled: nothing changed, the site stays open"
+    if [ "$(edge_proxy)" = cloudflare ]; then
+        compose pull --quiet cloudflared </dev/null \
+            || die "the tunnel's connector could not be pulled: nothing changed, the site stays open"
+    fi
+    validate_caddy
     service_running db || compose up -d --no-deps --wait db
     compose run --rm --no-deps -T web migrate-plan </dev/null
     compose run --rm --no-deps -T web check </dev/null
@@ -311,6 +352,7 @@ main() {
     check_env_files
     check_host_directories
     check_caddy_files
+    check_edge
     check_port_driver
     warn_docker_group
 

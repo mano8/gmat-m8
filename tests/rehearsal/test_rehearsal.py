@@ -28,6 +28,7 @@ from tests.rehearsal.conftest import (
     docker,
     identity_of,
     make_world,
+    network_keys,
 )
 
 pytestmark = pytest.mark.rehearsal
@@ -1030,10 +1031,10 @@ def drill_world(base: dict[str, Any], name: str, subnet: str, source: World) -> 
         )
     # The same database roles as the backup's installation (offline copies of the env files).
     text = (source.compose_dir / ".env").read_text(encoding="utf-8")
-    lines = [line for line in text.splitlines() if not line.startswith("EDGE_SUBNET=")]
-    (drill.compose_dir / ".env").write_text(
-        "\n".join([*lines, f"EDGE_SUBNET={subnet}"]) + "\n", encoding="utf-8"
-    )
+    networks = network_keys(subnet)
+    lines = [line for line in text.splitlines() if line.split("=", 1)[0] not in networks]
+    own = [f"{key}={value}" for key, value in networks.items()]
+    (drill.compose_dir / ".env").write_text("\n".join([*lines, *own]) + "\n", encoding="utf-8")
     return drill
 
 
@@ -1164,16 +1165,18 @@ def test_a_new_vps_comes_up_from_the_offsite_copy_with_privileged_accounts_suspe
         text = (world.compose_dir / file).read_text(encoding="utf-8")
         (fresh.compose_dir / file).write_text(text, encoding="utf-8")
     env = fresh.compose_dir / ".env"
+    networks = network_keys("172.30.85.0/24")
     kept = [
         line
         for line in env.read_text(encoding="utf-8").splitlines()
-        if not line.startswith(("EDGE_SUBNET=", "REHEARSAL_HTTP", "HTTP_PORT=", "HTTPS_PORT="))
+        if not line.startswith(("REHEARSAL_HTTP", "HTTP_PORT=", "HTTPS_PORT="))
+        and line.split("=", 1)[0] not in networks
     ]
     env.write_text(
         "\n".join(
             [
                 *kept,
-                "EDGE_SUBNET=172.30.85.0/24",
+                *(f"{key}={value}" for key, value in networks.items()),
                 "REHEARSAL_HTTP_PORT=18380",
                 "REHEARSAL_HTTPS_PORT=18743",
                 "HTTP_PORT=18380",

@@ -407,12 +407,15 @@ def test_targets_include_the_released_images(tools: ModuleType) -> None:
     }
 
 
-def test_repository_compose_file_yields_caddy_postgres_and_clamav(tools: ModuleType) -> None:
+def test_repository_compose_file_yields_every_third_party_image(tools: ModuleType) -> None:
+    """The tunnel's connector too (ADR-0034), on both architectures: the pilot host is arm64."""
     compose = (tools.ROOT / "docker_compose/gmat_m8/docker-compose.yml").read_text(encoding="utf-8")
     names = {t["name"] for t in tools.scan_targets(compose, None)}
     assert names == {
         "caddy-amd64",
         "caddy-arm64",
+        "cloudflared-amd64",
+        "cloudflared-arm64",
         "postgres-amd64",
         "postgres-arm64",
         "clamav-amd64",

@@ -1,0 +1,28 @@
+# EDGE_PROXY=cloudflare (ADR-0034 points 3, 4 and 6): the visitors come through the cloudflared
+# service, whose one fixed address on the tunnel network is EDGE_TUNNEL_ADDRESS.
+(edge-proxy-servers) {
+	# Believed from that address only, and only CF-Connecting-IP. Quoted, the value is one token
+	# whatever it holds, and the literal /32 follows it: Caddy refuses a range, a list (one that
+	# ends in an address too), a keyword such as private_ranges and an empty value (measured on
+	# 2.11.9; unquoted, "0.0.0.0/0 <address>" was accepted). ops/checks.py edge refuses IPv6 and
+	# an address outside the tunnel's subnet before that.
+	trusted_proxies static "{$EDGE_TUNNEL_ADDRESS}/32"
+	client_ip_headers Cf-Connecting-Ip
+}
+
+(edge-proxy-site) {
+	# Cloudflare's features that rewrite a page honour no-transform. Deferred, it is added after
+	# Caddy's own compression, which it would otherwise turn off (measured).
+	header {
+		+Cache-Control "no-transform"
+		defer
+	}
+}
+
+(edge-proxy-upstream) {
+	# From a proxy it believes, Caddy would keep that proxy's X-Forwarded-Proto and
+	# X-Forwarded-Host (measured): Django reads the first (is the request secure?). The site is
+	# HTTPS only, so the first is Caddy's own value; neither Django nor Gunicorn reads the second.
+	header_up X-Forwarded-Proto https
+	header_up -X-Forwarded-Host
+}
