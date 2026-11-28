@@ -1,6 +1,7 @@
 """``deploy.sh``'s checks of the host itself (M12.3, ADR-0033): cosign 3 or newer, a rootless
 daemon's port driver that keeps the visitor's address, and the ``docker`` group; the ports a
-rootless daemon may publish (M12.5); and what ``recover.sh status`` says of the daemon.
+rootless daemon may publish (M12.5); Caddy's files open to its uid (M13.2); and what
+``recover.sh status`` says of the daemon.
 
 Every check is read-only: a host set up the wrong way is refused before anything changes, and the
 message names the fix. All but the ports run before the release is fetched; the ports need its
@@ -345,6 +346,41 @@ class TestPublishedPorts:
 
 
 # --- the docker group -----------------------------------------------------------------------------
+
+
+class TestCaddyFiles:
+    """Caddy reads ``caddy/`` as uid 1000 (ADR-0034 point 10), a shifted uid under a rootless
+    daemon that only the "other" bits let in: one file closed to it would stop Caddy at step 4,
+    behind the gates. Refused before anything changes, never widened by the script."""
+
+    def test_a_file_closed_to_caddy_is_refused_and_named(self, ready: World) -> None:
+        page = ready.stack / "caddy" / "maintenance" / "index.html"
+        page.chmod(0o600)
+        result = refused_before_anything(ready)
+        assert "caddy/maintenance/index.html is closed to the containers' uid 1000" in result.stderr
+        assert "run bash init.sh" in result.stderr
+        assert page.stat().st_mode & 0o777 == 0o600
+
+    def test_a_directory_closed_to_caddy_is_refused(self, ready: World) -> None:
+        (ready.stack / "caddy" / "maintenance").chmod(0o750)
+        result = refused_before_anything(ready)
+        assert "caddy/maintenance is closed to the containers' uid 1000" in result.stderr
+
+    def test_init_opens_them_and_the_deploy_goes_ahead(self, ready: World) -> None:
+        (ready.stack / "caddy" / "Caddyfile").chmod(0o600)
+        (ready.stack / "caddy" / "maintenance").chmod(0o700)
+        assert ready.run("init.sh").returncode == 0
+        deployed(ready)
+
+    def test_refused_on_resume_too(self, ready: World) -> None:
+        ready.fail_on("web verify-internal")
+        assert ready.run("deploy.sh", VERSION).returncode != 0
+        ready.recover()
+        ready.clear_logs()
+        (ready.stack / "caddy" / "Caddyfile").chmod(0o640)
+        result = refused_before_anything(ready, "--resume")
+        assert "caddy/Caddyfile is closed" in result.stderr
+        assert ready.gates() == (True, True)
 
 
 class TestDockerGroup:

@@ -150,6 +150,99 @@ def test_v_n_to_v_n_plus_one(world: World) -> None:
     note(f"{V1} -> {V2}: dump {row[4]}, gate window {window(result.stderr)}")
 
 
+# --- Caddy as uid 1000 (M13.2, ADR-0034 point 10) ----------------------------------------------
+
+# Caddy as every release before v0.4.0 defined it: root, with only NET_BIND_SERVICE.
+OLD_CADDY = """services:
+  caddy:
+    user: "0:0"
+    cap_add: [NET_BIND_SERVICE]
+    depends_on: !override
+      web:
+        condition: service_started
+"""
+CADDY_FILES = (
+    "sha256sum /data/caddy/pki/authorities/local/root.crt"
+    " /data/caddy/certificates/local/localhost/localhost.crt"
+    " && echo owners $(find /data /config ! -user 1000 | wc -l)"
+)
+
+
+def caddy_files(world: World) -> str:
+    """The internal CA's root, the site's certificate, and how many entries uid 1000 does not
+    own, read by the one-shot (the one container that may read them all)."""
+    return world.compose(
+        "run", "--rm", "--no-deps", "-T", "caddy-perms", "sh", "-c", CADDY_FILES
+    ).stdout.strip()
+
+
+def old_caddy(world: World, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    path = world.compose_dir / "docker-compose.old-caddy.yml"
+    path.write_text(OLD_CADDY, encoding="utf-8")
+    command = ["docker", "compose"]
+    for name in (*world.stack.compose_files, path.name):
+        command += ["-f", name]
+    return subprocess.run(  # noqa: S603 (fixed docker invocation, test input only)
+        [*command, *args],
+        cwd=world.compose_dir,
+        env=world.env,
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=check,
+    )
+
+
+def wait_for(probe: Any, seconds: int = 60) -> bool:
+    """Whether ``probe`` answers true within ``seconds``; a Caddy still starting resets the
+    handshake, which counts as not yet."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        try:
+            if probe():
+                return True
+        except OSError:
+            pass
+        time.sleep(2)
+    return False
+
+
+def test_caddy_volumes_left_to_root_are_converted_keeping_their_certificates(
+    world: World,
+) -> None:
+    """The volumes uid 1000 wrote stop a pre-v0.4.0 Caddy (measured in M13.1); given back to root
+    as deploy-rollback.md says, it starts on them; the next deploy converts them again, with the
+    same internal CA and certificate, and Caddy runs as uid 1000 with no capability."""
+    before = caddy_files(world)
+    assert before.endswith("owners 0"), before
+    world.compose("stop", "caddy")
+    old_caddy(world, "up", "-d", "--no-deps", "caddy")
+    assert wait_for(lambda: "permission denied" in world.stack.logs("caddy")), "it started"
+    old_caddy(world, "stop", "caddy")
+    # deploy-rollback.md, "A release before v0.4.0": from the current checkout, then the old one.
+    world.compose(
+        "run", "--rm", "--no-deps", "-T", "caddy-perms", "chown", "-R", "0:0", "/data", "/config"
+    )
+    old_caddy(world, "up", "-d", "--no-deps", "--force-recreate", "caddy")
+    assert wait_for(lambda: public(world) == 200), world.stack.logs("caddy")[-3000:]
+    root_owned = caddy_files(world)
+    assert root_owned.rsplit(" ", 1)[0] == before.rsplit(" ", 1)[0], "the same CA and certificate"
+    assert not root_owned.endswith("owners 0"), root_owned
+    note(
+        "a pre-v0.4.0 Caddy refuses uid 1000's volumes; given back to root, it serves "
+        f"{public(world)} with the same CA"
+    )
+
+    world.deploy(V2)
+    assert world.gates() == (False, False)
+    assert public(world) == 200
+    assert caddy_files(world) == before, "converted, with no new CA and no new certificate"
+    identity = world.compose("exec", "-T", "caddy", "sh", "-c", "id -u; grep CapEff /proc/1/status")
+    uid, capabilities = identity.stdout.split("\n", 1)
+    assert (uid, capabilities.split()[1].strip("0")) == ("1000", "")
+    note("deploy over root-owned Caddy volumes: converted, same CA root and certificate, uid 1000")
+
+
 def _set_env(world: World, key: str, value: str) -> None:
     path = world.compose_dir / ".env"
     lines = path.read_text(encoding="utf-8").splitlines()

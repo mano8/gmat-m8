@@ -482,9 +482,9 @@ class TestPortDriver:
 def caddy_ports(http: str, https: str, **extra: str) -> list[dict[str, Any]]:
     """Caddy's ports as ``docker compose config --format json`` gives them (Compose 5.7.0)."""
     return [
-        {"mode": "ingress", "target": 80, "published": http, "protocol": "tcp", **extra},
-        {"mode": "ingress", "target": 443, "published": https, "protocol": "tcp", **extra},
-        {"mode": "ingress", "target": 443, "published": https, "protocol": "udp", **extra},
+        {"mode": "ingress", "target": 8080, "published": http, "protocol": "tcp", **extra},
+        {"mode": "ingress", "target": 8443, "published": https, "protocol": "tcp", **extra},
+        {"mode": "ingress", "target": 8443, "published": https, "protocol": "udp", **extra},
     ]
 
 

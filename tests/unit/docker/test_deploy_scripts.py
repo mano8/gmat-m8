@@ -77,6 +77,7 @@ class TestASuccessfulDeploy:
             f"pull --quiet {PREFIX}/gmat-m8-backup@",
             "web migrate-plan",
             "web check",
+            "run --rm --no-deps -T caddy-perms",
             "up -d --no-deps caddy",
             "stop web worker",
             "backup run --wait 1800 --label pre-deploy-1.1.0",
@@ -106,6 +107,22 @@ class TestASuccessfulDeploy:
             "wait-timeout 120 decoder",
         ):
             assert log[position(log, fragment)].startswith("MW "), fragment
+
+    def test_caddy_gets_its_volumes_behind_the_gates_before_it_starts(self, ready: World) -> None:
+        """M13.2: Caddy runs as uid 1000, and --no-deps would skip the one-shot that gives it
+        volumes a release before v0.4.0 left to root. The site is already gated when they change."""
+        ready.run("deploy.sh", VERSION)
+        log = ready.docker_log()
+        perms = position(log, "caddy-perms")
+        assert log[perms].startswith("MW ")
+        assert perms < position(log, "up -d --no-deps caddy")
+        assert sum("caddy-perms" in line for line in log) == 1
+
+    def test_a_failed_one_shot_leaves_caddy_as_it_was(self, ready: World) -> None:
+        result = failed_deploy(ready, "caddy-perms")
+        assert "Caddy's volumes could not be given to its uid" in result.stderr
+        assert ready.gates() == (True, True)
+        assert ready.state("STEP") == "4"
 
     def test_a_changed_caddyfile_applies_behind_the_gates(self, ready: World) -> None:
         ready.run("deploy.sh", VERSION)
@@ -501,6 +518,26 @@ class TestRollback:
         log = ready.docker_log()
         in_order(log, "stop web worker", "web verify-internal", "WORKER_EXPECT_STATE=running")
         assert not [line for line in log if "migrate" in line]
+
+    def test_a_caddy_that_is_down_gets_its_volumes_before_it_starts(self, ready: World) -> None:
+        """M13.2: recover.sh starts Caddy with --no-deps too, so it runs the one-shot first."""
+        failed_deploy(ready, "backup run --wait")
+        ready.fail_on("ps --status running -q caddy")
+        result = ready.run("recover.sh", "rollback")
+        assert result.returncode == 0, result.stderr
+        log = ready.docker_log()
+        in_order(
+            log, "run --rm --no-deps -T caddy-perms", "up -d --no-deps caddy", "stop web worker"
+        )
+        assert log[position(log, "caddy-perms")].startswith("MW ")
+
+    def test_a_running_caddy_is_left_as_it_is(self, ready: World) -> None:
+        failed_deploy(ready, "backup run --wait")
+        assert ready.run("recover.sh", "rollback").returncode == 0
+        log = ready.docker_log()
+        assert [line for line in log if "caddy" in line] == [
+            "MW compose ps --status running -q caddy"
+        ]
 
     def test_refused_once_the_migration_may_have_run(self, ready: World) -> None:
         failed_deploy(ready, "web verify-internal")

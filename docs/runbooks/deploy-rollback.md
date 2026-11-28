@@ -36,10 +36,10 @@ cd docker_compose/gmat_m8
 
 | Step | What | If it fails |
 | --- | --- | --- |
-| 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the **cosign version** (3 or newer), the env files (0600), the **host** (`flags/` searchable by the worker, `backups/` the containers' uid at mode 0700), the **port driver** of a rootless daemon (it must keep the visitor's address and carry UDP), the admin allowlist (only while `DJANGO_ADMIN_ENABLED` turns the admin on), the offsite repository setting and the checkout. A member of the `docker` group is warned about, never refused. | Nothing changed. Fix and run again ([the refusals](#refusals-of-step-1-on-a-rootless-host)). |
+| 1 | Takes the deploy lock (`/var/lock/gmat-m8-deploy`), shared with `recover.sh` and the drill. Checks the tools, the **cosign version** (3 or newer), the env files (0600), the **host** (`flags/` searchable by Caddy and the worker, `backups/` the containers' uid at mode 0700, `caddy/` readable by the containers' uid), the **port driver** of a rootless daemon (it must keep the visitor's address and carry UDP), the admin allowlist (only while `DJANGO_ADMIN_ENABLED` turns the admin on), the offsite repository setting and the checkout. A member of the `docker` group is warned about, never refused. | Nothing changed. Fix and run again ([the refusals](#refusals-of-step-1-on-a-rootless-host)). |
 | 2 | Downloads the manifest, verifies its **signature** and the signature of both images against the workflow identity of that tag, checks version, repository and registry, pulls both images **by digest**. | Nothing changed, the site stayed open. |
 | 3 | Preflight: under a rootless daemon, that it may publish the stack's ports ([below](#refusals-of-step-1-on-a-rootless-host)); pulls the third-party images (Caddy, PostgreSQL, ClamAV), then with the new image, read-only: the pending migrations (`migrate-plan`), `check --deploy`, the offsite repository answers. | Nothing changed. |
-| 4 | **Gates on**: `flags/maintenance.on` and `flags/worker.paused`. Confirms from outside that Caddy answers 503. | Gates stay on. |
+| 4 | **Gates on**: `flags/maintenance.on` and `flags/worker.paused`. Gives Caddy's volumes to its uid 1000 (`caddy-perms`; the first time, a volume an older release left to root) and starts Caddy as uid 1000. Confirms from outside that Caddy answers 503. | Gates stay on. |
 | 5 | Stops `web` and `worker`. | Gates stay on. |
 | 6 | Pre-deploy backup (`pre-deploy-X.Y.Z`) with its offsite copy. The dump id is recorded. | Gates stay on; no migration ran. |
 | 7 | Migrates, as the owner role. | Gates stay on. The migration may have partly run. |
@@ -94,7 +94,8 @@ All of these stop before a release is fetched, with the gates as they were and t
 | `this daemon remaps users (userns-remap)` | a root daemon with user-namespace remapping: its dumps belong to a range `deploy` cannot enter | Use the rootless daemon ([vps-setup.md](vps-setup.md#41-docker-rootless)); this one is not supported |
 | `backups/ cannot be read`, or `backups/ is uid … mode … not uid 1000 mode 700` | `init.sh` did not run after the rootless daemon came up, or something changed the directory | `bash init.sh`. Never `chown` or `chmod` it by hand |
 | `XDG_RUNTIME_DIR is not set`, `docker.pid is missing`, `… does not name … dockerd`, `… was not started by … rootlesskit`, `not in a user namespace of its own`, `maps ids that are not … own`, `nsenter is not installed` | the target the helper would enter is not this account's rootless daemon (or `nsenter` is missing) | Read the reason; start the daemon as `deploy`, install `util-linux`. The scripts do not fall back to reading as `deploy` |
-| `flags/ is mode …: the worker could not see worker.paused` | `flags/` is mode 0700, so the worker (a shifted uid) cannot search it and would run behind a pause | `chmod 0755 flags` as `deploy`, which owns it |
+| `caddy/… is closed to the containers' uid 1000, so Caddy could not read it` | a checkout made under a umask of 077: Caddy reads its files as uid 1000, a shifted uid that only the "other" bits let in | `bash init.sh`, which makes `caddy/` world-readable (it holds no secret) |
+| `flags/ is mode …: neither Caddy nor the worker could see the gates` | `flags/` is mode 0700, so Caddy and the worker (a shifted uid) cannot search it: the site would stay open and the worker run behind the gates | `chmod 0755 flags` as `deploy`, which owns it |
 | the **port driver** is `builtin` (or hides the address, or has no UDP) | every visitor would look like one internal address: sign-in limits would lock everybody out, and the audit log's addresses would mean nothing | Set the two `slirp4netns` lines in `~/.config/systemd/user/docker.service.d/override.conf` and restart the daemon ([vps-setup.md](vps-setup.md#41-docker-rootless), point 5) |
 | a *warning* that the driver cannot be read | no source names it | From another machine, check that `/account/sessions/` shows that machine's own address |
 | `the rootless daemon cannot publish caddy's port 80/tcp: net.ipv4.ip_unprivileged_port_start is 1024` (at step 3, still before the gates) | the host took neither way of [vps-setup.md](vps-setup.md#41-docker-rootless) §4.1, point 3, or `.env` was not changed with way B. The daemon would refuse the port at step 4, behind the gates, without saying why | Way A: the sysctl file and `sysctl --system`. Way B: the redirect's unit running, and `PUBLISHED_HTTP_PORT=8080`, `PUBLISHED_HTTPS_PORT=8443` in `.env` |
@@ -108,6 +109,21 @@ Only when the release's signed manifest says the old code works on the new schem
 ```
 
 It starts the previous digests with the new schema, behind the gates. Users keep every write made since the deploy. If it does not say so, the script refuses, and **do not** work around it: old code on a changed schema can corrupt data. Forward-fix.
+
+### A release before v0.4.0
+
+`recover.sh`'s actions keep this checkout's compose files, so they keep Caddy as uid 1000 and need nothing here. Deploying a release **older than v0.4.0 from its own checkout** is different. Such a release runs Caddy as root with only `NET_BIND_SERVICE`, which cannot read what uid 1000 wrote in Caddy's volumes: it exits with `permission denied`, behind the gates. Give the volumes back to root first, from the **current** checkout (the old one has no `caddy-perms`), then switch:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.production.yml \
+    run --rm --no-deps -T caddy-perms chown -R 0:0 /data /config
+git fetch --tags && git switch --detach vX.Y.Z
+./deploy.sh X.Y.Z
+```
+
+- The running Caddy keeps serving the certificates it holds in memory until that deploy recreates it at step 4. The ACME account, the certificates and the internal CA stay as they were (the rehearsal checks the CA's root and the site's certificate).
+- If that deploy stops before step 4 (nothing changed), the newer Caddy is still running, on volumes it can no longer write. Give them back to uid 1000 from the newer checkout (`… run --rm --no-deps -T caddy-perms`, with no command) or deploy the newer release again.
+- Coming back to v0.4.0 or later needs nothing: its step 4 gives the volumes to uid 1000 again, keeping the certificates.
 
 ### Restoring after writes were accepted
 

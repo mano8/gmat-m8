@@ -11,17 +11,20 @@
 
 services:
   caddy:
-    # Caddy listens on 80 and 443; the host publishes them there, or on the unprivileged ports a
-    # rootless host redirects 80 and 443 to (.env's PUBLISHED_HTTP_PORT and PUBLISHED_HTTPS_PORT,
-    # ADR-0033 point 3). Either way visitors, links and Alt-Svc keep 80 and 443.
+    # Caddy, uid 1000 with no capability, listens on 8080 and 8443 (ADR-0034 point 10). The host
+    # publishes them on 80 and 443, or on the unprivileged ports a rootless host redirects 80 and
+    # 443 to (.env's PUBLISHED_HTTP_PORT and PUBLISHED_HTTPS_PORT, ADR-0033 point 3). Either way
+    # visitors, links and Alt-Svc keep 80 and 443, and ACME's challenges arrive on 80 and 443.
     ports: !override
-      - "${PUBLISHED_HTTP_PORT:-80}:80"
-      - "${PUBLISHED_HTTPS_PORT:-443}:443/tcp"
-      - "${PUBLISHED_HTTPS_PORT:-443}:443/udp"
+      - "${PUBLISHED_HTTP_PORT:-80}:8080"
+      - "${PUBLISHED_HTTPS_PORT:-443}:8443/tcp"
+      - "${PUBLISHED_HTTPS_PORT:-443}:8443/udp"
     environment:
-      HTTP_PORT: "80"
-      HTTPS_PORT: "443"
+      HTTP_PORT: "8080"
+      HTTPS_PORT: "8443"
       HTTPS_PORT_SUFFIX: ""
+      # Caddy names the port it listens on in Alt-Svc; the Caddyfile replaces it (measured).
+      ALT_SVC_PORT: "443"
       HTTP_PROTOCOLS: "h1 h2 h3"
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
       APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}

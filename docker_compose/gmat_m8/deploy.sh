@@ -8,14 +8,15 @@
 #               release after a failure). Both gates stay on until this one's commit point.
 #
 #   1  lock                the same flock as recover.sh and the restore drill; then, read-only:
-#                          cosign 3 or newer, the env files, backups/ and flags/, and under a
-#                          rootless daemon a port driver that keeps the visitor's address
+#                          cosign 3 or newer, the env files, backups/, flags/ and caddy/, and
+#                          under a rootless daemon a port driver that keeps the visitor's address
 #   2  verify the release  signed manifest, signed images, both pulled by digest; any mismatch aborts
 #   3  preflight           under a rootless daemon, ports it may publish; the third-party images
 #                          pulled; with the new image, read-only: migrate-plan, check --deploy, the
 #                          offsite repository answers; a flagged irreversible migration needs
 #                          typing the version
-#   4  gates on            flags/maintenance.on + flags/worker.paused; 503 confirmed from outside
+#   4  gates on            flags/maintenance.on + flags/worker.paused; Caddy's volumes given to its
+#                          uid, Caddy (re)started; 503 confirmed from outside
 #   5  stop the writers    web and worker; what the release changed in db or Caddy applies now
 #   6  pre-deploy backup   dump + manifest + offsite copy; the dump id is recorded
 #   7  migrate             with the new image, as the owner role
@@ -155,6 +156,17 @@ check_host_directories() {
     [ "$DAEMON_KIND" = rootless ] || [ "${seen% *}" = "$CONTAINER_UID" ] \
         || fix="the containers write it as uid $CONTAINER_UID: sudo chown $CONTAINER_UID:$CONTAINER_GID backups && chmod 0700 backups"
     die "backups/ is uid ${seen% *} mode ${seen#* } as the $DAEMON_KIND daemon's containers see it, not uid $CONTAINER_UID mode 700: $fix"
+}
+
+# Caddy reads its configuration and the maintenance page as uid 1000 (ADR-0034 point 10), which
+# under a rootless daemon is a shifted uid that only the "other" bits let in. A checkout made under
+# a umask of 077 would stop Caddy at step 4, behind the gates. init.sh sets them; nothing here does.
+check_caddy_files() {
+    local closed
+    closed=$(find caddy \( \( -type d ! -perm -o=rx \) -o \( -type f ! -perm -o=r \) \) \
+        -print -quit 2>&1) || die "caddy/ cannot be read: $closed"
+    [ -z "$closed" ] \
+        || die "$closed is closed to the containers' uid $CONTAINER_UID, so Caddy could not read it: run bash init.sh"
 }
 
 # Under a rootless daemon the port driver decides whether the containers see the visitor's address
@@ -298,6 +310,7 @@ main() {
     check_cosign
     check_env_files
     check_host_directories
+    check_caddy_files
     check_port_driver
     warn_docker_group
 
@@ -311,7 +324,8 @@ main() {
 
     step 4 "gates on"
     gates_on
-    compose up -d --no-deps caddy
+    # A release before v0.4.0 left Caddy's volumes to root; recreated as uid 1000, it reads them.
+    start_caddy
     wait_public_status 503 /healthz/ 120 || die "the gate does not answer 503 from outside"
 
     step 5 "stopping the writers"

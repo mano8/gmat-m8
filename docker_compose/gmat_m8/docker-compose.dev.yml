@@ -104,6 +104,8 @@ services:
       target: assets
     image: gmat-m8:assets
     user: "${UID:-1000}:${GID:-1000}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     working_dir: /app
     command: ["tailwindcss", "--input", "static/src/app.css", "--output", "static/dist/app.css", "--watch=always"]
     volumes:

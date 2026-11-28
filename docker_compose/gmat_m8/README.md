@@ -23,7 +23,8 @@ The full stack, ready to use. Local by default: `https://localhost:8443`, Caddy'
 
 | Service | Image | Networks | Notes |
 | --- | --- | --- | --- |
-| `caddy` | `caddy:2.11.9-alpine` (digest) | `ingress`, `edge` | The only service that publishes ports. Admin API off. |
+| `caddy` | `caddy:2.11.9-alpine` (digest) | `ingress`, `edge` | The only service that publishes ports. Admin API off. uid 1000, listening on 8080 and 8443; production publishes 80 and 443 onto them. |
+| `caddy-perms` | `caddy:2.11.9-alpine` (digest) | none | One-shot before Caddy starts: gives Caddy's two volumes to uid 1000, then exits. The only container that runs as root, with `CHOWN` and `DAC_READ_SEARCH` and nothing else to do. |
 | `migrate` | `gmat-m8` | `db_migrate` | One-shot `migrate` as the **owner** role; `web` waits for it. |
 | `web` | `gmat-m8` | `edge`, `db_web` | Runtime role (data access only). No route to the internet. |
 | `db` | `postgres:18-alpine` (digest) | `db_web`, `db_worker`, `db_backup`, `db_migrate` | Never published (except in the dev overlay, on 127.0.0.1). |
@@ -34,7 +35,7 @@ The full stack, ready to use. Local by default: `https://localhost:8443`, Caddy'
 | `freshclam` | `clamav/clamav` (digest; x86-64) | `updates` | Keeps the signature volume current. Sees no uploaded file. |
 | `mailpit` | `axllent/mailpit` (digest) | `egress` | Local and CI stacks only (`docker-compose.local-mail.yml`, loaded through `COMPOSE_FILE` in `.env`): the worker delivers here, nothing leaves the host. |
 
-Every container drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem. `web`, `worker`, `migrate`, `backup` and Mailpit run as uid 1000, `decoder` as uid 1001, `clamd` and `freshclam` as their image's `clamav` user (uid 100), `db` as its image's `postgres` user (uid 70); Caddy runs as root inside its container with only `NET_BIND_SERVICE` (its data volumes are root-owned).
+Every container drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem. `web`, `worker`, `migrate`, `backup` and Mailpit run as uid 1000, `decoder` as uid 1001, `clamd` and `freshclam` as their image's `clamav` user (uid 100), `db` as its image's `postgres` user (uid 70), and Caddy as uid 1000 with no capability. Nothing that keeps running is root. `caddy-perms` runs as root for one `chown` before Caddy starts (compose's `depends_on`; `deploy.sh` and `recover.sh` run it themselves), because a volume written by an older release belongs to root. To run a release older than v0.4.0 from its own checkout, give the volumes back first ([docs/runbooks/deploy-rollback.md](../../docs/runbooks/deploy-rollback.md#a-release-before-v040)).
 
 ## First start
 

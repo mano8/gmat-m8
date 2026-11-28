@@ -8,8 +8,10 @@
 	# No admin API: nothing can reconfigure Caddy at run time.
 	admin off
 
-	# Listening ports. Inside the container they equal the published ones, so the automatic
-	# HTTP -> HTTPS redirect points at the port users actually reach.
+	# Listening ports: unprivileged, since Caddy runs as uid 1000 with no capability. Locally they
+	# are also the published ones; production publishes 80 and 443 onto 8080 and 8443. Links and
+	# redirects use HTTPS_PORT_SUFFIX and Alt-Svc uses ALT_SVC_PORT, the ports visitors reach.
+	# ACME's challenges reach these ports through the published ones.
 	http_port {$HTTP_PORT:8080}
 	https_port {$HTTPS_PORT:8443}
 
@@ -56,6 +58,11 @@ http://{$APP_DOMAIN:localhost}:{$HTTP_PORT:8080} {
 
 	# Neither Caddy nor Gunicorn announces itself.
 	header -Server
+
+	# With HTTP/3 on, Caddy advertises the port it listens on (8443 in production), where HTTP/3
+	# clients would then go: name the one visitors reach. Without HTTP/3 there is no Alt-Svc and
+	# this adds none. It applies to the gate's and the fallback's 503 too (measured).
+	header Alt-Svc `h3=":{$HTTPS_PORT:8443}"` `h3=":{$ALT_SVC_PORT:8443}"`
 
 	request_body {
 		max_size {$MAX_UPLOAD_SIZE:11MiB}

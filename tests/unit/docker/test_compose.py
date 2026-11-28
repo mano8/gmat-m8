@@ -39,8 +39,9 @@ _ComposeLoader.add_multi_constructor(
 )
 
 
-def compose(name: str) -> dict[str, Any]:
-    loaded: dict[str, Any] = yaml.load((STACK / name).read_text(encoding="utf-8"), _ComposeLoader)  # noqa: S506 (SafeLoader subclass)
+def compose(name: str, directory: Path = STACK) -> dict[str, Any]:
+    text = (directory / name).read_text(encoding="utf-8")
+    loaded: dict[str, Any] = yaml.load(text, _ComposeLoader)  # noqa: S506 (SafeLoader subclass)
     return loaded
 
 
@@ -76,6 +77,7 @@ def test_the_media_volume_is_private_to_web_worker_and_backup(base: dict[str, An
         for name, service in services.items()
     }
     assert mounts == {
+        "caddy-perms": [],
         "caddy": [],
         "migrate": [],
         "web": ["media:/srv/media"],
@@ -139,21 +141,97 @@ def test_mailpit_is_a_local_sink_only(base: dict[str, Any]) -> None:
 
 def test_production_publishes_80_and_443_or_the_ports_a_host_redirects_them_to() -> None:
     """ADR-0033 point 3, M12.5: .env names the host ports only on a rootless host that redirects
-    80 and 443. Caddy listens on 80 and 443 either way, so links and Alt-Svc keep them; the
-    fake ``docker compose config`` of ``conftest.py`` publishes the same."""
+    80 and 443. Caddy listens on 8080 and 8443 either way (ADR-0034 point 10, M13.2), and links
+    and Alt-Svc name 443; the fake ``docker compose config`` of ``conftest.py`` publishes the
+    same."""
     caddy = compose("docker-compose.production.yml")["services"]["caddy"]
     assert caddy["ports"] == [
-        "${PUBLISHED_HTTP_PORT:-80}:80",
-        "${PUBLISHED_HTTPS_PORT:-443}:443/tcp",
-        "${PUBLISHED_HTTPS_PORT:-443}:443/udp",
+        "${PUBLISHED_HTTP_PORT:-80}:8080",
+        "${PUBLISHED_HTTPS_PORT:-443}:8443/tcp",
+        "${PUBLISHED_HTTPS_PORT:-443}:8443/udp",
     ]
-    assert {key: caddy["environment"][key] for key in ("HTTP_PORT", "HTTPS_PORT")} == {
-        "HTTP_PORT": "80",
-        "HTTPS_PORT": "443",
-    }
-    assert caddy["environment"]["HTTPS_PORT_SUFFIX"] == ""
+    assert {
+        key: caddy["environment"][key]
+        for key in ("HTTP_PORT", "HTTPS_PORT", "HTTPS_PORT_SUFFIX", "ALT_SVC_PORT")
+    } == {"HTTP_PORT": "8080", "HTTPS_PORT": "8443", "HTTPS_PORT_SUFFIX": "", "ALT_SVC_PORT": "443"}
     env = (STACK / ".env.example").read_text(encoding="utf-8")
     assert "\nPUBLISHED_HTTP_PORT=\nPUBLISHED_HTTPS_PORT=\n" in env
+
+
+def test_alt_svc_names_the_port_visitors_reach() -> None:
+    """Caddy advertises HTTP/3 on the port it listens on (measured on 2.11.9: ``h3=":8443"``);
+    the site replaces it, which adds no header where HTTP/3 is off. Locally both ports are one."""
+    caddyfile = (STACK / "caddy" / "Caddyfile").read_text(encoding="utf-8")
+    assert 'header Alt-Svc `h3=":{$HTTPS_PORT:8443}"` `h3=":{$ALT_SVC_PORT:8443}"`' in caddyfile
+    caddy = compose("docker-compose.yml")["services"]["caddy"]
+    assert caddy["environment"]["ALT_SVC_PORT"] == caddy["environment"]["HTTPS_PORT"]
+    overlay = compose("docker-compose.rehearsal.yml", ROOT / "tests" / "rehearsal")
+    rehearsal = overlay["services"]["caddy"]["environment"]
+    assert rehearsal["ALT_SVC_PORT"] == rehearsal["HTTPS_PORT"]
+
+
+def test_caddy_runs_as_uid_1000_without_a_capability(base: dict[str, Any]) -> None:
+    """ADR-0034 point 10 (M13.2): its volumes come from the one-shot, which must have finished."""
+    caddy = base["services"]["caddy"]
+    assert caddy["user"] == "1000:1000"
+    assert caddy["cap_drop"] == ["ALL"]
+    assert "cap_add" not in caddy
+    assert caddy["read_only"] is True
+    assert caddy["depends_on"]["caddy-perms"] == {"condition": "service_completed_successfully"}
+    assert {"caddy_data:/data", "caddy_config:/config"} <= set(caddy["volumes"])
+
+
+def test_caddy_perms_only_gives_caddy_its_volumes(base: dict[str, Any]) -> None:
+    """Root for one chown, no network, Caddy's own pinned image. DAC_READ_SEARCH because Caddy's
+    0700 directories are closed to a root without it (measured: the second run failed)."""
+    services = base["services"]
+    perms = services["caddy-perms"]
+    assert perms["image"] == services["caddy"]["image"]
+    assert perms["user"] == "0:0"
+    assert perms["cap_drop"] == ["ALL"]
+    assert perms["cap_add"] == ["CHOWN", "DAC_READ_SEARCH"]
+    assert perms["network_mode"] == "none"
+    assert "networks" not in perms and "ports" not in perms
+    assert perms["read_only"] is True
+    assert perms["security_opt"] == ["no-new-privileges:true"]
+    assert perms["restart"] == "no"
+    assert perms["command"] == ["chown", "-R", "1000:1000", "/data", "/config"]
+    assert perms["volumes"] == ["caddy_data:/data", "caddy_config:/config"]
+    assert "environment" not in perms and "env_file" not in perms
+
+
+def _runs_as_root(user: str | None) -> bool:
+    return user is None or user.split(":", 1)[0] in {"0", "root"}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "docker-compose.yml",
+        "docker-compose.production.yml",
+        "docker-compose.dev.yml",
+        "docker-compose.local-mail.yml",
+        "docker-compose.restore-drill.yml",
+    ],
+)
+def test_no_long_running_service_runs_as_root_or_holds_a_capability(name: str) -> None:
+    """M13.2's "Done when": only the one-shot runs as root and holds a capability. An overlay
+    that sets neither key keeps the base file's."""
+    base_services = compose("docker-compose.yml")["services"]
+    for service, overlay in compose(name)["services"].items():
+        merged = {**base_services.get(service, {}), **overlay}
+        if service == "caddy-perms":
+            assert merged["restart"] == "no"
+            continue
+        assert not _runs_as_root(merged.get("user")), (name, service)
+        assert "cap_add" not in merged, (name, service)
+        assert merged.get("cap_drop") == ["ALL"], (name, service)
+
+
+def test_init_lets_caddy_read_its_files() -> None:
+    """Under a rootless daemon Caddy's uid 1000 is shifted: it reads caddy/ by its "other" bits."""
+    init = (STACK / "init.sh").read_text(encoding="utf-8")
+    assert "chmod -R a+rX ../../docker/postgres/initdb caddy" in init
 
 
 def test_production_runs_the_worker_from_the_signed_digest() -> None:

@@ -9,10 +9,12 @@ import json
 import re
 import socket
 import ssl
+import subprocess
 import time
 import uuid
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from urllib.parse import urlencode
 
 import pytest
@@ -450,6 +452,60 @@ def test_the_database_runs_without_root_or_a_capability(stack: Stack) -> None:
     uid, capabilities = result.stdout.split("\n", 1)
     assert uid == "70"
     assert capabilities.split()[1].strip("0") == ""
+
+
+def test_caddy_runs_as_uid_1000_without_a_capability(stack: Stack) -> None:
+    """ADR-0034 point 10 (M13.2), seen from inside: and it answers, so its volumes are its own."""
+    result = stack.compose("exec", "-T", "caddy", "sh", "-c", "id -u; grep CapEff /proc/1/status")
+    uid, capabilities = result.stdout.split("\n", 1)
+    assert uid == "1000"
+    assert capabilities.split()[1].strip("0") == ""
+    assert stack.get("/healthz/").status == 200
+
+
+def _inside(uid_map: str, host_uid: int) -> int:
+    """``host_uid`` as the process's own user namespace names it (the identity map under a root
+    daemon; under a rootless one container root is the daemon's owner)."""
+    for line in uid_map.splitlines():
+        first, host, count = (int(field) for field in line.split())
+        if host <= host_uid < host + count:
+            return first + host_uid - host
+    raise AssertionError(f"uid {host_uid} is not mapped: {uid_map!r}")
+
+
+def _identity(pid: str) -> tuple[int, int]:
+    """The effective uid inside its namespace and the effective capabilities of ``pid``, from
+    the host's /proc: every image has one, a shell or not."""
+    proc = Path("/proc") / pid
+    lines = (proc / "status").read_text(encoding="utf-8").splitlines()
+    fields = dict(line.split(":", 1) for line in lines if ":" in line)
+    host_uid = int(fields["Uid"].split()[1])
+    return _inside((proc / "uid_map").read_text(encoding="utf-8"), host_uid), int(
+        fields["CapEff"], 16
+    )
+
+
+def test_no_running_service_is_root_or_holds_a_capability(stack: Stack) -> None:
+    """M13.2's "Done when": every long-running process of the stack. The one-shot caddy-perms is
+    root for one chown, and has exited by the time Caddy runs."""
+    seen: dict[str, tuple[int, int]] = {}
+    for container in stack.compose("ps", "-q").stdout.split():
+        found = subprocess.run(  # noqa: S603 (fixed docker invocation, test input only)
+            [  # noqa: S607
+                "docker",
+                "inspect",
+                "--format",
+                '{{index .Config.Labels "com.docker.compose.service"}} {{.State.Pid}}',
+                container,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+        seen[found[0]] = _identity(found[1])
+    assert {"caddy", "web", "worker", "db"} <= set(seen), seen
+    assert "caddy-perms" not in seen
+    assert {name: found for name, found in seen.items() if found[0] == 0 or found[1]} == {}
 
 
 def _as_role(stack: Stack, role: str, statement: str) -> tuple[int, str]:

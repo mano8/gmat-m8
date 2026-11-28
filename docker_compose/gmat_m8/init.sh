@@ -180,10 +180,10 @@ else
     say "the Docker daemon does not answer: a missing backups/ is created as $(id -un), mode 0700. On a rootless host, run init.sh again once the daemon runs (docs/rootless-host.md)"
     [ -e backups ] || [ -L backups ] || mkdir -m 0700 backups
 fi
-# Read by the scanner's containers and the database under their own uid, whatever the checkout's
-# umask was.
+# Read by the scanner's containers, the database and Caddy under their own uid, whatever the
+# checkout's umask was (deploy.sh refuses a caddy/ they could not read).
 chmod 0644 clamav/clamd.conf clamav/freshclam.conf
-chmod -R a+rX ../../docker/postgres/initdb
+chmod -R a+rX ../../docker/postgres/initdb caddy
 if [ "$ci" = 1 ]; then
     # A CI runner is not uid 1000; the data is throwaway. Only on a root daemon (above).
     chmod 0777 backups

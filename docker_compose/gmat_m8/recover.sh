@@ -85,7 +85,9 @@ require_operator() { [ -n "$OPERATOR" ] || die "--operator EMAIL is required: a 
 
 begin() {
     gates_on
-    service_running caddy || compose up -d --no-deps caddy
+    if ! service_running caddy; then
+        start_caddy
+    fi
     stop_writers
     compose stop backup
     # A database that does not start is dealt with by preserve_failed_state.

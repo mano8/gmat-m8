@@ -97,8 +97,8 @@ elif "config --format json" in line:
     env = dict(e.split("=", 1) for e in pathlib.Path(".env").read_text().splitlines() if "=" in e)
     http, https = env.get("PUBLISHED_HTTP_PORT") or "80", env.get("PUBLISHED_HTTPS_PORT") or "443"
     ports = [{"mode": "ingress", "target": target, "published": published, "protocol": protocol}
-             for target, published, protocol in ((80, http, "tcp"), (443, https, "tcp"),
-                                                 (443, https, "udp"))]
+             for target, published, protocol in ((8080, http, "tcp"), (8443, https, "tcp"),
+                                                 (8443, https, "udp"))]
     print(json.dumps({"services": {"caddy": {"ports": ports}, "db": {"image": "postgres"}}}))
 elif "config --images" in line:
     print(f"{os.environ['FAKE_PREFIX']}/gmat-m8@{os.environ['APP_DIGEST']}")
@@ -532,8 +532,9 @@ ENV_FILE = textwrap.dedent(
 
 
 def _checkout(root: Path) -> Path:
-    """The parts of a checkout the host scripts reach: the stack directory and what it reads
-    from ``docker/`` (``init.sh``'s role scripts, the drill's manifest query)."""
+    """The parts of a checkout the host scripts reach: the stack directory (Caddy's files
+    included) and what it reads from ``docker/`` (``init.sh``'s role scripts, the drill's
+    manifest query)."""
     stack = root / "docker_compose" / "gmat_m8"
     stack.mkdir(parents=True)
     for name in ("deploy.sh", "recover.sh", "restore-drill.sh", "init.sh"):
@@ -544,6 +545,8 @@ def _checkout(root: Path) -> Path:
     (stack / "clamav").mkdir()
     for name in ("clamd.conf", "freshclam.conf"):
         shutil.copy2(STACK / "clamav" / name, stack / "clamav" / name)
+    # Caddy's configuration and pages, which deploy.sh checks its uid can read (M13.2).
+    shutil.copytree(STACK / "caddy", stack / "caddy")
     shutil.copytree(ROOT / "docker/postgres/initdb", root / "docker/postgres/initdb")
     (root / "docker/backup").mkdir(parents=True)
     shutil.copy2(ROOT / "docker/backup/manifest.sql", root / "docker/backup/manifest.sql")

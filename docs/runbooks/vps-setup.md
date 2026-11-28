@@ -185,7 +185,7 @@ The daemon runs as `deploy`, as one of its `systemd` user services. Docker's own
    - **The firewall** (§2): allow `8080/tcp`, `8443/tcp` and `8443/udp` instead of 80 and 443, because ufw sees the port after the redirect.
    - **`.env`** (§6): `PUBLISHED_HTTP_PORT=8080` and `PUBLISHED_HTTPS_PORT=8443`.
 
-   Caddy still listens on 80 and 443 in its container, so links and the `Alt-Svc` header of HTTP/3 keep 443.
+   Links and the `Alt-Svc` header of HTTP/3 keep 443 either way: Caddy listens on 8080 and 8443 in its container, as uid 1000 with no capability, and the stack names 443 to visitors.
 
    **Never load this table through Debian's `nftables.service`.** Its stop, and so its restart, runs `nft flush ruleset`, which removes ufw's rules too. The unit above loads and removes its own table only.
 

@@ -106,9 +106,9 @@ take_lock() {
 
 # --- the gates --------------------------------------------------------------------------------
 
-# flags/ is deploy's. Caddy reads it as the containers' root; the worker as uid 1000, which under
-# a rootless daemon is a shifted uid that sees the flags only through the directory's "other"
-# bits (ADR-0033). One it cannot search hides worker.paused from it: refused, never widened.
+# flags/ is deploy's. Caddy and the worker read it as uid 1000, which under a rootless daemon is
+# a shifted uid that sees the flags only through the directory's "other" bits (ADR-0033). One they
+# cannot search hides the flags from them: refused, never widened.
 flags_searchable() { # a missing flags/ is created searchable by gates_on
     local mode
     [ -e flags ] || return 0
@@ -117,7 +117,7 @@ flags_searchable() { # a missing flags/ is created searchable by gates_on
 }
 
 require_flags_searchable() {
-    flags_searchable || die "flags/ is mode $(stat -c %a flags 2>/dev/null || echo unknown): the worker could not see worker.paused. Set it back: chmod 0755 flags"
+    flags_searchable || die "flags/ is mode $(stat -c %a flags 2>/dev/null || echo unknown): neither Caddy nor the worker could see the gates (maintenance.on, worker.paused). Set it back: chmod 0755 flags"
 }
 
 # Checked before the first flag is written: a refusal leaves both gates as they were.
@@ -178,6 +178,15 @@ wait_worker_state() { # wait_worker_state STATES SECONDS
 }
 
 stop_writers() { compose stop web worker; }
+
+# Caddy runs as uid 1000 (ADR-0034 point 10); the one-shot gives it its volumes, which a release
+# before v0.4.0 left to root. Run before every start of Caddy: the scripts start it with --no-deps,
+# so compose would not run the one-shot by itself. A no-op once they are Caddy's.
+start_caddy() {
+    compose run --rm --no-deps -T caddy-perms </dev/null \
+        || die "Caddy's volumes could not be given to its uid (caddy-perms): Caddy was not started"
+    compose up -d --no-deps "$@" caddy
+}
 
 # The scanner is recreated every time: its configuration is a bind mount, which `up` does not see
 # changed. All of this is behind the gates, and verify_internal asks both services for an answer.
