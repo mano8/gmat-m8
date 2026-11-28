@@ -20,7 +20,7 @@ Who the application defends against and what it accepts (the threat model and th
 
 ### Actors and boundaries
 
-**Anonymous visitors on the internet.** They reach only the sign-in and reset pages, the token links, the health checks and static files. Caddy terminates TLS (1.2 or later), limits headers and bodies, and is the only published port. Against them:
+**Anonymous visitors on the internet.** They reach only the sign-in and reset pages, the token links, the health checks and static files. Caddy terminates TLS (1.2 or later), limits headers and bodies, and is the only published port. Through the opt-in Cloudflare tunnel, Cloudflare terminates their TLS first, and Access stands in front (see *The edge* below). Against them:
 
 - every page carries the CSP and the other headers;
 - sign-in, MFA codes, resets and token links are rate-limited on a cache that fails closed;
@@ -68,13 +68,65 @@ Who the application defends against and what it accepts (the threat model and th
 - **The host runs Docker rootless** ([ADR-0033](adr/0033-rootless-docker-host.md), [rootless-host.md](rootless-host.md)): the daemon and every container belong to `deploy`, no root daemon runs, and nobody is in the `docker` group. So `deploy` is **not root-equivalent**, and neither is a container escape: a process that leaves a container lands as `deploy` (container uid 0, Caddy's included) or as one of `deploy`'s subordinate uids (a container's uid N ≥ 1 is host uid 100000 + N − 1, 100999 for the stack's own uid 1000), never as the host's root. Root still needs `sudo` and its password, which `deploy` loses once the setup is done (vps-setup.md §9). This is why the paragraph above says "root on the server" and the stack's attacker is one step further from it. What such an attacker still has is everything `deploy` owns: the env files and so every secret listed above, the daemon and its socket, `flags/`, the data root with the database and media volumes. The recovery is the same, a rebuilt server.
 - **Who reads `backups/`.** Its files belong to the containers' uid 1000, a shifted uid on the host, in a 0700 directory: `deploy` and a process of `deploy`'s that escaped a container cannot read a dump without entering the daemon's user namespace, and the scripts do that only through one helper that checks its target every time, runs one of nine fixed commands, never widens a mode and never gives a file to `deploy` (ADR-0033 point 6). A compromised `deploy` can still run the helper, so against that attacker the dumps are as exposed as the live database, which it reaches anyway: exception X12 stands.
 
+**The edge: a tunnel, a LAN address, a certificate from files** ([ADR-0034](adr/0034-edge-modes-opt-in.md), M13). Three opt-in settings, all off by default. An installation that sets none of them is the one described above. The pilot host uses all three: visitors come through Cloudflare Tunnel with Cloudflare Access in front, or on the LAN by the host's address, and Caddy serves a certificate read from files. One part per risk:
+
+- **(a) A believed proxy header.**
+  - **Who may send it.** Without `EDGE_PROXY`, Caddy believes no header and the visitor is the connection's peer. With `EDGE_PROXY=cloudflare`, it believes `CF-Connecting-IP`, and only from the `cloudflared` service's one address (`EDGE_TUNNEL_ADDRESS`). That service is fixed on `tunnel`, an internal network that only Caddy and the connector join, chosen by the maintainer on 2026-11-28 (Q76). Nothing else can send from that address: no other container joins the network, and no host process short of root can send from a container's address.
+  - **The check.** Caddy's snippet writes the address followed by a literal `/32`, so a range, a list, `private_ranges` or an empty value stops Caddy from starting (measured on 2.11.9; without the suffix Caddy accepts `0.0.0.0/0`). `ops/checks.py edge` also refuses an address outside the network's subnet, its network or gateway address, and IPv6.
+  - **What forging would buy:**
+    - allauth's per-address limits on sign-in, failed sign-ins, resets and token links (the per-account limits do not depend on the address);
+    - the address recorded in the audit trail, in `gmat.security` and in the session list.
+  - **Measured on Caddy 2.11.9.** From the trusted address, the visitor is the left-most valid address among every `CF-Connecting-IP` value (two headers or a list), IPv6 included and with any port removed. A value that is not an address leaves the connector's own. From any other address the header is ignored.
+  - **What Django reads.** Caddy writes `X-Forwarded-For` itself (`{client_ip}`) on both proxies in every mode, so a client's own never reaches Django as sent. Caddy also removes `CF-Connecting-IP` before proxying, so Django never reads it.
+  - **Rejected: `cloudflared` on the host,** the pilot's setup until now. Under the rootless daemon a host connection through the loopback reaches Caddy as `10.0.2.2`, because slirp4netns translates 127.0.0.0/8 to it. Trusting that address would trust every local process.
+  - **Residual.** Whoever controls the connector (its image or its token) can name any visitor, and sees what passes, as Cloudflare does (b).
+  - **IPv6.** Through Cloudflare, visitors also arrive over IPv6, even at a host without it. A per-address limit then counts one address of the /64 such a visitor holds; the per-account limits still bound guessing. Cloudflare's Pseudo IPv4 hashes the whole address, so it does not help, and stays off.
+- **(b) A third party terminating TLS.** Through the tunnel, Cloudflare terminates the visitor's TLS and opens its own to the connector, which opens a third to Caddy.
+  - Cloudflare and the connector see in plaintext:
+    - passwords;
+    - TOTP and recovery codes;
+    - the invitation, reset and email-change tokens;
+    - session cookies.
+  - Access in front changes nothing to that.
+  - Accepted for the pilot by the maintainer: exception X16.
+- **(c) Token links through Access.** Every path of the tunnel's host name is behind Access, the token paths included, with no bypass (the maintainer's decision, 2026-11-28).
+  - **What leaks.** A link opened before signing in to Access goes to Access's login page, and the path, token included, travels in that page's `redirect_url`: it lands in the browser's history on the team's Cloudflare domain and in Cloudflare's logs (X16). After the sign-in, the browser comes back to the link, and the application moves the token out of the URL at once, as everywhere. The token is single use and expires: one hour for a reset, 24 hours for an email change, 72 hours for an invitation.
+  - **What it buys.** The connector checks Access's token on every request itself (the `access` origin setting), so a link stolen outside the LAN works only for someone Access admits.
+  - **Two rules (runbook).** Each person is added to Access before their invitation is sent. During an email change, both addresses stay in Access until the change applies or is cancelled, so the old address's cancel link still opens.
+  - **What Access is not.** It is no authorization layer of the application: the LAN address and the host's loopback never meet it.
+- **(d) Edge features that change pages.** Cloudflare can rewrite what the origin sends: Rocket Loader, Email Address Obfuscation, JavaScript detections, the Web Analytics beacon, Automatic HTTPS Rewrites. It can also replace a page (a challenge, such as Bot Fight Mode's) or keep one (a cache rule).
+  - **Why the CSP does not catch them.** The scripts it injects load from the host's own `/cdn-cgi/` path, which `script-src 'self'` allows.
+  - **What stops the rewriting.** In `cloudflare` mode, Caddy adds `Cache-Control: no-transform` to every response, after its own compression (measured: set earlier, the header makes Caddy compress nothing). Cloudflare's features that change a page's body honour that directive (its documentation; below Enterprise its Origin Cache Control cannot be turned off).
+  - **What the header cannot stop:**
+    - a challenge, which replaces the page and breaks htmx requests;
+    - a cache rule that ignores the origin's `Cache-Control`, which would keep a `no-store` page and serve it to someone else, since Cloudflare ignores `Vary: Cookie`.
+  - **The runbook** keeps Bot Fight Mode, cache rules and Zaraz off for the host, and checks that a signed-in page arrives with `cf-cache-status: DYNAMIC`.
+- **(e) A certificate from files** (`EDGE_TLS=files`).
+  - **No ACME.** Caddy reads `cert.pem` and `key.pem` from a read-only mount. The key is mode 0400 and owned by the containers' uid 1000; under the rootless daemon that owner is set through ADR-0033's helper, so `deploy` itself does not read it.
+  - **`default_sni`** gives that certificate to a client that sends no server name, as a browser does for an IP address. A client that names another host gets nothing more.
+  - **Renewal** is a date in the runbooks' calendar, not a robot: `ops/checks.py edge` warns 30 days before expiry.
+  - **The connector verifies the certificate,** with its origin server name and a CA pool, and never "No TLS Verify". The certificate is either a Cloudflare Origin CA certificate, which `cloudflared` trusts by default today (its source marks those roots for removal, so the CA pool names the issuer anyway), or a private CA's.
+  - **A private CA** that devices trust is trusted for every name they visit, unless its certificate constrains the names. Whoever holds its key could then intercept those devices' traffic anywhere. The runbook keeps that key off the host and constrains the CA to the installation's names and addresses.
+- **(f) What Cloudflare adds to a request.** Access sends its token for the person to the origin in `Cf-Access-Jwt-Assertion`: a bearer credential that carries their email.
+  - Caddy logs every request header and by default redacts only `Cookie` (where Access's `CF_Authorization` cookie sits), `Set-Cookie` and `Authorization`. So both of Caddy's log filters delete `Cf-Access-Jwt-Assertion`.
+  - The token paths are redacted on the tunnel's host name as on the main one, because the filters match paths, not hosts.
+- **(g) The tunnel's token.** Whoever holds it can run another connector for the same tunnel, and Cloudflare sends visitors to the nearest one: it is as sensitive as the TLS key.
+  - It reaches `cloudflared` only as a file (`TUNNEL_TOKEN_FILE`), never as an environment value, which `docker compose config` and `docker inspect` would print.
+  - After a compromise it is rotated with the other secrets.
+
 **The supply chain.**
 
 - Dependencies come from `uv.lock` with hashes, with security floors (allauth), `pip-audit` and Dependabot.
 - Base images are pinned by digest and scanned by Trivy on every PR and every night, Caddy, PostgreSQL and ClamAV included, with dated exceptions (X1).
 - Actions are pinned by commit SHA, and gitleaks scans the whole history. One action fetches code when it runs, whatever its pin says (X14). The only repository secrets CI reads are the two coverage tokens, in a job that runs nothing of the project's and that no required check depends on.
 
-**Out of scope.** The security of users' devices and mailboxes; the email provider (which sees every mail; supplier dispatches carry prices by design); DNS and the domain's mail authentication (SPF, DKIM, DMARC: H8.6). Unrelated customer groups get separate deployments (ADR-0003).
+**Out of scope.**
+
+- The security of users' devices and mailboxes.
+- The email provider, which sees every mail (supplier dispatches carry prices by design).
+- Cloudflare's own security, when the tunnel is on (it sees everything that passes: X16).
+- DNS and the domain's mail authentication (SPF, DKIM, DMARC: H8.6).
+- Unrelated customer groups, which get separate deployments (ADR-0003).
 
 ## Exception register
 
@@ -90,6 +142,7 @@ What the application knowingly does not do, or does differently from a rule, wit
 | X12 | Local backup copies are not encrypted on the host | Plan §9: files 0600 in a 0700 directory, kept 3 days; a compromised host exposes the live database anyway; the offsite copies are encrypted by restic | maintainer | 2027-02-01 | accepted (plan §9) |
 | X14 | Codacy's coverage action, pinned by SHA, fetches `get.sh` from Codacy's `master` branch and the reporter it names each time it runs, so that code is not pinned | The maintainer's choice of the two services (2026-11-07). It runs in `coverage-upload` only, last, with nothing on disk (`persist-credentials: false`) and a read-only run token; what it can reach is the Codacy project token, which posts coverage. No required check depends on it, and nothing runs after it. A checksum-pinned download of the reporter would remove the exception | maintainer | 2027-02-01 | accepted on merging PR #34 |
 | X15 | The rootless host (ADR-0033) runs the containers without Docker's AppArmor profile, which is not supported there; and, on a host that takes way A of ADR-0033 point 3 (the default), it lets any local account listen on a port from 80 up (`net.ipv4.ip_unprivileged_port_start=80`, so that Caddy, as `deploy`, can listen on 80 and 443) | The profile's work is covered by what does apply: seccomp, `cap_drop: ALL`, `no-new-privileges`, a read-only root, a user namespace in which container root is `deploy` and the rest is a subordinate uid, memory and process limits. The sysctl keeps ports below 80 (SSH, SMTP, DNS) privileged; the server has one login, key-only, and its other processes are system daemons that cannot read Caddy's key; `setcap` on `rootlesskit` would be narrower but a package upgrade drops it and 443 stops answering. Way B keeps the kernel's floor and redirects 80 and 443 to 8080 and 8443 instead; that moves the same exposure to those two ports rather than removing it. A root daemon would instead make `deploy` root on the host | maintainer | 2027-02-22 | accepted 2026-11-27 with ADR-0033 (proposed in M12.4, 2026-11-24) |
+| X16 | With the opt-in tunnel (`EDGE_PROXY=cloudflare`, ADR-0034), Cloudflare terminates the visitors' TLS. It sees in plaintext passwords, TOTP and recovery codes, the invitation, reset and email-change tokens, and session cookies, as does the `cloudflared` connector. A token link opened before signing in to Access also carries its token in the URL of Access's login page (the browser's history, Cloudflare's logs). Access in front changes none of this | The maintainer's choice for the pilot (Q77, 2026-11-28): it reaches a host with no public address. The mode is off by default, and a VPS on ACME keeps TLS from the visitor to Caddy. What limits the risk: every path stays behind Access, whose token the connector checks again; tokens are single use, short-lived and leave the URL at their first use; Cloudflare's page rewriting is off at the origin (`no-transform`); the connector is pinned and scanned, has no other network than Caddy's and its way out, and its token is a file only it reads | maintainer | 2027-02-26, and before v1.0.0 (H8.8) | chosen by the maintainer on 2026-11-28 (M13.1); accepted with the M13 pull request |
 
 **Refused by the maintainer on 2026-11-05, so they are no longer exceptions.** Each number stays retired:
 
